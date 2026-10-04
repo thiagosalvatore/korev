@@ -34,6 +34,7 @@ describe('AppShell', () => {
   it('ignores the ? shortcut while a text field has focus', () => {
     const { emitCommand } = renderShell();
     act(() => emitCommand('show-settings'));
+    fireEvent.click(screen.getByRole('button', { name: 'Repositories' }));
     const filter = screen.getByLabelText('Filter repos');
     filter.focus();
 

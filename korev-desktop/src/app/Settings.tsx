@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { version } from '../../package.json';
-import { Avatar, Button, Card, Tabs, Toast } from '../design-system';
+import {
+  Avatar,
+  Button,
+  Card,
+  SidebarNav,
+  Tabs,
+  Toast,
+  type SidebarNavItem,
+} from '../design-system';
 import type { AuthState, Connection, ConnectionMethod } from '../shared/auth';
 import type { InboxSnapshot } from '../shared/inbox';
 import type { Settings, ThemePreference } from '../shared/settings';
@@ -34,6 +42,26 @@ const THEME_TABS: { id: ThemePreference; label: string }[] = [
   { id: 'light', label: 'Light' },
   { id: 'dark', label: 'Dark' },
 ];
+
+type SettingsSection = 'github' | 'repositories' | 'agents' | 'general';
+
+const GITHUB_SECTION: SidebarNavItem<SettingsSection> = {
+  id: 'github',
+  label: 'GitHub',
+  icon: 'circle-user-round',
+};
+
+const APP_SECTIONS: SidebarNavItem<SettingsSection>[] = [
+  { id: 'repositories', label: 'Repositories', icon: 'folder-git-2' },
+  { id: 'agents', label: 'AI agents', icon: 'bot-message-square' },
+  { id: 'general', label: 'General', icon: 'sliders-horizontal' },
+];
+
+function sectionsFor(
+  connection: Connection | null,
+): SidebarNavItem<SettingsSection>[] {
+  return connection ? [GITHUB_SECTION, ...APP_SECTIONS] : APP_SECTIONS;
+}
 
 function themeById(id: string): ThemePreference | undefined {
   return THEME_TABS.find((tab) => tab.id === id)?.id;
@@ -193,22 +221,61 @@ export interface SettingsPageProps {
   snapshot: InboxSnapshot | null;
 }
 
-export function SettingsPage({ auth, settings, snapshot }: SettingsPageProps) {
-  return (
-    <div className="mx-auto flex max-w-160 flex-col gap-4 px-6 py-6">
-      {auth.connection ? (
-        <AccountCard
-          connection={auth.connection}
-          authLost={snapshot?.status === 'auth_lost'}
-        />
-      ) : null}
-      <AgentsCard preference={settings.agent} />
-      <RepositoriesCard
-        settings={settings}
-        repoMerge={snapshot?.repoMerge ?? {}}
+interface SectionContentProps extends SettingsPageProps {
+  section: SettingsSection;
+}
+
+function SectionContent({
+  section,
+  auth,
+  settings,
+  snapshot,
+}: SectionContentProps) {
+  if (section === 'github' && auth.connection) {
+    return (
+      <AccountCard
+        connection={auth.connection}
+        authLost={snapshot?.status === 'auth_lost'}
       />
-      <AppearanceCard theme={settings.theme} />
-      <AboutCard stacksUnavailable={snapshot?.stacksUnavailable ?? false} />
+    );
+  }
+  if (section === 'agents') {
+    return <AgentsCard preference={settings.agent} />;
+  }
+  if (section === 'general') {
+    return (
+      <>
+        <AppearanceCard theme={settings.theme} />
+        <AboutCard stacksUnavailable={snapshot?.stacksUnavailable ?? false} />
+      </>
+    );
+  }
+  return (
+    <RepositoriesCard
+      settings={settings}
+      repoMerge={snapshot?.repoMerge ?? {}}
+    />
+  );
+}
+
+export function SettingsPage(props: SettingsPageProps) {
+  const sections = sectionsFor(props.auth.connection);
+  const [section, setSection] = useState(sections[0].id);
+  const current = sections.some(({ id }) => id === section)
+    ? section
+    : sections[0].id;
+  return (
+    <div className="mx-auto flex max-w-210 gap-6 px-6 py-6">
+      <SidebarNav
+        label="Settings"
+        items={sections}
+        value={current}
+        onChange={setSection}
+        className="sticky top-6 w-44 shrink-0 self-start"
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
+        <SectionContent section={current} {...props} />
+      </div>
     </div>
   );
 }

@@ -145,6 +145,7 @@ test('groups PRs by repo in the order chosen in Settings, with keyboard collapse
       await expect(repoHeaders(window).first()).toContainText(API_REPO);
 
       await window.getByRole('button', { name: 'Settings' }).click();
+      await window.getByRole('button', { name: 'Repositories' }).click();
       await window
         .getByRole('button', { name: `Reorder ${API_REPO}, 1 of 2` })
         .press('Alt+ArrowDown');
@@ -222,6 +223,7 @@ test("sends PRs to GitHub's merge queue and to Trunk", async () => {
         ).toBeVisible();
 
         await window.getByRole('button', { name: 'Settings' }).click();
+        await window.getByRole('button', { name: 'Repositories' }).click();
         await window.getByLabel(`Merge ${WEB_REPO} with`).selectOption('trunk');
         await window.getByRole('button', { name: /My PRs/ }).click();
         await openRow(window, WEB_PR_TITLE);
