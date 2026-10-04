@@ -99,6 +99,21 @@ const teamMembersResponse: CannedResponse = {
   },
 };
 
+const restrictedTeamOrgsResponse: CannedResponse = {
+  body: {
+    data: {
+      viewer: { organizations: { nodes: [{ login: 'acme', teams: null }] } },
+    },
+    errors: [
+      {
+        type: 'FORBIDDEN',
+        path: ['viewer', 'organizations', 'nodes', 0, 'teams'],
+        message: ORG_RESTRICTION_MESSAGE,
+      },
+    ],
+  },
+};
+
 const teamsResponses = [
   teamOrgsResponse([{ login: 'acme', teamCount: 1 }]),
   teamMembersResponse,
@@ -516,6 +531,39 @@ describe('createGithubClient', () => {
         { org: 'acme', slug: 'backend', members: ['maria', 'li'] },
       ]);
       expect(fake.requests).toHaveLength(7);
+    });
+
+    it('reports a team lookup blocked by OAuth App restrictions', async () => {
+      const { client } = setup(
+        inboxResponse({ mine: [], reviews: [] }),
+        restrictedTeamOrgsResponse,
+      );
+
+      const inbox = await client.fetchInbox(TOKEN, ['acme/api']);
+
+      expect(inbox.problems).toEqual([
+        expect.objectContaining({
+          kind: 'restricted',
+          actionUrl: `https://github.com/settings/connections/applications/${GITHUB_OAUTH_CLIENT_ID}`,
+        }),
+      ]);
+    });
+
+    it('looks the viewer teams up again after a failed lookup', async () => {
+      const { fake, client } = setup(
+        inboxResponse({ mine: [], reviews: [] }),
+        restrictedTeamOrgsResponse,
+        inboxResponse({ mine: [], reviews: [] }),
+        ...teamsResponses,
+      );
+
+      await client.fetchInbox(TOKEN, ['acme/api']);
+      const retried = await client.fetchInbox(TOKEN, ['acme/api']);
+
+      expect(retried.viewerTeams).toEqual([
+        { org: 'acme', slug: 'backend', members: ['maria', 'li'] },
+      ]);
+      expect(fake.requests).toHaveLength(5);
     });
 
     it('reads team members only in orgs where the viewer is on a team', async () => {

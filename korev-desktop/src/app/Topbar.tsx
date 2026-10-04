@@ -157,10 +157,10 @@ export function Topbar({
       )}
     >
       <h1 className="m-0 truncate type-h3 text-fg-1">{title}</h1>
+      {filter}
       {subtitle ? (
         <span className="truncate text-xs text-fg-3">{subtitle}</span>
       ) : null}
-      {filter}
       <span className="flex-1" />
       <span className="inline-flex">
         {snapshot ? (

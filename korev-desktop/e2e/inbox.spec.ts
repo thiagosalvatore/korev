@@ -213,21 +213,24 @@ test('shows a PR whose only recent activity is a bot comment as stale, and keeps
   );
 });
 
-test('filters to one repo from the topbar, and Esc closes only the menu', async () => {
+test('filters to one repo from the topbar without moving the menu, and Esc closes only the menu', async () => {
   await withSession(async (github, userDataDir) => {
     const app = await launch(github, userDataDir);
     try {
       const window = await appWindow(app);
       await connectAndOpenMyPrs(window);
       const trigger = window.getByRole('button', { name: /^Repo filter/ });
+      const menu = window.getByRole('dialog', { name: /^Repo filter/ });
 
       await trigger.click();
       await expect(
         window.getByRole('checkbox', { name: 'acme' }),
       ).toBeFocused();
+      const menuBeforeFilter = await menu.boundingBox();
       await window.keyboard.press('ArrowDown');
       await window.keyboard.press('Space');
       await expect(window.getByText(/· filtered/)).toBeVisible();
+      expect(await menu.boundingBox()).toEqual(menuBeforeFilter);
       await expect(window.getByText(FAILING_PR_TITLE)).toBeHidden();
       await expect(window.getByLabel('1 need you')).toBeVisible();
       await window.keyboard.press('Escape');

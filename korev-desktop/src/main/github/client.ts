@@ -123,6 +123,11 @@ interface CollectedSearches {
   repoAvatars: Record<string, string>;
 }
 
+interface TeamLookup {
+  teams: ViewerTeam[];
+  problems: Problem[];
+}
+
 interface InboxPageRequest {
   variables: InboxQueryVariables;
   accessTargets: RepoAccessTarget[];
@@ -217,14 +222,14 @@ class GithubApiClient implements GithubClient {
         this.#withAllReviewThreads(token, node, signal),
       ),
     );
-    const viewerTeams = await this.#viewerTeams(
+    const teamLookup = await this.#viewerTeams(
       token,
       searches.viewerLogin,
       signal,
     );
     return {
       viewerLogin: searches.viewerLogin,
-      viewerTeams,
+      viewerTeams: teamLookup.teams,
       mine: mineNodes.map((node) => toPullRequest(node)),
       reviews: searches.progress.reviews.nodes.map((node) =>
         toPullRequest(node),
@@ -233,7 +238,7 @@ class GithubApiClient implements GithubClient {
         mine: searches.progress.mine.truncated,
         reviews: searches.progress.reviews.truncated,
       },
-      problems: uniqueProblems(searches.problems),
+      problems: uniqueProblems([...searches.problems, ...teamLookup.problems]),
       renamedRepos: searches.renamedRepos,
       repoMerge: searches.repoMerge,
       repoAvatars: searches.repoAvatars,
@@ -394,23 +399,31 @@ class GithubApiClient implements GithubClient {
     token: string,
     login: string,
     signal?: AbortSignal,
-  ): Promise<ViewerTeam[]> {
+  ): Promise<TeamLookup> {
     const cached = this.#teamsByLogin.get(login);
-    if (cached) return cached;
+    if (cached) return { teams: cached, problems: [] };
     const result = await this.#query<ViewerTeamsData>(
       token,
       VIEWER_TEAMS_QUERY,
       { login },
       signal,
     );
-    const teamsPerOrg = await Promise.all(
+    const perOrg = await Promise.all(
       orgsWithViewerTeams(result.data).map((org) =>
         this.#orgTeams(token, org, login, signal),
       ),
     );
-    const teams = teamsPerOrg.flat();
-    this.#teamsByLogin.set(login, teams);
-    return teams;
+    const lookup: TeamLookup = {
+      teams: perOrg.flatMap((org) => org.teams),
+      problems: [
+        ...resultProblems(result, token),
+        ...perOrg.flatMap((org) => org.problems),
+      ],
+    };
+    if (lookup.problems.length === 0) {
+      this.#teamsByLogin.set(login, lookup.teams);
+    }
+    return lookup;
   }
 
   async #orgTeams(
@@ -418,14 +431,17 @@ class GithubApiClient implements GithubClient {
     org: string,
     login: string,
     signal?: AbortSignal,
-  ): Promise<ViewerTeam[]> {
+  ): Promise<TeamLookup> {
     const result = await this.#query<TeamMembersData>(
       token,
       TEAM_MEMBERS_QUERY,
       { org, login },
       signal,
     );
-    return toViewerTeams(org, result.data);
+    return {
+      teams: toViewerTeams(org, result.data),
+      problems: resultProblems(result, token),
+    };
   }
 
   #query<TData>(
@@ -574,6 +590,18 @@ function repositoryName(value: unknown): string | null {
   const repository = childAt(value, 'repository');
   const name = childAt(repository, 'nameWithOwner');
   return typeof name === 'string' ? name : null;
+}
+
+function resultProblems(
+  result: { data: unknown; errors: GraphqlError[]; headers: ResponseHeaders },
+  token: string,
+): Problem[] {
+  return toProblems(
+    result.errors,
+    result.data,
+    result.headers.get(SSO_HEADER),
+    token,
+  );
 }
 
 function uniqueProblems(problems: Problem[]): Problem[] {
