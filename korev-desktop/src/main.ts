@@ -28,6 +28,7 @@ import { restorableBounds } from './main/window-bounds';
 const DEFAULT_WINDOW_SIZE = { width: 1280, height: 832 };
 const MIN_WINDOW_SIZE = { width: 760, height: 520 };
 const TRAFFIC_LIGHT_POSITION = { x: 18, y: 17 };
+const DEV_ICON_PATH = '../../assets/icon.png';
 
 const appOrigin: AppOrigin = {
   devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
@@ -146,10 +147,16 @@ app.on('web-contents-created', (_event, contents) =>
   hardenWebContents(contents),
 );
 
+function showDevDockIcon() {
+  if (app.isPackaged) return;
+  app.dock?.setIcon(path.join(__dirname, DEV_ICON_PATH));
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
+  showDevDockIcon();
   installAppMenu();
   const korev = createKorevApp();
   registerIpcHandlers(ipcMain, korev.handlers, (url) =>

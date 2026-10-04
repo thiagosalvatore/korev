@@ -7,16 +7,19 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
+const ICON = 'assets/icon';
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    icon: ICON,
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({ setupIcon: `${ICON}.ico` }),
     new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    new MakerRpm({ options: { icon: `${ICON}.png` } }),
+    new MakerDeb({ options: { icon: `${ICON}.png` } }),
   ],
   plugins: [
     new VitePlugin({
