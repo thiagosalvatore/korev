@@ -87,6 +87,7 @@ export interface PullRequestNode {
   reviewThreads?: Connection<ReviewThreadNode>;
   isInMergeQueue?: boolean;
   comments?: Connection<CommentNode>;
+  commits?: Connection<{ commit?: { committedDate?: string } | null }>;
   files?: Connection<{ path: string; additions: number; deletions: number }>;
   reviewRequests?: Connection<{ requestedReviewer?: ReviewerNode | null }>;
   timelineItems?: Connection<{

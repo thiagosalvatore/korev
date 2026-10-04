@@ -5,6 +5,8 @@ import { saveCollapsedSection, useSettings } from '../useSettings';
 const COLLAPSED_BY_DEFAULT: Record<CollapsibleSection, boolean> = {
   ready: false,
   'in-progress': false,
+  stale: true,
+  kept: true,
   approved: true,
 };
 

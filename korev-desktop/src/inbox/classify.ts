@@ -2,11 +2,14 @@ import type { MyPr, Reason, ReasonCode, ReasonSeverity } from '../shared/inbox';
 import type { MergeTool, QueueStatus } from '../shared/merge';
 import type { MergeStateStatus, PullRequest } from '../shared/pull-request';
 import { countOf } from './format';
+import { STALE_AFTER_DAYS, daysSince, isKeepActive, keepEndsAt } from './keep';
 import { severityRank } from './severity';
 
 export interface ClassifyContext {
   unknownMergeStreak: number;
   queue?: QueueStatus | null;
+  now?: Date;
+  keptAt?: string | null;
 }
 
 type ReasonRule = (pr: PullRequest, context: ClassifyContext) => Reason | null;
@@ -43,6 +46,7 @@ const REASON_SEVERITY: Record<ReasonCode, ReasonSeverity> = {
   'mergeability-unknown': 'neutral',
   'no-checks': 'neutral',
   'ready-to-merge': 'success',
+  stale: 'warning',
 };
 
 function reason(code: ReasonCode, label: string): Reason {
@@ -213,10 +217,33 @@ function isReadyToMerge(pr: PullRequest): boolean {
   );
 }
 
+function staleDays(item: MyPr, { now }: ClassifyContext): number | null {
+  if (!now || item.bucket === 'ready' || item.queue?.kind === 'queued') {
+    return null;
+  }
+  const days = daysSince(item.pr.lastActivityAt, now);
+  return days > STALE_AFTER_DAYS ? days : null;
+}
+
+function withStaleness(item: MyPr, context: ClassifyContext): MyPr {
+  const days = staleDays(item, context);
+  if (days === null || !context.now) return item;
+  const { keptAt } = context;
+  if (keptAt && isKeepActive(keptAt, item.pr.lastActivityAt, context.now)) {
+    return { ...item, bucket: 'kept', keptUntil: keepEndsAt(keptAt) };
+  }
+  const stale = reason('stale', `No activity for ${days}d`);
+  return { ...item, bucket: 'stale', reasons: [stale, ...item.reasons] };
+}
+
 export function classifyMyPr(
   pr: PullRequest,
   context: ClassifyContext = FIRST_SIGHTING,
 ): MyPr {
+  return withStaleness(classifyByState(pr, context), context);
+}
+
+function classifyByState(pr: PullRequest, context: ClassifyContext): MyPr {
   const needsYou = collectReasons(pr, context, NEEDS_YOU_RULES);
   const queue = context.queue ?? null;
   if (needsYou.length > 0) {

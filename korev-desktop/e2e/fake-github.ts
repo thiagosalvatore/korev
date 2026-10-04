@@ -11,6 +11,7 @@ export const WEB_REPO = 'acme/web';
 export const FAILING_PR_TITLE = 'Rate-limit per tenant on ingestion endpoints';
 export const NEW_PR_TITLE = 'Bump OpenTelemetry to 1.31';
 export const WEB_PR_TITLE = 'Settings: org access states';
+export const STALE_PR_TITLE = 'Old experiment with the exporter';
 
 const GRANTED_SCOPES = 'repo, read:org';
 const POLL_INTERVAL_SECONDS = '1';
@@ -22,6 +23,7 @@ const MERGE_ASYNC =
   /^\/repos\/([^/]+\/[^/]+)\/pulls\/(\d+)\/merge-async(?:\/([^/]+))?$/;
 const HTTP_OK = 200;
 const HTTP_ACCEPTED = 202;
+const MS_PER_DAY = 86_400_000;
 
 interface GraphqlRequest {
   query: string;
@@ -43,6 +45,7 @@ interface PrSpec {
   mergeStateStatus: string;
   rollup: string;
   conclusion: string;
+  quietDays?: number;
 }
 
 const FAILING_PR: PrSpec = {
@@ -62,6 +65,31 @@ const NEW_PR: PrSpec = {
   rollup: 'SUCCESS',
   conclusion: 'SUCCESS',
 };
+
+const STALE_PR: PrSpec = {
+  repo: WEB_REPO,
+  number: 290,
+  title: STALE_PR_TITLE,
+  mergeStateStatus: 'BLOCKED',
+  rollup: 'FAILURE',
+  conclusion: 'FAILURE',
+  quietDays: 30,
+};
+
+function daysAgo(days: number): string {
+  return new Date(Date.now() - days * MS_PER_DAY).toISOString();
+}
+
+function botComment(spec: PrSpec): FakeComment {
+  const createdAt = daysAgo(1);
+  return {
+    author: { __typename: 'Bot', login: 'github-actions' },
+    body: 'This PR has had no activity.',
+    createdAt,
+    updatedAt: createdAt,
+    url: `https://github.com/${spec.repo}/pull/${spec.number}#issuecomment-2`,
+  };
+}
 
 const WEB_PR: PrSpec = {
   repo: WEB_REPO,
@@ -85,7 +113,9 @@ function prNode(spec: PrSpec, state: PrState) {
     url: `https://github.com/${spec.repo}/pull/${spec.number}`,
     state: 'OPEN',
     isDraft: false,
-    createdAt: '2026-10-01T10:00:00Z',
+    createdAt: spec.quietDays
+      ? daysAgo(spec.quietDays)
+      : '2026-10-01T10:00:00Z',
     updatedAt: '2026-10-03T10:00:00Z',
     repository: { nameWithOwner: spec.repo },
     author: { login: VIEWER_LOGIN, avatarUrl: null },
@@ -111,6 +141,9 @@ function prNode(spec: PrSpec, state: PrState) {
     latestReviews: { nodes: [] },
     isInMergeQueue: state.inMergeQueue,
     comments: { nodes: state.comments },
+    commits: {
+      nodes: [{ commit: { committedDate: daysAgo(spec.quietDays ?? 0) } }],
+    },
     stack: null,
     stackEntry: null,
     reviewThreads: {
@@ -188,6 +221,7 @@ export interface FakeGithubOptions {
   mergeQueueRepos?: string[];
   ownerAvatarUrl?: string;
   includeNewPr?: boolean;
+  includeStalePr?: boolean;
 }
 
 export interface FakeGithub {
@@ -207,11 +241,15 @@ export async function startFakeGithub(
     FAILING_PR,
     WEB_PR,
     ...(options.includeNewPr ? [NEW_PR] : []),
+    ...(options.includeStalePr ? [STALE_PR] : []),
   ];
   const states = new Map<number, PrState>(
-    [FAILING_PR, WEB_PR, NEW_PR].map((spec) => [
+    [FAILING_PR, WEB_PR, NEW_PR, STALE_PR].map((spec) => [
       spec.number,
-      { inMergeQueue: false, comments: [] },
+      {
+        inMergeQueue: false,
+        comments: spec.quietDays ? [botComment(spec)] : [],
+      },
     ]),
   );
   const stateOf = (spec: PrSpec) => states.get(spec.number)!;

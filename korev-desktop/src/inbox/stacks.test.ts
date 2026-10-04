@@ -17,6 +17,8 @@ const SEVERITY_BY_BUCKET = {
   'needs-you': 'danger',
   'in-progress': 'neutral',
   ready: 'success',
+  stale: 'warning',
+  kept: 'neutral',
 } as const;
 
 function stackOf(layers: StackLayer[], position: number, id = 'S1'): StackInfo {
@@ -93,6 +95,8 @@ describe('groupMyPrs', () => {
       'needs-you',
       'ready',
       'in-progress',
+      'stale',
+      'kept',
     ]);
     expect(sections[1]).toMatchObject({ count: 1, entries: [{ kind: 'pr' }] });
   });
@@ -145,7 +149,7 @@ describe('groupMyPrs', () => {
       NO_REPO_ORDER,
     );
 
-    expect(sections.map((section) => section.count)).toEqual([2, 1, 0]);
+    expect(sections.map((section) => section.count)).toEqual([2, 1, 0, 0, 0]);
     expect(onlyStack(sections)).toMatchObject({
       bucket: 'needs-you',
       headline: 'Needs you: #304 Lint failing',
@@ -202,6 +206,19 @@ describe('groupMyPrs', () => {
 
     expect(sections.filter((section) => section.count > 0)).toHaveLength(1);
     expect(numbersIn(sections[0].entries)).toEqual([2, 3, 1]);
+  });
+
+  it('leaves a stack out of Stale while one of its layers is fresh', () => {
+    const layers = fourLayers(['OPEN', 'OPEN', 'OPEN', 'OPEN']);
+    const sections = groupMyPrs(
+      [
+        myPr(301, 'stale', stackOf(layers, 1)),
+        myPr(302, 'needs-you', stackOf(layers, 2)),
+      ],
+      NO_REPO_ORDER,
+    );
+
+    expect(onlyStack(sections).bucket).toBe('needs-you');
   });
 
   it('keeps a stack with one layer running and one ready in In progress', () => {

@@ -13,10 +13,18 @@ import { IpcChannel } from '../shared/ipc-contract';
 import type { RepoOwner, RepoPage } from '../shared/repos';
 import type { InboxView, Settings, ThemePreference } from '../shared/settings';
 import { buildInbox } from '../inbox/build-inbox';
-import { parseMergeRequest, parseMergeTool, parseTarget } from './action-input';
+import { liveKeeps } from '../inbox/keep';
+import { myPrsIn } from '../inbox/stacks';
+import {
+  parseMergeRequest,
+  parseMergeTool,
+  parseTarget,
+  parseTargets,
+} from './action-input';
 import { createAgentsService } from './agents/agents-service';
 import type { CommandRunner } from './agents/command-runner';
 import { isGithubUrl } from './app-origin';
+import { isPrRef } from './repo-names';
 import { createAuthService } from './auth-service';
 import type { SecretCipher } from './encrypted-file';
 import type { FileSystem } from './file-system';
@@ -86,6 +94,10 @@ export interface Korev {
   start(): Promise<void>;
 }
 
+function isPrRefString(value: unknown): value is string {
+  return typeof value === 'string' && isPrRef(value);
+}
+
 function sameRepoSet(left: string[], right: string[]): boolean {
   const rightSet = new Set(right);
   return (
@@ -122,6 +134,7 @@ export function createKorev(deps: KorevDeps): Korev {
     token: () => auth.token(),
     repos: () => settings.current().repos,
     mergeWith: () => settings.current().mergeWith,
+    keptPrs: () => settings.current().keptPrs,
     renameRepos: followRepoRenames,
     now: () => new Date(),
     scheduler: timers,
@@ -175,10 +188,22 @@ export function createKorev(deps: KorevDeps): Korev {
     deps.broadcast(IpcChannel.InboxUpdated, withActions(snapshot));
   }
 
+  function pruneKeeps(snapshot: InboxSnapshot): void {
+    if (snapshot.truncated.mine) return;
+    const { keptPrs } = settings.current();
+    const openPrs = myPrsIn(snapshot.mine).map((item) => item.pr);
+    const live = liveKeeps(keptPrs, openPrs, new Date());
+    if (Object.keys(live).length === Object.keys(keptPrs).length) return;
+    settings.update({ keptPrs: live }).catch((error: unknown) => {
+      deps.warn(`Could not prune kept PRs: ${String(error)}`);
+    });
+  }
+
   function publishInbox(snapshot: InboxSnapshot): void {
     if (snapshot.status === 'live') prActions.reconcile(snapshot);
     broadcastInbox(snapshot);
     if (snapshot.status !== 'live') return;
+    pruneKeeps(snapshot);
     inboxCache.save(snapshot).catch((error: unknown) => {
       deps.warn(`Could not cache the inbox: ${String(error)}`);
     });
@@ -224,6 +249,21 @@ export function createKorev(deps: KorevDeps): Korev {
     return settings.update({
       collapsedSections: { ...collapsedSections, [section]: collapsed },
     });
+  }
+
+  async function setKept(refs: unknown, kept: unknown): Promise<Settings> {
+    const current = settings.current();
+    const valid = Array.isArray(refs) && refs.every(isPrRefString);
+    if (!valid || typeof kept !== 'boolean') return current;
+    const keptAt = new Date().toISOString();
+    const keptPrs = { ...current.keptPrs };
+    for (const ref of refs) {
+      if (kept) keptPrs[ref] = keptAt;
+      else delete keptPrs[ref];
+    }
+    const updated = await settings.update({ keptPrs });
+    inbox.rebuild();
+    return updated;
   }
 
   async function setMergeWith(repo: unknown, tool: unknown) {
@@ -329,8 +369,9 @@ export function createKorev(deps: KorevDeps): Korev {
       async () => undefined,
     ),
     [IpcChannel.SettingsSetMergeWith]: setMergeWith,
+    [IpcChannel.SettingsSetKept]: setKept,
     [IpcChannel.PrMerge]: withParsed(parseMergeRequest, prActions.merge),
-    [IpcChannel.PrClose]: withParsed(parseTarget, prActions.close),
+    [IpcChannel.PrClose]: withParsed(parseTargets, prActions.close),
     [IpcChannel.PrReopen]: withParsed(parseTarget, prActions.reopen),
     [IpcChannel.PrCancelQueue]: withParsed(parseTarget, prActions.cancelQueue),
     [IpcChannel.SettingsSetAgent]: (agent: AgentPreference) =>

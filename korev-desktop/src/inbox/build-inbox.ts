@@ -5,6 +5,7 @@ import type {
   ReviewList,
 } from '../shared/inbox';
 import type { MergeTool } from '../shared/merge';
+import { prRef } from '../shared/pr-ref';
 import type { PullRequest } from '../shared/pull-request';
 import { approvalFor } from './approval';
 import { classifyMyPr } from './classify';
@@ -23,6 +24,7 @@ export interface InboxInput {
   unknownMergeStreaks: UnknownMergeStreaks;
   repoOrder: string[];
   mergeWith: Record<string, MergeTool>;
+  keptPrs: Record<string, string>;
 }
 
 export interface Inbox {
@@ -79,11 +81,14 @@ export function buildInbox({
   unknownMergeStreaks,
   repoOrder,
   mergeWith,
+  keptPrs,
 }: InboxInput): Inbox {
   const classified = mine.map((pr) =>
     classifyMyPr(pr, {
       unknownMergeStreak: unknownMergeStreaks[pr.id] ?? 0,
       queue: queueStatusFor(pr, mergeWith[pr.repo] ?? 'github'),
+      now,
+      keptAt: keptPrs[prRef(pr)] ?? null,
     }),
   );
   const sorted = reviews.map((pr) =>

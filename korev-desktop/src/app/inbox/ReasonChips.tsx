@@ -1,22 +1,8 @@
 import { Badge } from '../../design-system';
-import type { Reason, ReasonSeverity } from '../../shared/inbox';
-
-const SEVERITY_RANK: Record<ReasonSeverity, number> = {
-  danger: 0,
-  warning: 1,
-  neutral: 2,
-  success: 3,
-};
-
-function bySeverity(reasons: Reason[]): Reason[] {
-  return [...reasons].sort(
-    (left, right) =>
-      SEVERITY_RANK[left.severity] - SEVERITY_RANK[right.severity],
-  );
-}
+import type { Reason } from '../../shared/inbox';
 
 export function ReasonChips({ reasons }: { reasons: Reason[] }) {
-  const [primary, ...rest] = bySeverity(reasons);
+  const [primary, ...rest] = reasons;
   if (!primary) return <span />;
   return (
     <span

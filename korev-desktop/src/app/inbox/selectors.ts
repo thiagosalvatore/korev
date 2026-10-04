@@ -22,7 +22,9 @@ export function requestedItems(snapshot: InboxSnapshot): ReviewItem[] {
 }
 
 export function sectionCounts(snapshot: InboxSnapshot): SectionCount[] {
-  return snapshot.mine.map(({ bucket, count }) => ({ bucket, count }));
+  return snapshot.mine
+    .filter((section) => section.bucket !== 'kept')
+    .map(({ bucket, count }) => ({ bucket, count }));
 }
 
 export function needsYouCount(snapshot: InboxSnapshot): number {

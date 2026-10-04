@@ -12,6 +12,7 @@ import {
   API_REPO,
   FAILING_PR_TITLE,
   NEW_PR_TITLE,
+  STALE_PR_TITLE,
   VIEWER_LOGIN,
   WEB_PR_TITLE,
   WEB_REPO,
@@ -181,6 +182,34 @@ test('shows each section once and sorts repos inside it in the order chosen in S
       }
     },
     { includeNewPr: true },
+  );
+});
+
+test('shows a PR whose only recent activity is a bot comment as stale, and keeps it with ⇧K', async () => {
+  await withSession(
+    async (github, userDataDir) => {
+      const app = await launch(github, userDataDir);
+      try {
+        const window = await appWindow(app);
+        await connectAndOpenMyPrs(window);
+
+        await window
+          .getByRole('option', { name: 'Stale, 1 pull request' })
+          .click();
+        const row = window.getByRole('option', {
+          name: new RegExp(STALE_PR_TITLE),
+        });
+        await expect(row).toContainText('No activity for 30d');
+
+        await row.click();
+        await window.keyboard.press('Shift+K');
+        await expect(window.getByText('Kept #290 for 30 days')).toBeVisible();
+        await expect(row).toContainText('Kept · 30d left');
+      } finally {
+        await app.close();
+      }
+    },
+    { includeStalePr: true },
   );
 });
 

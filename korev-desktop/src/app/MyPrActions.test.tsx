@@ -12,10 +12,13 @@ import { installFakeBridge, installMatchMedia } from './fake-bridge';
 import { MyPrs } from './MyPrs';
 import {
   LINT_PR,
+  OLD_RETRIES_PR,
+  OLD_SPLIT_PR,
   OTEL_PR,
   PICKER_PR,
   WATCHING_SETTINGS,
   makeSnapshot,
+  withStaleStack,
 } from './test-fixtures';
 
 beforeEach(() => installMatchMedia());
@@ -28,6 +31,23 @@ function setup(
   const { bridge } = installFakeBridge({ settings });
   render(<MyPrs snapshot={snapshot} onOpenSettings={vi.fn()} />);
   return bridge;
+}
+
+const STALE_OPEN: Settings = {
+  ...WATCHING_SETTINGS,
+  collapsedSections: { stale: false },
+};
+
+const OLD_REFS = ['acme/web#401', 'acme/web#402'];
+
+function targetOf(item: typeof OLD_SPLIT_PR) {
+  return { id: item.pr.id, repo: item.pr.repo, number: item.pr.number };
+}
+
+async function selectStale(title: string) {
+  fireEvent.click(
+    await screen.findByRole('option', { name: new RegExp(title) }),
+  );
 }
 
 function select(title: string) {
@@ -124,11 +144,9 @@ describe('My PR actions', () => {
     fireEvent.click(
       within(dialog()).getByRole('button', { name: /^Close\s*⌘↵/ }),
     );
-    expect(bridge.pr.close).toHaveBeenCalledWith({
-      id: LINT_PR.pr.id,
-      repo: 'acme/web',
-      number: 304,
-    });
+    expect(bridge.pr.close).toHaveBeenCalledWith([
+      { id: LINT_PR.pr.id, repo: 'acme/web', number: 304 },
+    ]);
   });
 
   it('keeps Merge and Close disabled until the first live sync', () => {
@@ -164,5 +182,73 @@ describe('My PR actions', () => {
         'Required status check "lint" is failing.',
       ),
     ).toBeTruthy();
+  });
+
+  it("closes every one of the viewer's layers of a stale stack and names the teammate's layer", async () => {
+    const bridge = setup(withStaleStack(), STALE_OPEN);
+    await selectStale(OLD_RETRIES_PR.pr.title);
+    press('X');
+
+    expect(within(dialog()).getByText('Closes #401 and #402.')).toBeTruthy();
+    expect(
+      within(dialog()).getByText(
+        "Leaves @alex's #403 open; it will lose its base.",
+      ),
+    ).toBeTruthy();
+    fireEvent.click(
+      within(dialog()).getByRole('button', { name: /^Close\s*⌘↵/ }),
+    );
+    expect(bridge.pr.close).toHaveBeenCalledWith([
+      targetOf(OLD_SPLIT_PR),
+      targetOf(OLD_RETRIES_PR),
+    ]);
+  });
+
+  it('names only the closed PRs after a partial failure and reopens only those', async () => {
+    const { bridge } = installFakeBridge({ settings: STALE_OPEN });
+    const snapshot = withStaleStack();
+    const view = render(<MyPrs snapshot={snapshot} onOpenSettings={vi.fn()} />);
+    await selectStale(OLD_SPLIT_PR.pr.title);
+
+    view.rerender(
+      <MyPrs
+        snapshot={{
+          ...snapshot,
+          actions: {
+            'acme/web#401': { kind: 'closed' },
+            'acme/web#402': { kind: 'close-failed', message: 'Locked' },
+          },
+        }}
+        onOpenSettings={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Closed #401')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen' }));
+    expect(bridge.pr.reopen).toHaveBeenCalledTimes(1);
+    expect(bridge.pr.reopen).toHaveBeenCalledWith(targetOf(OLD_SPLIT_PR));
+  });
+
+  it('keeps a stale stack with ⇧K and undoes it from the toast', async () => {
+    const bridge = setup(withStaleStack(), STALE_OPEN);
+    await selectStale(OLD_SPLIT_PR.pr.title);
+    press('K');
+
+    expect(bridge.settings.setKept).toHaveBeenCalledWith(OLD_REFS, true);
+    expect(
+      await screen.findByText('Kept #401 and #402 for 30 days'),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(bridge.settings.setKept).toHaveBeenLastCalledWith(OLD_REFS, false);
+  });
+
+  it("says it couldn't save a keep and shows no toast when the save fails", async () => {
+    const bridge = setup(withStaleStack(), STALE_OPEN);
+    vi.mocked(bridge.settings.setKept).mockRejectedValueOnce(new Error('disk'));
+    await selectStale(OLD_SPLIT_PR.pr.title);
+    press('K');
+
+    expect(await screen.findByText(/Couldn't save/)).toBeTruthy();
+    expect(screen.queryByText(/Kept #401/)).toBeNull();
   });
 });

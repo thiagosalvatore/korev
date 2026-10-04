@@ -9,6 +9,7 @@ import {
   type CannedResponse,
   createFakeFetch,
 } from './github/test-fetch';
+import inboxPage from './github/fixtures/inbox-page.json';
 import { createKorev, type Korev } from './korev';
 import type { SecretCipher } from './encrypted-file';
 
@@ -37,7 +38,23 @@ const teamsResponse: CannedResponse = {
   body: { data: { viewer: { organizations: { nodes: [] } } } },
 };
 
+const [OPEN_PR_NODE] = inboxPage.data.mine.nodes;
+const OPEN_PR_REF = 'acme/api#412';
+
 function inboxResponse(...names: string[]): CannedResponse {
+  return inboxResponseWith(EMPTY_SEARCH, names);
+}
+
+function inboxWithOpenPr(): CannedResponse {
+  return inboxResponseWith({ ...EMPTY_SEARCH, nodes: [OPEN_PR_NODE] }, [
+    'acme/api',
+  ]);
+}
+
+function inboxResponseWith(
+  mine: { nodes: unknown[] },
+  names: string[],
+): CannedResponse {
   const access = names.map((nameWithOwner, index) => [
     `repo${index}`,
     { nameWithOwner, viewerPermission: 'WRITE', isArchived: false },
@@ -47,7 +64,7 @@ function inboxResponse(...names: string[]): CannedResponse {
       data: {
         viewer: VIEWER,
         ...Object.fromEntries(access),
-        mine: EMPTY_SEARCH,
+        mine,
         reviews: EMPTY_SEARCH,
       },
     },
@@ -182,6 +199,51 @@ describe('korev', () => {
 
     expect(fake.requests).toHaveLength(requestsBefore);
     expect(korev.settings.current().repos).toEqual(['acme/web', 'acme/api']);
+  });
+
+  it('keeps a PR without asking GitHub again', async () => {
+    const { korev, fake, invoke } = setup([
+      viewerResponse,
+      inboxWithOpenPr(),
+      teamsResponse,
+    ]);
+    await korev.start();
+    await invoke(IpcChannel.AuthUseToken, 'ghp_token');
+    await invoke(IpcChannel.SettingsSetRepos, ['acme/api']);
+    await vi.waitFor(() =>
+      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
+        status: 'live',
+      }),
+    );
+    const requestsBefore = fake.requests.length;
+
+    await invoke(IpcChannel.SettingsSetKept, [OPEN_PR_REF], true);
+
+    expect(Object.keys(korev.settings.current().keptPrs)).toEqual([
+      OPEN_PR_REF,
+    ]);
+    expect(fake.requests).toHaveLength(requestsBefore);
+  });
+
+  it('prunes keeps for PRs that are no longer open after a sync', async () => {
+    const keptAt = new Date().toISOString();
+    const { korev, invoke } = setup(
+      [viewerResponse, inboxWithOpenPr(), teamsResponse],
+      {
+        [`${USER_DATA}/settings.json`]: JSON.stringify({
+          repos: ['acme/api'],
+          keptPrs: { [OPEN_PR_REF]: keptAt, 'acme/api#999': keptAt },
+        }),
+      },
+    );
+    await korev.start();
+    await invoke(IpcChannel.AuthUseToken, 'ghp_token');
+
+    await vi.waitFor(() =>
+      expect(korev.settings.current().keptPrs).toEqual({
+        [OPEN_PR_REF]: keptAt,
+      }),
+    );
   });
 
   it('shows the cached inbox from the last session while the first sync runs', async () => {

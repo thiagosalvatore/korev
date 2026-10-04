@@ -1,13 +1,22 @@
 import { Badge, Button } from '../../design-system';
 import type { PrActionState, QueueStatus } from '../../shared/merge';
+import { KEEP_DAYS } from '../../inbox/keep';
 import { formatAge, joinMeta } from '../format';
+import { TEXT_BUTTON } from '../layout';
 import { MINUTE_MS, useNow } from '../useNow';
 import { isBusy } from './action-state';
 import { numberSpan } from './merge-plan';
 
 export const MERGE_KEY = 'M';
 export const CLOSE_KEY = 'X';
+export const KEEP_KEY = 'K';
 const LOCKED_HINT = 'Waiting for GitHub sync';
+
+export interface KeepAction {
+  kept: boolean;
+  failed: boolean;
+  onToggle: () => void;
+}
 
 export interface PanelActions {
   state: PrActionState | null;
@@ -20,56 +29,81 @@ export interface PanelActions {
   onClose: () => void;
   onCancelQueue: () => void;
   onOpenGithub: () => void;
+  keep: KeepAction | null;
 }
 
 function lockedTitle(locked: boolean): string | undefined {
   return locked ? LOCKED_HINT : undefined;
 }
 
+function KeepButton({ keep }: { keep: KeepAction }) {
+  return (
+    <Button kbd={`⇧${KEEP_KEY}`} onClick={keep.onToggle}>
+      {keep.kept ? 'Stop keeping' : `Keep for ${KEEP_DAYS} days`}
+    </Button>
+  );
+}
+
+function KeepFailure({ keep }: { keep: KeepAction }) {
+  return (
+    <p className="m-0 text-xs text-danger-text">
+      Couldn't save ·{' '}
+      <button type="button" className={TEXT_BUTTON} onClick={keep.onToggle}>
+        Retry
+      </button>
+    </p>
+  );
+}
+
 export function ActionFooter({ actions }: { actions: PanelActions }) {
   const disabled = actions.locked || isBusy(actions.state);
   const queued = actions.queue?.kind === 'queued';
+  const { keep } = actions;
   return (
-    <div className="flex gap-2">
-      {queued ? (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        {queued ? (
+          <Button
+            className="flex-1"
+            disabled={disabled}
+            title={lockedTitle(actions.locked)}
+            onClick={actions.onCancelQueue}
+          >
+            Cancel
+          </Button>
+        ) : actions.ready ? (
+          <Button
+            variant="primary"
+            className="flex-1"
+            kbd={`⇧${MERGE_KEY}`}
+            disabled={disabled}
+            title={lockedTitle(actions.locked)}
+            onClick={actions.onMerge}
+          >
+            {actions.mergeLabel}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            className="flex-1"
+            kbd="⌘↵"
+            onClick={actions.onOpenGithub}
+          >
+            Open on GitHub
+          </Button>
+        )}
         <Button
-          className="flex-1"
+          variant="danger"
+          kbd={`⇧${CLOSE_KEY}`}
           disabled={disabled}
           title={lockedTitle(actions.locked)}
-          onClick={actions.onCancelQueue}
+          onClick={actions.onClose}
         >
-          Cancel
+          Close
         </Button>
-      ) : actions.ready ? (
-        <Button
-          variant="primary"
-          className="flex-1"
-          kbd={`⇧${MERGE_KEY}`}
-          disabled={disabled}
-          title={lockedTitle(actions.locked)}
-          onClick={actions.onMerge}
-        >
-          {actions.mergeLabel}
-        </Button>
-      ) : (
-        <Button
-          variant="primary"
-          className="flex-1"
-          kbd="⌘↵"
-          onClick={actions.onOpenGithub}
-        >
-          Open on GitHub
-        </Button>
-      )}
-      <Button
-        variant="danger"
-        kbd={`⇧${CLOSE_KEY}`}
-        disabled={disabled}
-        title={lockedTitle(actions.locked)}
-        onClick={actions.onClose}
-      >
-        Close
-      </Button>
+        {keep ? <KeepButton keep={keep} /> : null}
+      </div>
+      {keep?.failed ? <KeepFailure keep={keep} /> : null}
     </div>
   );
 }

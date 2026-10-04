@@ -31,6 +31,11 @@ describe('settings store', () => {
         theme: 'sepia',
         lastView: 'mine',
         collapsedSections: { ready: true, 'acme/web': true, approved: 'yes' },
+        keptPrs: {
+          'acme/api#7': '2026-10-01T00:00:00.000Z',
+          'acme/api': '2026-10-01T00:00:00.000Z',
+          'acme/api#8': 'soon',
+        },
       }),
     });
     const { settings } = await createSettingsStore({ fs, path: PATH }).load();
@@ -38,6 +43,9 @@ describe('settings store', () => {
     expect(settings.theme).toBe('system');
     expect(settings.lastView).toBe('mine');
     expect(settings.collapsedSections).toEqual({ ready: true });
+    expect(settings.keptPrs).toEqual({
+      'acme/api#7': '2026-10-01T00:00:00.000Z',
+    });
   });
 
   it('keeps only known agents and model ids that cannot pass as a flag', async () => {

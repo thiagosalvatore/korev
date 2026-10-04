@@ -38,6 +38,7 @@ export function makePr(
     isDraft: false,
     createdAt: OPENED_AT,
     updatedAt: SYNCED_AT,
+    lastActivityAt: SYNCED_AT,
     reviewDecision: null,
     mergeable: 'MERGEABLE',
     mergeStateStatus: 'CLEAN',
@@ -155,6 +156,102 @@ export const OTEL_PR: MyPr = {
   ],
   queue: null,
 };
+
+const STALE_REASON: MyPr['reasons'][number] = {
+  code: 'stale',
+  label: 'No activity for 23d',
+  severity: 'warning',
+};
+
+const OLD_STACK_LAYERS: StackLayer[] = [
+  layer(1, 401, 'Split the old exporter'),
+  layer(2, 402, 'Old exporter retries'),
+  layer(3, 403, 'Exporter docs', { authorLogin: 'alex' }),
+];
+
+function oldStackAt(position: number): StackInfo {
+  return {
+    id: 'STACK_old',
+    size: 3,
+    baseRefName: 'main',
+    position,
+    layers: OLD_STACK_LAYERS,
+  };
+}
+
+export const OLD_SPLIT_PR: MyPr = {
+  pr: makePr(401, 'Split the old exporter', {
+    repo: 'acme/web',
+    ci: 'failing',
+    stack: oldStackAt(1),
+  }),
+  bucket: 'stale',
+  reasons: [
+    STALE_REASON,
+    { code: 'checks-failing', label: 'Lint failing', severity: 'danger' },
+  ],
+  queue: null,
+};
+
+export const OLD_RETRIES_PR: MyPr = {
+  pr: makePr(402, 'Old exporter retries', {
+    repo: 'acme/web',
+    stack: oldStackAt(2),
+  }),
+  bucket: 'stale',
+  reasons: [STALE_REASON],
+  queue: null,
+};
+
+const OLD_STACK: MyStack = {
+  id: 'STACK_old',
+  repo: 'acme/web',
+  baseRefName: 'main',
+  size: 3,
+  openCount: 3,
+  partial: false,
+  bucket: 'stale',
+  headline: 'Stale: #401 No activity for 23d',
+  layers: [
+    { kind: 'mine', position: 1, item: OLD_SPLIT_PR },
+    { kind: 'mine', position: 2, item: OLD_RETRIES_PR },
+    { kind: 'other', position: 3, layer: OLD_STACK_LAYERS[2] },
+  ],
+};
+
+export function withStaleStack(snapshot = makeSnapshot()): InboxSnapshot {
+  return {
+    ...snapshot,
+    mine: [
+      ...snapshot.mine,
+      {
+        bucket: 'stale',
+        count: 2,
+        entries: [{ kind: 'stack', stack: OLD_STACK }],
+      },
+    ],
+  };
+}
+
+export const KEPT_PR: MyPr = {
+  pr: makePr(77, 'Parked billing migration', { ci: 'failing' }),
+  bucket: 'kept',
+  reasons: [
+    { code: 'checks-failing', label: 'Checks failing', severity: 'danger' },
+  ],
+  queue: null,
+  keptUntil: '2026-10-29T14:02:00.000Z',
+};
+
+export function withKeptPr(snapshot = makeSnapshot()): InboxSnapshot {
+  return {
+    ...snapshot,
+    mine: [
+      ...snapshot.mine,
+      { bucket: 'kept', count: 1, entries: [{ kind: 'pr', item: KEPT_PR }] },
+    ],
+  };
+}
 
 function priority(tier: Priority['tier'], reasons: string[]): Priority {
   return { tier, score: 0, reasons };

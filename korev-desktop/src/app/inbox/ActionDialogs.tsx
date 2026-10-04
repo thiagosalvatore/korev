@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, Dialog, Radio } from '../../design-system';
 import type { MyPr } from '../../shared/inbox';
 import type { MergeMethod, MergePath } from '../../shared/merge';
+import type { StackLayer } from '../../shared/pull-request';
 import { hasCommandModifier } from '../keyboard';
 import {
   layersBuiltOn,
@@ -9,6 +10,7 @@ import {
   mergeTitle,
   numberList,
   queueCommand,
+  type ClosePlan,
   type MergePlan,
 } from './merge-plan';
 
@@ -173,21 +175,47 @@ function builtOnNote(numbers: number[]): string | null {
   return `${numberList(numbers)} ${verb} built on this and will lose ${base} base.`;
 }
 
+function leftOpenNote(layers: StackLayer[]): string | null {
+  if (layers.length === 0) return null;
+  const owners = layers.map(
+    (layer) => `@${layer.authorLogin ?? 'someone'}'s #${layer.number}`,
+  );
+  const consequence =
+    layers.length === 1 ? 'it will lose its base' : 'they will lose their base';
+  return `Leaves ${owners.join(' and ')} open; ${consequence}.`;
+}
+
+function closeNotes(item: MyPr, plan: ClosePlan): (string | null)[] {
+  if (plan.targets.length === 1) return [builtOnNote(layersBuiltOn(item))];
+  const numbers = plan.targets.map((target) => target.number);
+  return [`Closes ${numberList(numbers)}.`, leftOpenNote(plan.leftOpen)];
+}
+
 export interface CloseConfirmProps {
   item: MyPr;
+  plan: ClosePlan;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export function CloseConfirm({ item, onConfirm, onCancel }: CloseConfirmProps) {
+export function CloseConfirm({
+  item,
+  plan,
+  onConfirm,
+  onCancel,
+}: CloseConfirmProps) {
   useConfirmShortcut(onConfirm, true);
-  const builtOn = builtOnNote(layersBuiltOn(item));
+  const single = plan.targets.length === 1;
   return (
     <Dialog
       open
       onClose={onCancel}
-      title={`Close #${item.pr.number}?`}
-      description={item.pr.title}
+      title={
+        single
+          ? `Close #${item.pr.number}?`
+          : `Close ${plan.targets.length} PRs?`
+      }
+      description={single ? item.pr.title : undefined}
       footer={
         <>
           <Button variant="ghost" autoFocus onClick={onCancel}>
@@ -199,7 +227,9 @@ export function CloseConfirm({ item, onConfirm, onCancel }: CloseConfirmProps) {
         </>
       }
     >
-      {builtOn ? <Note>{builtOn}</Note> : null}
+      {closeNotes(item, plan).map((note) =>
+        note ? <Note key={note}>{note}</Note> : null,
+      )}
     </Dialog>
   );
 }

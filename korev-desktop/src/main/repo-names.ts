@@ -2,6 +2,8 @@ const NAME_SEGMENT = '[\\w.-]+';
 const OWNER_PATTERN = new RegExp(`^${NAME_SEGMENT}$`);
 const REPO_PATTERN = new RegExp(`^${NAME_SEGMENT}/${NAME_SEGMENT}$`);
 const OWNER_SEPARATOR = '/';
+const PR_NUMBER_SEPARATOR = '#';
+const PR_NUMBER_PATTERN = /^\d+$/;
 
 export interface RepoParts {
   owner: string;
@@ -10,6 +12,15 @@ export interface RepoParts {
 
 export function isRepoName(value: unknown): value is string {
   return typeof value === 'string' && REPO_PATTERN.test(value);
+}
+
+export function isPrRef(value: string): boolean {
+  const [repo, number, ...rest] = value.split(PR_NUMBER_SEPARATOR);
+  return (
+    rest.length === 0 &&
+    isRepoName(repo) &&
+    PR_NUMBER_PATTERN.test(number ?? '')
+  );
 }
 
 export function isOwnerLogin(value: unknown): value is string {

@@ -29,11 +29,24 @@ function RowStatus({
   );
 }
 
+const MS_PER_DAY = 86_400_000;
+
+function daysLeft(until: string, now: number): number {
+  return Math.max(0, Math.round((Date.parse(until) - now) / MS_PER_DAY));
+}
+
+function rowNote(item: MyPr, now: number): string | null {
+  if (item.keptUntil) return `Kept · ${daysLeft(item.keptUntil, now)}d left`;
+  if (item.bucket === 'stale') return null;
+  return `updated ${formatAge(item.pr.updatedAt, now)}`;
+}
+
 export function MyPrRow({ item, stackPlace }: MyPrRowProps) {
   const now = useNow(MINUTE_MS);
   const { pr } = item;
   const action = usePrAction(prRef(pr));
   const settled = settledLabel(action);
+  const note = settled ?? rowNote(item, now);
   return (
     <PrRow
       optionKey={prRef(pr)}
@@ -49,11 +62,7 @@ export function MyPrRow({ item, stackPlace }: MyPrRowProps) {
         meta={
           <>
             <span className="font-mono">#{pr.number}</span>
-            <span className={NARROW_HIDDEN}>
-              {settled
-                ? ` · ${settled}`
-                : ` · updated ${formatAge(pr.updatedAt, now)}`}
-            </span>
+            {note ? <span className={NARROW_HIDDEN}> · {note}</span> : null}
           </>
         }
       />

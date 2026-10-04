@@ -23,6 +23,7 @@ export function makePr(overrides: Partial<PullRequest> = {}): PullRequest {
     isDraft: false,
     createdAt: daysAgo(1),
     updatedAt: hoursAgo(1),
+    lastActivityAt: hoursAgo(1),
     reviewDecision: null,
     mergeable: 'MERGEABLE',
     mergeStateStatus: 'CLEAN',

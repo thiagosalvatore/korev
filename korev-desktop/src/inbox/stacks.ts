@@ -47,6 +47,8 @@ const BUCKET_LABEL: Record<Bucket, string> = {
   'needs-you': 'Needs you',
   'in-progress': 'In progress',
   ready: 'Ready to merge',
+  stale: 'Stale',
+  kept: 'Kept',
 };
 
 export function blocksLayers(pr: PullRequest): number {

@@ -10,7 +10,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InboxSnapshot } from '../shared/inbox';
 import { installFakeBridge, installMatchMedia } from './fake-bridge';
 import { MyPrs } from './MyPrs';
-import { makeSnapshot } from './test-fixtures';
+import {
+  KEPT_PR,
+  OLD_SPLIT_PR,
+  WATCHING_SETTINGS,
+  makeSnapshot,
+  withKeptPr,
+  withStaleStack,
+} from './test-fixtures';
 
 let bridge: ReturnType<typeof installFakeBridge>['bridge'];
 
@@ -97,6 +104,39 @@ describe('MyPrs', () => {
     renderMyPrs(withoutNeedsYou());
     expect(screen.getByText('Nothing needs you.')).toBeTruthy();
     expect(rowTitled('Bump OpenTelemetry')).toBeTruthy();
+  });
+
+  it('starts Stale collapsed when there is no saved choice', () => {
+    renderMyPrs(withStaleStack());
+    const header = sectionHeader('Stale');
+    expect(header.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText(OLD_SPLIT_PR.pr.title)).toBeNull();
+  });
+
+  it('shows the stale chip on a stale row even when CI fails, without "updated"', async () => {
+    installFakeBridge({
+      settings: { ...WATCHING_SETTINGS, collapsedSections: { stale: false } },
+    });
+    renderMyPrs(withStaleStack());
+    const row = await screen.findByRole('option', {
+      name: new RegExp(OLD_SPLIT_PR.pr.title),
+    });
+
+    expect(within(row).getByText('No activity for 23d')).toBeTruthy();
+    expect(within(row).getByText('+1')).toBeTruthy();
+    expect(row.textContent).not.toContain('updated');
+  });
+
+  it('puts kept PRs behind a collapsed Kept toggle at the bottom of Stale', async () => {
+    installFakeBridge({
+      settings: { ...WATCHING_SETTINGS, collapsedSections: { stale: false } },
+    });
+    renderMyPrs(withKeptPr(withStaleStack()));
+    const toggle = await screen.findByRole('option', { name: /^Kept/ });
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText(KEPT_PR.pr.title)).toBeNull();
+    expect(within(sectionHeader('Stale')).getByText('2')).toBeTruthy();
   });
 
   it('renders stack layers bottom-first and labels the teammate layer', () => {

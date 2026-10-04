@@ -4,12 +4,16 @@ export const BUCKET_ORDER: readonly Bucket[] = [
   'needs-you',
   'in-progress',
   'ready',
+  'stale',
+  'kept',
 ];
 
 export const SECTION_ORDER: readonly Bucket[] = [
   'needs-you',
   'ready',
   'in-progress',
+  'stale',
+  'kept',
 ];
 
 const SEVERITY_ORDER: readonly ReasonSeverity[] = [

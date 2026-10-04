@@ -15,6 +15,8 @@ export interface WindowBounds {
 export const COLLAPSIBLE_SECTIONS = [
   'ready',
   'in-progress',
+  'stale',
+  'kept',
   'approved',
 ] as const;
 
@@ -30,6 +32,7 @@ export interface Settings {
   collapsedSections: CollapsedSections;
   mergeWith: Record<string, MergeTool>;
   agent: AgentPreference;
+  keptPrs: Record<string, string>;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -40,4 +43,5 @@ export const DEFAULT_SETTINGS: Settings = {
   collapsedSections: {},
   mergeWith: {},
   agent: { provider: null, models: {} },
+  keptPrs: {},
 };

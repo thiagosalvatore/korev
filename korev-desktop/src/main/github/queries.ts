@@ -181,6 +181,7 @@ fragment MyPrFields on PullRequest {
   comments(last: ${PR_COMMENTS_LIMIT}) {
     nodes { author { __typename login } body createdAt updatedAt url }
   }
+  commits(last: 1) { nodes { commit { committedDate } } }
 }`;
 
 const REVIEW_REQUEST_FRAGMENT = `

@@ -154,4 +154,34 @@ describe('toPullRequest', () => {
       'failing',
     ]);
   });
+
+  it('takes the last activity from creation, the last commit and the newest human comment, ignoring bots', () => {
+    const comment = (createdAt: string, typename: string) => ({
+      author: { __typename: typename, login: 'someone' },
+      body: 'Looks good',
+      createdAt,
+      url: 'https://github.com/acme/api/pull/1#issuecomment-1',
+    });
+    const pr = toPullRequest({
+      ...failingNode,
+      createdAt: '2026-09-01T00:00:00Z',
+      commits: {
+        nodes: [{ commit: { committedDate: '2026-09-10T00:00:00Z' } }],
+      },
+      comments: {
+        nodes: [
+          comment('2026-09-12T00:00:00Z', 'User'),
+          comment('2026-09-20T00:00:00Z', 'Bot'),
+        ],
+      },
+    });
+
+    expect(pr.lastActivityAt).toBe('2026-09-12T00:00:00Z');
+  });
+
+  it('falls back to the creation time when a node has no commits field', () => {
+    const pr = toPullRequest(noStackFieldNode);
+
+    expect(pr.lastActivityAt).toBe(noStackFieldNode.createdAt);
+  });
 });

@@ -92,6 +92,7 @@ export interface PullRequest {
   isDraft: boolean;
   createdAt: string;
   updatedAt: string;
+  lastActivityAt: string;
   reviewDecision: ReviewDecision | null;
   mergeable: Mergeable;
   mergeStateStatus: MergeStateStatus;

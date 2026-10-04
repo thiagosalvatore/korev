@@ -19,6 +19,7 @@ function build(input: Partial<InboxInput>) {
     unknownMergeStreaks: {},
     repoOrder: [],
     mergeWith: {},
+    keptPrs: {},
     ...input,
   });
 }
@@ -57,7 +58,7 @@ describe('buildInbox', () => {
       ],
     });
 
-    expect(inbox.mine.map((section) => section.count)).toEqual([1, 1, 0]);
+    expect(inbox.mine.map((section) => section.count)).toEqual([1, 1, 0, 0, 0]);
   });
 
   it('keeps stacks whole and counts only reviews still waiting on the viewer', () => {

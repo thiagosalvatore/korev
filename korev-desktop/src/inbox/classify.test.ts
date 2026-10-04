@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Check } from '../shared/pull-request';
 import { classifyMyPr } from './classify';
-import { makePr } from './test-fixtures';
+import { NOW, daysAgo, makePr } from './test-fixtures';
 
 function codesOf(result: ReturnType<typeof classifyMyPr>) {
   return result.reasons.map((reason) => reason.code);
@@ -200,5 +200,65 @@ describe('classifyMyPr queue status', () => {
     expect(result.bucket).toBe('needs-you');
     expect(codesOf(result)).toEqual(['removed-from-queue']);
     expect(result.reasons[0].label).toBe('Removed from merge queue');
+  });
+});
+
+describe('classifyMyPr stale', () => {
+  const failing = { ci: 'failing' as const };
+
+  function classifyQuiet(
+    days: number,
+    overrides: Parameters<typeof makePr>[0] = failing,
+    keptAt: string | null = null,
+  ) {
+    return classifyMyPr(
+      makePr({ lastActivityAt: daysAgo(days), ...overrides }),
+      { unknownMergeStreak: 1, now: NOW, keptAt },
+    );
+  }
+
+  it('moves a PR quiet for 15 days to Stale, with the stale reason first', () => {
+    const result = classifyQuiet(15);
+
+    expect(result.bucket).toBe('stale');
+    expect(result.reasons[0]).toEqual({
+      code: 'stale',
+      label: 'No activity for 15d',
+      severity: 'warning',
+    });
+    expect(codesOf(result)).toContain('checks-failing');
+  });
+
+  it('keeps a PR quiet for 13 days where it was', () => {
+    expect(classifyQuiet(13).bucket).toBe('needs-you');
+  });
+
+  it('never marks a ready PR stale', () => {
+    expect(classifyQuiet(15, {}).bucket).toBe('ready');
+  });
+
+  it('never marks a queued PR stale', () => {
+    const result = classifyMyPr(makePr({ lastActivityAt: daysAgo(30) }), {
+      unknownMergeStreak: 1,
+      now: NOW,
+      queue: { kind: 'queued', tool: 'trunk', by: 'li', at: null, url: null },
+    });
+
+    expect(result.bucket).toBe('in-progress');
+  });
+
+  it('puts a kept stale PR in Kept until the keep ends', () => {
+    const result = classifyQuiet(20, failing, daysAgo(4));
+
+    expect(result.bucket).toBe('kept');
+    expect(result.keptUntil).toBe(daysAgo(4 - 30));
+  });
+
+  it('ends a keep when there is activity after it', () => {
+    expect(classifyQuiet(15, failing, daysAgo(16)).bucket).toBe('stale');
+  });
+
+  it('ends a keep after 30 days', () => {
+    expect(classifyQuiet(40, failing, daysAgo(31)).bucket).toBe('stale');
   });
 });

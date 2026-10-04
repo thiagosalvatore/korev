@@ -7,6 +7,7 @@ import type { RepoOwner, RepoPage } from '../shared/repos';
 import type { Settings } from '../shared/settings';
 import {
   CONNECTED_AUTH,
+  SYNCED_AT,
   WATCHING_SETTINGS,
   makeRepoPage,
   makeSnapshot,
@@ -87,6 +88,12 @@ export function installFakeBridge({
       setMergeWith: vi.fn(async (repo, tool) => ({
         ...settings,
         mergeWith: { ...settings.mergeWith, [repo]: tool },
+      })),
+      setKept: vi.fn(async (refs: string[], kept: boolean) => ({
+        ...settings,
+        keptPrs: kept
+          ? Object.fromEntries(refs.map((ref) => [ref, SYNCED_AT]))
+          : {},
       })),
       setCollapsedSection: vi.fn(async (section, collapsed) => ({
         ...settings,

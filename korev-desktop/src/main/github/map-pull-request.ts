@@ -101,6 +101,7 @@ export function toPullRequest(
   warn: WarningLogger = console.warn,
 ): PullRequest {
   const files = presentNodes(node.files);
+  const comments = presentNodes(node.comments).flatMap(toComment);
   return {
     id: node.id,
     number: node.number,
@@ -113,6 +114,7 @@ export function toPullRequest(
     isDraft: node.isDraft,
     createdAt: node.createdAt,
     updatedAt: node.updatedAt,
+    lastActivityAt: lastActivityAt(node, comments),
     reviewDecision: oneOf(node.reviewDecision, REVIEW_DECISIONS, null),
     mergeable: oneOf(node.mergeable, MERGEABLE_VALUES, 'UNKNOWN'),
     mergeStateStatus: oneOf(
@@ -133,8 +135,20 @@ export function toPullRequest(
     reviewRequestEvents: toReviewRequestEvents(node),
     stack: toStack(node, warn),
     isInMergeQueue: node.isInMergeQueue ?? false,
-    comments: presentNodes(node.comments).flatMap(toComment),
+    comments,
   };
+}
+
+function lastActivityAt(node: PullRequestNode, comments: PrComment[]): string {
+  const commitTimes = presentNodes(node.commits).flatMap((entry) =>
+    entry.commit?.committedDate ? [entry.commit.committedDate] : [],
+  );
+  const humanCommentTimes = comments
+    .filter((comment) => !comment.isBot)
+    .map((comment) => comment.createdAt);
+  return [node.createdAt, ...commitTimes, ...humanCommentTimes].reduce(
+    (newest, time) => (Date.parse(time) > Date.parse(newest) ? time : newest),
+  );
 }
 
 function toComment(node: CommentNode): PrComment[] {

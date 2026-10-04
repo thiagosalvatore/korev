@@ -43,6 +43,7 @@ export interface InboxPollerDeps {
   token(): string | null;
   repos(): string[];
   mergeWith(): Record<string, MergeTool>;
+  keptPrs(): Record<string, string>;
   renameRepos(renames: RepoRename[]): Promise<void>;
   now(): Date;
   scheduler: Scheduler;
@@ -346,6 +347,7 @@ class GithubInboxPoller implements InboxPoller {
         unknownMergeStreaks: this.#session.unknownMergeStreaks,
         repoOrder: this.deps.repos(),
         mergeWith: this.deps.mergeWith(),
+        keptPrs: this.deps.keptPrs(),
       }),
       repoMerge: fetched.repoMerge,
       repoAvatars: fetched.repoAvatars,

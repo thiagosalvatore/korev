@@ -46,6 +46,10 @@ export function saveAgent(agent: AgentPreference): Promise<void> {
   return applySettings(korev().settings.setAgent(agent));
 }
 
+export function saveKept(refs: string[], kept: boolean): Promise<void> {
+  return applySettings(korev().settings.setKept(refs, kept));
+}
+
 export function saveCollapsedSection(
   section: CollapsibleSection,
   collapsed: boolean,

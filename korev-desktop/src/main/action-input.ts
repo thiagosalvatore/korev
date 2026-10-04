@@ -32,6 +32,12 @@ export function parseTarget(value: unknown): PrTarget | null {
   return { id, repo, number };
 }
 
+export function parseTargets(value: unknown): PrTarget[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const targets = value.map(parseTarget);
+  return targets.every((target) => target !== null) ? targets : null;
+}
+
 export function parseMergeRequest(value: unknown): MergeRequest | null {
   const fields = asRecord(value);
   const target = parseTarget(fields.target);

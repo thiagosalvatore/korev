@@ -155,6 +155,27 @@ describe('PR actions', () => {
     });
   });
 
+  it('closes several PRs, marking each closing and then closed or failed', async () => {
+    const { writer, actions, refresh, stateOf } = setup();
+    writer.closePullRequest
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('Pull request is locked'));
+    const targets = [
+      { id: 'PR_301', repo: 'acme/web', number: 301 },
+      { id: 'PR_302', repo: 'acme/web', number: 302 },
+    ];
+
+    const closing = actions.close(targets);
+    expect(stateOf(301)).toEqual({ kind: 'closing' });
+    expect(stateOf(302)).toEqual({ kind: 'closing' });
+    const result = await closing;
+
+    expect(stateOf(301)).toEqual({ kind: 'closed' });
+    expect(stateOf(302)).toMatchObject({ kind: 'close-failed' });
+    expect(result.ok).toBe(false);
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
   it('posts the queue command for a third-party queue and refreshes', async () => {
     const { writer, refresh, merge } = setup('trunk');
 

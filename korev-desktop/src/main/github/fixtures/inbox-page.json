@@ -123,6 +123,15 @@
                 "isResolved": false
               }
             ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "committedDate": "2026-09-30T15:09:23Z"
+                }
+              }
+            ]
           }
         },
         {
@@ -180,6 +189,15 @@
               "endCursor": null
             },
             "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "committedDate": "2026-07-13T15:38:13Z"
+                }
+              }
+            ]
           }
         }
       ]

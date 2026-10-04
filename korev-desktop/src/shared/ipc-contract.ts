@@ -34,6 +34,7 @@ export enum IpcChannel {
   SettingsSetCollapsedSection = 'settings:set-collapsed-section',
   SettingsSetMergeWith = 'settings:set-merge-with',
   SettingsSetAgent = 'settings:set-agent',
+  SettingsSetKept = 'settings:set-kept',
   PrMerge = 'pr:merge',
   PrClose = 'pr:close',
   PrReopen = 'pr:reopen',
@@ -88,6 +89,7 @@ export interface KorevBridge {
     ): Promise<Settings>;
     setMergeWith(repo: string, tool: MergeTool): Promise<Settings>;
     setAgent(agent: AgentPreference): Promise<Settings>;
+    setKept(refs: string[], kept: boolean): Promise<Settings>;
     suggestedRepos(): Promise<string[]>;
     onChanged(listener: (settings: Settings) => void): Unsubscribe;
   };
@@ -98,7 +100,7 @@ export interface KorevBridge {
   };
   pr: {
     merge(request: MergeRequest): Promise<ActionResult>;
-    close(target: PrTarget): Promise<ActionResult>;
+    close(targets: PrTarget[]): Promise<ActionResult>;
     reopen(target: PrTarget): Promise<ActionResult>;
     cancelQueue(target: PrTarget): Promise<ActionResult>;
   };

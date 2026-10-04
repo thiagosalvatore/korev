@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Button, Toast } from '../../design-system';
+import { KEEP_DAYS } from '../../inbox/keep';
 import { mergePathFor } from '../../inbox/merge-path';
 import type { InboxSnapshot, MyPr } from '../../shared/inbox';
 import type {
@@ -8,9 +9,11 @@ import type {
   PrActionState,
   PrTarget,
 } from '../../shared/merge';
+import { prRef } from '../../shared/pr-ref';
 import { korev } from '../bridge';
 import type { ShortcutMap } from '../keyboard';
-import { useSettings } from '../useSettings';
+import { announce } from '../LiveAnnouncer';
+import { saveKept, useSettings } from '../useSettings';
 import { useTimedToast } from '../useTimedToast';
 import { CLOSED_GONE_LABEL, MERGED_GONE_LABEL } from './action-state';
 import {
@@ -20,12 +23,23 @@ import {
 } from './ActionDialogs';
 import type { PanelSubject, SubjectIndex } from './list-model';
 import {
+  closePlan,
+  isQuiet,
   mergeButtonLabel,
   mergePlan,
+  numberList,
   numberSpan,
+  quietStackItems,
+  targetOf,
   toolName,
 } from './merge-plan';
-import { CLOSE_KEY, MERGE_KEY, type PanelActions } from './PanelActions';
+import {
+  CLOSE_KEY,
+  KEEP_KEY,
+  MERGE_KEY,
+  type KeepAction,
+  type PanelActions,
+} from './PanelActions';
 
 type DialogKind = 'merge' | 'close' | 'cancel-queue';
 
@@ -34,15 +48,24 @@ interface OpenDialog {
   key: string;
 }
 
+interface ToastAction {
+  label: string;
+  run: () => void;
+}
+
 interface ActionToast {
   message: string;
-  reopen: PrTarget | null;
+  action: ToastAction | null;
 }
 
 const TOAST_MS = 6000;
+const SAVE_FAILED = "Couldn't save";
 
-function targetOf(item: MyPr): PrTarget {
-  return { id: item.pr.id, repo: item.pr.repo, number: item.pr.number };
+function reopenAction(targets: PrTarget[]): ToastAction {
+  return {
+    label: 'Reopen',
+    run: () => targets.forEach((target) => void korev().pr.reopen(target)),
+  };
 }
 
 function mineItem(subjects: SubjectIndex, key: string | null): MyPr | null {
@@ -50,18 +73,39 @@ function mineItem(subjects: SubjectIndex, key: string | null): MyPr | null {
   return subject?.kind === 'mine' ? subject.item : null;
 }
 
-function settledToast(
-  key: string,
-  state: PrActionState,
+type FreshState = [string, PrActionState];
+
+function mergedToast(fresh: FreshState[]): ActionToast | null {
+  const merged = fresh.find(([, state]) => state.kind === 'merged')?.[1];
+  if (merged?.kind !== 'merged') return null;
+  return { message: `Merged ${numberSpan(merged.numbers)}`, action: null };
+}
+
+function closedToast(
+  fresh: FreshState[],
   subjects: SubjectIndex,
 ): ActionToast | null {
-  if (state.kind === 'merged') {
-    return { message: `Merged ${numberSpan(state.numbers)}`, reopen: null };
-  }
-  if (state.kind !== 'closed') return null;
-  const item = mineItem(subjects, key);
-  if (!item) return null;
-  return { message: `Closed #${item.pr.number}`, reopen: targetOf(item) };
+  const closed = fresh
+    .filter(([, state]) => state.kind === 'closed')
+    .flatMap(([key]) => {
+      const item = mineItem(subjects, key);
+      return item ? [item] : [];
+    })
+    .sort((left, right) => left.pr.number - right.pr.number);
+  if (closed.length === 0) return null;
+  const partial = fresh.some(([, state]) => state.kind === 'close-failed');
+  const numbers = closed.map((item) => item.pr.number);
+  return {
+    message: `Closed ${partial ? numberList(numbers) : numberSpan(numbers)}`,
+    action: reopenAction(closed.map(targetOf)),
+  };
+}
+
+function settledToast(
+  fresh: FreshState[],
+  subjects: SubjectIndex,
+): ActionToast | null {
+  return mergedToast(fresh) ?? closedToast(fresh, subjects);
 }
 
 function useSettledHistory(
@@ -83,9 +127,7 @@ function useSettledHistory(
     ...current,
     ...Object.fromEntries(fresh.map(([key, state]) => [key, state.kind])),
   }));
-  const toast = fresh
-    .map(([key, state]) => settledToast(key, state, subjects))
-    .find((candidate) => candidate !== null);
+  const toast = settledToast(fresh, subjects);
   if (toast) onSettled(toast);
   return history;
 }
@@ -112,6 +154,7 @@ export function useMyPrActions(
 ): MyPrActions {
   const settings = useSettings();
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
+  const [keepFailedKey, setKeepFailedKey] = useState<string | null>(null);
   const toast = useTimedToast<ActionToast>(TOAST_MS);
   const history = useSettledHistory(snapshot.actions, subjects, toast.show);
   const locked = snapshot.fromCache;
@@ -136,7 +179,37 @@ export function useMyPrActions(
 
   function close(item: MyPr) {
     closeDialog();
-    void korev().pr.close(targetOf(item));
+    void korev().pr.close(closePlan(item, subjects).targets);
+  }
+
+  async function toggleKeep(item: MyPr | null) {
+    if (!enabled || !item || !isQuiet(item)) return;
+    const items = quietStackItems(item, subjects);
+    const refs = items.map((kept) => prRef(kept.pr));
+    const keeping = item.bucket !== 'kept';
+    try {
+      await saveKept(refs, keeping);
+    } catch {
+      setKeepFailedKey(prRef(item.pr));
+      announce(SAVE_FAILED);
+      return;
+    }
+    setKeepFailedKey(null);
+    if (!keeping) return;
+    const numbers = items.map((kept) => kept.pr.number);
+    toast.show({
+      message: `Kept ${numberList(numbers)} for ${KEEP_DAYS} days`,
+      action: { label: 'Undo', run: () => void saveKept(refs, false) },
+    });
+  }
+
+  function keepAction(item: MyPr): KeepAction | null {
+    if (!isQuiet(item)) return null;
+    return {
+      kept: item.bucket === 'kept',
+      failed: keepFailedKey === prRef(item.pr),
+      onToggle: () => void toggleKeep(item),
+    };
   }
 
   function cancelQueue(item: MyPr) {
@@ -164,6 +237,7 @@ export function useMyPrActions(
       onClose: () => open('close', item),
       onCancelQueue: () => open('cancel-queue', item),
       onOpenGithub: () => openGithub(item.pr.url),
+      keep: keepAction(item),
     };
   }
 
@@ -174,6 +248,7 @@ export function useMyPrActions(
       return (
         <CloseConfirm
           item={item}
+          plan={closePlan(item, subjects)}
           onConfirm={() => close(item)}
           onCancel={closeDialog}
         />
@@ -215,16 +290,15 @@ export function useMyPrActions(
             title={shown.message}
             onClose={toast.dismiss}
             action={
-              shown.reopen ? (
+              shown.action ? (
                 <Button
                   size="sm"
                   onClick={() => {
-                    const target = shown.reopen;
                     toast.dismiss();
-                    if (target) void korev().pr.reopen(target);
+                    shown.action?.run();
                   }}
                 >
-                  Reopen
+                  {shown.action.label}
                 </Button>
               ) : undefined
             }
@@ -238,6 +312,7 @@ export function useMyPrActions(
     shortcuts: {
       [MERGE_KEY]: () => open('merge', mineItem(subjects, selectedKey)),
       [CLOSE_KEY]: () => open('close', mineItem(subjects, selectedKey)),
+      [KEEP_KEY]: () => void toggleKeep(mineItem(subjects, selectedKey)),
     },
     panelActions,
     goneLabel: (key) =>

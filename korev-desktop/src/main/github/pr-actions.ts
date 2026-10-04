@@ -29,7 +29,7 @@ export interface PrActionsDeps {
 export interface PrActions {
   state(): Record<string, PrActionState>;
   merge(request: MergeRequest): Promise<ActionResult>;
-  close(target: PrTarget): Promise<ActionResult>;
+  close(targets: PrTarget[]): Promise<ActionResult>;
   reopen(target: PrTarget): Promise<ActionResult>;
   cancelQueue(target: PrTarget): Promise<ActionResult>;
   reconcile(snapshot: InboxSnapshot): void;
@@ -81,12 +81,16 @@ export function createPrActions(deps: PrActionsDeps): PrActions {
   const states = new Map<string, PrActionState>();
   const timers = new Set<TimerHandle>();
 
-  function set(keys: string[], state: PrActionState | null): void {
-    for (const key of keys) {
+  function apply(entries: [string, PrActionState | null][]): void {
+    for (const [key, state] of entries) {
       if (state) states.set(key, state);
       else states.delete(key);
     }
     deps.onChange();
+  }
+
+  function set(keys: string[], state: PrActionState | null): void {
+    apply(keys.map((key) => [key, state]));
   }
 
   function rangeKeys(request: MergeRequest): string[] {
@@ -228,21 +232,33 @@ export function createPrActions(deps: PrActionsDeps): PrActions {
     });
   }
 
-  async function close(target: PrTarget): Promise<ActionResult> {
+  async function closeOne(
+    token: string,
+    target: PrTarget,
+  ): Promise<[string, PrActionState]> {
     const key = keyOf(target.repo, target.number);
-    if (isBusy(key)) return failure(ALREADY_RUNNING);
+    try {
+      await deps.writer.closePullRequest(token, target.id);
+      return [key, { kind: 'closed' }];
+    } catch (error) {
+      return [key, { kind: 'close-failed', message: describeError(error) }];
+    }
+  }
+
+  async function close(targets: PrTarget[]): Promise<ActionResult> {
+    const keys = targets.map((target) => keyOf(target.repo, target.number));
+    if (keys.some(isBusy)) return failure(ALREADY_RUNNING);
     return withToken(async (token) => {
-      set([key], { kind: 'closing' });
-      try {
-        await deps.writer.closePullRequest(token, target.id);
-      } catch (error) {
-        const message = describeError(error);
-        set([key], { kind: 'close-failed', message });
-        return failure(message);
-      }
-      set([key], { kind: 'closed' });
-      deps.refresh();
-      return OK;
+      set(keys, { kind: 'closing' });
+      const results = await Promise.all(
+        targets.map((target) => closeOne(token, target)),
+      );
+      apply(results);
+      if (results.some(([, state]) => state.kind === 'closed')) deps.refresh();
+      const messages = results.flatMap(([, state]) =>
+        state.kind === 'close-failed' ? [state.message] : [],
+      );
+      return messages.length > 0 ? failure(messages[0]) : OK;
     });
   }
 

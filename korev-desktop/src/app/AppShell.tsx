@@ -86,6 +86,8 @@ const SECTION_SUMMARY: Record<Bucket, string> = {
   'needs-you': 'need you',
   ready: 'ready to merge',
   'in-progress': 'in progress',
+  stale: 'stale',
+  kept: 'kept',
 };
 
 const NO_OPEN_PRS = 'No open PRs';

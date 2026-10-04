@@ -10,6 +10,7 @@ import type {
   CommentMergeTool,
   MergePath,
   MergeTool,
+  PrTarget,
 } from '../../shared/merge';
 import { prRef } from '../../shared/pr-ref';
 import type { StackLayer } from '../../shared/pull-request';
@@ -112,6 +113,59 @@ export function mergePlan(
     blocker: blockers.find((blocker) => blocker !== null) ?? null,
     partial: pr.stack ? pr.stack.size > pr.stack.layers.length : false,
     method: mergeMethodChoice(info),
+  };
+}
+
+export interface ClosePlan {
+  targets: PrTarget[];
+  leftOpen: StackLayer[];
+}
+
+export function targetOf(item: MyPr): PrTarget {
+  return { id: item.pr.id, repo: item.pr.repo, number: item.pr.number };
+}
+
+export function isQuiet(item: MyPr): boolean {
+  return item.bucket === 'stale' || item.bucket === 'kept';
+}
+
+function openLayers(item: MyPr): StackLayer[] {
+  return (item.pr.stack?.layers ?? []).filter(
+    (layer) => layer.state === 'OPEN',
+  );
+}
+
+function viewerItem(
+  item: MyPr,
+  layer: StackLayer,
+  subjects: SubjectIndex,
+): MyPr[] {
+  const subject = subjects.get(
+    prRef({ repo: item.pr.repo, number: layer.number }),
+  );
+  return subject?.kind === 'mine' ? [subject.item] : [];
+}
+
+export function quietStackItems(item: MyPr, subjects: SubjectIndex): MyPr[] {
+  if (!item.pr.stack || !isQuiet(item)) return [item];
+  const mine = openLayers(item).flatMap((layer) =>
+    viewerItem(item, layer, subjects),
+  );
+  return mine.every(isQuiet) ? mine : [item];
+}
+
+export function closePlan(item: MyPr, subjects: SubjectIndex): ClosePlan {
+  const closing = quietStackItems(item, subjects);
+  if (closing.length === 1) return { targets: [targetOf(item)], leftOpen: [] };
+  const numbers = new Set(closing.map((closed) => closed.pr.number));
+  const lowest = Math.min(
+    ...closing.map((closed) => closed.pr.stack?.position ?? 0),
+  );
+  return {
+    targets: closing.map(targetOf),
+    leftOpen: openLayers(item).filter(
+      (layer) => !numbers.has(layer.number) && layer.position > lowest,
+    ),
   };
 }
 

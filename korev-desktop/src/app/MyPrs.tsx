@@ -19,6 +19,7 @@ import { MyPrRow } from './inbox/MyPrRow';
 import { OtherLayerRow } from './inbox/OtherLayerRow';
 import { inboxPhase } from './inbox/phase';
 import { StackGroup, StackLayerItem, byPosition } from './inbox/StackGroup';
+import { ToggleRow } from './inbox/ToggleRow';
 import {
   useCollapsedSections,
   type CollapsedSections,
@@ -28,6 +29,8 @@ const BUCKET_LABELS: Record<Bucket, string> = {
   'needs-you': 'Needs you',
   'in-progress': 'In progress',
   ready: 'Ready to merge',
+  stale: 'Stale',
+  kept: 'Kept',
 };
 
 const LIST_LABEL = 'My pull requests';
@@ -73,6 +76,8 @@ const COUNT_TONES: Record<Bucket, CountTone> = {
   'needs-you': 'danger',
   ready: 'success',
   'in-progress': 'neutral',
+  stale: 'neutral',
+  kept: 'neutral',
 };
 
 const ALWAYS_OPEN = 'needs-you' satisfies Bucket;
@@ -88,12 +93,41 @@ function sectionToggle(
   };
 }
 
+function KeptToggle({
+  kept,
+  collapsed,
+}: {
+  kept: MySection;
+  collapsed: CollapsedSections;
+}) {
+  const toggle = sectionToggle('kept', collapsed);
+  return (
+    <>
+      <ToggleRow
+        optionKey={toggle.optionKey}
+        expanded={toggle.expanded}
+        onToggle={toggle.onToggle}
+        className="pl-5"
+      >
+        {BUCKET_LABELS.kept}
+        <span className="font-mono text-fg-2">{kept.count}</span>
+      </ToggleRow>
+      {toggle.expanded
+        ? kept.entries.map((entry) => (
+            <MyEntryView key={entryKey(entry)} entry={entry} />
+          ))
+        : null}
+    </>
+  );
+}
+
 interface SectionBlockProps {
   section: MySection;
+  kept: MySection | null;
   collapsed: CollapsedSections;
 }
 
-function SectionBlock({ section, collapsed }: SectionBlockProps) {
+function SectionBlock({ section, kept, collapsed }: SectionBlockProps) {
   const { bucket } = section;
   return (
     <GroupBlock
@@ -107,6 +141,7 @@ function SectionBlock({ section, collapsed }: SectionBlockProps) {
       {section.entries.map((entry) => (
         <MyEntryView key={entryKey(entry)} entry={entry} />
       ))}
+      {kept ? <KeptToggle kept={kept} collapsed={collapsed} /> : null}
     </GroupBlock>
   );
 }
@@ -127,7 +162,14 @@ function MySections({
   sections: MySection[];
   collapsed: CollapsedSections;
 }) {
-  const shown = sections.filter((section) => section.entries.length > 0);
+  const kept = sections.find(
+    (section) => section.bucket === 'kept' && section.entries.length > 0,
+  );
+  const shown = sections.filter(
+    (section) =>
+      section.bucket !== 'kept' &&
+      (section.entries.length > 0 || (section.bucket === 'stale' && kept)),
+  );
   const needsYouShown = shown.some((section) => section.bucket === ALWAYS_OPEN);
   return (
     <>
@@ -136,6 +178,7 @@ function MySections({
         <SectionBlock
           key={section.bucket}
           section={section}
+          kept={section.bucket === 'stale' ? (kept ?? null) : null}
           collapsed={collapsed}
         />
       ))}

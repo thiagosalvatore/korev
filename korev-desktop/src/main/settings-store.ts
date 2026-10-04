@@ -15,7 +15,7 @@ import {
 } from '../shared/agents';
 import type { MergeTool } from '../shared/merge';
 import type { FileSystem } from './file-system';
-import { isRepoName } from './repo-names';
+import { isPrRef, isRepoName } from './repo-names';
 
 const THEMES: readonly ThemePreference[] = ['system', 'light', 'dark'];
 const MERGE_TOOLS: readonly MergeTool[] = [
@@ -64,6 +64,18 @@ function pickMergeWith(value: unknown): Record<string, MergeTool> {
   );
 }
 
+function pickKeptPrs(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([ref, keptAt]) =>
+        isPrRef(ref) &&
+        typeof keptAt === 'string' &&
+        !Number.isNaN(Date.parse(keptAt)),
+    ),
+  );
+}
+
 function pickOneOf<T>(options: readonly T[], value: unknown, fallback: T): T {
   return options.includes(value as T) ? (value as T) : fallback;
 }
@@ -101,6 +113,7 @@ function sanitize(raw: Record<string, unknown>): Settings {
     collapsedSections: pickCollapsedSections(raw.collapsedSections),
     mergeWith: pickMergeWith(raw.mergeWith),
     agent: pickAgent(raw.agent),
+    keptPrs: pickKeptPrs(raw.keptPrs),
   };
 }
 

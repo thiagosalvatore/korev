@@ -1,7 +1,7 @@
 import type { PrActionState, QueueStatus, RepoMergeInfo } from './merge';
 import type { PullRequest, StackLayer } from './pull-request';
 
-export type Bucket = 'needs-you' | 'in-progress' | 'ready';
+export type Bucket = 'needs-you' | 'in-progress' | 'ready' | 'stale' | 'kept';
 
 export type ReasonSeverity = 'danger' | 'warning' | 'neutral' | 'success';
 
@@ -21,7 +21,8 @@ export type ReasonCode =
   | 'no-checks'
   | 'ready-to-merge'
   | 'in-queue'
-  | 'removed-from-queue';
+  | 'removed-from-queue'
+  | 'stale';
 
 export interface Reason {
   code: ReasonCode;
@@ -34,6 +35,7 @@ export interface MyPr {
   bucket: Bucket;
   reasons: Reason[];
   queue: QueueStatus | null;
+  keptUntil?: string;
 }
 
 export type MyStackLayer =

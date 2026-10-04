@@ -41,6 +41,7 @@ const bridge: KorevBridge = {
     setMergeWith: (repo, tool) =>
       invoke(IpcChannel.SettingsSetMergeWith, repo, tool),
     setAgent: (agent) => invoke(IpcChannel.SettingsSetAgent, agent),
+    setKept: (refs, kept) => invoke(IpcChannel.SettingsSetKept, refs, kept),
     suggestedRepos: () => invoke(IpcChannel.SettingsSuggestedRepos),
     onChanged: (listener) => subscribe(IpcChannel.SettingsChanged, listener),
   },
@@ -51,7 +52,7 @@ const bridge: KorevBridge = {
   },
   pr: {
     merge: (request) => invoke(IpcChannel.PrMerge, request),
-    close: (target) => invoke(IpcChannel.PrClose, target),
+    close: (targets) => invoke(IpcChannel.PrClose, targets),
     reopen: (target) => invoke(IpcChannel.PrReopen, target),
     cancelQueue: (target) => invoke(IpcChannel.PrCancelQueue, target),
   },

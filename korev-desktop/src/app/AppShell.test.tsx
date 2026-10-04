@@ -13,6 +13,8 @@ import {
   CONNECTED_AUTH,
   WATCHING_SETTINGS,
   makeSnapshot,
+  withKeptPr,
+  withStaleStack,
 } from './test-fixtures';
 
 beforeEach(() => installMatchMedia());
@@ -68,5 +70,16 @@ describe('AppShell', () => {
     act(() => emitCommand('show-mine'));
 
     expect(await screen.findByText('No open PRs')).toBeTruthy();
+  });
+
+  it('counts stale PRs in the summary but leaves kept PRs out', async () => {
+    const { emitCommand } = renderShell(withKeptPr(withStaleStack()));
+    act(() => emitCommand('show-mine'));
+
+    expect(
+      await screen.findByText(
+        '3 need you · 1 ready to merge · 1 in progress · 2 stale',
+      ),
+    ).toBeTruthy();
   });
 });
