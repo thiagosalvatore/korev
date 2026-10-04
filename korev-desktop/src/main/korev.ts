@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import {
+  AGENT_INFO,
   isAgentProvider,
   type AgentModel,
   type AgentPreference,
@@ -292,6 +293,10 @@ export function createKorev(deps: KorevDeps): Korev {
     if (isGithubUrl(url)) await deps.openExternal(url);
   }
 
+  async function openAgentInstall(provider: AgentProvider): Promise<void> {
+    await deps.openExternal(AGENT_INFO[provider].installUrl);
+  }
+
   async function useToken(token: unknown) {
     if (typeof token !== 'string') {
       return { ok: false as const, message: 'Paste a GitHub token.' };
@@ -319,6 +324,10 @@ export function createKorev(deps: KorevDeps): Korev {
     [IpcChannel.ReposPage]: repoPage,
     [IpcChannel.ReposSearch]: searchRepos,
     [IpcChannel.ShellOpenGithub]: openGithub,
+    [IpcChannel.ShellOpenAgentInstall]: forAgent(
+      openAgentInstall,
+      async () => undefined,
+    ),
     [IpcChannel.SettingsSetMergeWith]: setMergeWith,
     [IpcChannel.PrMerge]: withParsed(parseMergeRequest, prActions.merge),
     [IpcChannel.PrClose]: withParsed(parseTarget, prActions.close),

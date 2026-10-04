@@ -4,6 +4,7 @@ import { Avatar, Button, Card, Tabs, Toast } from '../design-system';
 import type { AuthState, Connection, ConnectionMethod } from '../shared/auth';
 import type { InboxSnapshot } from '../shared/inbox';
 import type { Settings, ThemePreference } from '../shared/settings';
+import { AgentsCard } from './agents/AgentsCard';
 import { korev } from './bridge';
 import { pluralize } from './format';
 import { InboxOrder } from './repos/InboxOrder';
@@ -201,6 +202,7 @@ export function SettingsPage({ auth, settings, snapshot }: SettingsPageProps) {
           authLost={snapshot?.status === 'auth_lost'}
         />
       ) : null}
+      <AgentsCard preference={settings.agent} />
       <RepositoriesCard
         settings={settings}
         repoMerge={snapshot?.repoMerge ?? {}}

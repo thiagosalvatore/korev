@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import type { AgentModel, AgentStatus } from '../shared/agents';
 import type { AuthState } from '../shared/auth';
 import type { InboxSnapshot } from '../shared/inbox';
 import type { AppCommand, KorevBridge } from '../shared/ipc-contract';
@@ -18,6 +19,8 @@ export interface FakeBridgeOptions {
   suggestedRepos?: string[];
   owners?: RepoOwner[];
   pages?: RepoPage[];
+  agents?: AgentStatus[];
+  agentModels?: AgentModel[];
 }
 
 export interface FakeBridge {
@@ -48,6 +51,8 @@ export function installFakeBridge({
   suggestedRepos = [],
   owners = [],
   pages = [],
+  agents = [],
+  agentModels = [],
 }: FakeBridgeOptions = {}): FakeBridge {
   const inboxListeners = new Set<(next: InboxSnapshot) => void>();
   const settingsListeners = new Set<(next: Settings) => void>();
@@ -108,13 +113,16 @@ export function installFakeBridge({
       cancelQueue: vi.fn(async () => ({ ok: true as const })),
     },
     agents: {
-      statuses: vi.fn(async () => []),
-      signIn: vi.fn(async () => []),
+      statuses: vi.fn(async () => agents),
+      signIn: vi.fn(async () => agents),
       cancelSignIn: vi.fn(async () => undefined),
-      models: vi.fn(async () => []),
+      models: vi.fn(async () => agentModels),
       test: vi.fn(async () => ({ ok: true as const, output: 'OK' })),
     },
-    shell: { openGithub: vi.fn(async () => undefined) },
+    shell: {
+      openGithub: vi.fn(async () => undefined),
+      openAgentInstall: vi.fn(async () => undefined),
+    },
     app: {
       onCommand: vi.fn((listener) => {
         commandListeners.add(listener);

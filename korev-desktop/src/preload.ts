@@ -64,6 +64,8 @@ const bridge: KorevBridge = {
   },
   shell: {
     openGithub: (url) => invoke(IpcChannel.ShellOpenGithub, url),
+    openAgentInstall: (provider) =>
+      invoke(IpcChannel.ShellOpenAgentInstall, provider),
   },
   app: {
     onCommand: (listener) => subscribe(IpcChannel.AppCommand, listener),

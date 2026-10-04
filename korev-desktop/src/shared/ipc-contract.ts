@@ -39,6 +39,7 @@ export enum IpcChannel {
   ReposPage = 'repos:page',
   ReposSearch = 'repos:search',
   ShellOpenGithub = 'shell:open-github',
+  ShellOpenAgentInstall = 'shell:open-agent-install',
   AppCommand = 'app:command',
   AgentsStatuses = 'agents:statuses',
   AgentsSignIn = 'agents:sign-in',
@@ -102,6 +103,7 @@ export interface KorevBridge {
   };
   shell: {
     openGithub(url: string): Promise<void>;
+    openAgentInstall(provider: AgentProvider): Promise<void>;
   };
   app: {
     onCommand(listener: (command: AppCommand) => void): Unsubscribe;

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import type { AgentPreference } from '../shared/agents';
 import type { MergeTool } from '../shared/merge';
 import type { InboxView, Settings, ThemePreference } from '../shared/settings';
 import { korev } from './bridge';
@@ -34,6 +35,10 @@ export function saveLastView(view: InboxView): Promise<void> {
 
 export function saveMergeWith(repo: string, tool: MergeTool): Promise<void> {
   return applySettings(korev().settings.setMergeWith(repo, tool));
+}
+
+export function saveAgent(agent: AgentPreference): Promise<void> {
+  return applySettings(korev().settings.setAgent(agent));
 }
 
 export function saveCollapsedRepos(
