@@ -71,9 +71,9 @@ const CODEX_SANDBOX: Record<AgentAccess, string> = {
 };
 
 const CLAUDE_MODELS: AgentModel[] = [
-  { id: 'fable', label: 'Fable' },
-  { id: 'opus', label: 'Opus' },
-  { id: 'sonnet', label: 'Sonnet' },
+  { id: 'claude-fable-5-1', label: 'Fable 5.1' },
+  { id: 'claude-opus-5-5', label: 'Opus 5.5' },
+  { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5' },
 ];
 
 type JsonRecord = Record<string, unknown>;

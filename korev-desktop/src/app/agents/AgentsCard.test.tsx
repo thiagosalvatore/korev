@@ -32,7 +32,7 @@ function renderCard(
 ) {
   const fake = installFakeBridge({
     agents,
-    agentModels: [{ id: 'opus', label: 'Opus' }],
+    agentModels: [{ id: 'claude-opus-5-5', label: 'Opus 5.5' }],
   });
   render(<AgentsCard preference={preference} />);
   return fake;
@@ -72,9 +72,9 @@ describe('AgentsCard', () => {
     });
 
     fireEvent.click(await screen.findByRole('tab', { name: 'Claude Code' }));
-    await screen.findByRole('option', { name: 'Opus' });
+    await screen.findByRole('option', { name: 'Opus 5.5' });
     fireEvent.change(screen.getByLabelText('Model'), {
-      target: { value: 'opus' },
+      target: { value: 'claude-opus-5-5' },
     });
 
     expect(bridge.settings.setAgent).toHaveBeenCalledWith({
@@ -83,7 +83,7 @@ describe('AgentsCard', () => {
     });
     expect(bridge.settings.setAgent).toHaveBeenLastCalledWith({
       provider: 'claude',
-      models: { claude: 'opus' },
+      models: { claude: 'claude-opus-5-5' },
     });
   });
 
