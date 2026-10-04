@@ -1,3 +1,4 @@
+import type { AgentPreference } from './agents';
 import type { MergeTool } from './merge';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
@@ -20,6 +21,7 @@ export interface Settings {
   windowBounds: WindowBounds | null;
   collapsedRepos: CollapsedRepos;
   mergeWith: Record<string, MergeTool>;
+  agent: AgentPreference;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -29,4 +31,5 @@ export const DEFAULT_SETTINGS: Settings = {
   windowBounds: null,
   collapsedRepos: { review: [], mine: [] },
   mergeWith: {},
+  agent: { provider: null, models: {} },
 };

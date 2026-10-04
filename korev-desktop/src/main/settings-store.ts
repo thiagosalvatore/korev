@@ -6,6 +6,12 @@ import {
   type ThemePreference,
   type WindowBounds,
 } from '../shared/settings';
+import {
+  AGENT_PROVIDERS,
+  isAgentProvider,
+  isModelId,
+  type AgentPreference,
+} from '../shared/agents';
 import type { MergeTool } from '../shared/merge';
 import type { FileSystem } from './file-system';
 import { isRepoName } from './repo-names';
@@ -58,6 +64,19 @@ function pickOneOf<T>(options: readonly T[], value: unknown, fallback: T): T {
   return options.includes(value as T) ? (value as T) : fallback;
 }
 
+function pickAgent(value: unknown): AgentPreference {
+  const raw = (value ?? {}) as Partial<Record<keyof AgentPreference, unknown>>;
+  const models = (raw.models ?? {}) as Record<string, unknown>;
+  return {
+    provider: pickOneOf([...AGENT_PROVIDERS, null], raw.provider, null),
+    models: Object.fromEntries(
+      Object.entries(models).filter(
+        ([provider, model]) => isAgentProvider(provider) && isModelId(model),
+      ),
+    ),
+  };
+}
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
@@ -77,6 +96,7 @@ function sanitize(raw: Record<string, unknown>): Settings {
     windowBounds: pickBounds(raw.windowBounds),
     collapsedRepos: pickCollapsedRepos(raw.collapsedRepos),
     mergeWith: pickMergeWith(raw.mergeWith),
+    agent: pickAgent(raw.agent),
   };
 }
 

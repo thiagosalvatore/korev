@@ -1,4 +1,10 @@
 import { join } from 'node:path';
+import {
+  isAgentProvider,
+  type AgentModel,
+  type AgentPreference,
+  type AgentProvider,
+} from '../shared/agents';
 import type { AuthState, Connection } from '../shared/auth';
 import type { InboxSnapshot } from '../shared/inbox';
 import type { ActionResult } from '../shared/merge';
@@ -7,6 +13,8 @@ import type { RepoOwner, RepoPage } from '../shared/repos';
 import type { InboxView, Settings, ThemePreference } from '../shared/settings';
 import { buildInbox } from '../inbox/build-inbox';
 import { parseMergeRequest, parseMergeTool, parseTarget } from './action-input';
+import { createAgentsService } from './agents/agents-service';
+import type { CommandRunner } from './agents/command-runner';
 import { isGithubUrl } from './app-origin';
 import { createAuthService } from './auth-service';
 import type { SecretCipher } from './encrypted-file';
@@ -44,6 +52,7 @@ const INVALID_ACTION: ActionResult = {
   ok: false,
   message: 'Korev could not read that request.',
 };
+const NO_AGENT_MODELS: AgentModel[] = [];
 
 const timers: Scheduler = {
   setTimeout: (callback, milliseconds) => setTimeout(callback, milliseconds),
@@ -52,6 +61,9 @@ const timers: Scheduler = {
 
 export interface KorevDeps {
   userDataPath: string;
+  tempPath: string;
+  env: NodeJS.ProcessEnv;
+  runCommand: CommandRunner;
   fs: FileSystem;
   cipher: SecretCipher;
   fetch: FetchLike;
@@ -127,6 +139,13 @@ export function createKorev(deps: KorevDeps): Korev {
     scheduler: timers,
     onChange: () => broadcastInbox(inbox.snapshot()),
     refresh: () => void inbox.trigger('manual'),
+  });
+
+  const agents = createAgentsService({
+    run: deps.runCommand,
+    env: deps.env,
+    scratchDir: deps.tempPath,
+    preference: () => settings.current().agent,
   });
 
   const auth = createAuthService({
@@ -217,6 +236,13 @@ export function createKorev(deps: KorevDeps): Korev {
     return updated;
   }
 
+  function forAgent<T>(
+    run: (provider: AgentProvider) => Promise<T>,
+    invalid: () => Promise<T>,
+  ): (value: unknown) => Promise<T> {
+    return (value) => (isAgentProvider(value) ? run(value) : invalid());
+  }
+
   function withParsed<T>(
     parse: (value: unknown) => T | null,
     run: (parsed: T) => Promise<ActionResult>,
@@ -298,6 +324,16 @@ export function createKorev(deps: KorevDeps): Korev {
     [IpcChannel.PrClose]: withParsed(parseTarget, prActions.close),
     [IpcChannel.PrReopen]: withParsed(parseTarget, prActions.reopen),
     [IpcChannel.PrCancelQueue]: withParsed(parseTarget, prActions.cancelQueue),
+    [IpcChannel.SettingsSetAgent]: (agent: AgentPreference) =>
+      settings.update({ agent }),
+    [IpcChannel.AgentsStatuses]: () => agents.statuses(),
+    [IpcChannel.AgentsSignIn]: forAgent(agents.signIn, agents.statuses),
+    [IpcChannel.AgentsCancelSignIn]: () => agents.cancelSignIn(),
+    [IpcChannel.AgentsModels]: forAgent(
+      agents.models,
+      async () => NO_AGENT_MODELS,
+    ),
+    [IpcChannel.AgentsTest]: forAgent(agents.test, async () => INVALID_ACTION),
   };
 
   async function start(): Promise<void> {
@@ -316,6 +352,7 @@ export function createKorev(deps: KorevDeps): Korev {
     stop: () => {
       inbox.stop();
       prActions.stop();
+      agents.stop();
     },
   };
 

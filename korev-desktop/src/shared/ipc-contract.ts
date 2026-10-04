@@ -1,3 +1,10 @@
+import type {
+  AgentModel,
+  AgentPreference,
+  AgentProvider,
+  AgentRunResult,
+  AgentStatus,
+} from './agents';
 import type { AuthState, LoginState, TokenResult } from './auth';
 import type { InboxSnapshot } from './inbox';
 import type { ActionResult, MergeRequest, MergeTool, PrTarget } from './merge';
@@ -21,6 +28,7 @@ export enum IpcChannel {
   SettingsSetLastView = 'settings:set-last-view',
   SettingsSetCollapsedRepos = 'settings:set-collapsed-repos',
   SettingsSetMergeWith = 'settings:set-merge-with',
+  SettingsSetAgent = 'settings:set-agent',
   PrMerge = 'pr:merge',
   PrClose = 'pr:close',
   PrReopen = 'pr:reopen',
@@ -32,6 +40,11 @@ export enum IpcChannel {
   ReposSearch = 'repos:search',
   ShellOpenGithub = 'shell:open-github',
   AppCommand = 'app:command',
+  AgentsStatuses = 'agents:statuses',
+  AgentsSignIn = 'agents:sign-in',
+  AgentsCancelSignIn = 'agents:cancel-sign-in',
+  AgentsModels = 'agents:models',
+  AgentsTest = 'agents:test',
 }
 
 export type AppCommand =
@@ -65,6 +78,7 @@ export interface KorevBridge {
     setLastView(view: InboxView): Promise<Settings>;
     setCollapsedRepos(view: InboxView, repos: string[]): Promise<Settings>;
     setMergeWith(repo: string, tool: MergeTool): Promise<Settings>;
+    setAgent(agent: AgentPreference): Promise<Settings>;
     suggestedRepos(): Promise<string[]>;
     onChanged(listener: (settings: Settings) => void): Unsubscribe;
   };
@@ -78,6 +92,13 @@ export interface KorevBridge {
     close(target: PrTarget): Promise<ActionResult>;
     reopen(target: PrTarget): Promise<ActionResult>;
     cancelQueue(target: PrTarget): Promise<ActionResult>;
+  };
+  agents: {
+    statuses(): Promise<AgentStatus[]>;
+    signIn(provider: AgentProvider): Promise<AgentStatus[]>;
+    cancelSignIn(): Promise<void>;
+    models(provider: AgentProvider): Promise<AgentModel[]>;
+    test(provider: AgentProvider): Promise<AgentRunResult>;
   };
   shell: {
     openGithub(url: string): Promise<void>;

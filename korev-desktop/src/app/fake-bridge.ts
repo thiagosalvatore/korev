@@ -87,6 +87,7 @@ export function installFakeBridge({
         ...settings,
         collapsedRepos: { ...settings.collapsedRepos, [view]: repos },
       })),
+      setAgent: vi.fn(async (agent) => ({ ...settings, agent })),
       suggestedRepos: vi.fn(async () => suggestedRepos),
       onChanged: vi.fn((listener) => {
         settingsListeners.add(listener);
@@ -105,6 +106,13 @@ export function installFakeBridge({
       close: vi.fn(async () => ({ ok: true as const })),
       reopen: vi.fn(async () => ({ ok: true as const })),
       cancelQueue: vi.fn(async () => ({ ok: true as const })),
+    },
+    agents: {
+      statuses: vi.fn(async () => []),
+      signIn: vi.fn(async () => []),
+      cancelSignIn: vi.fn(async () => undefined),
+      models: vi.fn(async () => []),
+      test: vi.fn(async () => ({ ok: true as const, output: 'OK' })),
     },
     shell: { openGithub: vi.fn(async () => undefined) },
     app: {

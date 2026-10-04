@@ -95,6 +95,11 @@ function setup(
   const fs = createMemoryFileSystem(files);
   const korev = createKorev({
     userDataPath: USER_DATA,
+    tempPath: '/tmp',
+    env: {},
+    runCommand: async () => {
+      throw new Error('No CLI in tests');
+    },
     fs,
     cipher: plainCipher,
     fetch: fake.fetch,

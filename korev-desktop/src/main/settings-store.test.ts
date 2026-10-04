@@ -38,6 +38,22 @@ describe('settings store', () => {
     expect(settings.lastView).toBe('mine');
   });
 
+  it('keeps only known agents and model ids that cannot pass as a flag', async () => {
+    const fs = createMemoryFileSystem({
+      [PATH]: JSON.stringify({
+        agent: {
+          provider: 'gemini',
+          models: { claude: 'opus', codex: '--yolo', gemini: 'pro' },
+        },
+      }),
+    });
+    const { settings } = await createSettingsStore({ fs, path: PATH }).load();
+    expect(settings.agent).toEqual({
+      provider: null,
+      models: { claude: 'opus' },
+    });
+  });
+
   it('persists updates so a new store reads them back', async () => {
     const fs = createMemoryFileSystem();
     await createSettingsStore({ fs, path: PATH }).update({
