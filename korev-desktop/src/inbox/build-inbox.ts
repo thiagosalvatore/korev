@@ -1,20 +1,19 @@
 import type {
   ApprovedReview,
-  MyRepoGroup,
+  MySection,
   ReviewItem,
-  ReviewRepoGroup,
+  ReviewList,
 } from '../shared/inbox';
 import type { MergeTool } from '../shared/merge';
 import type { PullRequest } from '../shared/pull-request';
 import { approvalFor } from './approval';
 import { classifyMyPr } from './classify';
 import type { UnknownMergeStreaks } from './merge-streaks';
-import { compareReviewItems, priority } from './priority';
+import { priority } from './priority';
 import { queueStatusFor } from './queue-status';
-import { groupByRepo, sortByRepoOrder } from './repo-order';
 import { reviewRequestFor, type Viewer } from './request-age';
 import { prSize } from './size';
-import { blocksLayers, groupMyPrs, groupReviews } from './stacks';
+import { blocksLayers, groupMyPrs, groupReviews, sortApproved } from './stacks';
 
 export interface InboxInput {
   mine: PullRequest[];
@@ -27,8 +26,8 @@ export interface InboxInput {
 }
 
 export interface Inbox {
-  mine: MyRepoGroup[];
-  reviews: ReviewRepoGroup[];
+  mine: MySection[];
+  reviews: ReviewList;
   reviewCount: number;
 }
 
@@ -58,15 +57,17 @@ function sortReview(item: ReviewItem, viewer: Viewer): SortedReview {
   return { item, approved: approval ? { item, approval } : null };
 }
 
-function toReviewGroup(repo: string, sorted: SortedReview[]): ReviewRepoGroup {
+function toReviewList(sorted: SortedReview[], repoOrder: string[]): ReviewList {
   const waiting = sorted.filter((review) => !review.approved);
-  const approved = sorted
-    .flatMap((review) => (review.approved ? [review.approved] : []))
-    .sort((left, right) => compareReviewItems(left.item, right.item));
+  const approved = sorted.flatMap((review) =>
+    review.approved ? [review.approved] : [],
+  );
   return {
-    repo,
-    entries: groupReviews(waiting.map((review) => review.item)),
-    approved,
+    entries: groupReviews(
+      waiting.map((review) => review.item),
+      repoOrder,
+    ),
+    approved: sortApproved(approved, repoOrder),
   };
 }
 
@@ -85,18 +86,12 @@ export function buildInbox({
       queue: queueStatusFor(pr, mergeWith[pr.repo] ?? 'github'),
     }),
   );
-  const mineGroups = groupByRepo(classified, (item) => item.pr.repo).map(
-    ([repo, items]) => ({ repo, sections: groupMyPrs(items) }),
-  );
   const sorted = reviews.map((pr) =>
     sortReview(toReviewItem(pr, viewer, now), viewer),
   );
-  const reviewGroups = groupByRepo(sorted, (review) => review.item.pr.repo).map(
-    ([repo, items]) => toReviewGroup(repo, items),
-  );
   return {
-    mine: sortByRepoOrder(mineGroups, repoOrder),
-    reviews: sortByRepoOrder(reviewGroups, repoOrder),
+    mine: groupMyPrs(classified, repoOrder),
+    reviews: toReviewList(sorted, repoOrder),
     reviewCount: sorted.filter((review) => !review.approved).length,
   };
 }

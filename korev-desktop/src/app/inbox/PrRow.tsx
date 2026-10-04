@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../design-system';
 import { useListOption } from './listbox';
+import { RepoLabel } from './OwnerAvatar';
 
 const ROW =
   'grid min-h-13 w-full cursor-pointer items-center gap-3 px-5 py-2 text-left font-sans text-fg-1 transition-colors duration-(--dur-fast) ease-out hover:bg-hover aria-selected:bg-raised aria-selected:shadow-[inset_2px_0_0_var(--accent)] focus-visible:relative focus-visible:shadow-focus';
@@ -24,10 +25,16 @@ export function PrRow({ optionKey, url, className, children }: PrRowProps) {
 export interface PrSummaryProps {
   title: string;
   meta: ReactNode;
+  repo?: string;
   muted?: boolean;
 }
 
-export function PrSummary({ title, meta, muted = false }: PrSummaryProps) {
+export function PrSummary({
+  title,
+  meta,
+  repo,
+  muted = false,
+}: PrSummaryProps) {
   return (
     <span className="flex min-w-0 flex-col">
       <span
@@ -39,7 +46,15 @@ export function PrSummary({ title, meta, muted = false }: PrSummaryProps) {
       >
         {title}
       </span>
-      <span className="mt-0.5 truncate text-xs text-fg-3">{meta}</span>
+      <span className="mt-0.5 inline-flex min-w-0 items-center text-xs whitespace-nowrap text-fg-3">
+        {repo ? (
+          <>
+            <RepoLabel repo={repo} />
+            <span className="shrink-0">&nbsp;·&nbsp;</span>
+          </>
+        ) : null}
+        <span className="truncate">{meta}</span>
+      </span>
     </span>
   );
 }

@@ -3,16 +3,18 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { InboxSnapshot } from '../shared/inbox';
+import type { ApprovedReview, InboxSnapshot } from '../shared/inbox';
 import { installFakeBridge, installMatchMedia } from './fake-bridge';
 import { ReviewInbox } from './ReviewInbox';
 import {
   APPROVED_REVIEW,
   INVOICE_REVIEW,
   SPIKE_REVIEW,
+  makePr,
   makeSnapshot,
 } from './test-fixtures';
 
@@ -42,62 +44,67 @@ function panel(): HTMLElement {
 
 function reorderedSnapshot(): InboxSnapshot {
   const snapshot = makeSnapshot();
-  const [api, web, billing] = snapshot.reviews;
-  return { ...snapshot, reviews: [billing, api, web] };
+  const [invoice, engine, spike] = snapshot.reviews.entries;
+  return {
+    ...snapshot,
+    reviews: { ...snapshot.reviews, entries: [spike, invoice, engine] },
+  };
 }
 
+const API_APPROVED: ApprovedReview = {
+  ...APPROVED_REVIEW,
+  item: {
+    ...APPROVED_REVIEW.item,
+    pr: makePr(77, 'Drop legacy tokens', { repo: 'acme/api' }),
+  },
+};
+
 function withApproved(
-  reviews: InboxSnapshot['reviews'] = makeSnapshot().reviews,
+  entries: InboxSnapshot['reviews']['entries'] = makeSnapshot().reviews.entries,
 ): InboxSnapshot {
   return makeSnapshot({
-    reviews: reviews.map((group) =>
-      group.repo === 'acme/web'
-        ? { ...group, approved: [APPROVED_REVIEW] }
-        : group,
-    ),
+    reviews: { entries, approved: [APPROVED_REVIEW, API_APPROVED] },
   });
 }
 
 describe('ReviewInbox', () => {
-  it('lists requests by repo in the given order and marks only drafts', () => {
+  it('lists requests in one list with the repo on each row, and marks only drafts', () => {
     installFakeBridge();
     renderInbox();
-    const titles = optionTitles();
-    const order = [
-      'acme/api',
-      'Spike: replace cron',
-      'acme/web',
-      'planner rewrite',
-      'Migrate dashboards',
+    expect(optionTitles()[0]).toContain(INVOICE_REVIEW.pr.title);
+    expect(rowTitled(INVOICE_REVIEW.pr.title).textContent).toContain(
       'acme/billing',
-      'Fix double-charge',
-    ].map((title) => titles.findIndex((text) => text.includes(title)));
-    expect(order).toEqual([...order].sort((left, right) => left - right));
+    );
+    expect(rowTitled(SPIKE_REVIEW.pr.title).textContent).toContain('acme/api');
+    expect(screen.queryByRole('group', { name: 'acme/api' })).toBeNull();
     expect(screen.getAllByText('Draft')).toHaveLength(1);
     expect(rowTitled(SPIKE_REVIEW.pr.title).textContent).toContain('Draft');
   });
 
-  it('keeps already-approved requests in a collapsed section of their repo', () => {
+  it('keeps already-approved requests from every repo behind one collapsed toggle', async () => {
     installFakeBridge();
     renderInbox(withApproved());
     expect(screen.queryByText(APPROVED_REVIEW.item.pr.title)).toBeNull();
+    expect(
+      screen.getAllByRole('option', { name: /Already approved/ }),
+    ).toHaveLength(1);
 
     fireEvent.click(rowTitled('Already approved'));
 
-    const row = rowTitled(APPROVED_REVIEW.item.pr.title);
-    expect(row.textContent).toContain('Approved by @sakce');
-    expect(within(row).getByText('Approved')).toBeTruthy();
+    await waitFor(() => {
+      const row = rowTitled(APPROVED_REVIEW.item.pr.title);
+      expect(row.textContent).toContain('Approved by @sakce');
+      expect(row.textContent).toContain('acme/web');
+      expect(within(row).getByText('Approved')).toBeTruthy();
+      expect(rowTitled(API_APPROVED.item.pr.title)).toBeTruthy();
+    });
   });
 
   it('says nothing is waiting while still listing approved requests', () => {
     installFakeBridge();
-    const onlyApproved = withApproved(
-      makeSnapshot().reviews.map((group) => ({ ...group, entries: [] })),
-    );
-    renderInbox({ ...onlyApproved, reviewCount: 0 });
+    renderInbox({ ...withApproved([]), reviewCount: 0 });
 
     expect(screen.getByText('No reviews waiting on you.')).toBeTruthy();
-    expect(rowTitled('acme/web').textContent).toContain('0 waiting');
     expect(rowTitled('Already approved')).toBeTruthy();
   });
 
@@ -134,9 +141,9 @@ describe('ReviewInbox', () => {
 
     rerenderWith(reorderedSnapshot());
 
-    expect(optionTitles()[1]).toContain(SPIKE_REVIEW.pr.title);
+    expect(optionTitles()[0]).toContain(INVOICE_REVIEW.pr.title);
     fireEvent.click(screen.getByRole('button', { name: /1 update/ }));
-    expect(optionTitles()[1]).toContain(INVOICE_REVIEW.pr.title);
+    expect(optionTitles()[0]).toContain(SPIKE_REVIEW.pr.title);
   });
 
   it('applies the first live sync after a cached launch without holding it', () => {
@@ -146,7 +153,7 @@ describe('ReviewInbox', () => {
 
     rerenderWith(reorderedSnapshot());
 
-    expect(optionTitles()[1]).toContain(INVOICE_REVIEW.pr.title);
+    expect(optionTitles()[0]).toContain(SPIKE_REVIEW.pr.title);
     expect(screen.queryByRole('button', { name: /update/ })).toBeNull();
   });
 

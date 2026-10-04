@@ -1,28 +1,28 @@
-import { useId } from 'react';
-import { EmptyState } from '../design-system';
+import { EmptyState, Icon } from '../design-system';
 import type {
   Bucket,
   InboxSnapshot,
   MyEntry,
-  MyRepoGroup,
   MySection,
   MyStack,
 } from '../shared/inbox';
+import { sectionToggleKey } from './inbox/entries';
+import {
+  GroupBlock,
+  type CountTone,
+  type GroupToggle,
+} from './inbox/GroupHeader';
 import { InboxList } from './inbox/InboxList';
-import { LoadError, LoadingList, RepoSkeletons } from './inbox/InboxStates';
+import { LoadError, LoadingList, SectionSkeletons } from './inbox/InboxStates';
 import { MINE_MODEL } from './inbox/list-model';
 import { MyPrRow } from './inbox/MyPrRow';
 import { OtherLayerRow } from './inbox/OtherLayerRow';
 import { inboxPhase } from './inbox/phase';
-import { RepoBlock } from './inbox/RepoHeader';
-import { groupNeedsYouCount, groupOpenCount } from './inbox/selectors';
 import { StackGroup, StackLayerItem, byPosition } from './inbox/StackGroup';
 import {
-  useCollapsedRepos,
-  type CollapsedRepos,
-} from './inbox/useCollapsedRepos';
-
-const BUCKET_ORDER: Bucket[] = ['needs-you', 'in-progress', 'ready'];
+  useCollapsedSections,
+  type CollapsedSections,
+} from './inbox/useCollapsedSections';
 
 const BUCKET_LABELS: Record<Bucket, string> = {
   'needs-you': 'Needs you',
@@ -69,75 +69,77 @@ function MyEntryView({ entry }: { entry: MyEntry }) {
   return <MyPrRow item={entry.item} />;
 }
 
-interface SectionHeadingProps {
-  id: string;
-  label: string;
-  count: number;
+const COUNT_TONES: Record<Bucket, CountTone> = {
+  'needs-you': 'danger',
+  ready: 'success',
+  'in-progress': 'neutral',
+};
+
+const ALWAYS_OPEN = 'needs-you' satisfies Bucket;
+
+function sectionToggle(
+  bucket: Exclude<Bucket, typeof ALWAYS_OPEN>,
+  collapsed: CollapsedSections,
+): GroupToggle {
+  return {
+    optionKey: sectionToggleKey(bucket),
+    expanded: !collapsed.isCollapsed(bucket),
+    onToggle: () => collapsed.toggle(bucket, BUCKET_LABELS[bucket]),
+  };
 }
 
-function SectionHeading({ id, label, count }: SectionHeadingProps) {
+interface SectionBlockProps {
+  section: MySection;
+  collapsed: CollapsedSections;
+}
+
+function SectionBlock({ section, collapsed }: SectionBlockProps) {
+  const { bucket } = section;
   return (
-    <h2
-      id={id}
-      className="m-0 flex items-center gap-2 px-5 pt-4 pb-1.5 type-overline text-fg-3"
+    <GroupBlock
+      label={BUCKET_LABELS[bucket]}
+      count={section.count}
+      tone={COUNT_TONES[bucket]}
+      toggle={
+        bucket === ALWAYS_OPEN ? undefined : sectionToggle(bucket, collapsed)
+      }
     >
-      {label}
-      <span className="font-mono text-fg-2">{count}</span>
-    </h2>
-  );
-}
-
-function SectionBlock({ section }: { section: MySection }) {
-  const headingId = useId();
-  return (
-    <div role="group" aria-labelledby={headingId}>
-      <SectionHeading
-        id={headingId}
-        label={BUCKET_LABELS[section.bucket]}
-        count={section.count}
-      />
       {section.entries.map((entry) => (
         <MyEntryView key={entryKey(entry)} entry={entry} />
       ))}
-    </div>
+    </GroupBlock>
   );
 }
 
-function orderedSections(group: MyRepoGroup): MySection[] {
-  return BUCKET_ORDER.flatMap((bucket) =>
-    group.sections.filter(
-      (section) => section.bucket === bucket && section.entries.length > 0,
-    ),
-  );
-}
-
-function urgentLabel(group: MyRepoGroup): string | null {
-  const needsYou = groupNeedsYouCount(group);
-  return needsYou > 0 ? `${needsYou} need you` : null;
-}
-
-interface MyRepoViewProps {
-  group: MyRepoGroup;
-  avatarUrl?: string;
-  collapsed: CollapsedRepos;
-}
-
-function MyRepoView({ group, avatarUrl, collapsed }: MyRepoViewProps) {
-  const sections = orderedSections(group);
-  if (sections.length === 0) return null;
+function NothingNeedsYou() {
   return (
-    <RepoBlock
-      repo={group.repo}
-      avatarUrl={avatarUrl}
-      countLabel={`${groupOpenCount(group)} open`}
-      urgentLabel={urgentLabel(group)}
-      expanded={!collapsed.isCollapsed(group.repo)}
-      onToggle={() => collapsed.toggle(group.repo)}
-    >
-      {sections.map((section) => (
-        <SectionBlock key={section.bucket} section={section} />
+    <p className="m-0 flex h-9 items-center gap-2 px-5 type-ui text-fg-2">
+      <Icon name="check-check" size={14} />
+      Nothing needs you.
+    </p>
+  );
+}
+
+function MySections({
+  sections,
+  collapsed,
+}: {
+  sections: MySection[];
+  collapsed: CollapsedSections;
+}) {
+  const shown = sections.filter((section) => section.entries.length > 0);
+  const needsYouShown = shown.some((section) => section.bucket === ALWAYS_OPEN);
+  return (
+    <>
+      {needsYouShown ? null : <NothingNeedsYou />}
+      {shown.map((section) => (
+        <SectionBlock
+          key={section.bucket}
+          section={section}
+          collapsed={collapsed}
+        />
       ))}
-    </RepoBlock>
+    </>
   );
 }
 
@@ -155,12 +157,12 @@ export interface MyPrsProps {
 }
 
 export function MyPrs({ snapshot, onOpenSettings }: MyPrsProps) {
-  const collapsed = useCollapsedRepos('mine');
+  const collapsed = useCollapsedSections();
   const phase = inboxPhase(snapshot);
   if (phase.kind === 'loading') {
     return (
       <LoadingList>
-        <RepoSkeletons />
+        <SectionSkeletons />
       </LoadingList>
     );
   }
@@ -176,16 +178,9 @@ export function MyPrs({ snapshot, onOpenSettings }: MyPrsProps) {
       onOpenSettings={onOpenSettings}
       empty={NOTHING_NEEDS_YOU}
     >
-      {(displayed) =>
-        displayed.mine.map((group) => (
-          <MyRepoView
-            key={group.repo}
-            group={group}
-            avatarUrl={displayed.repoAvatars[group.repo]}
-            collapsed={collapsed}
-          />
-        ))
-      }
+      {(displayed) => (
+        <MySections sections={displayed.mine} collapsed={collapsed} />
+      )}
     </InboxList>
   );
 }

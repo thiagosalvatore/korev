@@ -1,10 +1,14 @@
 import type {
+  Bucket,
   InboxSnapshot,
-  MyRepoGroup,
   ReviewEntry,
   ReviewItem,
-  ReviewRepoGroup,
 } from '../../shared/inbox';
+
+export interface SectionCount {
+  bucket: Bucket;
+  count: number;
+}
 
 function requestedInEntry(entry: ReviewEntry): ReviewItem[] {
   if (entry.kind === 'pr') return [entry.item];
@@ -13,42 +17,20 @@ function requestedInEntry(entry: ReviewEntry): ReviewItem[] {
   );
 }
 
-export function requestedInGroup(group: ReviewRepoGroup): ReviewItem[] {
-  return group.entries.flatMap(requestedInEntry);
-}
-
 export function requestedItems(snapshot: InboxSnapshot): ReviewItem[] {
-  return snapshot.reviews.flatMap(requestedInGroup);
+  return snapshot.reviews.entries.flatMap(requestedInEntry);
 }
 
-export function groupNeedsYouCount(group: MyRepoGroup): number {
-  return group.sections
-    .filter((section) => section.bucket === 'needs-you')
-    .reduce((total, section) => total + section.count, 0);
-}
-
-export function groupOpenCount(group: MyRepoGroup): number {
-  return group.sections.reduce((total, section) => total + section.count, 0);
+export function sectionCounts(snapshot: InboxSnapshot): SectionCount[] {
+  return snapshot.mine.map(({ bucket, count }) => ({ bucket, count }));
 }
 
 export function needsYouCount(snapshot: InboxSnapshot): number {
-  return snapshot.mine.reduce(
-    (total, group) => total + groupNeedsYouCount(group),
-    0,
+  return (
+    snapshot.mine.find((section) => section.bucket === 'needs-you')?.count ?? 0
   );
-}
-
-export function openCount(snapshot: InboxSnapshot): number {
-  return snapshot.mine.reduce(
-    (total, group) => total + groupOpenCount(group),
-    0,
-  );
-}
-
-export function topPriorityCount(items: ReviewItem[]): number {
-  return items.filter((item) => item.priority.tier === 'P1').length;
 }
 
 export function hasTopPriority(snapshot: InboxSnapshot): boolean {
-  return topPriorityCount(requestedItems(snapshot)) > 0;
+  return requestedItems(snapshot).some((item) => item.priority.tier === 'P1');
 }

@@ -88,9 +88,12 @@ export function installFakeBridge({
         ...settings,
         mergeWith: { ...settings.mergeWith, [repo]: tool },
       })),
-      setCollapsedRepos: vi.fn(async (view, repos) => ({
+      setCollapsedSection: vi.fn(async (section, collapsed) => ({
         ...settings,
-        collapsedRepos: { ...settings.collapsedRepos, [view]: repos },
+        collapsedSections: {
+          ...settings.collapsedSections,
+          [section]: collapsed,
+        },
       })),
       setAgent: vi.fn(async (agent) => ({ ...settings, agent })),
       suggestedRepos: vi.fn(async () => suggestedRepos),

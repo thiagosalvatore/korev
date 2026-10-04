@@ -9,7 +9,12 @@ import type { AuthState, LoginState, TokenResult } from './auth';
 import type { InboxSnapshot } from './inbox';
 import type { ActionResult, MergeRequest, MergeTool, PrTarget } from './merge';
 import type { RepoOwner, RepoPage } from './repos';
-import type { InboxView, Settings, ThemePreference } from './settings';
+import type {
+  CollapsibleSection,
+  InboxView,
+  Settings,
+  ThemePreference,
+} from './settings';
 
 export enum IpcChannel {
   InboxLoad = 'inbox:load',
@@ -26,7 +31,7 @@ export enum IpcChannel {
   SettingsSetRepos = 'settings:set-repos',
   SettingsSetTheme = 'settings:set-theme',
   SettingsSetLastView = 'settings:set-last-view',
-  SettingsSetCollapsedRepos = 'settings:set-collapsed-repos',
+  SettingsSetCollapsedSection = 'settings:set-collapsed-section',
   SettingsSetMergeWith = 'settings:set-merge-with',
   SettingsSetAgent = 'settings:set-agent',
   PrMerge = 'pr:merge',
@@ -77,7 +82,10 @@ export interface KorevBridge {
     setRepos(repos: string[]): Promise<Settings>;
     setTheme(theme: ThemePreference): Promise<Settings>;
     setLastView(view: InboxView): Promise<Settings>;
-    setCollapsedRepos(view: InboxView, repos: string[]): Promise<Settings>;
+    setCollapsedSection(
+      section: CollapsibleSection,
+      collapsed: boolean,
+    ): Promise<Settings>;
     setMergeWith(repo: string, tool: MergeTool): Promise<Settings>;
     setAgent(agent: AgentPreference): Promise<Settings>;
     suggestedRepos(): Promise<string[]>;

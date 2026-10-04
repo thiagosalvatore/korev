@@ -44,6 +44,7 @@ export function MyPrRow({ item, stackPlace }: MyPrRowProps) {
       <CiIcon state={pr.ci} checks={pr.checks} />
       <PrSummary
         title={pr.title}
+        repo={stackPlace ? undefined : pr.repo}
         muted={settled !== null}
         meta={
           <>

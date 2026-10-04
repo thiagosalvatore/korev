@@ -36,8 +36,8 @@ const bridge: KorevBridge = {
     setRepos: (repos) => invoke(IpcChannel.SettingsSetRepos, repos),
     setTheme: (theme) => invoke(IpcChannel.SettingsSetTheme, theme),
     setLastView: (view) => invoke(IpcChannel.SettingsSetLastView, view),
-    setCollapsedRepos: (view, repos) =>
-      invoke(IpcChannel.SettingsSetCollapsedRepos, view, repos),
+    setCollapsedSection: (section, collapsed) =>
+      invoke(IpcChannel.SettingsSetCollapsedSection, section, collapsed),
     setMergeWith: (repo, tool) =>
       invoke(IpcChannel.SettingsSetMergeWith, repo, tool),
     setAgent: (agent) => invoke(IpcChannel.SettingsSetAgent, agent),

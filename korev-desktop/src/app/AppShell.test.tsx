@@ -8,13 +8,18 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppShell } from './AppShell';
 import { installFakeBridge, installMatchMedia } from './fake-bridge';
-import { CONNECTED_AUTH, WATCHING_SETTINGS } from './test-fixtures';
+import type { InboxSnapshot } from '../shared/inbox';
+import {
+  CONNECTED_AUTH,
+  WATCHING_SETTINGS,
+  makeSnapshot,
+} from './test-fixtures';
 
 beforeEach(() => installMatchMedia());
 afterEach(cleanup);
 
-function renderShell() {
-  const fake = installFakeBridge();
+function renderShell(snapshot?: InboxSnapshot) {
+  const fake = installFakeBridge({ snapshot });
   render(<AppShell auth={CONNECTED_AUTH} settings={WATCHING_SETTINGS} />);
   return fake;
 }
@@ -45,5 +50,23 @@ describe('AppShell', () => {
     expect(
       screen.getByRole('dialog', { name: 'Keyboard shortcuts' }),
     ).toBeTruthy();
+  });
+
+  it('sums up My PRs by section in display order, leaving out empty sections', async () => {
+    const snapshot = makeSnapshot();
+    const { emitCommand } = renderShell({
+      ...snapshot,
+      mine: snapshot.mine.filter((section) => section.bucket !== 'ready'),
+    });
+    act(() => emitCommand('show-mine'));
+
+    expect(await screen.findByText('3 need you · 1 in progress')).toBeTruthy();
+  });
+
+  it('says there are no open PRs when every section is empty', async () => {
+    const { emitCommand } = renderShell(makeSnapshot({ mine: [] }));
+    act(() => emitCommand('show-mine'));
+
+    expect(await screen.findByText('No open PRs')).toBeTruthy();
   });
 });

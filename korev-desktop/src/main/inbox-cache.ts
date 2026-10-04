@@ -17,7 +17,7 @@ interface CacheFile {
   snapshot: InboxSnapshot;
 }
 
-const CACHE_VERSION = 3;
+export const CACHE_VERSION = 4;
 
 function sameLogin(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();

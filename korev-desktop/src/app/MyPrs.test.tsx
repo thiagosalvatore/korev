@@ -34,70 +34,69 @@ function pressFrom(row: HTMLElement, key: string): Element | null {
   return document.activeElement;
 }
 
-function repoGroup(repo: string): HTMLElement {
-  return screen.getByRole('group', { name: repo });
+function sectionHeader(name: string): HTMLElement {
+  return screen.getByRole('option', { name: new RegExp(`^${name}`) });
 }
 
-function repoHeader(repo: string): HTMLElement {
-  return screen.getByRole('option', { name: new RegExp(`^${repo}`) });
-}
-
-function sectionHeading(name: string, within_ = document.body): HTMLElement {
-  return within(within_).getByRole('heading', {
-    name: new RegExp(`^${name}`),
-  });
+function withoutNeedsYou(): InboxSnapshot {
+  const snapshot = makeSnapshot();
+  return {
+    ...snapshot,
+    mine: snapshot.mine.filter((section) => section.bucket !== 'needs-you'),
+  };
 }
 
 describe('MyPrs', () => {
-  it('groups PRs under repo headers in order, with sections inside each repo', () => {
+  it('shows each section once across repos, in display order', () => {
     renderMyPrs();
-    const headers = screen
-      .getAllByRole('option')
-      .filter((option) => option.hasAttribute('aria-expanded'))
-      .map((option) => option.textContent);
-    expect(headers[0]).toContain('acme/api');
-    expect(headers[1]).toContain('acme/web');
-    const api = repoGroup('acme/api');
+    const groups = screen
+      .getAllByRole('group')
+      .map((group) => group.getAttribute('aria-label'))
+      .filter((label) => !label?.startsWith('Stack'));
+    expect(groups).toEqual(['Needs you', 'Ready to merge', 'In progress']);
     expect(
-      within(sectionHeading('Needs you', api)).getByText('1'),
+      screen.getByRole('heading', { name: 'Needs you, 3 pull requests' }),
     ).toBeTruthy();
-    expect(
-      within(sectionHeading('In progress', api)).getByText('1'),
-    ).toBeTruthy();
-    expect(
-      within(sectionHeading('Ready to merge', api)).getByText('1'),
-    ).toBeTruthy();
-    expect(within(repoHeader('acme/web')).getByText('2 need you')).toBeTruthy();
+    expect(sectionHeader('Ready to merge, 1 pull request')).toBeTruthy();
   });
 
-  it("shows the repo owner's avatar in the repo header when GitHub has one", () => {
+  it('shows the repo and its owner avatar on each row', () => {
     const avatarUrl = 'https://avatars.githubusercontent.com/u/1?s=32';
-    renderMyPrs(makeSnapshot({ repoAvatars: { 'acme/web': avatarUrl } }));
+    renderMyPrs(makeSnapshot({ repoAvatars: { 'acme/api': avatarUrl } }));
 
-    expect(repoHeader('acme/web').querySelector('img')?.src).toBe(avatarUrl);
-    expect(repoHeader('acme/api').querySelector('img')).toBeNull();
+    const row = rowTitled('Rate-limit per tenant');
+    expect(row.textContent).toContain('acme/api');
+    expect(row.querySelector('img')?.src).toBe(avatarUrl);
+    expect(rowTitled('Settings: org access states').textContent).not.toContain(
+      'acme/web',
+    );
   });
 
-  it('collapses a repo with ArrowLeft, keeps its urgency badge and saves the choice', async () => {
+  it('never makes Needs you collapsible', () => {
     renderMyPrs();
-    const header = repoHeader('acme/web');
+    expect(screen.queryByRole('option', { name: /^Needs you/ })).toBeNull();
+  });
+
+  it('collapses Ready to merge with ArrowLeft, keeps its count and saves the choice', async () => {
+    renderMyPrs();
+    const header = sectionHeader('Ready to merge');
     header.focus();
     fireEvent.keyDown(header, { key: 'ArrowLeft' });
 
-    expect(bridge.settings.setCollapsedRepos).toHaveBeenCalledWith('mine', [
-      'acme/web',
-    ]);
-    await waitFor(() => expect(screen.queryByText('App shell')).toBeNull());
-    expect(within(repoHeader('acme/web')).getByText('2 need you')).toBeTruthy();
+    expect(bridge.settings.setCollapsedSection).toHaveBeenCalledWith(
+      'ready',
+      true,
+    );
+    await waitFor(() =>
+      expect(screen.queryByText('Bump OpenTelemetry to 1.31')).toBeNull(),
+    );
+    expect(within(sectionHeader('Ready to merge')).getByText('1')).toBeTruthy();
   });
 
-  it('hides the header of an empty section', () => {
-    renderMyPrs();
-    const web = repoGroup('acme/web');
-    expect(
-      within(web).queryByRole('heading', { name: /^Ready to merge/ }),
-    ).toBeNull();
-    expect(sectionHeading('Needs you', web)).toBeTruthy();
+  it('says nothing needs you when only other sections have PRs', () => {
+    renderMyPrs(withoutNeedsYou());
+    expect(screen.getByText('Nothing needs you.')).toBeTruthy();
+    expect(rowTitled('Bump OpenTelemetry')).toBeTruthy();
   });
 
   it('renders stack layers bottom-first and labels the teammate layer', () => {
@@ -122,20 +121,20 @@ describe('MyPrs', () => {
     expect(screen.getByText('Merged')).toBeTruthy();
   });
 
-  it('moves with j/k across sections, repo headers and into stack layers', () => {
+  it('moves with j/k across section headers and into stack layers, skipping Needs you', () => {
     renderMyPrs();
+    const firstRow = rowTitled('Rate-limit per tenant');
+    expect(pressFrom(firstRow, 'ArrowUp')).toBe(firstRow);
+    expect(pressFrom(firstRow, 'j')?.textContent).toContain('App shell');
     expect(
-      pressFrom(rowTitled('Rate-limit per tenant'), 'j')?.textContent,
-    ).toContain('Retry flaky exporter');
+      pressFrom(rowTitled('Settings: repo picker UI'), 'j')?.textContent,
+    ).toContain('Ready to merge');
     expect(
-      pressFrom(rowTitled('Bump OpenTelemetry'), 'j')?.textContent,
-    ).toContain('acme/web');
-    expect(pressFrom(repoHeader('acme/web'), 'j')?.textContent).toContain(
-      'App shell',
-    );
-    expect(pressFrom(rowTitled('App shell'), 'ArrowUp')?.textContent).toContain(
-      'acme/web',
-    );
+      pressFrom(sectionHeader('Ready to merge'), 'j')?.textContent,
+    ).toContain('Bump OpenTelemetry');
+    expect(
+      pressFrom(rowTitled('Bump OpenTelemetry'), 'k')?.textContent,
+    ).toContain('Ready to merge');
   });
 
   it('keeps the list under an offline banner', () => {

@@ -5,7 +5,7 @@ import type {
   ReviewItem,
   ReviewRequest,
 } from '../../shared/inbox';
-import { formatAge, joinMeta, pluralize } from '../format';
+import { formatAge, pluralize } from '../format';
 import { NARROW_HIDDEN } from '../layout';
 import { MINUTE_MS, useNow } from '../useNow';
 import { CiIcon } from './CiIcon';
@@ -26,15 +26,23 @@ function requestSource(request: ReviewRequest): string {
   return 'Requested from you';
 }
 
-function requestTiming(item: ReviewItem, now: number): string[] {
+interface MetaPart {
+  text: string | null;
+  narrowHidden?: boolean;
+}
+
+function requestTiming(item: ReviewItem, now: number): MetaPart[] {
   const { request, pr } = item;
   if (request.approximate) {
     return [
-      `PR opened ${formatAge(pr.createdAt, now)} ago`,
-      'request time unknown',
+      { text: `PR opened ${formatAge(pr.createdAt, now)} ago` },
+      { text: 'request time unknown' },
     ];
   }
-  return [requestSource(request), formatAge(request.requestedAt, now)];
+  return [
+    { text: requestSource(request), narrowHidden: true },
+    { text: formatAge(request.requestedAt, now) },
+  ];
 }
 
 function blocksNote(blocksLayers: number): string | null {
@@ -42,14 +50,44 @@ function blocksNote(blocksLayers: number): string | null {
   return `blocks ${pluralize(blocksLayers, 'layer')}`;
 }
 
-function reviewMeta(item: ReviewItem, now: number): string {
-  const { pr } = item;
-  return joinMeta([
-    authorHandle(pr.authorLogin),
-    `#${pr.number}`,
-    ...requestTiming(item, now),
-    blocksNote(item.blocksLayers),
-  ]);
+interface MetaLineProps {
+  authorLogin: string | null;
+  number: number;
+  parts: MetaPart[];
+}
+
+function MetaLine({ authorLogin, number, parts }: MetaLineProps) {
+  const author = authorHandle(authorLogin);
+  return (
+    <>
+      {author ? <span className={NARROW_HIDDEN}>{author} · </span> : null}#
+      {number}
+      {parts.map((part) =>
+        part.text ? (
+          <span
+            key={part.text}
+            className={part.narrowHidden ? NARROW_HIDDEN : undefined}
+          >
+            {' · '}
+            {part.text}
+          </span>
+        ) : null,
+      )}
+    </>
+  );
+}
+
+function reviewMeta(item: ReviewItem, now: number) {
+  return (
+    <MetaLine
+      authorLogin={item.pr.authorLogin}
+      number={item.pr.number}
+      parts={[
+        ...requestTiming(item, now),
+        { text: blocksNote(item.blocksLayers) },
+      ]}
+    />
+  );
 }
 
 export function approvalText(approval: Approval): string {
@@ -70,13 +108,17 @@ export function ApprovalBadge({ approval }: { approval: Approval }) {
   return <Badge tone="success">Approved</Badge>;
 }
 
-function approvedMeta({ item, approval }: ApprovedReview): string {
-  return joinMeta([
-    authorHandle(item.pr.authorLogin),
-    `#${item.pr.number}`,
-    requestSource(item.request),
-    approvalText(approval),
-  ]);
+function approvedMeta({ item, approval }: ApprovedReview) {
+  return (
+    <MetaLine
+      authorLogin={item.pr.authorLogin}
+      number={item.pr.number}
+      parts={[
+        { text: requestSource(item.request), narrowHidden: true },
+        { text: approvalText(approval) },
+      ]}
+    />
+  );
 }
 
 interface ReviewColumnsProps {
@@ -116,7 +158,11 @@ export function ReviewRow({ item, stackPlace }: ReviewRowProps) {
     >
       {stackPlace ? <LayerLabel {...stackPlace} /> : null}
       <PriorityBadge priority={priority} />
-      <PrSummary title={pr.title} meta={reviewMeta(item, now)} />
+      <PrSummary
+        title={pr.title}
+        repo={stackPlace ? undefined : pr.repo}
+        meta={reviewMeta(item, now)}
+      />
       <ReviewColumns item={item} />
     </PrRow>
   );
@@ -129,7 +175,11 @@ export function ApprovedRow({ approved }: { approved: ApprovedReview }) {
       <span>
         <ApprovalBadge approval={approved.approval} />
       </span>
-      <PrSummary title={pr.title} meta={approvedMeta(approved)} />
+      <PrSummary
+        title={pr.title}
+        repo={pr.repo}
+        meta={approvedMeta(approved)}
+      />
       <ReviewColumns item={approved.item} />
     </PrRow>
   );

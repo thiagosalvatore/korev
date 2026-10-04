@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Badge } from '../../design-system';
+import { OwnerAvatar, useRepoAvatar } from './OwnerAvatar';
 
 export interface StackGroupProps {
   repo: string;
@@ -19,6 +20,7 @@ export function StackGroup({
   partial,
   children,
 }: StackGroupProps) {
+  const avatarUrl = useRepoAvatar(repo);
   return (
     <div
       role="group"
@@ -26,6 +28,11 @@ export function StackGroup({
       className="mx-5 my-1 overflow-hidden rounded-md border border-border-1"
     >
       <div className="flex min-w-0 items-center gap-2 border-b border-border-1 px-3 py-2 text-xs text-fg-2">
+        {avatarUrl ? <OwnerAvatar src={avatarUrl} size="sm" /> : null}
+        <span title={repo} className="truncate font-mono text-fg-3">
+          {repo}
+        </span>
+        <span aria-hidden="true">·</span>
         <Badge tone="accent">Stack</Badge>
         <span className="truncate font-mono">→ {baseRefName}</span>
         <span className="flex-1" />

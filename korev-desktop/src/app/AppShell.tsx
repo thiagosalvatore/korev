@@ -9,8 +9,12 @@ import {
 import type { AuthState } from '../shared/auth';
 import type { InboxSnapshot } from '../shared/inbox';
 import type { InboxView, Settings } from '../shared/settings';
-import { pluralize } from './format';
-import { hasTopPriority, needsYouCount, openCount } from './inbox/selectors';
+import type { Bucket } from '../shared/inbox';
+import {
+  hasTopPriority,
+  needsYouCount,
+  sectionCounts,
+} from './inbox/selectors';
 import { useKeyShortcuts } from './keyboard';
 import { DRAG_REGION, NARROW_QUERY } from './layout';
 import { LiveAnnouncer } from './LiveAnnouncer';
@@ -78,11 +82,25 @@ function inboxItems(snapshot: InboxSnapshot | null): SidebarNavItem<View>[] {
   ];
 }
 
+const SECTION_SUMMARY: Record<Bucket, string> = {
+  'needs-you': 'need you',
+  ready: 'ready to merge',
+  'in-progress': 'in progress',
+};
+
+const NO_OPEN_PRS = 'No open PRs';
+
+function mineSummary(snapshot: InboxSnapshot): string {
+  const parts = sectionCounts(snapshot)
+    .filter((section) => section.count > 0)
+    .map((section) => `${section.count} ${SECTION_SUMMARY[section.bucket]}`);
+  return parts.length > 0 ? parts.join(' · ') : NO_OPEN_PRS;
+}
+
 function viewSubtitle(view: View, snapshot: InboxSnapshot | null) {
   if (view === SETTINGS_VIEW || !isSynced(snapshot)) return undefined;
-  const repos = pluralize(snapshot.repoCount, 'repo');
-  if (view === 'mine') return `${openCount(snapshot)} open · ${repos}`;
-  return `${snapshot.reviewCount} waiting on you · ${repos}`;
+  if (view === 'mine') return mineSummary(snapshot);
+  return `${snapshot.reviewCount} waiting on you`;
 }
 
 interface SidebarProps {

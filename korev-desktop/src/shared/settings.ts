@@ -12,14 +12,22 @@ export interface WindowBounds {
   height: number;
 }
 
-export type CollapsedRepos = Record<InboxView, string[]>;
+export const COLLAPSIBLE_SECTIONS = [
+  'ready',
+  'in-progress',
+  'approved',
+] as const;
+
+export type CollapsibleSection = (typeof COLLAPSIBLE_SECTIONS)[number];
+
+export type CollapsedSections = Partial<Record<CollapsibleSection, boolean>>;
 
 export interface Settings {
   repos: string[];
   theme: ThemePreference;
   lastView: InboxView;
   windowBounds: WindowBounds | null;
-  collapsedRepos: CollapsedRepos;
+  collapsedSections: CollapsedSections;
   mergeWith: Record<string, MergeTool>;
   agent: AgentPreference;
 }
@@ -29,7 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   lastView: 'review',
   windowBounds: null,
-  collapsedRepos: { review: [], mine: [] },
+  collapsedSections: {},
   mergeWith: {},
   agent: { provider: null, models: {} },
 };

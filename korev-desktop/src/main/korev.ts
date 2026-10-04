@@ -219,10 +219,10 @@ export function createKorev(deps: KorevDeps): Korev {
     return updated;
   }
 
-  function setCollapsedRepos(view: InboxView, repos: string[]) {
-    const { collapsedRepos } = settings.current();
+  function setCollapsedSection(section: string, collapsed: unknown) {
+    const { collapsedSections } = settings.current();
     return settings.update({
-      collapsedRepos: { ...collapsedRepos, [view]: repos },
+      collapsedSections: { ...collapsedSections, [section]: collapsed },
     });
   }
 
@@ -318,7 +318,7 @@ export function createKorev(deps: KorevDeps): Korev {
     [IpcChannel.SettingsSetTheme]: setTheme,
     [IpcChannel.SettingsSetLastView]: (lastView: InboxView) =>
       settings.update({ lastView }),
-    [IpcChannel.SettingsSetCollapsedRepos]: setCollapsedRepos,
+    [IpcChannel.SettingsSetCollapsedSection]: setCollapsedSection,
     [IpcChannel.SettingsSuggestedRepos]: suggestedRepos,
     [IpcChannel.ReposOwners]: repoOwners,
     [IpcChannel.ReposPage]: repoPage,

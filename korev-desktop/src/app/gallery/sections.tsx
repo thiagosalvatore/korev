@@ -33,7 +33,7 @@ import {
   type SidebarNavItem,
 } from '../../design-system';
 import { ActionChip } from '../inbox/action-state';
-import { RepoHeader } from '../inbox/RepoHeader';
+import { GroupHeader } from '../inbox/GroupHeader';
 import { ApprovalBadge } from '../inbox/ReviewRow';
 import { ToggleRow } from '../inbox/ToggleRow';
 import { UnlockStep } from '../setup/UnlockStep';
@@ -434,30 +434,30 @@ function SidePanelSample() {
   );
 }
 
-function RepoGroupSamples() {
+function SectionHeaderSamples() {
   const [expanded, setExpanded] = useState(true);
   return (
     <div className="rounded-md border border-border-1">
-      <RepoHeader
-        repo="acme/web"
-        countLabel="3 open"
-        urgentLabel="2 need you"
-        expanded={expanded}
-        onToggle={() => setExpanded((current) => !current)}
+      <GroupHeader label="Needs you" count={3} tone="danger" />
+      <GroupHeader
+        label="Ready to merge"
+        count={2}
+        tone="success"
+        toggle={{
+          optionKey: 'gallery-ready',
+          expanded,
+          onToggle: () => setExpanded((current) => !current),
+        }}
       />
-      <RepoHeader
-        repo="acme/api"
-        countLabel="1 waiting"
-        urgentLabel="1 P1"
-        expanded={false}
-        onToggle={() => undefined}
-      />
-      <RepoHeader
-        repo="acme/billing"
-        countLabel="0 waiting"
-        urgentLabel={null}
-        expanded
-        onToggle={() => undefined}
+      <GroupHeader
+        label="In progress"
+        count={5}
+        tone="neutral"
+        toggle={{
+          optionKey: 'gallery-in-progress',
+          expanded: false,
+          onToggle: () => undefined,
+        }}
       />
       <ToggleRow
         optionKey="gallery-approved"
@@ -517,7 +517,7 @@ export function InboxSection() {
           action={<Button size="sm">Refresh</Button>}
         />
       </div>
-      <RepoGroupSamples />
+      <SectionHeaderSamples />
       <BannerSamples />
       <SidePanelSample />
       <div className="w-105 rounded-lg border border-border-2 bg-surface p-7">

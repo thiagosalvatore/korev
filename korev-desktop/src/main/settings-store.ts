@@ -1,6 +1,7 @@
 import {
+  COLLAPSIBLE_SECTIONS,
   DEFAULT_SETTINGS,
-  type CollapsedRepos,
+  type CollapsedSections,
   type InboxView,
   type Settings,
   type ThemePreference,
@@ -42,12 +43,15 @@ function pickRepos(value: unknown): string[] {
   return [...new Set(value.filter(isRepoName))];
 }
 
-function pickCollapsedRepos(value: unknown): CollapsedRepos {
-  const raw = (value ?? {}) as Partial<Record<InboxView, unknown>>;
-  return {
-    review: pickRepos(raw.review),
-    mine: pickRepos(raw.mine),
-  };
+function pickCollapsedSections(value: unknown): CollapsedSections {
+  if (!value || typeof value !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([section, collapsed]) =>
+        (COLLAPSIBLE_SECTIONS as readonly string[]).includes(section) &&
+        typeof collapsed === 'boolean',
+    ),
+  );
 }
 
 function pickMergeWith(value: unknown): Record<string, MergeTool> {
@@ -94,7 +98,7 @@ function sanitize(raw: Record<string, unknown>): Settings {
     theme: pickOneOf(THEMES, raw.theme, DEFAULT_SETTINGS.theme),
     lastView: pickOneOf(VIEWS, raw.lastView, DEFAULT_SETTINGS.lastView),
     windowBounds: pickBounds(raw.windowBounds),
-    collapsedRepos: pickCollapsedRepos(raw.collapsedRepos),
+    collapsedSections: pickCollapsedSections(raw.collapsedSections),
     mergeWith: pickMergeWith(raw.mergeWith),
     agent: pickAgent(raw.agent),
   };

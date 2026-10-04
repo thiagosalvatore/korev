@@ -22,8 +22,8 @@ export type EntryShape<Item, Stack> =
 
 const STACK_GROUP_SEPARATOR = '>';
 const TOGGLE_KEY_PREFIX = 'toggle:';
-const REPO_TOGGLE_PREFIX = 'repo:';
-const APPROVED_TOGGLE_PREFIX = 'approved-section:';
+const SECTION_TOGGLE_PREFIX = 'section:';
+const APPROVED_TOGGLE = 'approved-section';
 const APPROVED_KEY_PREFIX = 'approved:';
 
 export function layerRef(repo: string, layer: StackLayer): string {
@@ -46,12 +46,12 @@ export function isToggleKey(key: string): boolean {
   return key.startsWith(TOGGLE_KEY_PREFIX);
 }
 
-export function repoToggleKey(repo: string): string {
-  return toggleKey(`${REPO_TOGGLE_PREFIX}${repo}`);
+export function sectionToggleKey(section: string): string {
+  return toggleKey(`${SECTION_TOGGLE_PREFIX}${section}`);
 }
 
-export function approvedToggleKey(repo: string): string {
-  return toggleKey(`${APPROVED_TOGGLE_PREFIX}${repo}`);
+export function approvedToggleKey(): string {
+  return toggleKey(APPROVED_TOGGLE);
 }
 
 export function approvedKey(pr: { repo: string; number: number }): string {

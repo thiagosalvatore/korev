@@ -3,7 +3,7 @@ import type { InboxSnapshot } from '../shared/inbox';
 import type { SecretCipher } from './encrypted-file';
 import { createMemoryFileSystem } from './file-system';
 import { emptySnapshot } from './github/inbox-poller';
-import { createInboxCache } from './inbox-cache';
+import { CACHE_VERSION, createInboxCache } from './inbox-cache';
 
 const PATH = '/user-data/inbox-cache.bin';
 const PREFIX = 'enc:';
@@ -65,6 +65,17 @@ describe('inbox cache', () => {
     await cache.save(liveSnapshot('maria'));
 
     expect(await cache.load('octocat')).toBeNull();
+  });
+
+  it('ignores a cache saved with an older version', async () => {
+    const { fs, cache } = setup();
+    const older = {
+      version: CACHE_VERSION - 1,
+      snapshot: liveSnapshot('maria'),
+    };
+    fs.files.set(PATH, Buffer.from(PREFIX + JSON.stringify(older)));
+
+    expect(await cache.load('maria')).toBeNull();
   });
 
   it('forgets the snapshot when cleared', async () => {

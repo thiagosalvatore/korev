@@ -62,11 +62,6 @@ export interface MySection {
   entries: MyEntry[];
 }
 
-export interface MyRepoGroup {
-  repo: string;
-  sections: MySection[];
-}
-
 export type PrSize = 'S' | 'M' | 'L';
 
 export interface SizeInfo {
@@ -128,8 +123,7 @@ export interface ApprovedReview {
   approval: Approval;
 }
 
-export interface ReviewRepoGroup {
-  repo: string;
+export interface ReviewList {
   entries: ReviewEntry[];
   approved: ApprovedReview[];
 }
@@ -164,8 +158,8 @@ export interface InboxSnapshot {
   fromCache: boolean;
   viewerLogin: string | null;
   repoCount: number;
-  mine: MyRepoGroup[];
-  reviews: ReviewRepoGroup[];
+  mine: MySection[];
+  reviews: ReviewList;
   reviewCount: number;
   problems: Problem[];
   repoMerge: Record<string, RepoMergeInfo>;

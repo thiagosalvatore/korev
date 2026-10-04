@@ -32,7 +32,7 @@ function requestedFrom(reviewer: Reviewer) {
 }
 
 describe('buildInbox', () => {
-  it('groups by repo in the chosen order, with unknown repos last alphabetically', () => {
+  it('sorts one section by repo order, with unknown repos last alphabetically', () => {
     const inbox = build({
       mine: [
         makePr({ number: 1, repo: 'acme/zeta' }),
@@ -43,15 +43,13 @@ describe('buildInbox', () => {
       repoOrder: ['acme/web', 'acme/api'],
     });
 
-    expect(inbox.mine.map((group) => group.repo)).toEqual([
-      'acme/web',
-      'acme/api',
-      'acme/alpha',
-      'acme/zeta',
-    ]);
+    const ready = inbox.mine.find((section) => section.bucket === 'ready');
+    expect(
+      ready?.entries.map((entry) => entry.kind === 'pr' && entry.item.pr.repo),
+    ).toEqual(['acme/web', 'acme/api', 'acme/alpha', 'acme/zeta']);
   });
 
-  it('buckets my PRs inside each repo', () => {
+  it('buckets my PRs into sections in display order', () => {
     const inbox = build({
       mine: [
         makePr({ number: 10, reviewDecision: 'CHANGES_REQUESTED' }),
@@ -59,10 +57,7 @@ describe('buildInbox', () => {
       ],
     });
 
-    expect(inbox.mine).toHaveLength(1);
-    expect(inbox.mine[0].sections.map((section) => section.count)).toEqual([
-      1, 0, 1,
-    ]);
+    expect(inbox.mine.map((section) => section.count)).toEqual([1, 1, 0]);
   });
 
   it('keeps stacks whole and counts only reviews still waiting on the viewer', () => {
@@ -89,11 +84,10 @@ describe('buildInbox', () => {
     });
 
     expect(inbox.reviewCount).toBe(2);
-    expect(inbox.reviews).toHaveLength(1);
-    expect(inbox.reviews[0].entries).toMatchObject([
+    expect(inbox.reviews.entries).toMatchObject([
       { kind: 'stack', stack: { requestedCount: 2, size: 3 } },
     ]);
-    expect(inbox.reviews[0].approved).toMatchObject([
+    expect(inbox.reviews.approved).toMatchObject([
       { item: { pr: { number: 40 } }, approval: { kind: 'teammate' } },
     ]);
   });

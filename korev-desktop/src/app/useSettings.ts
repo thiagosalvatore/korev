@@ -1,7 +1,12 @@
 import { useSyncExternalStore } from 'react';
 import type { AgentPreference } from '../shared/agents';
 import type { MergeTool } from '../shared/merge';
-import type { InboxView, Settings, ThemePreference } from '../shared/settings';
+import type {
+  CollapsibleSection,
+  InboxView,
+  Settings,
+  ThemePreference,
+} from '../shared/settings';
 import { korev } from './bridge';
 import { createBridgeStore } from './store';
 
@@ -41,9 +46,11 @@ export function saveAgent(agent: AgentPreference): Promise<void> {
   return applySettings(korev().settings.setAgent(agent));
 }
 
-export function saveCollapsedRepos(
-  view: InboxView,
-  repos: string[],
+export function saveCollapsedSection(
+  section: CollapsibleSection,
+  collapsed: boolean,
 ): Promise<void> {
-  return applySettings(korev().settings.setCollapsedRepos(view, repos));
+  return applySettings(
+    korev().settings.setCollapsedSection(section, collapsed),
+  );
 }

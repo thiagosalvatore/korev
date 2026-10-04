@@ -6,6 +6,12 @@ export const BUCKET_ORDER: readonly Bucket[] = [
   'ready',
 ];
 
+export const SECTION_ORDER: readonly Bucket[] = [
+  'needs-you',
+  'ready',
+  'in-progress',
+];
+
 const SEVERITY_ORDER: readonly ReasonSeverity[] = [
   'danger',
   'warning',

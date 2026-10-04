@@ -69,10 +69,10 @@ async function openRow(window: Page, title: string) {
   await window.getByRole('option', { name: new RegExp(title) }).click();
 }
 
-function repoHeaders(window: Page) {
-  return window.locator('[role="option"][aria-expanded]').filter({
-    hasText: /^acme\//,
-  });
+function sectionRows(window: Page, section: string) {
+  return window
+    .getByRole('group', { name: section, exact: true })
+    .locator('[role="option"]:not([aria-expanded])');
 }
 
 async function withSession(
@@ -136,37 +136,52 @@ test('keeps the sign-in across a relaunch and shows the cached inbox before the 
   });
 });
 
-test('groups PRs by repo in the order chosen in Settings, with keyboard collapse', async () => {
-  await withSession(async (github, userDataDir) => {
-    const app = await launch(github, userDataDir);
-    try {
-      const window = await appWindow(app);
-      await connectAndOpenMyPrs(window);
-      await expect(repoHeaders(window).first()).toContainText(API_REPO);
+test('shows each section once and sorts repos inside it in the order chosen in Settings, with keyboard collapse', async () => {
+  await withSession(
+    async (github, userDataDir) => {
+      const app = await launch(github, userDataDir);
+      try {
+        const window = await appWindow(app);
+        await connectAndOpenMyPrs(window);
+        const ready = window.getByRole('group', {
+          name: 'Ready to merge',
+          exact: true,
+        });
+        await expect(ready).toHaveCount(1);
+        await expect(
+          sectionRows(window, 'Ready to merge').first(),
+        ).toContainText(NEW_PR_TITLE);
 
-      await window.getByRole('button', { name: 'Settings' }).click();
-      await window.getByRole('button', { name: 'Repositories' }).click();
-      await window
-        .getByRole('button', { name: `Reorder ${API_REPO}, 1 of 2` })
-        .press('Alt+ArrowDown');
-      await window.getByRole('button', { name: /My PRs/ }).click();
+        await window.getByRole('button', { name: 'Settings' }).click();
+        await window.getByRole('button', { name: 'Repositories' }).click();
+        await window
+          .getByRole('button', { name: `Reorder ${API_REPO}, 1 of 2` })
+          .press('Alt+ArrowDown');
+        await window.getByRole('button', { name: /My PRs/ }).click();
 
-      await expect(repoHeaders(window).first()).toContainText(WEB_REPO);
-      await expect(repoHeaders(window).nth(1)).toContainText(API_REPO);
+        const readyRows = sectionRows(window, 'Ready to merge');
+        await expect(readyRows.first()).toContainText(WEB_PR_TITLE);
+        await expect(readyRows.nth(1)).toContainText(NEW_PR_TITLE);
 
-      await window.keyboard.press('j');
-      await expect(repoHeaders(window).first()).toBeFocused();
-      await window.keyboard.press('ArrowLeft');
-      await expect(window.getByText(WEB_PR_TITLE)).toBeHidden();
-      await window.keyboard.press('ArrowRight');
-      await window.keyboard.press('j');
-      await expect(
-        window.getByRole('option', { name: new RegExp(WEB_PR_TITLE) }),
-      ).toBeFocused();
-    } finally {
-      await app.close();
-    }
-  });
+        const readyHeader = window.getByRole('option', {
+          name: /^Ready to merge/,
+        });
+        await window.keyboard.press('j');
+        await window.keyboard.press('j');
+        await expect(readyHeader).toBeFocused();
+        await window.keyboard.press('ArrowLeft');
+        await expect(window.getByText(WEB_PR_TITLE)).toBeHidden();
+        await window.keyboard.press('ArrowRight');
+        await window.keyboard.press('j');
+        await expect(
+          window.getByRole('option', { name: new RegExp(WEB_PR_TITLE) }),
+        ).toBeFocused();
+      } finally {
+        await app.close();
+      }
+    },
+    { includeNewPr: true },
+  );
 });
 
 test('merges a ready PR and closes another after confirming', async () => {

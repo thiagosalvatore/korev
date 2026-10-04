@@ -3,7 +3,13 @@ import {
   type UnknownMergeStreaks,
   advanceUnknownMergeStreaks,
 } from '../../inbox/merge-streaks';
-import { sortByRepoOrder } from '../../inbox/repo-order';
+import {
+  groupMyPrs,
+  groupReviews,
+  myPrsIn,
+  reviewItemsIn,
+  sortApproved,
+} from '../../inbox/stacks';
 import type { InboxSnapshot, SyncStatus } from '../../shared/inbox';
 import type { MergeTool } from '../../shared/merge';
 import type { GithubClient, InboxResult } from './client';
@@ -99,7 +105,7 @@ export function emptySnapshot(repoCount = 0): InboxSnapshot {
     viewerLogin: null,
     repoCount,
     mine: [],
-    reviews: [],
+    reviews: { entries: [], approved: [] },
     reviewCount: 0,
     problems: [],
     repoMerge: {},
@@ -184,10 +190,14 @@ class GithubInboxPoller implements InboxPoller {
       return;
     }
     const repoOrder = this.deps.repos();
+    const { mine, reviews } = this.#current;
     this.#publish({
       ...this.#current,
-      mine: sortByRepoOrder(this.#current.mine, repoOrder),
-      reviews: sortByRepoOrder(this.#current.reviews, repoOrder),
+      mine: groupMyPrs(myPrsIn(mine), repoOrder),
+      reviews: {
+        entries: groupReviews(reviewItemsIn(reviews.entries), repoOrder),
+        approved: sortApproved(reviews.approved, repoOrder),
+      },
     });
   }
 

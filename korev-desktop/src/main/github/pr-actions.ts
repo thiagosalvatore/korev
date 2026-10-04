@@ -1,5 +1,6 @@
 import { mergePathFor } from '../../inbox/merge-path';
 import { QUEUE_COMMANDS } from '../../inbox/queue-status';
+import { myPrsIn } from '../../inbox/stacks';
 import type { InboxSnapshot } from '../../shared/inbox';
 import type {
   ActionResult,
@@ -73,19 +74,7 @@ function keyOf(repo: string, number: number): string {
 }
 
 function openPrKeys(snapshot: InboxSnapshot): Set<string> {
-  return new Set(
-    snapshot.mine
-      .flatMap((group) => group.sections)
-      .flatMap((section) => section.entries)
-      .flatMap((entry) =>
-        entry.kind === 'pr'
-          ? [entry.item.pr]
-          : entry.stack.layers.flatMap((layer) =>
-              layer.kind === 'mine' ? [layer.item.pr] : [],
-            ),
-      )
-      .map((pr) => prRef(pr)),
-  );
+  return new Set(myPrsIn(snapshot.mine).map((item) => prRef(item.pr)));
 }
 
 export function createPrActions(deps: PrActionsDeps): PrActions {

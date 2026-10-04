@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import type { InboxSnapshot, SyncStatus } from '../shared/inbox';
 import type { PrActionState } from '../shared/merge';
 import { pluralize } from './format';
@@ -92,6 +92,30 @@ function nextTracked(
   };
 }
 
+interface Announcement {
+  text: string;
+}
+
+let latestAnnouncement: Announcement = { text: '' };
+const announcementListeners = new Set<() => void>();
+
+export function announce(text: string) {
+  latestAnnouncement = { text };
+  announcementListeners.forEach((listener) => listener());
+}
+
+function subscribeToAnnouncements(listener: () => void) {
+  announcementListeners.add(listener);
+  return () => announcementListeners.delete(listener);
+}
+
+function useAnnouncement(): Announcement {
+  return useSyncExternalStore(
+    subscribeToAnnouncements,
+    () => latestAnnouncement,
+  );
+}
+
 export function LiveAnnouncer({
   snapshot,
 }: {
@@ -102,7 +126,13 @@ export function LiveAnnouncer({
     settled: settledStatus(null, snapshot),
     message: '',
   }));
+  const announcement = useAnnouncement();
+  const [heard, setHeard] = useState(announcement);
   if (tracked.snapshot !== snapshot) setTracked(nextTracked(tracked, snapshot));
+  if (heard !== announcement) {
+    setHeard(announcement);
+    setTracked({ ...tracked, message: announcement.text });
+  }
   return (
     <div role="status" aria-live="polite" className="sr-only">
       {tracked.message}

@@ -43,34 +43,29 @@ function inboxResult(
 }
 
 function fakeBuildInbox(input: InboxInput): Inbox {
-  const repos = [
-    ...new Set([...input.repoOrder, ...input.mine.map((pr) => pr.repo)]),
-  ].filter((repo) => input.mine.some((pr) => pr.repo === repo));
+  const rank = (pr: PullRequest) => {
+    const index = input.repoOrder.indexOf(pr.repo);
+    return index === -1 ? input.repoOrder.length : index;
+  };
+  const prs = [...input.mine].sort((left, right) => rank(left) - rank(right));
   return {
-    mine: repos.map((repo) => {
-      const prs = input.mine.filter((pr) => pr.repo === repo);
-      return {
-        repo,
-        sections: [
-          {
-            bucket: 'needs-you',
-            count: prs.length,
-            entries: prs.map((pr) => ({
-              kind: 'pr',
-              item: { pr, bucket: 'needs-you', reasons: [], queue: null },
-            })),
-          },
-        ],
-      };
-    }),
-    reviews: [],
+    mine: [
+      {
+        bucket: 'needs-you',
+        count: prs.length,
+        entries: prs.map((pr) => ({
+          kind: 'pr',
+          item: { pr, bucket: 'needs-you', reasons: [], queue: null },
+        })),
+      },
+    ],
+    reviews: { entries: [], approved: [] },
     reviewCount: 0,
   };
 }
 
 function prIds(snapshot: InboxSnapshot | undefined): string[] {
   return (snapshot?.mine ?? [])
-    .flatMap((group) => group.sections)
     .flatMap((section) => section.entries)
     .flatMap((entry) => (entry.kind === 'pr' ? [entry.item.pr.id] : []));
 }
@@ -191,7 +186,7 @@ describe('inbox poller', () => {
     expect(prIds(last())).toEqual(['PR_1']);
   });
 
-  it('rebuilds the repo groups in the new repo order without fetching', async () => {
+  it('rebuilds in the new repo order without fetching', async () => {
     const { poller, client, session, last, syncCount } = setup();
     session.repos = ['acme/api', 'acme/web'];
     client.fetchInbox.mockResolvedValueOnce(
@@ -205,11 +200,31 @@ describe('inbox poller', () => {
     session.repos = ['acme/web', 'acme/api'];
     poller.rebuild();
 
-    expect(last()?.mine.map((group) => group.repo)).toEqual([
-      'acme/web',
-      'acme/api',
-    ]);
+    expect(prIds(last())).toEqual(['PR_WEB', 'PR_API']);
     expect(syncCount()).toBe(1);
+  });
+
+  it('re-sorts entries inside a section of a cached snapshot without fetching', () => {
+    const { poller, session, last, syncCount } = setup();
+    const cached = fakeBuildInbox({
+      mine: [
+        makePr({ id: 'PR_API', repo: 'acme/api' }),
+        makePr({ id: 'PR_WEB', repo: 'acme/web' }),
+      ],
+      repoOrder: ['acme/api', 'acme/web'],
+    } as unknown as InboxInput);
+    poller.restore({
+      ...emptySnapshot(2),
+      ...cached,
+      syncedAt: '2026-10-02T18:40:00.000Z',
+      viewerLogin: 'maria',
+    });
+
+    session.repos = ['acme/web', 'acme/api'];
+    poller.rebuild();
+
+    expect(prIds(last())).toEqual(['PR_WEB', 'PR_API']);
+    expect(syncCount()).toBe(0);
   });
 
   it('runs a full refresh every three minutes while live', async () => {

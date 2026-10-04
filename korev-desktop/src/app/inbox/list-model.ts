@@ -47,7 +47,8 @@ export interface ListModel {
   isEmpty(snapshot: InboxSnapshot): boolean;
 }
 
-const APPROVED_GROUP_SUFFIX = ':approved';
+const REQUESTED_GROUP = 'requested';
+const APPROVED_GROUP = 'approved';
 
 function stackInfoOf<Item extends ItemShape>(
   layers: LayerShape<Item>[],
@@ -106,17 +107,15 @@ function approvedSubject({ item, approval }: ApprovedReview): PanelSubject {
 }
 
 function mineEntries(snapshot: InboxSnapshot): MyEntry[] {
-  return snapshot.mine.flatMap((group) =>
-    group.sections.flatMap((section) => section.entries),
-  );
+  return snapshot.mine.flatMap((section) => section.entries);
 }
 
 function reviewEntries(snapshot: InboxSnapshot): ReviewEntry[] {
-  return snapshot.reviews.flatMap((group) => group.entries);
+  return snapshot.reviews.entries;
 }
 
 function approvedReviews(snapshot: InboxSnapshot): ApprovedReview[] {
-  return snapshot.reviews.flatMap((group) => group.approved);
+  return snapshot.reviews.approved;
 }
 
 function keyOfApproved(approved: ApprovedReview): string {
@@ -125,21 +124,16 @@ function keyOfApproved(approved: ApprovedReview): string {
 
 export const MINE_MODEL: ListModel = {
   placements: (snapshot) =>
-    snapshot.mine.flatMap((group) =>
-      group.sections.flatMap((section) =>
-        entryPlacements(section.entries, `${group.repo}:${section.bucket}`),
-      ),
+    snapshot.mine.flatMap((section) =>
+      entryPlacements(section.entries, section.bucket),
     ),
   refresh: (held, incoming) => {
     const index = indexEntries(mineEntries(incoming));
     return {
       ...incoming,
-      mine: held.mine.map((group) => ({
-        ...group,
-        sections: group.sections.map((section) => ({
-          ...section,
-          entries: refreshEntries(section.entries, index),
-        })),
+      mine: held.mine.map((section) => ({
+        ...section,
+        entries: refreshEntries(section.entries, index),
       })),
     };
   },
@@ -148,14 +142,13 @@ export const MINE_MODEL: ListModel = {
 };
 
 export const REVIEW_MODEL: ListModel = {
-  placements: (snapshot) =>
-    snapshot.reviews.flatMap((group) => [
-      ...entryPlacements(group.entries, group.repo),
-      ...group.approved.map((approved) => ({
-        key: keyOfApproved(approved),
-        group: `${group.repo}${APPROVED_GROUP_SUFFIX}`,
-      })),
-    ]),
+  placements: (snapshot) => [
+    ...entryPlacements(reviewEntries(snapshot), REQUESTED_GROUP),
+    ...approvedReviews(snapshot).map((approved) => ({
+      key: keyOfApproved(approved),
+      group: APPROVED_GROUP,
+    })),
+  ],
   refresh: (held, incoming) => {
     const index = indexEntries(reviewEntries(incoming));
     const latestApproved = new Map(
@@ -166,13 +159,12 @@ export const REVIEW_MODEL: ListModel = {
     );
     return {
       ...incoming,
-      reviews: held.reviews.map((group) => ({
-        ...group,
-        entries: refreshEntries(group.entries, index),
-        approved: group.approved.map(
+      reviews: {
+        entries: refreshEntries(reviewEntries(held), index),
+        approved: approvedReviews(held).map(
           (approved) => latestApproved.get(keyOfApproved(approved)) ?? approved,
         ),
-      })),
+      },
     };
   },
   subjects: (snapshot) => {

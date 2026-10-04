@@ -1,10 +1,12 @@
 import type {
   Bucket,
+  ApprovedReview,
   MyEntry,
   MyPr,
   MySection,
   MyStack,
   MyStackLayer,
+  PriorityTier,
   ReviewEntry,
   ReviewItem,
   ReviewStack,
@@ -16,7 +18,8 @@ import type {
   StackLayer,
 } from '../shared/pull-request';
 import { compareReviewItems } from './priority';
-import { BUCKET_ORDER, bucketRank, topSeverityRank } from './severity';
+import { compareReposIn, type RepoComparator } from './repo-order';
+import { SECTION_ORDER, bucketRank, topSeverityRank } from './severity';
 
 interface HasPr {
   pr: PullRequest;
@@ -164,17 +167,21 @@ function placeMyPr(item: MyPr): PlacedMyEntry {
   };
 }
 
-function compareMyEntries(a: PlacedMyEntry, b: PlacedMyEntry): number {
-  return (
+function compareMyEntries(compareRepos: RepoComparator) {
+  return (a: PlacedMyEntry, b: PlacedMyEntry): number =>
+    compareRepos(a.lead.pr.repo, b.lead.pr.repo) ||
     topSeverityRank(a.lead.reasons) - topSeverityRank(b.lead.reasons) ||
-    b.updatedAt - a.updatedAt
-  );
+    b.updatedAt - a.updatedAt;
 }
 
-function sectionFor(bucket: Bucket, placed: PlacedMyEntry[]): MySection {
+function sectionFor(
+  bucket: Bucket,
+  placed: PlacedMyEntry[],
+  compareRepos: RepoComparator,
+): MySection {
   const inBucket = placed
     .filter((candidate) => candidate.lead.bucket === bucket)
-    .sort(compareMyEntries);
+    .sort(compareMyEntries(compareRepos));
   return {
     bucket,
     count: inBucket.reduce((total, candidate) => total + candidate.prCount, 0),
@@ -182,10 +189,25 @@ function sectionFor(bucket: Bucket, placed: PlacedMyEntry[]): MySection {
   };
 }
 
-export function groupMyPrs(items: MyPr[]): MySection[] {
+export function groupMyPrs(items: MyPr[], repoOrder: string[]): MySection[] {
   const { singles, groups } = partitionByStack(items);
   const placed = [...singles.map(placeMyPr), ...groups.map(placeMyStack)];
-  return BUCKET_ORDER.map((bucket) => sectionFor(bucket, placed));
+  const compareRepos = compareReposIn(repoOrder);
+  return SECTION_ORDER.map((bucket) =>
+    sectionFor(bucket, placed, compareRepos),
+  );
+}
+
+export function myPrsIn(sections: MySection[]): MyPr[] {
+  return sections
+    .flatMap((section) => section.entries)
+    .flatMap((entry) =>
+      entry.kind === 'pr'
+        ? [entry.item]
+        : entry.stack.layers.flatMap((layer) =>
+            layer.kind === 'mine' ? [layer.item] : [],
+          ),
+    );
 }
 
 function buildReviewStack(group: StackGroup<ReviewItem>): ReviewStack {
@@ -204,6 +226,22 @@ function buildReviewStack(group: StackGroup<ReviewItem>): ReviewStack {
   };
 }
 
+const TIER_ORDER: readonly PriorityTier[] = ['P1', 'P2', 'P3'];
+
+function tierRank(item: ReviewItem): number {
+  return TIER_ORDER.indexOf(item.priority.tier);
+}
+
+export function compareReviewsIn(
+  repoOrder: string[],
+): (a: ReviewItem, b: ReviewItem) => number {
+  const compareRepos = compareReposIn(repoOrder);
+  return (a, b) =>
+    tierRank(a) - tierRank(b) ||
+    compareRepos(a.pr.repo, b.pr.repo) ||
+    compareReviewItems(a, b);
+}
+
 function placeReviewStack(group: StackGroup<ReviewItem>): PlacedReviewEntry {
   return {
     entry: { kind: 'stack', stack: buildReviewStack(group) },
@@ -215,9 +253,31 @@ function placeReviewItem(item: ReviewItem): PlacedReviewEntry {
   return { entry: { kind: 'pr', item }, lead: item };
 }
 
-export function groupReviews(items: ReviewItem[]): ReviewEntry[] {
+export function groupReviews(
+  items: ReviewItem[],
+  repoOrder: string[],
+): ReviewEntry[] {
   const { singles, groups } = partitionByStack(items);
+  const compare = compareReviewsIn(repoOrder);
   return [...singles.map(placeReviewItem), ...groups.map(placeReviewStack)]
-    .sort((a, b) => compareReviewItems(a.lead, b.lead))
+    .sort((a, b) => compare(a.lead, b.lead))
     .map((placed) => placed.entry);
+}
+
+export function sortApproved(
+  approved: ApprovedReview[],
+  repoOrder: string[],
+): ApprovedReview[] {
+  const compare = compareReviewsIn(repoOrder);
+  return [...approved].sort((left, right) => compare(left.item, right.item));
+}
+
+export function reviewItemsIn(entries: ReviewEntry[]): ReviewItem[] {
+  return entries.flatMap((entry) =>
+    entry.kind === 'pr'
+      ? [entry.item]
+      : entry.stack.layers.flatMap((layer) =>
+          layer.kind === 'requested' ? [layer.item] : [],
+        ),
+  );
 }

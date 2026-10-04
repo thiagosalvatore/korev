@@ -30,12 +30,14 @@ describe('settings store', () => {
         repos: ['acme/api', 'not a repo', 'acme/api', 42],
         theme: 'sepia',
         lastView: 'mine',
+        collapsedSections: { ready: true, 'acme/web': true, approved: 'yes' },
       }),
     });
     const { settings } = await createSettingsStore({ fs, path: PATH }).load();
     expect(settings.repos).toEqual(['acme/api']);
     expect(settings.theme).toBe('system');
     expect(settings.lastView).toBe('mine');
+    expect(settings.collapsedSections).toEqual({ ready: true });
   });
 
   it('keeps only known agents and model ids that cannot pass as a flag', async () => {

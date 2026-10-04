@@ -12,7 +12,7 @@ const SHORTCUTS: Shortcut[] = [
   { keys: ['K', '↑'], label: 'Previous pull request' },
   {
     keys: ['→', '←'],
-    label: 'Expand or collapse a repo, approved PRs or stack layers',
+    label: 'Expand or collapse a section, approved PRs or stack layers',
   },
   { keys: ['↵'], label: 'Open details' },
   { keys: ['⌘↵'], label: 'Open on GitHub' },

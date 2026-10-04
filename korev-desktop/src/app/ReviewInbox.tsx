@@ -4,7 +4,6 @@ import type {
   ApprovedReview,
   InboxSnapshot,
   ReviewEntry,
-  ReviewRepoGroup,
   ReviewStack,
   ReviewStackLayer,
 } from '../shared/inbox';
@@ -12,23 +11,18 @@ import { formatSynced, joinMeta, pluralize } from './format';
 import { approvedKey, approvedToggleKey, toggleKey } from './inbox/entries';
 import { REVIEW_GRID } from './inbox/grid';
 import { InboxList } from './inbox/InboxList';
-import { LoadError, LoadingList, RepoSkeletons } from './inbox/InboxStates';
+import { LoadError, LoadingList, SectionSkeletons } from './inbox/InboxStates';
 import { REVIEW_MODEL } from './inbox/list-model';
 import { OtherLayerRow } from './inbox/OtherLayerRow';
 import { inboxPhase } from './inbox/phase';
-import { RepoBlock } from './inbox/RepoHeader';
 import { ApprovedRow, ReviewRow } from './inbox/ReviewRow';
-import {
-  requestedInGroup,
-  requestedItems,
-  topPriorityCount,
-} from './inbox/selectors';
+import { requestedItems } from './inbox/selectors';
 import { StackGroup, StackLayerItem, byPosition } from './inbox/StackGroup';
 import { ToggleRow } from './inbox/ToggleRow';
 import {
-  useCollapsedRepos,
-  type CollapsedRepos,
-} from './inbox/useCollapsedRepos';
+  useCollapsedSections,
+  type CollapsedSections,
+} from './inbox/useCollapsedSections';
 import { NARROW_HIDDEN } from './layout';
 import { MINUTE_MS, useNow } from './useNow';
 
@@ -80,7 +74,7 @@ function ReviewStackGroup({ stack }: { stack: ReviewStack }) {
     <StackGroup
       repo={stack.repo}
       baseRefName={stack.baseRefName}
-      summary={`you're asked on ${stack.requestedCount} of ${stack.size}`}
+      summary={`You're asked on ${stack.requestedCount} of ${stack.size}`}
       partial={stack.partial}
     >
       {others.length > 0 ? (
@@ -116,7 +110,7 @@ function ColumnHeader() {
     <div
       aria-hidden="true"
       className={cn(
-        'grid items-end gap-3 px-5 pt-3 pb-1 type-overline text-fg-3',
+        'sticky top-0 z-5 grid items-end gap-3 border-b border-border-1 bg-app px-5 pt-3 pb-1 type-overline text-fg-3',
         REVIEW_GRID,
       )}
     >
@@ -141,23 +135,25 @@ function NoReviews({ syncedAt }: { syncedAt: string | null }) {
   );
 }
 
+const APPROVED_LABEL = 'Already approved';
+
 function ApprovedSection({
-  repo,
   approved,
+  collapsed,
 }: {
-  repo: string;
   approved: ApprovedReview[];
+  collapsed: CollapsedSections;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const expanded = !collapsed.isCollapsed('approved');
   return (
     <>
       <ToggleRow
-        optionKey={approvedToggleKey(repo)}
+        optionKey={approvedToggleKey()}
         expanded={expanded}
-        onToggle={() => setExpanded((current) => !current)}
+        onToggle={() => collapsed.toggle('approved', APPROVED_LABEL)}
         className="pl-5"
       >
-        Already approved
+        {APPROVED_LABEL}
         <span className="font-mono text-fg-2">{approved.length}</span>
       </ToggleRow>
       {expanded
@@ -169,58 +165,25 @@ function ApprovedSection({
   );
 }
 
-function urgentLabel(group: ReviewRepoGroup): string | null {
-  const topPriority = topPriorityCount(requestedInGroup(group));
-  return topPriority > 0 ? `${topPriority} P1` : null;
-}
-
-interface ReviewRepoViewProps {
-  group: ReviewRepoGroup;
-  avatarUrl?: string;
-  collapsed: CollapsedRepos;
-}
-
-function ReviewRepoView({ group, avatarUrl, collapsed }: ReviewRepoViewProps) {
-  if (group.entries.length === 0 && group.approved.length === 0) return null;
-  return (
-    <RepoBlock
-      repo={group.repo}
-      avatarUrl={avatarUrl}
-      countLabel={`${requestedInGroup(group).length} waiting`}
-      urgentLabel={urgentLabel(group)}
-      expanded={!collapsed.isCollapsed(group.repo)}
-      onToggle={() => collapsed.toggle(group.repo)}
-    >
-      {group.entries.map((entry) => (
-        <ReviewEntryView key={entryKey(entry)} entry={entry} />
-      ))}
-      {group.approved.length > 0 ? (
-        <ApprovedSection repo={group.repo} approved={group.approved} />
-      ) : null}
-    </RepoBlock>
-  );
-}
-
-function ReviewGroups({
+function ReviewList({
   snapshot,
   collapsed,
 }: {
   snapshot: InboxSnapshot;
-  collapsed: CollapsedRepos;
+  collapsed: CollapsedSections;
 }) {
+  const { entries, approved } = snapshot.reviews;
   return (
     <>
       {requestedItems(snapshot).length === 0 ? (
         <p className="m-0 px-5 pt-4 pb-2 text-sm text-fg-2">{NO_REVIEWS}</p>
       ) : null}
-      {snapshot.reviews.map((group) => (
-        <ReviewRepoView
-          key={group.repo}
-          group={group}
-          avatarUrl={snapshot.repoAvatars[group.repo]}
-          collapsed={collapsed}
-        />
+      {entries.map((entry) => (
+        <ReviewEntryView key={entryKey(entry)} entry={entry} />
       ))}
+      {approved.length > 0 ? (
+        <ApprovedSection approved={approved} collapsed={collapsed} />
+      ) : null}
     </>
   );
 }
@@ -231,12 +194,12 @@ export interface ReviewInboxProps {
 }
 
 export function ReviewInbox({ snapshot, onOpenSettings }: ReviewInboxProps) {
-  const collapsed = useCollapsedRepos('review');
+  const collapsed = useCollapsedSections();
   const phase = inboxPhase(snapshot);
   if (phase.kind === 'loading') {
     return (
       <LoadingList>
-        <RepoSkeletons />
+        <SectionSkeletons />
       </LoadingList>
     );
   }
@@ -258,9 +221,7 @@ export function ReviewInbox({ snapshot, onOpenSettings }: ReviewInboxProps) {
       header={<ColumnHeader />}
       empty={<NoReviews syncedAt={phase.snapshot.syncedAt} />}
     >
-      {(displayed) => (
-        <ReviewGroups snapshot={displayed} collapsed={collapsed} />
-      )}
+      {(displayed) => <ReviewList snapshot={displayed} collapsed={collapsed} />}
     </InboxList>
   );
 }

@@ -293,55 +293,32 @@ export function makeSnapshot(
     repoCount: 4,
     mine: [
       {
-        repo: 'acme/api',
-        sections: [
-          {
-            bucket: 'needs-you',
-            count: 1,
-            entries: [{ kind: 'pr', item: RATE_LIMIT_PR }],
-          },
-          {
-            bucket: 'in-progress',
-            count: 1,
-            entries: [{ kind: 'pr', item: EXPORTER_PR }],
-          },
-          {
-            bucket: 'ready',
-            count: 1,
-            entries: [{ kind: 'pr', item: OTEL_PR }],
-          },
+        bucket: 'needs-you',
+        count: 3,
+        entries: [
+          { kind: 'pr', item: RATE_LIMIT_PR },
+          { kind: 'stack', stack: WEB_STACK },
         ],
       },
       {
-        repo: 'acme/web',
-        sections: [
-          {
-            bucket: 'needs-you',
-            count: 2,
-            entries: [{ kind: 'stack', stack: WEB_STACK }],
-          },
-          { bucket: 'in-progress', count: 0, entries: [] },
-          { bucket: 'ready', count: 0, entries: [] },
-        ],
+        bucket: 'ready',
+        count: 1,
+        entries: [{ kind: 'pr', item: OTEL_PR }],
+      },
+      {
+        bucket: 'in-progress',
+        count: 1,
+        entries: [{ kind: 'pr', item: EXPORTER_PR }],
       },
     ],
-    reviews: [
-      {
-        repo: 'acme/api',
-        entries: [{ kind: 'pr', item: SPIKE_REVIEW }],
-        approved: [],
-      },
-      {
-        repo: 'acme/web',
-        entries: [{ kind: 'stack', stack: ENGINE_STACK }],
-        approved: [],
-      },
-      {
-        repo: 'acme/billing',
-        entries: [{ kind: 'pr', item: INVOICE_REVIEW }],
-        approved: [],
-      },
-    ],
+    reviews: {
+      entries: [
+        { kind: 'pr', item: INVOICE_REVIEW },
+        { kind: 'stack', stack: ENGINE_STACK },
+        { kind: 'pr', item: SPIKE_REVIEW },
+      ],
+      approved: [],
+    },
     reviewCount: 4,
     problems: [],
     repoMerge: {},

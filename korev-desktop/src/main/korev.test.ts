@@ -3,6 +3,7 @@ import { IpcChannel } from '../shared/ipc-contract';
 import { createMemoryFileSystem } from './file-system';
 import { githubEndpoints } from './github/config';
 import { emptySnapshot } from './github/inbox-poller';
+import { CACHE_VERSION } from './inbox-cache';
 import {
   type CannedReply,
   type CannedResponse,
@@ -64,13 +65,10 @@ function previousSession(): Record<string, string> {
     status: 'live',
     syncedAt: '2026-10-02T18:40:00.000Z',
     viewerLogin: VIEWER.login,
-    reviews: [
-      {
-        repo: 'acme/api',
-        entries: [{ kind: 'pr', item: { pr: { title: CACHED_PR_TITLE } } }],
-        approved: [],
-      },
-    ],
+    reviews: {
+      entries: [{ kind: 'pr', item: { pr: { title: CACHED_PR_TITLE } } }],
+      approved: [],
+    },
   };
   return {
     [`${USER_DATA}/settings.json`]: JSON.stringify({ repos: ['acme/api'] }),
@@ -80,7 +78,10 @@ function previousSession(): Record<string, string> {
       login: VIEWER.login,
       avatarUrl: null,
     }),
-    [`${USER_DATA}/inbox-cache.bin`]: JSON.stringify({ version: 3, snapshot }),
+    [`${USER_DATA}/inbox-cache.bin`]: JSON.stringify({
+      version: CACHE_VERSION,
+      snapshot,
+    }),
   };
 }
 
@@ -194,7 +195,7 @@ describe('korev', () => {
     expect(await invoke(IpcChannel.InboxLoad)).toMatchObject({
       status: 'syncing',
       fromCache: true,
-      reviews: [{ entries: [{ item: { pr: { title: CACHED_PR_TITLE } } }] }],
+      reviews: { entries: [{ item: { pr: { title: CACHED_PR_TITLE } } }] },
     });
   });
 
