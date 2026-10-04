@@ -42,6 +42,8 @@ const bridge: KorevBridge = {
       invoke(IpcChannel.SettingsSetMergeWith, repo, tool),
     setAgent: (agent) => invoke(IpcChannel.SettingsSetAgent, agent),
     setKept: (refs, kept) => invoke(IpcChannel.SettingsSetKept, refs, kept),
+    setRepoFilter: (view, repos) =>
+      invoke(IpcChannel.SettingsSetRepoFilter, view, repos),
     suggestedRepos: () => invoke(IpcChannel.SettingsSuggestedRepos),
     onChanged: (listener) => subscribe(IpcChannel.SettingsChanged, listener),
   },

@@ -35,6 +35,7 @@ export enum IpcChannel {
   SettingsSetMergeWith = 'settings:set-merge-with',
   SettingsSetAgent = 'settings:set-agent',
   SettingsSetKept = 'settings:set-kept',
+  SettingsSetRepoFilter = 'settings:set-repo-filter',
   PrMerge = 'pr:merge',
   PrClose = 'pr:close',
   PrReopen = 'pr:reopen',
@@ -90,6 +91,7 @@ export interface KorevBridge {
     setMergeWith(repo: string, tool: MergeTool): Promise<Settings>;
     setAgent(agent: AgentPreference): Promise<Settings>;
     setKept(refs: string[], kept: boolean): Promise<Settings>;
+    setRepoFilter(view: InboxView, repos: string[]): Promise<Settings>;
     suggestedRepos(): Promise<string[]>;
     onChanged(listener: (settings: Settings) => void): Unsubscribe;
   };

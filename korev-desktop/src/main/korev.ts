@@ -266,6 +266,11 @@ export function createKorev(deps: KorevDeps): Korev {
     return updated;
   }
 
+  function setRepoFilter(view: InboxView, repos: unknown) {
+    const { repoFilter } = settings.current();
+    return settings.update({ repoFilter: { ...repoFilter, [view]: repos } });
+  }
+
   async function setMergeWith(repo: unknown, tool: unknown) {
     const mergeTool = parseMergeTool(tool);
     const current = settings.current();
@@ -370,6 +375,7 @@ export function createKorev(deps: KorevDeps): Korev {
     ),
     [IpcChannel.SettingsSetMergeWith]: setMergeWith,
     [IpcChannel.SettingsSetKept]: setKept,
+    [IpcChannel.SettingsSetRepoFilter]: setRepoFilter,
     [IpcChannel.PrMerge]: withParsed(parseMergeRequest, prActions.merge),
     [IpcChannel.PrClose]: withParsed(parseTargets, prActions.close),
     [IpcChannel.PrReopen]: withParsed(parseTarget, prActions.reopen),

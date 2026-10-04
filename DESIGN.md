@@ -131,6 +131,28 @@ and open `#gallery`).
 - Review requests sort by suggested-priority tier first, then by repo order, so a P1
   stays on top whatever its repo.
 
+## Repo filter
+
+- Both views have a repo filter in the topbar, right after the summary: a ghost
+  `sm` button with `funnel` that reads "All repos ▾" or "2 of 5 repos ▾" (`accent-text`
+  while a filter is on; icon plus "2/5" below 900px). It is hidden in Settings. Each
+  view keeps its own filter.
+- It opens a `CheckboxMenu`: repos grouped by owner (avatar + login, with an owner
+  checkbox that shows a dash when only some repos are chosen), then "Show all repos".
+  The menu uses the native `popover` attribute, so it sits in the top layer and closes
+  on an outside click. ↑/↓ move between checkboxes, Space toggles, Esc closes the menu
+  and returns focus to the button without closing the side panel. Changes are
+  announced ("Showing 2 of 5 repos").
+- The list, the topbar summary and the empty states follow the filter; the topbar adds
+  "· filtered". The sidebar counts always cover every watched repo.
+- A filter change applies at once, never behind the updates pill. If it hides the
+  selected PR, the selection clears and the panel closes, with no "gone" row.
+- When the filter hides everything: `funnel` empty state, "No PRs in the selected
+  repos." (or "No review requests in the selected repos."), "6 open PRs are in other
+  repos.", and a primary "Show all repos" button.
+- Choosing every repo, or none, means all repos. A repo removed from Settings drops out
+  of the filter.
+
 ## States and the banner slot
 
 - **Loading:** skeleton rows in the shape of the final list: two section header bars

@@ -95,6 +95,10 @@ export function installFakeBridge({
           ? Object.fromEntries(refs.map((ref) => [ref, SYNCED_AT]))
           : {},
       })),
+      setRepoFilter: vi.fn(async (view, repos) => ({
+        ...settings,
+        repoFilter: { ...settings.repoFilter, [view]: repos },
+      })),
       setCollapsedSection: vi.fn(async (section, collapsed) => ({
         ...settings,
         collapsedSections: {

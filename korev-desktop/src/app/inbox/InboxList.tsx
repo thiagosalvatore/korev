@@ -15,6 +15,7 @@ import { useKeyShortcuts } from '../keyboard';
 import { WIDE_QUERY } from '../layout';
 import { useMediaQuery } from '../useMediaQuery';
 import { BannerSlot } from './BannerSlot';
+import { filterSnapshot } from './filter';
 import { GoneRow } from './GoneRow';
 import type { ListModel } from './list-model';
 import {
@@ -85,14 +86,31 @@ function openExternal(url: string) {
   void korev().shell.openGithub(url);
 }
 
+const FILTER_KEY_SEPARATOR = ',';
+const NOTHING_HIDDEN: ReadonlySet<string> = new Set();
+
+function hiddenByFilter(
+  model: ListModel,
+  unfiltered: InboxSnapshot,
+  filtered: InboxSnapshot,
+): ReadonlySet<string> {
+  if (unfiltered === filtered) return NOTHING_HIDDEN;
+  const shown = model.subjects(filtered);
+  return new Set(
+    [...model.subjects(unfiltered).keys()].filter((key) => !shown.has(key)),
+  );
+}
+
 export interface InboxListProps {
   snapshot: InboxSnapshot;
   model: ListModel;
   view: InboxView;
   label: string;
+  repoFilter: string[];
   onOpenSettings: () => void;
   header?: ReactNode;
   empty: ReactNode;
+  filteredOut: ReactNode;
   children: (displayed: InboxSnapshot) => ReactNode;
 }
 
@@ -101,9 +119,11 @@ export function InboxList({
   model,
   view,
   label,
+  repoFilter,
   onOpenSettings,
   header,
   empty,
+  filteredOut,
   children,
 }: InboxListProps) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -112,12 +132,25 @@ export function InboxList({
   const [panelOpen, setPanelOpen] = useState(false);
   const focusWithin = useFocusWithin();
   const holding = pointerInside || focusWithin.focused || panelOpen;
-  const held = useHeldSnapshot(snapshot, model, holding);
+  const filtered = useMemo(
+    () => filterSnapshot(snapshot, repoFilter),
+    [snapshot, repoFilter],
+  );
+  const hidden = useMemo(
+    () => hiddenByFilter(model, snapshot, filtered),
+    [model, snapshot, filtered],
+  );
+  const held = useHeldSnapshot(
+    filtered,
+    model,
+    holding,
+    repoFilter.join(FILTER_KEY_SEPARATOR),
+  );
   const subjects = useMemo(
     () => model.subjects(held.displayed),
     [model, held.displayed],
   );
-  const selection = useSelection(subjects);
+  const selection = useSelection(subjects, hidden);
   if (panelOpen && !selection.subject) setPanelOpen(false);
   const captureAnchor = useScrollAnchor(
     scroller,
@@ -211,8 +244,10 @@ export function InboxList({
                     {children(held.displayed)}
                   </div>
                 </>
-              ) : (
+              ) : model.isEmpty(snapshot) ? (
                 empty
+              ) : (
+                filteredOut
               )}
             </div>
             {panelOpen && selection.subject ? (

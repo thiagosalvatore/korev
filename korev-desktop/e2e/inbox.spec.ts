@@ -213,6 +213,37 @@ test('shows a PR whose only recent activity is a bot comment as stale, and keeps
   );
 });
 
+test('filters to one repo from the topbar, and Esc closes only the menu', async () => {
+  await withSession(async (github, userDataDir) => {
+    const app = await launch(github, userDataDir);
+    try {
+      const window = await appWindow(app);
+      await connectAndOpenMyPrs(window);
+      const trigger = window.getByRole('button', { name: /^Repo filter/ });
+
+      await trigger.click();
+      await expect(
+        window.getByRole('checkbox', { name: 'acme' }),
+      ).toBeFocused();
+      await window.keyboard.press('ArrowDown');
+      await window.keyboard.press('Space');
+      await expect(window.getByText(/· filtered/)).toBeVisible();
+      await expect(window.getByText(FAILING_PR_TITLE)).toBeHidden();
+      await expect(window.getByLabel('1 need you')).toBeVisible();
+      await window.keyboard.press('Escape');
+      await expect(trigger).toBeFocused();
+
+      await openRow(window, WEB_PR_TITLE);
+      await trigger.click();
+      await window.keyboard.press('Escape');
+      await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      await expect(panel(window)).toBeVisible();
+    } finally {
+      await app.close();
+    }
+  });
+});
+
 test('merges a ready PR and closes another after confirming', async () => {
   await withSession(async (github, userDataDir) => {
     const app = await launch(github, userDataDir);

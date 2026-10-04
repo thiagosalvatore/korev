@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { cn } from '../../cn';
 import { Icon } from '../core/Icon';
 import {
@@ -9,7 +9,7 @@ import {
 } from './Choice';
 
 export interface CheckboxProps {
-  label?: string;
+  label?: ReactNode;
   checked?: boolean;
   indeterminate?: boolean;
   onChange?: (checked: boolean) => void;

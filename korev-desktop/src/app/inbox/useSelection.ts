@@ -24,14 +24,24 @@ function vanished(
   return previous.get(key) ?? null;
 }
 
-export function useSelection(subjects: SubjectIndex): Selection {
+export function useSelection(
+  subjects: SubjectIndex,
+  hidden: ReadonlySet<string>,
+): Selection {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [subjectKey, setSubjectKey] = useState<string | null>(null);
   const [tracked, setTracked] = useState<Tracked>({ subjects, gone: null });
   if (tracked.subjects !== subjects) {
+    const filteredOut = subjectKey !== null && hidden.has(subjectKey);
+    if (filteredOut) {
+      setSelectedKey(null);
+      setSubjectKey(null);
+    }
     setTracked({
       subjects,
-      gone: vanished(tracked.subjects, subjects, subjectKey),
+      gone: filteredOut
+        ? null
+        : vanished(tracked.subjects, subjects, subjectKey),
     });
   }
   const gone = tracked.gone?.key === subjectKey ? tracked.gone : null;

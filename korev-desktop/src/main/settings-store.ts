@@ -3,6 +3,7 @@ import {
   DEFAULT_SETTINGS,
   type CollapsedSections,
   type InboxView,
+  type RepoFilter,
   type Settings,
   type ThemePreference,
   type WindowBounds,
@@ -52,6 +53,13 @@ function pickCollapsedSections(value: unknown): CollapsedSections {
         typeof collapsed === 'boolean',
     ),
   );
+}
+
+function pickRepoFilter(value: unknown, watched: string[]): RepoFilter {
+  const raw = (value ?? {}) as Partial<Record<InboxView, unknown>>;
+  const pickWatched = (repos: unknown) =>
+    pickRepos(repos).filter((repo) => watched.includes(repo));
+  return { review: pickWatched(raw.review), mine: pickWatched(raw.mine) };
 }
 
 function pickMergeWith(value: unknown): Record<string, MergeTool> {
@@ -105,8 +113,9 @@ function pickBounds(value: unknown): WindowBounds | null {
 }
 
 function sanitize(raw: Record<string, unknown>): Settings {
+  const repos = pickRepos(raw.repos);
   return {
-    repos: pickRepos(raw.repos),
+    repos,
     theme: pickOneOf(THEMES, raw.theme, DEFAULT_SETTINGS.theme),
     lastView: pickOneOf(VIEWS, raw.lastView, DEFAULT_SETTINGS.lastView),
     windowBounds: pickBounds(raw.windowBounds),
@@ -114,6 +123,7 @@ function sanitize(raw: Record<string, unknown>): Settings {
     mergeWith: pickMergeWith(raw.mergeWith),
     agent: pickAgent(raw.agent),
     keptPrs: pickKeptPrs(raw.keptPrs),
+    repoFilter: pickRepoFilter(raw.repoFilter, repos),
   };
 }
 

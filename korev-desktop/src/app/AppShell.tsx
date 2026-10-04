@@ -8,7 +8,14 @@ import {
 } from '../design-system';
 import type { AuthState } from '../shared/auth';
 import type { InboxSnapshot } from '../shared/inbox';
-import type { InboxView, Settings } from '../shared/settings';
+import {
+  DEFAULT_SETTINGS,
+  type InboxView,
+  type RepoFilter,
+  type Settings,
+} from '../shared/settings';
+import { filterSnapshot } from './inbox/filter';
+import { RepoFilterMenu } from './inbox/RepoFilterMenu';
 import type { Bucket } from '../shared/inbox';
 import {
   hasTopPriority,
@@ -26,7 +33,7 @@ import { Topbar } from './Topbar';
 import { useAppCommands } from './useAppCommands';
 import { refreshInbox, useInboxSnapshot } from './useInboxSnapshot';
 import { useMediaQuery } from './useMediaQuery';
-import { saveLastView } from './useSettings';
+import { saveLastView, useSettings } from './useSettings';
 
 const SETTINGS_VIEW = 'settings';
 
@@ -99,10 +106,22 @@ function mineSummary(snapshot: InboxSnapshot): string {
   return parts.length > 0 ? parts.join(' · ') : NO_OPEN_PRS;
 }
 
-function viewSubtitle(view: View, snapshot: InboxSnapshot | null) {
-  if (view === SETTINGS_VIEW || !isSynced(snapshot)) return undefined;
+const FILTERED_NOTE = ' · filtered';
+
+function viewSummary(view: InboxView, snapshot: InboxSnapshot): string {
   if (view === 'mine') return mineSummary(snapshot);
   return `${snapshot.reviewCount} waiting on you`;
+}
+
+function viewSubtitle(
+  view: View,
+  snapshot: InboxSnapshot | null,
+  repoFilter: RepoFilter,
+) {
+  if (view === SETTINGS_VIEW || !isSynced(snapshot)) return undefined;
+  const repos = repoFilter[view];
+  const summary = viewSummary(view, filterSnapshot(snapshot, repos));
+  return repos.length > 0 ? `${summary}${FILTERED_NOTE}` : summary;
 }
 
 interface SidebarProps {
@@ -183,6 +202,7 @@ export function AppShell({ auth, settings }: AppShellProps) {
   const [view, setView] = useState<View>(settings.lastView);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const snapshot = useInboxSnapshot();
+  const repoFilter = useSettings()?.repoFilter ?? DEFAULT_SETTINGS.repoFilter;
   const openSettings = () => selectView(SETTINGS_VIEW);
   const showShortcuts = () => setShortcutsOpen(true);
 
@@ -206,7 +226,15 @@ export function AppShell({ auth, settings }: AppShellProps) {
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           title={VIEW_TITLES[view]}
-          subtitle={viewSubtitle(view, snapshot)}
+          subtitle={viewSubtitle(view, snapshot, repoFilter)}
+          filter={
+            view === SETTINGS_VIEW ? undefined : (
+              <RepoFilterMenu
+                view={view}
+                repoAvatars={snapshot?.repoAvatars ?? {}}
+              />
+            )
+          }
           snapshot={snapshot}
           onReconnect={openSettings}
           onShowShortcuts={view === SETTINGS_VIEW ? undefined : showShortcuts}

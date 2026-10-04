@@ -50,6 +50,13 @@ export function saveKept(refs: string[], kept: boolean): Promise<void> {
   return applySettings(korev().settings.setKept(refs, kept));
 }
 
+export function saveRepoFilter(
+  view: InboxView,
+  repos: string[],
+): Promise<void> {
+  return applySettings(korev().settings.setRepoFilter(view, repos));
+}
+
 export function saveCollapsedSection(
   section: CollapsibleSection,
   collapsed: boolean,

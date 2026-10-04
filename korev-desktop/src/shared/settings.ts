@@ -24,6 +24,8 @@ export type CollapsibleSection = (typeof COLLAPSIBLE_SECTIONS)[number];
 
 export type CollapsedSections = Partial<Record<CollapsibleSection, boolean>>;
 
+export type RepoFilter = Record<InboxView, string[]>;
+
 export interface Settings {
   repos: string[];
   theme: ThemePreference;
@@ -33,6 +35,7 @@ export interface Settings {
   mergeWith: Record<string, MergeTool>;
   agent: AgentPreference;
   keptPrs: Record<string, string>;
+  repoFilter: RepoFilter;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -44,4 +47,5 @@ export const DEFAULT_SETTINGS: Settings = {
   mergeWith: {},
   agent: { provider: null, models: {} },
   keptPrs: {},
+  repoFilter: { review: [], mine: [] },
 };

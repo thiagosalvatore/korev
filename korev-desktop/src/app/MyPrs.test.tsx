@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -137,6 +138,46 @@ describe('MyPrs', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByText(KEPT_PR.pr.title)).toBeNull();
     expect(within(sectionHeader('Stale')).getByText('2')).toBeTruthy();
+  });
+
+  it('drops the selection and closes the panel when the filter hides the selected PR', async () => {
+    const fake = installFakeBridge();
+    renderMyPrs();
+    fireEvent.click(rowTitled('Rate-limit per tenant'));
+    expect(screen.getByRole('complementary')).toBeTruthy();
+
+    act(() =>
+      fake.emitSettings({
+        ...WATCHING_SETTINGS,
+        repoFilter: { mine: ['acme/web'], review: [] },
+      }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Rate-limit per tenant on ingestion endpoints'),
+      ).toBeNull(),
+    );
+    expect(screen.queryByRole('complementary')).toBeNull();
+    expect(screen.queryByText(/gone on next refresh/)).toBeNull();
+  });
+
+  it('says every PR is in another repo when the filter hides them all, and shows all again', async () => {
+    const { bridge: filtered } = installFakeBridge({
+      settings: {
+        ...WATCHING_SETTINGS,
+        repos: ['acme/api', 'acme/web', 'acme/billing'],
+        repoFilter: { mine: ['acme/billing'], review: [] },
+      },
+    });
+    renderMyPrs();
+
+    expect(
+      await screen.findByText('No PRs in the selected repos.'),
+    ).toBeTruthy();
+    expect(screen.getByText('5 open PRs are in other repos.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Show all repos' }));
+    expect(filtered.settings.setRepoFilter).toHaveBeenCalledWith('mine', []);
   });
 
   it('renders stack layers bottom-first and labels the teammate layer', () => {

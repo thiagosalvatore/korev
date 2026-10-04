@@ -29,7 +29,9 @@ import {
   Tag,
   Toast,
   Tooltip,
+  CheckboxMenu,
   type BannerItem,
+  type CheckboxMenuGroup,
   type SidebarNavItem,
 } from '../../design-system';
 import { ActionChip } from '../inbox/action-state';
@@ -231,6 +233,43 @@ export function NavigationSection() {
   );
 }
 
+const SAMPLE_REPO_GROUPS: CheckboxMenuGroup[] = [
+  {
+    id: 'acme',
+    label: 'acme',
+    items: ['api', 'web', 'billing'].map((name) => ({
+      id: `acme/${name}`,
+      label: name,
+    })),
+  },
+  {
+    id: 'thiago',
+    label: 'thiago',
+    items: [{ id: 'thiago/korev', label: 'korev' }],
+  },
+];
+
+const SAMPLE_REPOS = SAMPLE_REPO_GROUPS.flatMap((group) =>
+  group.items.map((item) => item.id),
+);
+
+function CheckboxMenuSample() {
+  const [selected, setSelected] = useState(SAMPLE_REPOS.slice(0, 2));
+  return (
+    <CheckboxMenu
+      label="Repo filter"
+      triggerLabel={`${selected.length} of ${SAMPLE_REPOS.length} repos`}
+      triggerIcon="funnel"
+      triggerClassName="text-accent-text"
+      groups={SAMPLE_REPO_GROUPS}
+      selected={selected}
+      onChange={setSelected}
+      resetLabel="Show all repos"
+      onReset={() => setSelected(SAMPLE_REPOS)}
+    />
+  );
+}
+
 export function OverlaySection() {
   const [dialogOpen, setDialogOpen] = useState(false);
   return (
@@ -243,6 +282,7 @@ export function OverlaySection() {
         <Tooltip label="Shown below" side="bottom">
           <Button size="sm">Hover me</Button>
         </Tooltip>
+        <CheckboxMenuSample />
       </Row>
       <div className="flex flex-col gap-2">
         <Toast

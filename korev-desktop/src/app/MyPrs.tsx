@@ -13,7 +13,12 @@ import {
   type GroupToggle,
 } from './inbox/GroupHeader';
 import { InboxList } from './inbox/InboxList';
-import { LoadError, LoadingList, SectionSkeletons } from './inbox/InboxStates';
+import {
+  FilteredOut,
+  LoadError,
+  LoadingList,
+  SectionSkeletons,
+} from './inbox/InboxStates';
 import { MINE_MODEL } from './inbox/list-model';
 import { MyPrRow } from './inbox/MyPrRow';
 import { OtherLayerRow } from './inbox/OtherLayerRow';
@@ -24,6 +29,7 @@ import {
   useCollapsedSections,
   type CollapsedSections,
 } from './inbox/useCollapsedSections';
+import { useRepoFilter } from './inbox/useRepoFilter';
 
 const BUCKET_LABELS: Record<Bucket, string> = {
   'needs-you': 'Needs you',
@@ -186,6 +192,10 @@ function MySections({
   );
 }
 
+function openPrCount(snapshot: InboxSnapshot): number {
+  return snapshot.mine.reduce((total, section) => total + section.count, 0);
+}
+
 const NOTHING_NEEDS_YOU = (
   <EmptyState
     icon="check-check"
@@ -201,6 +211,7 @@ export interface MyPrsProps {
 
 export function MyPrs({ snapshot, onOpenSettings }: MyPrsProps) {
   const collapsed = useCollapsedSections();
+  const filter = useRepoFilter('mine');
   const phase = inboxPhase(snapshot);
   if (phase.kind === 'loading') {
     return (
@@ -218,8 +229,17 @@ export function MyPrs({ snapshot, onOpenSettings }: MyPrsProps) {
       model={MINE_MODEL}
       view="mine"
       label={LIST_LABEL}
+      repoFilter={filter.repos}
       onOpenSettings={onOpenSettings}
       empty={NOTHING_NEEDS_YOU}
+      filteredOut={
+        <FilteredOut
+          title="No PRs in the selected repos."
+          hiddenCount={openPrCount(phase.snapshot)}
+          noun="open PR"
+          onShowAll={filter.clear}
+        />
+      }
     >
       {(displayed) => (
         <MySections sections={displayed.mine} collapsed={collapsed} />

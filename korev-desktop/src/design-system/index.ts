@@ -14,6 +14,7 @@ export * from './components/display/Badge';
 export * from './components/display/Tag';
 export * from './components/display/Avatar';
 export * from './components/navigation/Tabs';
+export * from './components/overlay/CheckboxMenu';
 export * from './components/overlay/Dialog';
 export * from './components/overlay/Tooltip';
 export * from './components/overlay/Toast';

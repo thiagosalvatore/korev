@@ -16,9 +16,15 @@ export function useHeldSnapshot(
   incoming: InboxSnapshot,
   model: ListModel,
   holding: boolean,
+  resetKey: string,
 ): HeldSnapshot {
   const [base, setBase] = useState(incoming);
-  const mayHold = holding && !base.fromCache;
+  const [baseKey, setBaseKey] = useState(resetKey);
+  if (baseKey !== resetKey) {
+    setBaseKey(resetKey);
+    setBase(incoming);
+  }
+  const mayHold = holding && !base.fromCache && baseKey === resetKey;
   if (!mayHold && base !== incoming) setBase(incoming);
   const structuralChanges = useMemo(
     () =>

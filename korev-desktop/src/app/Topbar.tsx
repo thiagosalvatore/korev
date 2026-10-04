@@ -135,6 +135,7 @@ function KeyHints({ onShowShortcuts }: { onShowShortcuts: () => void }) {
 export interface TopbarProps {
   title: string;
   subtitle?: string;
+  filter?: ReactNode;
   snapshot: InboxSnapshot | null;
   onReconnect: () => void;
   onShowShortcuts?: () => void;
@@ -143,6 +144,7 @@ export interface TopbarProps {
 export function Topbar({
   title,
   subtitle,
+  filter,
   snapshot,
   onReconnect,
   onShowShortcuts,
@@ -158,6 +160,7 @@ export function Topbar({
       {subtitle ? (
         <span className="truncate text-xs text-fg-3">{subtitle}</span>
       ) : null}
+      {filter}
       <span className="flex-1" />
       <span className="inline-flex">
         {snapshot ? (

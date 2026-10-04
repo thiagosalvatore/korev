@@ -11,7 +11,12 @@ import { formatSynced, joinMeta, pluralize } from './format';
 import { approvedKey, approvedToggleKey, toggleKey } from './inbox/entries';
 import { REVIEW_GRID } from './inbox/grid';
 import { InboxList } from './inbox/InboxList';
-import { LoadError, LoadingList, SectionSkeletons } from './inbox/InboxStates';
+import {
+  FilteredOut,
+  LoadError,
+  LoadingList,
+  SectionSkeletons,
+} from './inbox/InboxStates';
 import { REVIEW_MODEL } from './inbox/list-model';
 import { OtherLayerRow } from './inbox/OtherLayerRow';
 import { inboxPhase } from './inbox/phase';
@@ -23,6 +28,7 @@ import {
   useCollapsedSections,
   type CollapsedSections,
 } from './inbox/useCollapsedSections';
+import { useRepoFilter } from './inbox/useRepoFilter';
 import { NARROW_HIDDEN } from './layout';
 import { MINUTE_MS, useNow } from './useNow';
 
@@ -195,6 +201,7 @@ export interface ReviewInboxProps {
 
 export function ReviewInbox({ snapshot, onOpenSettings }: ReviewInboxProps) {
   const collapsed = useCollapsedSections();
+  const filter = useRepoFilter('review');
   const phase = inboxPhase(snapshot);
   if (phase.kind === 'loading') {
     return (
@@ -217,7 +224,19 @@ export function ReviewInbox({ snapshot, onOpenSettings }: ReviewInboxProps) {
       model={REVIEW_MODEL}
       view="review"
       label={LIST_LABEL}
+      repoFilter={filter.repos}
       onOpenSettings={onOpenSettings}
+      filteredOut={
+        <FilteredOut
+          title="No review requests in the selected repos."
+          hiddenCount={
+            requestedItems(phase.snapshot).length +
+            phase.snapshot.reviews.approved.length
+          }
+          noun="review request"
+          onShowAll={filter.clear}
+        />
+      }
       header={<ColumnHeader />}
       empty={<NoReviews syncedAt={phase.snapshot.syncedAt} />}
     >

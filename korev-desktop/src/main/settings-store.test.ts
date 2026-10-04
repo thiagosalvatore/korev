@@ -31,6 +31,7 @@ describe('settings store', () => {
         theme: 'sepia',
         lastView: 'mine',
         collapsedSections: { ready: true, 'acme/web': true, approved: 'yes' },
+        repoFilter: { mine: ['acme/api', 'acme/gone'], review: 'acme/api' },
         keptPrs: {
           'acme/api#7': '2026-10-01T00:00:00.000Z',
           'acme/api': '2026-10-01T00:00:00.000Z',
@@ -43,6 +44,7 @@ describe('settings store', () => {
     expect(settings.theme).toBe('system');
     expect(settings.lastView).toBe('mine');
     expect(settings.collapsedSections).toEqual({ ready: true });
+    expect(settings.repoFilter).toEqual({ mine: ['acme/api'], review: [] });
     expect(settings.keptPrs).toEqual({
       'acme/api#7': '2026-10-01T00:00:00.000Z',
     });

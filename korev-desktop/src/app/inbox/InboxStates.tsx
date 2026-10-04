@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Button, EmptyState, Skeleton } from '../../design-system';
+import { pluralize } from '../format';
 import { refreshInbox } from '../useInboxSnapshot';
 
 const FALLBACK_ERROR = 'Korev could not reach GitHub.';
@@ -34,6 +35,34 @@ function SkeletonRow() {
       </span>
       <Skeleton className="h-5 w-16" />
     </div>
+  );
+}
+
+export interface FilteredOutProps {
+  title: string;
+  hiddenCount: number;
+  noun: string;
+  onShowAll: () => void;
+}
+
+export function FilteredOut({
+  title,
+  hiddenCount,
+  noun,
+  onShowAll,
+}: FilteredOutProps) {
+  const verb = hiddenCount === 1 ? 'is' : 'are';
+  return (
+    <EmptyState
+      icon="funnel"
+      title={title}
+      description={`${pluralize(hiddenCount, noun)} ${verb} in other repos.`}
+      action={
+        <Button variant="primary" onClick={onShowAll}>
+          Show all repos
+        </Button>
+      }
+    />
   );
 }
 
