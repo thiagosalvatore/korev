@@ -21,6 +21,8 @@ export const AGENT_INFO: Record<AgentProvider, AgentInfo> = {
   },
 };
 
+export type AgentAccess = 'read-only' | 'edit';
+
 export interface AgentStatus {
   provider: AgentProvider;
   installed: boolean;

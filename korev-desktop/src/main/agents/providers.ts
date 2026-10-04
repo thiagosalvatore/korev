@@ -1,4 +1,5 @@
 import type {
+  AgentAccess,
   AgentModel,
   AgentProvider,
   AgentRunResult,
@@ -12,6 +13,11 @@ export interface SignInState {
 
 export type RunProviderCommand = (args: string[]) => Promise<CommandResult>;
 
+export interface RunOptions {
+  model: string | null;
+  access: AgentAccess;
+}
+
 export interface ProviderDefinition {
   binary: string;
   versionArgs: string[];
@@ -19,7 +25,7 @@ export interface ProviderDefinition {
   parseStatus(result: CommandResult): SignInState;
   loginArgs: string[] | null;
   listModels(run: RunProviderCommand): Promise<AgentModel[]>;
-  runArgs(model: string | null): string[];
+  runArgs(options: RunOptions): string[];
   parseRun(stdout: string): AgentRunResult | null;
 }
 
@@ -27,6 +33,42 @@ const VERSION_PATTERN = /\d+\.\d+\.\d+\S*/;
 const STDIN_PROMPT = '-';
 const LISTED_MODEL_VISIBILITY = 'list';
 const CODEX_PLANS = ['ChatGPT', 'API key'];
+
+const CLAUDE_READ_TOOLS = ['Read', 'Grep', 'Glob'];
+const CLAUDE_EDIT_TOOLS = [...CLAUDE_READ_TOOLS, 'Edit', 'Write', 'Bash'];
+const CLAUDE_SANDBOX_SETTINGS = JSON.stringify({
+  sandbox: {
+    enabled: true,
+    allowUnsandboxedCommands: false,
+    failIfUnavailable: true,
+  },
+});
+
+const CLAUDE_ACCESS_ARGS: Record<AgentAccess, string[]> = {
+  'read-only': [
+    '--restricted',
+    '--tools',
+    CLAUDE_READ_TOOLS.join(','),
+    '--permission-prompts',
+    'none',
+  ],
+  edit: [
+    '--restricted',
+    '--tools',
+    CLAUDE_EDIT_TOOLS.join(','),
+    '--permission-mode',
+    'acceptEdits',
+    '--permission-prompts',
+    'none',
+    '--settings',
+    CLAUDE_SANDBOX_SETTINGS,
+  ],
+};
+
+const CODEX_SANDBOX: Record<AgentAccess, string> = {
+  'read-only': 'read-only',
+  edit: 'workspace-write',
+};
 
 const CLAUDE_MODELS: AgentModel[] = [
   { id: 'fable', label: 'Fable' },
@@ -144,11 +186,12 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
     parseStatus: parseClaudeStatus,
     loginArgs: null,
     listModels: async () => CLAUDE_MODELS,
-    runArgs: (model) => [
+    runArgs: ({ model, access }) => [
       '-p',
       '--output-format',
       'json',
       '--no-session-persistence',
+      ...CLAUDE_ACCESS_ARGS[access],
       ...modelArgs('--model', model),
     ],
     parseRun: parseClaudeRun,
@@ -161,13 +204,13 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
     loginArgs: ['login'],
     listModels: async (run) =>
       parseCodexModels((await run(['debug', 'models'])).stdout),
-    runArgs: (model) => [
+    runArgs: ({ model, access }) => [
       'exec',
       '--json',
       '--ephemeral',
       '--skip-git-repo-check',
       '--sandbox',
-      'read-only',
+      CODEX_SANDBOX[access],
       ...modelArgs('--model', model),
       STDIN_PROMPT,
     ],

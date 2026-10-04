@@ -1,6 +1,7 @@
 import {
   AGENT_INFO,
   AGENT_PROVIDERS,
+  type AgentAccess,
   type AgentModel,
   type AgentPreference,
   type AgentProvider,
@@ -26,6 +27,7 @@ const NO_AGENT_CHOSEN = 'Choose an AI agent in Settings first.';
 export interface AgentRunRequest {
   prompt: string;
   cwd: string;
+  access: AgentAccess;
   provider?: AgentProvider;
   model?: string | null;
   signal?: AbortSignal;
@@ -172,12 +174,16 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
         : request.model;
     const definition = PROVIDERS[provider];
     try {
-      const result = await exec(provider, definition.runArgs(model), {
-        cwd: request.cwd,
-        stdin: request.prompt,
-        timeoutMs: RUN_TIMEOUT_MS,
-        signal: request.signal,
-      });
+      const result = await exec(
+        provider,
+        definition.runArgs({ model, access: request.access }),
+        {
+          cwd: request.cwd,
+          stdin: request.prompt,
+          timeoutMs: RUN_TIMEOUT_MS,
+          signal: request.signal,
+        },
+      );
       return (
         definition.parseRun(result.stdout) ?? {
           ok: false,
@@ -196,7 +202,12 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
     models,
     run,
     test: (provider) =>
-      run({ provider, prompt: TEST_PROMPT, cwd: deps.scratchDir }),
+      run({
+        provider,
+        prompt: TEST_PROMPT,
+        cwd: deps.scratchDir,
+        access: 'read-only',
+      }),
     stop: () => lifetime.abort(),
   };
 }

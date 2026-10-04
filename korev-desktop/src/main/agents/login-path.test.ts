@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CommandRunner } from './command-runner';
-import { resolveLoginPath } from './login-path';
+import { childEnv, resolveLoginPath } from './login-path';
 
 const ENV = { HOME: '/Users/maria', SHELL: '/bin/zsh', PATH: '/usr/bin:/bin' };
 
@@ -38,5 +38,21 @@ describe('resolveLoginPath', () => {
       '/opt/homebrew/bin',
       '/usr/local/bin',
     ]);
+  });
+});
+
+describe('childEnv', () => {
+  it('keeps GitHub tokens and Electron variables away from the agent', () => {
+    const env = childEnv(
+      {
+        HOME: '/Users/maria',
+        GH_TOKEN: 'gho_secret',
+        GITHUB_TOKEN: 'ghp_secret',
+        ELECTRON_RUN_AS_NODE: '1',
+      },
+      '/usr/bin',
+    );
+
+    expect(env).toEqual({ HOME: '/Users/maria', PATH: '/usr/bin' });
   });
 });

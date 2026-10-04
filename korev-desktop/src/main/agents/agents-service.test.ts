@@ -75,7 +75,7 @@ describe('agents service', () => {
     ]);
   });
 
-  it('runs the saved agent and model with the prompt on stdin and the login PATH', async () => {
+  it('runs the saved agent and model at the requested access, with the prompt on stdin and the login PATH', async () => {
     const { agents, callTo } = setup(
       {
         codex: ok(
@@ -85,11 +85,17 @@ describe('agents service', () => {
       { provider: 'codex', models: { codex: 'gpt-6-sol' } },
     );
 
-    const result = await agents.run({ prompt: 'Fix CI', cwd: '/repo' });
+    const result = await agents.run({
+      prompt: 'Fix CI',
+      cwd: '/repo',
+      access: 'edit',
+    });
 
     expect(result).toEqual({ ok: true, output: 'Done' });
     const [, args, options] = callTo('codex') ?? [];
-    expect(args).toEqual(expect.arrayContaining(['--model', 'gpt-6-sol']));
+    expect(args).toEqual(
+      expect.arrayContaining(['--model', 'gpt-6-sol', 'workspace-write']),
+    );
     expect(options).toMatchObject({
       cwd: '/repo',
       stdin: 'Fix CI',
@@ -112,7 +118,9 @@ describe('agents service', () => {
   it('asks the user to choose an agent before running one', async () => {
     const { agents } = setup({});
 
-    expect(await agents.run({ prompt: 'Fix CI', cwd: '/repo' })).toEqual({
+    expect(
+      await agents.run({ prompt: 'Fix CI', cwd: '/repo', access: 'read-only' }),
+    ).toEqual({
       ok: false,
       message: expect.stringContaining('Choose an AI agent'),
     });

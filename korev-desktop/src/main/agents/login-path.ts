@@ -9,6 +9,12 @@ const PATH_SEPARATOR = ':';
 const SYSTEM_DIRS = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'];
 const HOME_DIRS = ['.local/bin', '.npm-global/bin', '.bun/bin'];
 const ELECTRON_VARIABLE_PREFIX = 'ELECTRON_';
+const GITHUB_TOKEN_VARIABLES = new Set([
+  'GH_TOKEN',
+  'GITHUB_TOKEN',
+  'GH_ENTERPRISE_TOKEN',
+  'GITHUB_ENTERPRISE_TOKEN',
+]);
 
 function between(text: string, start: string, end: string): string | null {
   const from = text.indexOf(start);
@@ -55,7 +61,9 @@ export function childEnv(
   path: string,
 ): NodeJS.ProcessEnv {
   const inherited = Object.entries(env).filter(
-    ([name]) => !name.startsWith(ELECTRON_VARIABLE_PREFIX),
+    ([name]) =>
+      !name.startsWith(ELECTRON_VARIABLE_PREFIX) &&
+      !GITHUB_TOKEN_VARIABLES.has(name),
   );
   return { ...Object.fromEntries(inherited), PATH: path };
 }

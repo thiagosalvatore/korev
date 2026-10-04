@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import {
+  AGENT_PROVIDERS,
+  type AgentAccess,
+  type AgentProvider,
+} from '../../shared/agents';
 import type { CommandResult } from './command-runner';
 import { PROVIDERS } from './providers';
 
@@ -103,4 +108,63 @@ describe('codex provider', () => {
       message: 'You hit your usage limit',
     });
   });
+});
+
+const ACCESS_LEVELS: AgentAccess[] = ['read-only', 'edit'];
+
+function flagValue(args: string[], flag: string): string | undefined {
+  return args[args.indexOf(flag) + 1];
+}
+
+describe('run access', () => {
+  it('gives Claude Code only the file-reading tools for a read-only run', () => {
+    const args = PROVIDERS.claude.runArgs({ model: null, access: 'read-only' });
+
+    expect(args).toContain('--restricted');
+    expect(flagValue(args, '--tools')).toBe('Read,Grep,Glob');
+    expect(flagValue(args, '--permission-prompts')).toBe('none');
+  });
+
+  it('runs Claude Code shell commands in a sandbox that cannot be skipped for an edit run', () => {
+    const args = PROVIDERS.claude.runArgs({ model: null, access: 'edit' });
+
+    expect(args).toContain('--restricted');
+    expect(flagValue(args, '--tools')?.split(',')).toEqual(
+      expect.arrayContaining(['Edit', 'Write', 'Bash']),
+    );
+    expect(flagValue(args, '--permission-mode')).toBe('acceptEdits');
+    expect(JSON.parse(flagValue(args, '--settings') ?? '{}')).toEqual({
+      sandbox: {
+        enabled: true,
+        allowUnsandboxedCommands: false,
+        failIfUnavailable: true,
+      },
+    });
+  });
+
+  it.each([
+    ['read-only', 'read-only'],
+    ['edit', 'workspace-write'],
+  ] as const)('runs Codex %s in the %s sandbox', (access, sandbox) => {
+    const args = PROVIDERS.codex.runArgs({ model: null, access });
+
+    expect(flagValue(args, '--sandbox')).toBe(sandbox);
+  });
+
+  const everyRun: [AgentProvider, AgentAccess][] = AGENT_PROVIDERS.flatMap(
+    (provider) =>
+      ACCESS_LEVELS.map((access): [AgentProvider, AgentAccess] => [
+        provider,
+        access,
+      ]),
+  );
+
+  it.each(everyRun)(
+    'never lets %s skip its permissions on a %s run',
+    (provider, access) => {
+      const args = PROVIDERS[provider].runArgs({ model: null, access });
+
+      expect(args.join(' ')).not.toMatch(/dangerously|bypass/i);
+    },
+  );
 });
