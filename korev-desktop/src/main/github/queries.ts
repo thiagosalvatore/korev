@@ -254,12 +254,19 @@ query ViewerTeams($login: String!) {
     organizations(first: ${ORGANIZATIONS_LIMIT}) {
       nodes {
         login
-        teams(first: ${TEAMS_LIMIT}, userLogins: [$login]) {
-          nodes {
-            slug
-            members(first: ${TEAM_MEMBERS_LIMIT}) { nodes { login } }
-          }
-        }
+        teams(first: 1, userLogins: [$login]) { totalCount }
+      }
+    }
+  }
+}`;
+
+export const TEAM_MEMBERS_QUERY = `
+query TeamMembers($org: String!, $login: String!) {
+  organization(login: $org) {
+    teams(first: ${TEAMS_LIMIT}, userLogins: [$login]) {
+      nodes {
+        slug
+        members(first: ${TEAM_MEMBERS_LIMIT}) { nodes { login } }
       }
     }
   }

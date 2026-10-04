@@ -25,6 +25,7 @@ import {
   type RepoAccessTarget,
   REVIEW_THREADS_QUERY,
   SUGGESTED_REPOS_QUERY,
+  TEAM_MEMBERS_QUERY,
   VIEWER_QUERY,
   VIEWER_TEAMS_QUERY,
   buildInboxQuery,
@@ -131,12 +132,18 @@ interface ViewerTeamsData {
   viewer: {
     organizations?: Connection<{
       login: string;
-      teams?: Connection<{
-        slug: string;
-        members?: Connection<{ login: string }>;
-      }>;
+      teams?: { totalCount: number } | null;
     }>;
   };
+}
+
+interface TeamMembersData {
+  organization?: {
+    teams?: Connection<{
+      slug: string;
+      members?: Connection<{ login: string }>;
+    }>;
+  } | null;
 }
 
 interface ReviewThreadsData {
@@ -396,9 +403,29 @@ class GithubApiClient implements GithubClient {
       { login },
       signal,
     );
-    const teams = toViewerTeams(result.data);
+    const teamsPerOrg = await Promise.all(
+      orgsWithViewerTeams(result.data).map((org) =>
+        this.#orgTeams(token, org, login, signal),
+      ),
+    );
+    const teams = teamsPerOrg.flat();
     this.#teamsByLogin.set(login, teams);
     return teams;
+  }
+
+  async #orgTeams(
+    token: string,
+    org: string,
+    login: string,
+    signal?: AbortSignal,
+  ): Promise<ViewerTeam[]> {
+    const result = await this.#query<TeamMembersData>(
+      token,
+      TEAM_MEMBERS_QUERY,
+      { org, login },
+      signal,
+    );
+    return toViewerTeams(org, result.data);
   }
 
   #query<TData>(
@@ -556,14 +583,18 @@ function uniqueProblems(problems: Problem[]): Problem[] {
   return [...byKey.values()];
 }
 
-function toViewerTeams(data: ViewerTeamsData): ViewerTeam[] {
-  return presentNodes(data.viewer.organizations).flatMap((organization) =>
-    presentNodes(organization.teams).map((team) => ({
-      org: organization.login,
-      slug: team.slug,
-      members: presentNodes(team.members).map((member) => member.login),
-    })),
-  );
+function orgsWithViewerTeams(data: ViewerTeamsData): string[] {
+  return presentNodes(data.viewer.organizations)
+    .filter((organization) => (organization.teams?.totalCount ?? 0) > 0)
+    .map((organization) => organization.login);
+}
+
+function toViewerTeams(org: string, data: TeamMembersData): ViewerTeam[] {
+  return presentNodes(data.organization?.teams).map((team) => ({
+    org,
+    slug: team.slug,
+    members: presentNodes(team.members).map((member) => member.login),
+  }));
 }
 
 function parseScopes(header: string | null): string[] {
