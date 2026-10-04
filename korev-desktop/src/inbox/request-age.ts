@@ -74,7 +74,26 @@ function bestMatch(
       isViewer(event.reviewer, viewer) && isPending(event.reviewer, pr),
   );
   const direct = matches.filter((event) => event.reviewer.kind === 'user');
-  return latest(direct) ?? latest(matches);
+  const viewerMatch = latest(direct) ?? latest(matches);
+  if (viewerMatch || isPendingUser(pr, viewer)) return viewerMatch;
+  return latestPendingTeamRequest(pr);
+}
+
+function isPendingUser(pr: PullRequest, viewer: Viewer): boolean {
+  return pr.pendingReviewers.some(
+    (reviewer) => reviewer.kind === 'user' && isViewer(reviewer, viewer),
+  );
+}
+
+function latestPendingTeamRequest(
+  pr: PullRequest,
+): ReviewRequestEvent | undefined {
+  return latest(
+    pr.reviewRequestEvents.filter(
+      (event) =>
+        event.reviewer.kind === 'team' && isPending(event.reviewer, pr),
+    ),
+  );
 }
 
 function approximateRequest(pr: PullRequest, viewer: Viewer): ReviewRequest {

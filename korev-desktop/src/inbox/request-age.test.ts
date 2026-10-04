@@ -83,4 +83,32 @@ describe('reviewRequestFor', () => {
       team: null,
     });
   });
+
+  it('uses a pending team request when the viewer teams are unknown', () => {
+    const pr = makePr({
+      createdAt: daysAgo(4),
+      pendingReviewers: [frontendTeam],
+      reviewRequestEvents: [{ reviewer: frontendTeam, createdAt: daysAgo(2) }],
+    });
+
+    expect(reviewRequestFor(pr, { login: 'alice', teams: [] })).toEqual({
+      requestedAt: daysAgo(2),
+      approximate: false,
+      direct: false,
+      team: '@acme/frontend',
+    });
+  });
+
+  it('ignores team requests that are no longer pending', () => {
+    const pr = makePr({
+      createdAt: daysAgo(4),
+      pendingReviewers: [aliceUser],
+      reviewRequestEvents: [{ reviewer: frontendTeam, createdAt: daysAgo(2) }],
+    });
+
+    expect(reviewRequestFor(pr, { login: 'alice', teams: [] })).toMatchObject({
+      requestedAt: daysAgo(4),
+      approximate: true,
+    });
+  });
 });

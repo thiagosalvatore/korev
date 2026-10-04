@@ -182,7 +182,7 @@ export function CheckboxMenu({
         aria-label={label}
         onKeyDown={moveFocus}
         className={cn(
-          'm-0 mt-1 max-h-[60vh] w-64 animate-fade overflow-auto rounded-md border-0 bg-raised p-0 py-1 text-fg-1 shadow-pop',
+          'm-0 mt-1 max-h-[60vh] [-webkit-app-region:no-drag] w-64 animate-fade overflow-auto rounded-md border-0 bg-raised p-0 py-1 text-fg-1 shadow-pop',
           '[position-area:bottom_span-right] [position-try-fallbacks:flip-block]',
         )}
       >

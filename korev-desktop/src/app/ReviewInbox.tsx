@@ -120,7 +120,7 @@ function ColumnHeader() {
         REVIEW_GRID,
       )}
     >
-      <span>Suggested priority</span>
+      <span>Priority</span>
       <span>Pull request</span>
       <span className={cn('text-right', NARROW_HIDDEN)}>Files</span>
       <span>Size</span>

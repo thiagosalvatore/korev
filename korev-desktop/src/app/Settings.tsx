@@ -265,7 +265,7 @@ export function SettingsPage(props: SettingsPageProps) {
     ? section
     : sections[0].id;
   return (
-    <div className="mx-auto flex max-w-210 gap-6 px-6 py-6">
+    <div className="flex max-w-210 gap-6 px-6 py-6">
       <SidebarNav
         label="Settings"
         items={sections}
