@@ -29,7 +29,7 @@ describe('settings store', () => {
       [PATH]: JSON.stringify({
         repos: ['acme/api', 'not a repo', 'acme/api', 42],
         theme: 'sepia',
-        lastView: 'mine',
+        lastView: 'ready',
         collapsedSections: { ready: true, 'acme/web': true, approved: 'yes' },
         repoFilter: { mine: ['acme/api', 'acme/gone'], review: 'acme/api' },
         keptPrs: {
@@ -42,12 +42,20 @@ describe('settings store', () => {
     const { settings } = await createSettingsStore({ fs, path: PATH }).load();
     expect(settings.repos).toEqual(['acme/api']);
     expect(settings.theme).toBe('system');
-    expect(settings.lastView).toBe('mine');
+    expect(settings.lastView).toBe('ready');
     expect(settings.collapsedSections).toEqual({ ready: true });
     expect(settings.repoFilter).toEqual({ mine: ['acme/api'], review: [] });
     expect(settings.keptPrs).toEqual({
       'acme/api#7': '2026-10-01T00:00:00.000Z',
     });
+  });
+
+  it('opens Open for a last view saved as My PRs', async () => {
+    const fs = createMemoryFileSystem({
+      [PATH]: JSON.stringify({ lastView: 'mine' }),
+    });
+    const { settings } = await createSettingsStore({ fs, path: PATH }).load();
+    expect(settings.lastView).toBe('open');
   });
 
   it('keeps only known agents and model ids that cannot pass as a flag', async () => {

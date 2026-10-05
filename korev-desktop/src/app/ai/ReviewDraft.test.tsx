@@ -186,6 +186,7 @@ describe('review draft', () => {
     const target = { id: mine.id, repo: mine.repo, number: mine.number };
     render(
       <MyPrs
+        view="open"
         snapshot={makeSnapshot({
           agentTasks: { [`${mine.repo}#${mine.number}`]: doneWith(DRAFT) },
         })}

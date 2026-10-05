@@ -5,6 +5,7 @@ import type { MergeTool } from '../shared/merge';
 import type {
   CollapsibleSection,
   InboxView,
+  ListView,
   Settings,
   ThemePreference,
 } from '../shared/settings';
@@ -35,7 +36,7 @@ export function saveTheme(theme: ThemePreference): Promise<void> {
   return applySettings(korev().settings.setTheme(theme));
 }
 
-export function saveLastView(view: InboxView): Promise<void> {
+export function saveLastView(view: ListView): Promise<void> {
   return applySettings(korev().settings.setLastView(view));
 }
 

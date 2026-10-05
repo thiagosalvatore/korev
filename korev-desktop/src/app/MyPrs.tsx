@@ -1,4 +1,6 @@
+import { useMemo, type ReactNode } from 'react';
 import { EmptyState, Icon } from '../design-system';
+import { STALE_AFTER_DAYS } from '../inbox/keep';
 import type {
   Bucket,
   InboxSnapshot,
@@ -6,6 +8,7 @@ import type {
   MySection,
   MyStack,
 } from '../shared/inbox';
+import type { MyPrsView } from '../shared/settings';
 import { sectionToggleKey } from './inbox/entries';
 import {
   GroupBlock,
@@ -23,6 +26,7 @@ import { MINE_MODEL } from './inbox/list-model';
 import { MyPrRow } from './inbox/MyPrRow';
 import { OtherLayerRow } from './inbox/OtherLayerRow';
 import { inboxPhase } from './inbox/phase';
+import { myPrsViewSnapshot } from './inbox/selectors';
 import { StackGroup, StackLayerItem, byPosition } from './inbox/StackGroup';
 import { ToggleRow } from './inbox/ToggleRow';
 import {
@@ -129,13 +133,18 @@ function KeptToggle({
   );
 }
 
+function SectionEntries({ section }: { section: MySection }) {
+  return section.entries.map((entry) => (
+    <MyEntryView key={entryKey(entry)} entry={entry} />
+  ));
+}
+
 interface SectionBlockProps {
   section: MySection;
-  kept: MySection | null;
   collapsed: CollapsedSections;
 }
 
-function SectionBlock({ section, kept, collapsed }: SectionBlockProps) {
+function SectionBlock({ section, collapsed }: SectionBlockProps) {
   const { bucket } = section;
   return (
     <GroupBlock
@@ -146,10 +155,7 @@ function SectionBlock({ section, kept, collapsed }: SectionBlockProps) {
         bucket === ALWAYS_OPEN ? undefined : sectionToggle(bucket, collapsed)
       }
     >
-      {section.entries.map((entry) => (
-        <MyEntryView key={entryKey(entry)} entry={entry} />
-      ))}
-      {kept ? <KeptToggle kept={kept} collapsed={collapsed} /> : null}
+      <SectionEntries section={section} />
     </GroupBlock>
   );
 }
@@ -163,21 +169,13 @@ function NothingNeedsYou() {
   );
 }
 
-function MySections({
-  sections,
-  collapsed,
-}: {
+interface SectionsProps {
   sections: MySection[];
   collapsed: CollapsedSections;
-}) {
-  const kept = sections.find(
-    (section) => section.bucket === 'kept' && section.entries.length > 0,
-  );
-  const shown = sections.filter(
-    (section) =>
-      section.bucket !== 'kept' &&
-      (section.entries.length > 0 || (section.bucket === 'stale' && kept)),
-  );
+}
+
+function OpenSections({ sections, collapsed }: SectionsProps) {
+  const shown = sections.filter((section) => section.entries.length > 0);
   const needsYouShown = shown.some((section) => section.bucket === ALWAYS_OPEN);
   return (
     <>
@@ -186,7 +184,6 @@ function MySections({
         <SectionBlock
           key={section.bucket}
           section={section}
-          kept={section.bucket === 'stale' ? (kept ?? null) : null}
           collapsed={collapsed}
         />
       ))}
@@ -194,27 +191,69 @@ function MySections({
   );
 }
 
+function SingleBucketSections({ sections, collapsed }: SectionsProps) {
+  const kept = sections.find(
+    (section) => section.bucket === 'kept' && section.entries.length > 0,
+  );
+  return (
+    <>
+      {sections
+        .filter((section) => section.bucket !== 'kept')
+        .map((section) => (
+          <SectionEntries key={section.bucket} section={section} />
+        ))}
+      {kept ? <KeptToggle kept={kept} collapsed={collapsed} /> : null}
+    </>
+  );
+}
+
+function MySections({ view, ...props }: SectionsProps & { view: MyPrsView }) {
+  if (view === 'open') return <OpenSections {...props} />;
+  return <SingleBucketSections {...props} />;
+}
+
 function openPrCount(snapshot: InboxSnapshot): number {
   return snapshot.mine.reduce((total, section) => total + section.count, 0);
 }
 
-const NOTHING_NEEDS_YOU = (
-  <EmptyState
-    icon="check-check"
-    title="Nothing needs you."
-    description="You have no open PRs in the repos Korev watches."
-  />
-);
+const EMPTY_STATES: Record<MyPrsView, ReactNode> = {
+  open: (
+    <EmptyState
+      icon="check-check"
+      title="Nothing needs you."
+      description="None of your open PRs need you or are in progress."
+    />
+  ),
+  ready: (
+    <EmptyState
+      icon="git-merge"
+      title="Nothing ready to merge."
+      description="Your PRs show up here once GitHub says they can merge."
+    />
+  ),
+  stale: (
+    <EmptyState
+      icon="clock"
+      title="No stale PRs."
+      description={`Your PRs show up here after ${STALE_AFTER_DAYS} days without activity.`}
+    />
+  ),
+};
 
 export interface MyPrsProps {
+  view: MyPrsView;
   snapshot: InboxSnapshot | null;
   onOpenSettings: () => void;
 }
 
-export function MyPrs({ snapshot, onOpenSettings }: MyPrsProps) {
+export function MyPrs({ view, snapshot, onOpenSettings }: MyPrsProps) {
   const collapsed = useCollapsedSections();
   const filter = useRepoFilter('mine');
-  const phase = inboxPhase(snapshot);
+  const viewSnapshot = useMemo(
+    () => snapshot && myPrsViewSnapshot(snapshot, view),
+    [snapshot, view],
+  );
+  const phase = inboxPhase(viewSnapshot);
   if (phase.kind === 'loading') {
     return (
       <LoadingList>
@@ -233,7 +272,7 @@ export function MyPrs({ snapshot, onOpenSettings }: MyPrsProps) {
       label={LIST_LABEL}
       repoFilter={filter.repos}
       onOpenSettings={onOpenSettings}
-      empty={NOTHING_NEEDS_YOU}
+      empty={EMPTY_STATES[view]}
       filteredOut={
         <FilteredOut
           title="No PRs in the selected repos."
@@ -244,7 +283,11 @@ export function MyPrs({ snapshot, onOpenSettings }: MyPrsProps) {
       }
     >
       {(displayed) => (
-        <MySections sections={displayed.mine} collapsed={collapsed} />
+        <MySections
+          view={view}
+          sections={displayed.mine}
+          collapsed={collapsed}
+        />
       )}
     </InboxList>
   );

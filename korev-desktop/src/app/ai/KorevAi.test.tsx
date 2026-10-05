@@ -44,7 +44,11 @@ function renderMine(
 ) {
   const fake = installFakeBridge({ settings: WITH_AGENT, ...options });
   render(
-    <MyPrs snapshot={makeSnapshot({ agentTasks })} onOpenSettings={vi.fn()} />,
+    <MyPrs
+      view="open"
+      snapshot={makeSnapshot({ agentTasks })}
+      onOpenSettings={vi.fn()}
+    />,
   );
   return fake.bridge;
 }

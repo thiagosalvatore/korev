@@ -4,9 +4,10 @@ import {
   confirmDialog,
   connectAndOpenMyPrs,
   launch,
+  listRows,
   openRow,
   panel,
-  sectionRows,
+  showView,
   withSession,
 } from './app';
 import {
@@ -22,7 +23,7 @@ const NOTIFICATION_REFRESH_TIMEOUT_MS = 90_000;
 
 test.setTimeout(150_000);
 
-test('connects with a token, shows My PRs and picks up a change from notifications', async () => {
+test('connects with a token, shows my open PRs and picks up a change from notifications', async () => {
   await withSession(async (github, userDataDir) => {
     const app = await launch(github, userDataDir);
     try {
@@ -32,13 +33,11 @@ test('connects with a token, shows My PRs and picks up a change from notificatio
         window.getByText('Needs you', { exact: false }).first(),
       ).toBeVisible();
 
+      await showView(window, 'Ready to merge');
       github.publishNewPr();
       await expect(window.getByText(NEW_PR_TITLE)).toBeVisible({
         timeout: NOTIFICATION_REFRESH_TIMEOUT_MS,
       });
-      await expect(
-        window.getByText('Ready to merge', { exact: false }).first(),
-      ).toBeVisible();
     } finally {
       await app.close();
     }
@@ -69,21 +68,15 @@ test('keeps the sign-in across a relaunch and shows the cached inbox before the 
   });
 });
 
-test('shows each section once and sorts repos inside it in the order chosen in Settings, with keyboard collapse', async () => {
+test('sorts ready PRs by repo in the order chosen in Settings, and moves through them with j', async () => {
   await withSession(
     async (github, userDataDir) => {
       const app = await launch(github, userDataDir);
       try {
         const window = await appWindow(app);
         await connectAndOpenMyPrs(window);
-        const ready = window.getByRole('group', {
-          name: 'Ready to merge',
-          exact: true,
-        });
-        await expect(ready).toHaveCount(1);
-        await expect(
-          sectionRows(window, 'Ready to merge').first(),
-        ).toContainText(NEW_PR_TITLE);
+        await showView(window, 'Ready to merge');
+        await expect(listRows(window).first()).toContainText(NEW_PR_TITLE);
 
         await window
           .getByRole('button', { name: 'Settings', exact: true })
@@ -92,25 +85,16 @@ test('shows each section once and sorts repos inside it in the order chosen in S
         await window
           .getByRole('button', { name: `Reorder ${API_REPO}, 1 of 2` })
           .press('Alt+ArrowDown');
-        await window.getByRole('button', { name: /My PRs/ }).click();
+        await showView(window, 'Ready to merge');
 
-        const readyRows = sectionRows(window, 'Ready to merge');
+        const readyRows = listRows(window);
         await expect(readyRows.first()).toContainText(WEB_PR_TITLE);
         await expect(readyRows.nth(1)).toContainText(NEW_PR_TITLE);
 
-        const readyHeader = window.getByRole('option', {
-          name: /^Ready to merge/,
-        });
         await window.keyboard.press('j');
+        await expect(readyRows.first()).toBeFocused();
         await window.keyboard.press('j');
-        await expect(readyHeader).toBeFocused();
-        await window.keyboard.press('ArrowLeft');
-        await expect(window.getByText(WEB_PR_TITLE)).toBeHidden();
-        await window.keyboard.press('ArrowRight');
-        await window.keyboard.press('j');
-        await expect(
-          window.getByRole('option', { name: new RegExp(WEB_PR_TITLE) }),
-        ).toBeFocused();
+        await expect(readyRows.nth(1)).toBeFocused();
       } finally {
         await app.close();
       }
@@ -127,9 +111,7 @@ test('shows a PR whose only recent activity is a bot comment as stale, and keeps
         const window = await appWindow(app);
         await connectAndOpenMyPrs(window);
 
-        await window
-          .getByRole('option', { name: 'Stale, 1 pull request' })
-          .click();
+        await showView(window, 'Stale');
         const row = window.getByRole('option', {
           name: new RegExp(STALE_PR_TITLE),
         });
@@ -170,6 +152,8 @@ test('filters to one repo from the topbar without moving the menu, and Esc close
       await window.keyboard.press('Escape');
       await expect(trigger).toBeFocused();
 
+      await showView(window, 'Ready to merge');
+      await expect(window.getByText(/· filtered/)).toBeVisible();
       await openRow(window, WEB_PR_TITLE);
       await trigger.click();
       await window.keyboard.press('Escape');
@@ -188,6 +172,7 @@ test('merges a ready PR and closes another after confirming', async () => {
       const window = await appWindow(app);
       await connectAndOpenMyPrs(window);
 
+      await showView(window, 'Ready to merge');
       await openRow(window, WEB_PR_TITLE);
       await panel(window)
         .getByRole('button', { name: /^Merge/ })
@@ -198,6 +183,7 @@ test('merges a ready PR and closes another after confirming', async () => {
         .click();
       await expect(window.getByText('Merged #304')).toBeVisible();
 
+      await showView(window, 'Open');
       await openRow(window, FAILING_PR_TITLE);
       await window.keyboard.press('Shift+X');
       await confirmDialog(window)
@@ -221,6 +207,7 @@ test("sends PRs to GitHub's merge queue and to Trunk", async () => {
         const window = await appWindow(app);
         await connectAndOpenMyPrs(window);
 
+        await showView(window, 'Ready to merge');
         await openRow(window, NEW_PR_TITLE);
         await panel(window)
           .getByRole('button', { name: /^Add to merge queue/ })
@@ -228,6 +215,7 @@ test("sends PRs to GitHub's merge queue and to Trunk", async () => {
         await confirmDialog(window)
           .getByRole('button', { name: /^Add to merge queue/ })
           .click();
+        await showView(window, 'Open');
         await expect(
           window
             .getByRole('option', { name: new RegExp(NEW_PR_TITLE) })
@@ -239,7 +227,7 @@ test("sends PRs to GitHub's merge queue and to Trunk", async () => {
           .click();
         await window.getByRole('button', { name: 'Repositories' }).click();
         await window.getByLabel(`Merge ${WEB_REPO} with`).selectOption('trunk');
-        await window.getByRole('button', { name: /My PRs/ }).click();
+        await showView(window, 'Ready to merge');
         await openRow(window, WEB_PR_TITLE);
         await panel(window)
           .getByRole('button', { name: /^Send to Trunk/ })
@@ -250,6 +238,7 @@ test("sends PRs to GitHub's merge queue and to Trunk", async () => {
         await confirmDialog(window)
           .getByRole('button', { name: /^Send to Trunk/ })
           .click();
+        await showView(window, 'Open');
         await expect(
           window
             .getByRole('option', { name: new RegExp(WEB_PR_TITLE) })

@@ -3,6 +3,7 @@ import {
   DEFAULT_SETTINGS,
   type CollapsedSections,
   type InboxView,
+  type ListView,
   type RepoFilter,
   type Settings,
   type ThemePreference,
@@ -32,7 +33,8 @@ const MERGE_TOOLS: readonly MergeTool[] = [
   'mergify',
   'aviator',
 ];
-const VIEWS: readonly InboxView[] = ['review', 'mine'];
+const VIEWS: readonly ListView[] = ['review', 'open', 'ready', 'stale'];
+const LEGACY_MY_PRS_VIEW = 'mine';
 const CORRUPT_SETTINGS_PROBLEM = 'Settings were reset';
 
 export interface SettingsLoadResult {
@@ -93,6 +95,11 @@ function pickKeptPrs(value: unknown): Record<string, string> {
 
 function pickOneOf<T>(options: readonly T[], value: unknown, fallback: T): T {
   return options.includes(value as T) ? (value as T) : fallback;
+}
+
+function pickLastView(value: unknown): ListView {
+  if (value === LEGACY_MY_PRS_VIEW) return 'open';
+  return pickOneOf(VIEWS, value, DEFAULT_SETTINGS.lastView);
 }
 
 function pickAgent(value: unknown): AgentPreference {
@@ -174,7 +181,7 @@ function sanitize(raw: Record<string, unknown>): Settings {
   return {
     repos,
     theme: pickOneOf(THEMES, raw.theme, DEFAULT_SETTINGS.theme),
-    lastView: pickOneOf(VIEWS, raw.lastView, DEFAULT_SETTINGS.lastView),
+    lastView: pickLastView(raw.lastView),
     windowBounds: pickBounds(raw.windowBounds),
     collapsedSections: pickCollapsedSections(raw.collapsedSections),
     mergeWith: pickMergeWith(raw.mergeWith),

@@ -11,6 +11,8 @@ import type { InboxSnapshot } from '../shared/inbox';
 import {
   DEFAULT_SETTINGS,
   type InboxView,
+  type ListView,
+  type MyPrsView,
   type RepoFilter,
   type Settings,
 } from '../shared/settings';
@@ -18,8 +20,10 @@ import { filterSnapshot } from './inbox/filter';
 import { RepoFilterMenu } from './inbox/RepoFilterMenu';
 import type { Bucket } from '../shared/inbox';
 import {
+  bucketCount,
   hasTopPriority,
-  needsYouCount,
+  myPrsViewOf,
+  myPrsViewSnapshot,
   sectionCounts,
 } from './inbox/selectors';
 import { useKeyShortcuts } from './keyboard';
@@ -32,19 +36,19 @@ import { SHORTCUT_SHEET_KEY, ShortcutSheet } from './ShortcutSheet';
 import { Topbar } from './Topbar';
 import { useAppCommands, useFocusPrRequests } from './useAppCommands';
 import { FocusRequestProvider, type FocusRequest } from './inbox/focus-request';
-import { myPrsIn } from '../inbox/stacks';
-import { prRef } from '../shared/pr-ref';
 import { refreshInbox, useInboxSnapshot } from './useInboxSnapshot';
 import { useMediaQuery } from './useMediaQuery';
 import { saveLastView, useSettings } from './useSettings';
 
 const SETTINGS_VIEW = 'settings';
 
-type View = InboxView | typeof SETTINGS_VIEW;
+type View = ListView | typeof SETTINGS_VIEW;
 
 const VIEW_TITLES: Record<View, string> = {
   review: 'Review requests',
-  mine: 'My PRs',
+  open: 'Open',
+  ready: 'Ready to merge',
+  stale: 'Stale',
   settings: 'Settings',
 };
 
@@ -65,9 +69,20 @@ function reviewBadge(snapshot: InboxSnapshot): SidebarNavBadge {
   return countBadge(count, hasTopPriority(snapshot), `${count} waiting`);
 }
 
-function mineBadge(snapshot: InboxSnapshot): SidebarNavBadge {
-  const count = needsYouCount(snapshot);
+function openBadge(snapshot: InboxSnapshot): SidebarNavBadge {
+  const count = bucketCount(snapshot, 'needs-you');
   return countBadge(count, count > 0, `${count} need you`);
+}
+
+function readyBadge(snapshot: InboxSnapshot): SidebarNavBadge {
+  const count = bucketCount(snapshot, 'ready');
+  const tone = count > 0 ? 'success' : 'neutral';
+  return { count, tone, label: `${count} ready to merge` };
+}
+
+function staleBadge(snapshot: InboxSnapshot): SidebarNavBadge {
+  const count = bucketCount(snapshot, 'stale');
+  return countBadge(count, false, `${count} stale`);
 }
 
 function isSynced(snapshot: InboxSnapshot | null): snapshot is InboxSnapshot {
@@ -84,10 +99,22 @@ function inboxItems(snapshot: InboxSnapshot | null): SidebarNavItem<View>[] {
       badge: synced ? reviewBadge(snapshot) : undefined,
     },
     {
-      id: 'mine',
-      label: VIEW_TITLES.mine,
+      id: 'open',
+      label: VIEW_TITLES.open,
       icon: 'git-pull-request',
-      badge: synced ? mineBadge(snapshot) : undefined,
+      badge: synced ? openBadge(snapshot) : undefined,
+    },
+    {
+      id: 'ready',
+      label: VIEW_TITLES.ready,
+      icon: 'git-merge',
+      badge: synced ? readyBadge(snapshot) : undefined,
+    },
+    {
+      id: 'stale',
+      label: VIEW_TITLES.stale,
+      icon: 'clock',
+      badge: synced ? staleBadge(snapshot) : undefined,
     },
   ];
 }
@@ -101,20 +128,28 @@ const SECTION_SUMMARY: Record<Bucket, string> = {
   kept: 'kept',
 };
 
-const NO_OPEN_PRS = 'No open PRs';
+const EMPTY_SUMMARIES: Record<MyPrsView, string> = {
+  open: 'Nothing needs you',
+  ready: 'Nothing ready to merge',
+  stale: 'Nothing stale',
+};
 
-function mineSummary(snapshot: InboxSnapshot): string {
-  const parts = sectionCounts(snapshot)
+function mineSummary(snapshot: InboxSnapshot, view: MyPrsView): string {
+  const parts = sectionCounts(myPrsViewSnapshot(snapshot, view))
     .filter((section) => section.count > 0)
     .map((section) => `${section.count} ${SECTION_SUMMARY[section.bucket]}`);
-  return parts.length > 0 ? parts.join(' · ') : NO_OPEN_PRS;
+  return parts.length > 0 ? parts.join(' · ') : EMPTY_SUMMARIES[view];
 }
 
 const FILTERED_NOTE = ' · filtered';
 
-function viewSummary(view: InboxView, snapshot: InboxSnapshot): string {
-  if (view === 'mine') return mineSummary(snapshot);
-  return `${snapshot.reviewCount} waiting on you`;
+function viewSummary(view: ListView, snapshot: InboxSnapshot): string {
+  if (view === 'review') return `${snapshot.reviewCount} waiting on you`;
+  return mineSummary(snapshot, view);
+}
+
+function inboxViewOf(view: ListView): InboxView {
+  return view === 'review' ? 'review' : 'mine';
 }
 
 function viewSubtitle(
@@ -123,7 +158,7 @@ function viewSubtitle(
   repoFilter: RepoFilter,
 ) {
   if (view === SETTINGS_VIEW || !isSynced(snapshot)) return undefined;
-  const repos = repoFilter[view];
+  const repos = repoFilter[inboxViewOf(view)];
   const summary = viewSummary(view, filterSnapshot(snapshot, repos));
   return repos.length > 0 ? `${summary}${FILTERED_NOTE}` : summary;
 }
@@ -184,11 +219,13 @@ function ViewContent({
   snapshot,
   onOpenSettings,
 }: ViewContentProps) {
-  if (view === 'mine') {
-    return <MyPrs snapshot={snapshot} onOpenSettings={onOpenSettings} />;
-  }
   if (view === 'review') {
     return <ReviewInbox snapshot={snapshot} onOpenSettings={onOpenSettings} />;
+  }
+  if (view !== SETTINGS_VIEW) {
+    return (
+      <MyPrs view={view} snapshot={snapshot} onOpenSettings={onOpenSettings} />
+    );
   }
   return (
     <div className="h-full overflow-auto">
@@ -217,15 +254,16 @@ export function AppShell({ auth, settings }: AppShellProps) {
 
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   useFocusPrRequests((ref) => {
-    const mine = snapshot ? myPrsIn(snapshot.mine) : [];
-    selectView(mine.some(({ pr }) => prRef(pr) === ref) ? 'mine' : 'review');
+    selectView((snapshot && myPrsViewOf(snapshot, ref)) ?? 'review');
     setFocusRequest({ ref, at: Date.now() });
   });
 
   useKeyShortcuts({ [SHORTCUT_SHEET_KEY]: showShortcuts });
   useAppCommands({
     'show-review': () => selectView('review'),
-    'show-mine': () => selectView('mine'),
+    'show-open': () => selectView('open'),
+    'show-ready': () => selectView('ready'),
+    'show-stale': () => selectView('stale'),
     'show-settings': openSettings,
     refresh: () => void refreshInbox(),
     'show-shortcuts': showShortcuts,
@@ -241,7 +279,7 @@ export function AppShell({ auth, settings }: AppShellProps) {
           filter={
             view === SETTINGS_VIEW ? undefined : (
               <RepoFilterMenu
-                view={view}
+                view={inboxViewOf(view)}
                 repoAvatars={snapshot?.repoAvatars ?? {}}
               />
             )

@@ -32,7 +32,9 @@ function withAi(aiTasks: Partial<Settings['aiTasks']> = {}): Settings {
 
 function renderMine(settings: Settings) {
   const { bridge } = installFakeBridge({ settings });
-  render(<MyPrs snapshot={makeSnapshot()} onOpenSettings={vi.fn()} />);
+  render(
+    <MyPrs view="open" snapshot={makeSnapshot()} onOpenSettings={vi.fn()} />,
+  );
   return bridge;
 }
 

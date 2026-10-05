@@ -45,7 +45,9 @@ function viewSubmenu(options: AppMenuOptions): MenuItemConstructorOptions[] {
   const { send } = options;
   return [
     commandItem('Review Requests', 'CmdOrCtrl+1', 'show-review', send),
-    commandItem('My PRs', 'CmdOrCtrl+2', 'show-mine', send),
+    commandItem('Open', 'CmdOrCtrl+2', 'show-open', send),
+    commandItem('Ready to Merge', 'CmdOrCtrl+3', 'show-ready', send),
+    commandItem('Stale', 'CmdOrCtrl+4', 'show-stale', send),
     SEPARATOR,
     commandItem('Refresh', 'CmdOrCtrl+R', 'refresh', send),
     commandItem('Keyboard Shortcuts', 'CmdOrCtrl+/', 'show-shortcuts', send),

@@ -33,7 +33,12 @@ import type {
   TerminalOutput,
 } from '../shared/terminal';
 import type { RepoOwner, RepoPage } from '../shared/repos';
-import type { InboxView, Settings, ThemePreference } from '../shared/settings';
+import type {
+  InboxView,
+  ListView,
+  Settings,
+  ThemePreference,
+} from '../shared/settings';
 import { buildInbox } from '../inbox/build-inbox';
 import { liveKeeps } from '../inbox/keep';
 import { myPrsIn, pullRequestsIn } from '../inbox/stacks';
@@ -840,7 +845,7 @@ export function createKorev(deps: KorevDeps): Korev {
     [IpcChannel.SettingsLoad]: () => settings.current(),
     [IpcChannel.SettingsSetRepos]: setRepos,
     [IpcChannel.SettingsSetTheme]: setTheme,
-    [IpcChannel.SettingsSetLastView]: (lastView: InboxView) =>
+    [IpcChannel.SettingsSetLastView]: (lastView: ListView) =>
       settings.update({ lastView }),
     [IpcChannel.SettingsSetCollapsedSection]: setCollapsedSection,
     [IpcChannel.SettingsSuggestedRepos]: suggestedRepos,

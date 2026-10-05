@@ -74,6 +74,7 @@ function renderMine(state: AgentTaskState) {
   const fake = installFakeBridge({ settings: WITH_AGENT });
   render(
     <MyPrs
+      view="open"
       snapshot={makeSnapshot({
         mine: [
           {

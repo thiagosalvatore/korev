@@ -22,6 +22,7 @@ import type { RepoOwner, RepoPage } from './repos';
 import type {
   CollapsibleSection,
   InboxView,
+  ListView,
   Settings,
   ThemePreference,
 } from './settings';
@@ -95,7 +96,9 @@ export enum IpcChannel {
 
 export type AppCommand =
   | 'show-review'
-  | 'show-mine'
+  | 'show-open'
+  | 'show-ready'
+  | 'show-stale'
   | 'show-settings'
   | 'refresh'
   | 'show-shortcuts';
@@ -121,7 +124,7 @@ export interface KorevBridge {
     load(): Promise<Settings>;
     setRepos(repos: string[]): Promise<Settings>;
     setTheme(theme: ThemePreference): Promise<Settings>;
-    setLastView(view: InboxView): Promise<Settings>;
+    setLastView(view: ListView): Promise<Settings>;
     setCollapsedSection(
       section: CollapsibleSection,
       collapsed: boolean,

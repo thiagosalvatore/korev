@@ -9,6 +9,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InboxSnapshot } from '../shared/inbox';
+import type { MyPrsView } from '../shared/settings';
 import { installFakeBridge, installMatchMedia } from './fake-bridge';
 import { MyPrs } from './MyPrs';
 import {
@@ -28,8 +29,13 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function renderMyPrs(snapshot: InboxSnapshot = makeSnapshot()) {
-  return render(<MyPrs snapshot={snapshot} onOpenSettings={vi.fn()} />);
+function renderMyPrs(
+  snapshot: InboxSnapshot = makeSnapshot(),
+  view: MyPrsView = 'open',
+) {
+  return render(
+    <MyPrs view={view} snapshot={snapshot} onOpenSettings={vi.fn()} />,
+  );
 }
 
 function rowTitled(title: string): HTMLElement {
@@ -46,6 +52,14 @@ function sectionHeader(name: string): HTMLElement {
   return screen.getByRole('option', { name: new RegExp(`^${name}`) });
 }
 
+function withoutReady(): InboxSnapshot {
+  const snapshot = makeSnapshot();
+  return {
+    ...snapshot,
+    mine: snapshot.mine.filter((section) => section.bucket !== 'ready'),
+  };
+}
+
 function withoutNeedsYou(): InboxSnapshot {
   const snapshot = makeSnapshot();
   return {
@@ -55,17 +69,31 @@ function withoutNeedsYou(): InboxSnapshot {
 }
 
 describe('MyPrs', () => {
-  it('shows each section once across repos, in display order', () => {
-    renderMyPrs();
+  it('shows the open sections in display order and leaves ready and stale PRs out', () => {
+    renderMyPrs(withStaleStack());
     const groups = screen
       .getAllByRole('group')
       .map((group) => group.getAttribute('aria-label'))
       .filter((label) => !label?.startsWith('Stack'));
-    expect(groups).toEqual(['Needs you', 'Ready to merge', 'In progress']);
+    expect(groups).toEqual(['Needs you', 'In progress']);
     expect(
       screen.getByRole('heading', { name: 'Needs you, 3 pull requests' }),
     ).toBeTruthy();
-    expect(sectionHeader('Ready to merge, 1 pull request')).toBeTruthy();
+    expect(sectionHeader('In progress, 1 pull request')).toBeTruthy();
+    expect(screen.queryByText('Bump OpenTelemetry to 1.31')).toBeNull();
+    expect(screen.queryByText(OLD_SPLIT_PR.pr.title)).toBeNull();
+  });
+
+  it('lists only ready PRs in Ready to merge, without a section header', () => {
+    renderMyPrs(withStaleStack(), 'ready');
+    expect(rowTitled('Bump OpenTelemetry')).toBeTruthy();
+    expect(screen.queryByText('Retry flaky exporter on 502')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Ready to merge' })).toBeNull();
+  });
+
+  it('says nothing is ready to merge when no PR is ready', () => {
+    renderMyPrs(withoutReady(), 'ready');
+    expect(screen.getByText('Nothing ready to merge.')).toBeTruthy();
   });
 
   it('shows the repo and its owner avatar on each row', () => {
@@ -85,59 +113,53 @@ describe('MyPrs', () => {
     expect(screen.queryByRole('option', { name: /^Needs you/ })).toBeNull();
   });
 
-  it('collapses Ready to merge with ArrowLeft, keeps its count and saves the choice', async () => {
+  it('collapses In progress with ArrowLeft, keeps its count and saves the choice', async () => {
     renderMyPrs();
-    const header = sectionHeader('Ready to merge');
+    const header = sectionHeader('In progress');
     header.focus();
     fireEvent.keyDown(header, { key: 'ArrowLeft' });
 
     expect(bridge.settings.setCollapsedSection).toHaveBeenCalledWith(
-      'ready',
+      'in-progress',
       true,
     );
     await waitFor(() =>
-      expect(screen.queryByText('Bump OpenTelemetry to 1.31')).toBeNull(),
+      expect(screen.queryByText('Retry flaky exporter on 502')).toBeNull(),
     );
-    expect(within(sectionHeader('Ready to merge')).getByText('1')).toBeTruthy();
+    expect(within(sectionHeader('In progress')).getByText('1')).toBeTruthy();
   });
 
   it('says nothing needs you when only other sections have PRs', () => {
     renderMyPrs(withoutNeedsYou());
     expect(screen.getByText('Nothing needs you.')).toBeTruthy();
-    expect(rowTitled('Bump OpenTelemetry')).toBeTruthy();
+    expect(rowTitled('Retry flaky exporter')).toBeTruthy();
   });
 
-  it('starts Stale collapsed when there is no saved choice', () => {
-    renderMyPrs(withStaleStack());
-    const header = sectionHeader('Stale');
-    expect(header.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByText(OLD_SPLIT_PR.pr.title)).toBeNull();
-  });
-
-  it('shows the stale chip on a stale row even when CI fails, without "updated"', async () => {
-    installFakeBridge({
-      settings: { ...WATCHING_SETTINGS, collapsedSections: { stale: false } },
-    });
-    renderMyPrs(withStaleStack());
-    const row = await screen.findByRole('option', {
-      name: new RegExp(OLD_SPLIT_PR.pr.title),
-    });
+  it('shows the stale chip on a stale row even when CI fails, without "updated"', () => {
+    renderMyPrs(withStaleStack(), 'stale');
+    const row = rowTitled(OLD_SPLIT_PR.pr.title);
 
     expect(within(row).getByText('No activity for 23d')).toBeTruthy();
     expect(within(row).getByText('+1')).toBeTruthy();
     expect(row.textContent).not.toContain('updated');
   });
 
-  it('puts kept PRs behind a collapsed Kept toggle at the bottom of Stale', async () => {
-    installFakeBridge({
-      settings: { ...WATCHING_SETTINGS, collapsedSections: { stale: false } },
-    });
-    renderMyPrs(withKeptPr(withStaleStack()));
-    const toggle = await screen.findByRole('option', { name: /^Kept/ });
+  it('puts kept PRs behind a collapsed Kept toggle below the stale PRs', () => {
+    renderMyPrs(withKeptPr(withStaleStack()), 'stale');
+    const toggle = screen.getByRole('option', { name: /^Kept/ });
 
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByText(KEPT_PR.pr.title)).toBeNull();
-    expect(within(sectionHeader('Stale')).getByText('2')).toBeTruthy();
+    expect(
+      rowTitled(OLD_SPLIT_PR.pr.title).compareDocumentPosition(toggle) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('shows the Kept toggle in Stale even when no PR is stale', () => {
+    renderMyPrs(withKeptPr(), 'stale');
+    expect(screen.getByRole('option', { name: /^Kept/ })).toBeTruthy();
+    expect(screen.queryByText('No stale PRs.')).toBeNull();
   });
 
   it('drops the selection and closes the panel when the filter hides the selected PR', async () => {
@@ -175,7 +197,7 @@ describe('MyPrs', () => {
     expect(
       await screen.findByText('No PRs in the selected repos.'),
     ).toBeTruthy();
-    expect(screen.getByText('5 open PRs are in other repos.')).toBeTruthy();
+    expect(screen.getByText('4 open PRs are in other repos.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Show all repos' }));
     expect(filtered.settings.setRepoFilter).toHaveBeenCalledWith('mine', []);
   });
@@ -209,18 +231,18 @@ describe('MyPrs', () => {
     expect(pressFrom(firstRow, 'j')?.textContent).toContain('App shell');
     expect(
       pressFrom(rowTitled('Settings: repo picker UI'), 'j')?.textContent,
-    ).toContain('Ready to merge');
+    ).toContain('In progress');
+    expect(pressFrom(sectionHeader('In progress'), 'j')?.textContent).toContain(
+      'Retry flaky exporter',
+    );
     expect(
-      pressFrom(sectionHeader('Ready to merge'), 'j')?.textContent,
-    ).toContain('Bump OpenTelemetry');
-    expect(
-      pressFrom(rowTitled('Bump OpenTelemetry'), 'k')?.textContent,
-    ).toContain('Ready to merge');
+      pressFrom(rowTitled('Retry flaky exporter'), 'k')?.textContent,
+    ).toContain('In progress');
   });
 
   it('keeps the list under an offline banner', () => {
     renderMyPrs(makeSnapshot({ status: 'offline' }));
     expect(screen.getByText(/^Offline · showing data from/)).toBeTruthy();
-    expect(rowTitled('Bump OpenTelemetry')).toBeTruthy();
+    expect(rowTitled('Retry flaky exporter')).toBeTruthy();
   });
 });

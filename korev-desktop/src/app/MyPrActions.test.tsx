@@ -7,7 +7,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InboxSnapshot } from '../shared/inbox';
-import type { Settings } from '../shared/settings';
+import type { MyPrsView, Settings } from '../shared/settings';
 import { installFakeBridge, installMatchMedia } from './fake-bridge';
 import { MyPrs } from './MyPrs';
 import {
@@ -27,16 +27,20 @@ afterEach(cleanup);
 function setup(
   snapshot: InboxSnapshot = makeSnapshot(),
   settings: Settings = WATCHING_SETTINGS,
+  view: MyPrsView = 'open',
 ) {
   const { bridge } = installFakeBridge({ settings });
-  render(<MyPrs snapshot={snapshot} onOpenSettings={vi.fn()} />);
+  render(<MyPrs view={view} snapshot={snapshot} onOpenSettings={vi.fn()} />);
   return bridge;
 }
 
-const STALE_OPEN: Settings = {
-  ...WATCHING_SETTINGS,
-  collapsedSections: { stale: false },
-};
+function setupReady(settings: Settings = WATCHING_SETTINGS) {
+  return setup(makeSnapshot(), settings, 'ready');
+}
+
+function setupStale() {
+  return setup(withStaleStack(), WATCHING_SETTINGS, 'stale');
+}
 
 const OLD_REFS = ['acme/web#401', 'acme/web#402'];
 
@@ -85,7 +89,7 @@ describe('My PR actions', () => {
   });
 
   it('cancels the confirm on Escape and keeps the panel open', () => {
-    setup();
+    setupReady();
     select(OTEL_PR.pr.title);
     press('M');
     fireEvent.keyDown(
@@ -100,7 +104,7 @@ describe('My PR actions', () => {
   });
 
   it('merges a ready PR from the panel after the confirm', () => {
-    const bridge = setup();
+    const bridge = setupReady();
     select(OTEL_PR.pr.title);
     fireEvent.click(screen.getByRole('button', { name: /^Merge/ }));
     fireEvent.click(within(dialog()).getByRole('button', { name: /^Merge/ }));
@@ -114,10 +118,7 @@ describe('My PR actions', () => {
   });
 
   it('shows the comment a third-party queue receives before sending it', async () => {
-    setup(makeSnapshot(), {
-      ...WATCHING_SETTINGS,
-      mergeWith: { 'acme/api': 'trunk' },
-    });
+    setupReady({ ...WATCHING_SETTINGS, mergeWith: { 'acme/api': 'trunk' } });
     select(OTEL_PR.pr.title);
     press('M');
 
@@ -150,7 +151,11 @@ describe('My PR actions', () => {
   });
 
   it('keeps Merge and Close disabled until the first live sync', () => {
-    setup(makeSnapshot({ fromCache: true, status: 'syncing' }));
+    setup(
+      makeSnapshot({ fromCache: true, status: 'syncing' }),
+      WATCHING_SETTINGS,
+      'ready',
+    );
     select(OTEL_PR.pr.title);
 
     const merge = screen.getByRole('button', { name: /^Merge/ });
@@ -170,6 +175,8 @@ describe('My PR actions', () => {
           },
         },
       }),
+      WATCHING_SETTINGS,
+      'ready',
     );
     const row = screen.getByRole('option', {
       name: new RegExp(OTEL_PR.pr.title),
@@ -185,7 +192,7 @@ describe('My PR actions', () => {
   });
 
   it("closes every one of the viewer's layers of a stale stack and names the teammate's layer", async () => {
-    const bridge = setup(withStaleStack(), STALE_OPEN);
+    const bridge = setupStale();
     await selectStale(OLD_RETRIES_PR.pr.title);
     press('X');
 
@@ -205,13 +212,16 @@ describe('My PR actions', () => {
   });
 
   it('names only the closed PRs after a partial failure and reopens only those', async () => {
-    const { bridge } = installFakeBridge({ settings: STALE_OPEN });
+    const { bridge } = installFakeBridge({ settings: WATCHING_SETTINGS });
     const snapshot = withStaleStack();
-    const view = render(<MyPrs snapshot={snapshot} onOpenSettings={vi.fn()} />);
+    const view = render(
+      <MyPrs view="stale" snapshot={snapshot} onOpenSettings={vi.fn()} />,
+    );
     await selectStale(OLD_SPLIT_PR.pr.title);
 
     view.rerender(
       <MyPrs
+        view="stale"
         snapshot={{
           ...snapshot,
           actions: {
@@ -230,7 +240,7 @@ describe('My PR actions', () => {
   });
 
   it('keeps a stale stack with ⇧K and undoes it from the toast', async () => {
-    const bridge = setup(withStaleStack(), STALE_OPEN);
+    const bridge = setupStale();
     await selectStale(OLD_SPLIT_PR.pr.title);
     press('K');
 
@@ -243,7 +253,7 @@ describe('My PR actions', () => {
   });
 
   it("says it couldn't save a keep and shows no toast when the save fails", async () => {
-    const bridge = setup(withStaleStack(), STALE_OPEN);
+    const bridge = setupStale();
     vi.mocked(bridge.settings.setKept).mockRejectedValueOnce(new Error('disk'));
     await selectStale(OLD_SPLIT_PR.pr.title);
     press('K');

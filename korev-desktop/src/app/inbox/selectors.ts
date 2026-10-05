@@ -4,6 +4,9 @@ import type {
   ReviewEntry,
   ReviewItem,
 } from '../../shared/inbox';
+import { prRef } from '../../shared/pr-ref';
+import type { MyPrsView } from '../../shared/settings';
+import { myPrsIn } from '../../inbox/stacks';
 
 export interface SectionCount {
   bucket: Bucket;
@@ -27,12 +30,40 @@ export function sectionCounts(snapshot: InboxSnapshot): SectionCount[] {
     .map(({ bucket, count }) => ({ bucket, count }));
 }
 
-export function needsYouCount(snapshot: InboxSnapshot): number {
-  return (
-    snapshot.mine.find((section) => section.bucket === 'needs-you')?.count ?? 0
-  );
-}
-
 export function hasTopPriority(snapshot: InboxSnapshot): boolean {
   return requestedItems(snapshot).some((item) => item.priority.tier === 'P1');
+}
+
+export const MY_PRS_VIEW_BUCKETS: Record<MyPrsView, readonly Bucket[]> = {
+  open: ['needs-you', 'korev-working', 'in-progress'],
+  ready: ['ready'],
+  stale: ['stale', 'kept'],
+};
+
+const MY_PRS_VIEWS = Object.keys(MY_PRS_VIEW_BUCKETS) as MyPrsView[];
+
+export function myPrsViewSnapshot(
+  snapshot: InboxSnapshot,
+  view: MyPrsView,
+): InboxSnapshot {
+  const buckets = MY_PRS_VIEW_BUCKETS[view];
+  return {
+    ...snapshot,
+    mine: snapshot.mine.filter((section) => buckets.includes(section.bucket)),
+  };
+}
+
+export function bucketCount(snapshot: InboxSnapshot, bucket: Bucket): number {
+  return snapshot.mine.find((section) => section.bucket === bucket)?.count ?? 0;
+}
+
+export function myPrsViewOf(
+  snapshot: InboxSnapshot,
+  ref: string,
+): MyPrsView | null {
+  const holdsRef = (view: MyPrsView) =>
+    myPrsIn(myPrsViewSnapshot(snapshot, view).mine).some(
+      ({ pr }) => prRef(pr) === ref,
+    );
+  return MY_PRS_VIEWS.find(holdsRef) ?? null;
 }

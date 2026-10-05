@@ -15,7 +15,7 @@ describe('Topbar', () => {
     const onReconnect = vi.fn();
     render(
       <Topbar
-        title="My PRs"
+        title="Open"
         snapshot={makeSnapshot({ status: 'auth_lost' })}
         onReconnect={onReconnect}
       />,
@@ -28,7 +28,7 @@ describe('Topbar', () => {
     vi.setSystemTime(SYNCED_AT);
     render(
       <Topbar
-        title="My PRs"
+        title="Open"
         snapshot={makeSnapshot({ status: 'offline' })}
         onReconnect={vi.fn()}
       />,
@@ -42,7 +42,7 @@ describe('Topbar', () => {
     vi.setSystemTime(new Date(Date.parse(SYNCED_AT) + 3 * DAY_MS));
     render(
       <Topbar
-        title="My PRs"
+        title="Open"
         snapshot={makeSnapshot({ status: 'syncing', fromCache: true })}
         onReconnect={vi.fn()}
       />,
@@ -57,7 +57,7 @@ describe('Topbar', () => {
   it('names why the sync failed', () => {
     render(
       <Topbar
-        title="My PRs"
+        title="Open"
         snapshot={makeSnapshot({
           status: 'error',
           error: 'GitHub answered with HTTP 504',

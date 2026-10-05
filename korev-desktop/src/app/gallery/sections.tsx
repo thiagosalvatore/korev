@@ -391,10 +391,22 @@ const SAMPLE_NAV_ITEMS: SidebarNavItem<string>[] = [
     badge: { count: 5, tone: 'danger', label: '5 waiting' },
   },
   {
-    id: 'mine',
-    label: 'My PRs',
+    id: 'open',
+    label: 'Open',
     icon: 'git-pull-request',
     badge: { count: 0, tone: 'neutral', label: '0 need you' },
+  },
+  {
+    id: 'ready',
+    label: 'Ready to merge',
+    icon: 'git-merge',
+    badge: { count: 2, tone: 'success', label: '2 ready to merge' },
+  },
+  {
+    id: 'stale',
+    label: 'Stale',
+    icon: 'clock',
+    badge: { count: 1, tone: 'neutral', label: '1 stale' },
   },
 ];
 

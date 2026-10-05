@@ -9,8 +9,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppShell } from './AppShell';
 import { installFakeBridge, installMatchMedia } from './fake-bridge';
 import type { InboxSnapshot } from '../shared/inbox';
+import { prRef } from '../shared/pr-ref';
 import {
   CONNECTED_AUTH,
+  OTEL_PR,
   WATCHING_SETTINGS,
   makeSnapshot,
   withKeptPr,
@@ -31,11 +33,25 @@ function viewTitle(): string {
 }
 
 describe('AppShell', () => {
-  it('switches view on the show-mine app command', () => {
+  it('switches view on the show-ready app command', () => {
     const { emitCommand } = renderShell();
     expect(viewTitle()).toBe('Review requests');
-    act(() => emitCommand('show-mine'));
-    expect(viewTitle()).toBe('My PRs');
+    act(() => emitCommand('show-ready'));
+    expect(viewTitle()).toBe('Ready to merge');
+  });
+
+  it('counts what each of my PR views holds in the sidebar, leaving kept PRs out of Stale', async () => {
+    renderShell(withKeptPr(withStaleStack()));
+    expect(await screen.findByLabelText('3 need you')).toBeTruthy();
+    expect(screen.getByLabelText('1 ready to merge')).toBeTruthy();
+    expect(screen.getByLabelText('2 stale')).toBeTruthy();
+  });
+
+  it('opens the view that holds the PR a notification points at', async () => {
+    const { emitFocusPr } = renderShell();
+    await screen.findByLabelText('1 ready to merge');
+    act(() => emitFocusPr(prRef(OTEL_PR.pr)));
+    expect(viewTitle()).toBe('Ready to merge');
   });
 
   it('ignores the ? shortcut while a text field has focus', () => {
@@ -54,33 +70,25 @@ describe('AppShell', () => {
     ).toBeTruthy();
   });
 
-  it('sums up My PRs by section in display order, leaving out empty sections', async () => {
-    const snapshot = makeSnapshot();
-    const { emitCommand } = renderShell({
-      ...snapshot,
-      mine: snapshot.mine.filter((section) => section.bucket !== 'ready'),
-    });
-    act(() => emitCommand('show-mine'));
+  it('sums up Open by section in display order, leaving out other views', async () => {
+    const { emitCommand } = renderShell(withStaleStack());
+    act(() => emitCommand('show-open'));
 
     expect(await screen.findByText('3 need you · 1 in progress')).toBeTruthy();
   });
 
-  it('says there are no open PRs when every section is empty', async () => {
+  it('says nothing is ready to merge when the view is empty', async () => {
     const { emitCommand } = renderShell(makeSnapshot({ mine: [] }));
-    act(() => emitCommand('show-mine'));
+    act(() => emitCommand('show-ready'));
 
-    expect(await screen.findByText('No open PRs')).toBeTruthy();
+    expect(await screen.findByText('Nothing ready to merge')).toBeTruthy();
   });
 
-  it('counts stale PRs in the summary but leaves kept PRs out', async () => {
+  it('counts stale PRs in the Stale summary but leaves kept PRs out', async () => {
     const { emitCommand } = renderShell(withKeptPr(withStaleStack()));
-    act(() => emitCommand('show-mine'));
+    act(() => emitCommand('show-stale'));
 
-    expect(
-      await screen.findByText(
-        '3 need you · 1 ready to merge · 1 in progress · 2 stale',
-      ),
-    ).toBeTruthy();
+    expect(await screen.findByText('2 stale')).toBeTruthy();
   });
 
   it('filters the list and the topbar to the chosen repos while the sidebar counts every repo', async () => {
@@ -88,7 +96,7 @@ describe('AppShell', () => {
       ...WATCHING_SETTINGS,
       repoFilter: { mine: ['acme/web'], review: [] },
     });
-    act(() => emitCommand('show-mine'));
+    act(() => emitCommand('show-open'));
 
     expect(await screen.findByText('2 need you · filtered')).toBeTruthy();
     expect(

@@ -50,8 +50,15 @@ export async function connectAndOpenMyPrs(window: Page) {
   await expect(window.getByText(`Connected as @${VIEWER_LOGIN}`)).toBeVisible();
   await window.getByRole('button', { name: /Open inbox/ }).click();
 
-  await window.getByRole('button', { name: /My PRs/ }).click();
+  await showView(window, 'Open');
   await expect(window.getByText(FAILING_PR_TITLE)).toBeVisible();
+}
+
+export async function showView(window: Page, label: string) {
+  await window
+    .getByRole('navigation', { name: 'Inbox' })
+    .getByRole('button', { name: new RegExp(`^${label}`) })
+    .click();
 }
 
 export function panel(window: Page) {
@@ -70,9 +77,9 @@ export async function openRow(window: Page, title: string) {
   await window.getByRole('option', { name: new RegExp(title) }).click();
 }
 
-export function sectionRows(window: Page, section: string) {
+export function listRows(window: Page) {
   return window
-    .getByRole('group', { name: section, exact: true })
+    .getByRole('listbox', { name: 'My pull requests' })
     .locator('[role="option"]:not([aria-expanded])');
 }
 

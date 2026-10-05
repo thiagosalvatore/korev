@@ -36,15 +36,15 @@ and open `#gallery`).
 | Action chip | My PR row while Korev acts on it: "Merging…" / "Closing…" (with `loader`), "Still merging on GitHub", "Merge failed", "Close failed" | neutral, or danger for a failure |
 | Task chip | Row while Korev's agent works on the PR: "Explaining…", "Fixing conflicts…", "Fixing CI…", "Addressing comments…", "Reviewing…", or "Queued" while it waits for one of the two run slots (with `loader`); "<Task> failed" | neutral, or danger for a failure |
 | Queue chip | "In Trunk queue" / "In merge queue" (In progress); "Removed from Trunk queue" (Needs you) | neutral / warning |
-| Section count | My PRs section header count | Needs you danger, Ready to merge success, In progress and Stale mono `fg-2` |
+| Section count | Section header count in Open | Needs you danger, Korev working and In progress mono `fg-2` |
 | Stack | Header of a stack group | accent |
-| Sidebar count | My PRs = Needs you count; Review requests = requests waiting | danger when something needs you or a P1 exists, otherwise neutral |
+| Sidebar count | Review requests = requests waiting; Open = Needs you count; Ready to merge = ready count; Stale = stale count, kept PRs left out | Review requests and Open danger when a P1 exists or something needs you; Ready to merge success when above zero; otherwise neutral |
 
 `RiskBadge` is reserved for review findings. Do not use it for size or priority.
 
 ## Wording
 
-- "Ready to merge" appears only in My PRs. Review requests show only "Draft".
+- "Ready to merge" appears only in the Ready to merge view. Review requests show only "Draft".
 - Say "Size", never "complexity". The priority column is "Suggested priority".
 - Priority is explained in plain reasons ("Requested from you directly · waiting 3d ·
   blocks 2 layers · small"), never as a number.
@@ -88,10 +88,14 @@ and open `#gallery`).
 
 ## Status sections
 
-- My PRs shows each section once, for every repo together: **Needs you → Ready to
-  merge → In progress → Stale**. A section with no PRs is hidden. When Needs you is empty but
-  other sections have PRs, the line "Nothing needs you." (`check-check`, `fg-2`) takes
-  its place at the top.
+- My PRs are split across three sidebar views, each for every repo together:
+  - **Open** shows the sections **Needs you → Korev working → In progress**. A section
+    with no PRs is hidden. When Needs you is empty but other sections have PRs, the line
+    "Nothing needs you." (`check-check`, `fg-2`) takes its place at the top.
+  - **Ready to merge** lists the ready PRs with no section header.
+  - **Stale** lists the stale PRs with no section header, then the Kept toggle.
+- The three views share one repo filter. ⌘2, ⌘3 and ⌘4 open them. A notification
+  opens the view that holds its PR.
 - A stack's section and the display order are separate orders. A stack goes in the most
   urgent section among the viewer's open layers (Needs you > In progress > Ready >
   Stale), so a stack with one layer running and one ready stays in In progress, and a
@@ -100,9 +104,9 @@ and open `#gallery`).
   Sticky on `bg-app` with a `border-1` bottom hairline, never a card. It sits below the
   updates pill.
 - Needs you never collapses: no chevron, and it is a plain heading, not a listbox
-  option. Ready to merge, In progress and Stale are listbox options with a chevron; ←/→
-  or Enter collapse and expand them, and the state is saved. Stale starts collapsed. A
-  collapsed section keeps its count.
+  option. Korev working and In progress are listbox options with a chevron; ←/→ or
+  Enter collapse and expand them, and the state is saved. A collapsed section keeps its
+  count.
 
 ## Stale and Keep
 
@@ -110,7 +114,7 @@ and open `#gallery`).
   or queued. Activity is the PR being opened, a commit being pushed, or a person
   commenting. Bot comments don't count.
 - "Keep for 30 days" (panel footer, or ⇧K) moves a stale PR into a collapsed "Kept"
-  toggle at the bottom of Stale, with a toast "Kept #302 for 30 days" and Undo. A keep
+  toggle at the bottom of the Stale view, with a toast "Kept #302 for 30 days" and Undo. A keep
   ends after 30 days or when someone acts on the PR again. Keeping a stale stack keeps
   all of the viewer's layers. Kept PRs are left out of the Stale count and the topbar.
   The panel shows "Stop keeping" for a kept PR, and ⇧K toggles.
@@ -121,8 +125,9 @@ and open `#gallery`).
   the requesting team, or GitHub's overall review decision approved it. Direct requests
   always stay. Approved rows are left out of the counts. The column header stays pinned
   while the list scrolls.
-- The topbar sums up My PRs by section, leaving out empty ones: "3 need you · 2 ready
-  to merge · 5 in progress", or "No open PRs". Review requests reads "2 waiting on you".
+- The topbar sums up the current view by section, leaving out empty ones: "3 need you ·
+  5 in progress" in Open, "2 ready to merge", "4 stale". An empty view reads "Nothing
+  needs you", "Nothing ready to merge" or "Nothing stale". Review requests reads "2 waiting on you".
 
 ## Repo order
 

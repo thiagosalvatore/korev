@@ -6,6 +6,10 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 
 export type InboxView = 'review' | 'mine';
 
+export type MyPrsView = 'open' | 'ready' | 'stale';
+
+export type ListView = 'review' | MyPrsView;
+
 export interface WindowBounds {
   x: number;
   y: number;
@@ -31,7 +35,7 @@ export type RepoFilter = Record<InboxView, string[]>;
 export interface Settings {
   repos: string[];
   theme: ThemePreference;
-  lastView: InboxView;
+  lastView: ListView;
   windowBounds: WindowBounds | null;
   collapsedSections: CollapsedSections;
   mergeWith: Record<string, MergeTool>;
