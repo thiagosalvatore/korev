@@ -124,6 +124,7 @@ describe('fix CI task', () => {
     checkouts.push.mockResolvedValueOnce({
       kind: 'workflow-files',
       files: ['.github/workflows/deploy.yml'],
+      sha: 'abc1234',
     });
 
     const failure = await outcome.catch((error: unknown) => error);

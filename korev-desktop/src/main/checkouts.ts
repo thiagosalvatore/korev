@@ -76,7 +76,7 @@ export interface Checkout {
 export type PushResult =
   | { kind: 'pushed'; sha: string }
   | { kind: 'unchanged' }
-  | { kind: 'workflow-files'; files: string[] };
+  | { kind: 'workflow-files'; files: string[]; sha: string };
 
 export interface CheckoutsDeps {
   run: CommandRunner;
@@ -328,7 +328,7 @@ export function createCheckouts(deps: CheckoutsDeps): Checkouts {
       .split('\n')
       .filter((file) => file.startsWith(WORKFLOWS_DIR));
     if (files.length > 0 && !canPushWorkflows) {
-      return { kind: 'workflow-files', files };
+      return { kind: 'workflow-files', files, sha };
     }
     await git(
       checkout.path,

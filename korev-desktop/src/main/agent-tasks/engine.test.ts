@@ -195,14 +195,16 @@ describe('agent tasks engine', () => {
   it('keeps the checkout of a commit Korev could not push until the failure is dismissed', async () => {
     const { engine, pending, releaseCheckout, settle } = setup();
     engine.start(refOf(1), 'fix-ci');
-    pending[0].reject(new UnpushedChangesError('Push it from your terminal.'));
+    pending[0].reject(
+      new UnpushedChangesError('Push it from your terminal.', 'h2'),
+    );
     await settle();
 
     expect(stateOf(engine, 1)).toEqual({
       status: 'failed',
       kind: 'fix-ci',
       message: 'Push it from your terminal.',
-      unpushed: true,
+      unpushed: 'h2',
     });
     expect(releaseCheckout).not.toHaveBeenCalled();
     expect(engine.keptRefs()).toEqual([refOf(1)]);
@@ -320,14 +322,34 @@ describe('keep mergeable', () => {
     const { engine, pending, settle } = setup(undefined, WATCH_ALL);
     const conflicted = mineSnapshot(watchedPr({ mergeable: 'CONFLICTING' }));
     engine.reconcile(conflicted);
-    pending[0].reject(new UnpushedChangesError('Push it from your terminal.'));
+    pending[0].reject(
+      new UnpushedChangesError('Push it from your terminal.', 'h2'),
+    );
     await settle();
 
     engine.reconcile(conflicted);
     await settle();
 
     expect(pending).toHaveLength(1);
-    expect(stateOf(engine, 1)).toMatchObject({ unpushed: true });
+    expect(stateOf(engine, 1)).toMatchObject({ unpushed: 'h2' });
+  });
+
+  it('clears the failure once the PR head is the commit Korev could not push', async () => {
+    const { engine, pending, releaseCheckout, settle } = setup(
+      undefined,
+      WATCH_ALL,
+    );
+    engine.reconcile(mineSnapshot(watchedPr({ mergeable: 'CONFLICTING' })));
+    pending[0].reject(
+      new UnpushedChangesError('Push it from your terminal.', 'h2'),
+    );
+    await settle();
+
+    engine.reconcile(mineSnapshot(watchedPr({ headRefOid: 'h2' })));
+    await settle();
+
+    expect(stateOf(engine, 1)).toBeUndefined();
+    expect(releaseCheckout).toHaveBeenCalledWith(refOf(1));
   });
 
   it('fixes the conflict first, then failing CI on a later snapshot', async () => {

@@ -41,7 +41,10 @@ export class TaskError extends Error {
 }
 
 export class UnpushedChangesError extends TaskError {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly sha: string,
+  ) {
     super(message);
     this.name = 'UnpushedChangesError';
   }
@@ -114,7 +117,7 @@ function isActive(record: TaskRecord | undefined): boolean {
 function failedState(kind: AgentTaskKind, error: unknown): AgentTaskState {
   const message = describeError(error);
   return error instanceof UnpushedChangesError
-    ? { status: 'failed', kind, message, unpushed: true }
+    ? { status: 'failed', kind, message, unpushed: error.sha }
     : { status: 'failed', kind, message };
 }
 
@@ -423,6 +426,14 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     }
   }
 
+  function dismissIfPushed(pr: PullRequest): void {
+    const ref = prRef(pr);
+    const state = records.get(ref)?.state;
+    if (state?.status === 'failed' && state.unpushed === pr.headRefOid) {
+      void dismiss(ref);
+    }
+  }
+
   function forgetGoneMemories(snapshot: InboxSnapshot, present: Set<string>) {
     if (snapshot.truncated.mine) return;
     for (const ref of memories.keys()) {
@@ -438,6 +449,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       else put(ref, null);
     }
     forgetGoneMemories(snapshot, present);
+    pullRequestsIn(snapshot).forEach(dismissIfPushed);
     myPrsIn(snapshot.mine).forEach(keepMergeable);
     persist();
   }

@@ -97,13 +97,13 @@ export type AgentTaskState =
       status: 'failed';
       kind: AgentTaskKind;
       message: string;
-      unpushed?: true;
+      unpushed?: string;
     };
 
 export function keepsCheckout(state: AgentTaskState): boolean {
   return (
     state.status === 'needs-input' ||
-    (state.status === 'failed' && state.unpushed === true)
+    (state.status === 'failed' && state.unpushed !== undefined)
   );
 }
 

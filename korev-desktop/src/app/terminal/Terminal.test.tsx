@@ -67,7 +67,7 @@ const UNPUSHED: AgentTaskState = {
   status: 'failed',
   kind: 'fix-ci',
   message: "Korev's GitHub sign-in can't push workflow files.",
-  unpushed: true,
+  unpushed: 'abc1234',
 };
 
 function renderMine(state: AgentTaskState) {

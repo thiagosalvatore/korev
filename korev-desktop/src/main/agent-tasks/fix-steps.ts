@@ -34,13 +34,14 @@ export function openForFix(checkouts: Checkouts, pr: PullRequest) {
 }
 
 function workflowRefusal(
-  files: string[],
+  { files, sha }: { files: string[]; sha: string },
   checkout: Checkout,
   target: PushTarget,
 ): TaskError {
   const command = `cd '${checkout.path}' && git push ${pushRemote(target)} HEAD:${target.headRefName}`;
   return new UnpushedChangesError(
     `This change touches ${files.join(', ')}. Korev's GitHub sign-in can't push workflow files; push it from your terminal with \`${command}\`.`,
+    sha,
   );
 }
 
@@ -58,7 +59,7 @@ export async function commitAndPush(
     await deps.canPushWorkflows(),
   );
   if (result.kind === 'workflow-files') {
-    throw workflowRefusal(result.files, checkout, target);
+    throw workflowRefusal(result, checkout, target);
   }
   return result.kind === 'pushed' ? [result.sha] : [];
 }

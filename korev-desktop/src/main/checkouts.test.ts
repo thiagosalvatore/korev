@@ -173,6 +173,7 @@ describe('checkouts', () => {
     expect(await checkouts.push(checkout, PUSH, false)).toEqual({
       kind: 'workflow-files',
       files: ['.github/workflows/ci.yml'],
+      sha: await checkouts.git(checkout.path, ['rev-parse', 'HEAD']),
     });
   });
 
