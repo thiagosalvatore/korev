@@ -53,4 +53,20 @@ describe('Topbar', () => {
       ),
     ).toBeTruthy();
   });
+
+  it('names why the sync failed', () => {
+    render(
+      <Topbar
+        title="My PRs"
+        snapshot={makeSnapshot({
+          status: 'error',
+          error: 'GitHub answered with HTTP 504',
+        })}
+        onReconnect={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByTitle('GitHub answered with HTTP 504').textContent,
+    ).toContain('Sync failed');
+  });
 });

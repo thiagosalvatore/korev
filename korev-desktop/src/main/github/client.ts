@@ -133,6 +133,12 @@ interface InboxPageRequest {
   accessTargets: RepoAccessTarget[];
 }
 
+interface SearchRequest {
+  key: SearchKey;
+  queries: Record<SearchKey, string>;
+  accessTargets: RepoAccessTarget[];
+}
+
 interface ViewerTeamsData {
   viewer: {
     organizations?: Connection<{
@@ -308,9 +314,34 @@ class GithubApiClient implements GithubClient {
       repoMerge: {},
       repoAvatars: {},
     };
-    let accessTargets = repoAccessTargets(repos);
-    while (SEARCH_KEYS.some((key) => !collected.progress[key].done)) {
-      const variables = inboxVariables(queries, collected.progress);
+    const accessTargets = repoAccessTargets(repos);
+    await Promise.all(
+      SEARCH_KEYS.map((key) =>
+        this.#collectSearch(
+          token,
+          {
+            key,
+            queries,
+            accessTargets: key === 'mine' ? accessTargets : [],
+          },
+          collected,
+          signal,
+        ),
+      ),
+    );
+    return collected;
+  }
+
+  async #collectSearch(
+    token: string,
+    request: SearchRequest,
+    collected: CollectedSearches,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const { key, queries } = request;
+    let accessTargets = request.accessTargets;
+    while (!collected.progress[key].done) {
+      const variables = inboxVariables(queries, key, collected.progress[key]);
       const result = await this.#inboxPage(
         token,
         { variables, accessTargets },
@@ -318,10 +349,12 @@ class GithubApiClient implements GithubClient {
       );
       collected.viewerLogin = result.data.viewer.login;
       recordRepoAccess(collected, accessTargets, result, token);
-      collected.progress = advanceAll(collected.progress, result.data);
+      collected.progress[key] = advance(
+        collected.progress[key],
+        result.data[key],
+      );
       accessTargets = [];
     }
-    return collected;
   }
 
   async #inboxPage(
@@ -466,25 +499,17 @@ function startProgress(): SearchProgress {
 
 function inboxVariables(
   queries: Record<SearchKey, string>,
-  progress: Record<SearchKey, SearchProgress>,
+  key: SearchKey,
+  progress: SearchProgress,
 ): InboxQueryVariables {
+  const isMine = key === 'mine';
   return {
     mineQuery: queries.mine,
     reviewsQuery: queries.reviews,
-    includeMine: !progress.mine.done,
-    includeReviews: !progress.reviews.done,
-    mineCursor: progress.mine.cursor,
-    reviewsCursor: progress.reviews.cursor,
-  };
-}
-
-function advanceAll(
-  progress: Record<SearchKey, SearchProgress>,
-  data: InboxData,
-): Record<SearchKey, SearchProgress> {
-  return {
-    mine: advance(progress.mine, data.mine),
-    reviews: advance(progress.reviews, data.reviews),
+    includeMine: isMine,
+    includeReviews: !isMine,
+    mineCursor: isMine ? progress.cursor : null,
+    reviewsCursor: isMine ? null : progress.cursor,
   };
 }
 

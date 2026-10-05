@@ -16,13 +16,16 @@ const STATUS_TONES: Record<StatusTone, string> = {
 
 function StatusText({
   tone = 'quiet',
+  title,
   children,
 }: {
   tone?: StatusTone;
+  title?: string;
   children: ReactNode;
 }) {
   return (
     <span
+      title={title}
       className={cn(
         'inline-flex items-center gap-1.5 text-xs whitespace-nowrap',
         STATUS_TONES[tone],
@@ -70,7 +73,7 @@ function SyncStatus({ snapshot, onReconnect }: SyncStatusProps) {
       );
     case 'error':
       return (
-        <StatusText tone="danger">
+        <StatusText tone="danger" title={snapshot.error ?? undefined}>
           Sync failed ·
           <Button
             size="sm"

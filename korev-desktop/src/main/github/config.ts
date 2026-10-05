@@ -5,7 +5,7 @@ export const GITHUB_WEB_URL = 'https://github.com';
 export const GITHUB_API_VERSION = '2022-11-28';
 export const GITHUB_USER_AGENT = 'Korev';
 
-export const SEARCH_PAGE_SIZE = 25;
+export const SEARCH_PAGE_SIZE = 10;
 export const SEARCH_RESULT_CAP = 300;
 export const STACK_ENTRIES_LIMIT = 20;
 export const FILES_LIMIT = 100;

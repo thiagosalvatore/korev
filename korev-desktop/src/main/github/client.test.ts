@@ -11,8 +11,10 @@ import inboxPage from './fixtures/inbox-page.json';
 import type { GraphqlError } from './graphql';
 import type { PullRequestNode } from './nodes';
 import {
+  type CannedReply,
   type CannedResponse,
   type FakeFetch,
+  type RecordedRequest,
   createFakeFetch,
   graphqlBody,
 } from './test-fetch';
@@ -49,19 +51,41 @@ function searchPage(
   };
 }
 
-function inboxResponse(options: PageOptions): CannedResponse {
+type SearchKey = 'mine' | 'reviews';
+
+function searchKeyOf(request: RecordedRequest): SearchKey {
+  return graphqlBody(request).variables.includeMine ? 'mine' : 'reviews';
+}
+
+function errorsFor(key: SearchKey, errors: GraphqlError[] | undefined) {
+  const belongsTo = (error: GraphqlError): SearchKey =>
+    error.path?.[0] === 'reviews' ? 'reviews' : 'mine';
+  return errors?.filter((error) => belongsTo(error) === key);
+}
+
+function searchResponse(key: SearchKey, options: PageOptions): CannedResponse {
+  const isMine = key === 'mine';
   return {
     headers: options.headers,
     body: {
       data: {
-        ...options.access,
+        ...(isMine ? options.access : {}),
         viewer: inboxPage.data.viewer,
-        mine: searchPage(options.mine, options.mineCursor),
-        reviews: searchPage(options.reviews, options.reviewsCursor),
+        [key]: isMine
+          ? searchPage(options.mine, options.mineCursor)
+          : searchPage(options.reviews, options.reviewsCursor),
       },
-      errors: options.errors,
+      errors: errorsFor(key, options.errors),
     },
   };
+}
+
+function inboxReply(options: PageOptions): CannedReply {
+  return async (request) => searchResponse(searchKeyOf(request), options);
+}
+
+function inboxReplies(options: PageOptions): CannedReply[] {
+  return [inboxReply(options), inboxReply(options)];
 }
 
 function teamOrgsResponse(
@@ -139,7 +163,7 @@ function prs(count: number, offset = 0): PullRequestNode[] {
   );
 }
 
-function setup(...replies: CannedResponse[]) {
+function setup(...replies: CannedReply[]) {
   const fake = createFakeFetch(...replies);
   const client = createGithubClient({ fetch: fake.fetch, apiUrl: API_URL });
   return { fake, client };
@@ -167,7 +191,7 @@ describe('createGithubClient', () => {
 
     it('adds one repo qualifier to both searches', async () => {
       const { fake, client } = setup(
-        inboxResponse({ mine: [], reviews: [] }),
+        ...inboxReplies({ mine: [], reviews: [] }),
         ...teamsResponses,
       );
 
@@ -186,7 +210,7 @@ describe('createGithubClient', () => {
         (_, index) => `acme/svc-${index}`,
       );
       const { fake, client } = setup(
-        inboxResponse({ mine: [], reviews: [] }),
+        ...inboxReplies({ mine: [], reviews: [] }),
         ...teamsResponses,
       );
 
@@ -199,26 +223,47 @@ describe('createGithubClient', () => {
       }
     });
 
-    it('follows the cursor of the search that still has pages and merges them', async () => {
+    it('sends each search as its own request so neither waits on the other', async () => {
       const { fake, client } = setup(
-        inboxResponse({
-          mine: [pr(singleNode, 1)],
-          mineCursor: 'cursor-1',
-          reviews: [reviewNode],
-        }),
-        inboxResponse({ mine: [pr(singleNode, 2)] }),
+        ...inboxReplies({ mine: [pr(singleNode, 1)], reviews: [reviewNode] }),
         ...teamsResponses,
       );
 
       const inbox = await client.fetchInbox(TOKEN, ['acme/api']);
 
+      expect(variablesOf(fake, 0)).toMatchObject({
+        includeMine: true,
+        includeReviews: false,
+      });
       expect(variablesOf(fake, 1)).toMatchObject({
+        includeMine: false,
+        includeReviews: true,
+      });
+      expect(queryOf(fake, 0)).toContain('repository(');
+      expect(queryOf(fake, 1)).not.toContain('repository(');
+      expect(inbox.mine.map((item) => item.number)).toEqual([1]);
+      expect(inbox.reviews.map((item) => item.number)).toEqual([530]);
+    });
+
+    it('follows the cursor of the search that still has pages and merges them', async () => {
+      const { fake, client } = setup(
+        ...inboxReplies({
+          mine: [pr(singleNode, 1)],
+          mineCursor: 'cursor-1',
+          reviews: [reviewNode],
+        }),
+        inboxReply({ mine: [pr(singleNode, 2)] }),
+        ...teamsResponses,
+      );
+
+      const inbox = await client.fetchInbox(TOKEN, ['acme/api']);
+
+      expect(variablesOf(fake, 2)).toMatchObject({
         includeMine: true,
         includeReviews: false,
         mineCursor: 'cursor-1',
       });
-      expect(queryOf(fake, 0)).toContain('repository(');
-      expect(queryOf(fake, 1)).not.toContain('repository(');
+      expect(queryOf(fake, 2)).not.toContain('repository(');
       expect(inbox.mine.map((item) => item.number)).toEqual([1, 2]);
       expect(inbox.reviews.map((item) => item.number)).toEqual([530]);
       expect(inbox.viewerTeams).toEqual([
@@ -229,24 +274,29 @@ describe('createGithubClient', () => {
 
     it('stops at 300 PRs and marks the search truncated', async () => {
       const pages = Array.from({ length: 12 }, (_, page) =>
-        inboxResponse({
+        inboxReply({
           mine: prs(25, page * 25),
           mineCursor: `cursor-${page + 1}`,
-          reviews: page === 0 ? [] : undefined,
+          reviews: [],
         }),
       );
-      const { fake, client } = setup(...pages, ...teamsResponses);
+      const { fake, client } = setup(
+        pages[0],
+        inboxReply({ reviews: [] }),
+        ...pages.slice(1),
+        ...teamsResponses,
+      );
 
       const inbox = await client.fetchInbox(TOKEN, ['acme/api']);
 
       expect(inbox.mine).toHaveLength(300);
       expect(inbox.truncated.mine).toBe(true);
-      expect(fake.requests).toHaveLength(14);
+      expect(fake.requests).toHaveLength(15);
     });
 
     it('keeps the good PRs and names the repo when part of the query fails', async () => {
       const { client } = setup(
-        inboxResponse({
+        ...inboxReplies({
           mine: [pr(singleNode, 7, 'acme/web')],
           reviews: [reviewNode, null],
           errors: [
@@ -285,7 +335,7 @@ describe('createGithubClient', () => {
 
     it('reports an unreadable repo and keeps the PRs of the other repos', async () => {
       const { fake, client } = setup(
-        inboxResponse({
+        ...inboxReplies({
           access: { repo0: readableRepo('acme/api'), repo1: null },
           errors: [
             {
@@ -320,7 +370,7 @@ describe('createGithubClient', () => {
 
     it('links a repo blocked by OAuth App restrictions to the Korev grant page', async () => {
       const { client } = setup(
-        inboxResponse({
+        ...inboxReplies({
           access: { repo0: null },
           errors: [
             {
@@ -360,7 +410,7 @@ describe('createGithubClient', () => {
       'links a repo behind SAML to the SSO page for header "$header"',
       async ({ header, actionUrl }) => {
         const { client } = setup(
-          inboxResponse({
+          ...inboxReplies({
             access: { repo0: null },
             errors: [
               { type: 'FORBIDDEN', path: ['repo0'], message: SAML_MESSAGE },
@@ -382,7 +432,7 @@ describe('createGithubClient', () => {
 
     it('reports a renamed repo with its new name', async () => {
       const { client } = setup(
-        inboxResponse({
+        ...inboxReplies({
           access: { repo0: readableRepo('acme/api-v2') },
           mine: [],
           reviews: [],
@@ -401,7 +451,7 @@ describe('createGithubClient', () => {
     it("reads each watched repo's owner avatar", async () => {
       const avatarUrl = 'https://avatars.githubusercontent.com/u/1?s=32';
       const { client } = setup(
-        inboxResponse({
+        ...inboxReplies({
           access: {
             repo0: { ...readableRepo('acme/api'), owner: { avatarUrl } },
           },
@@ -418,7 +468,7 @@ describe('createGithubClient', () => {
 
     it('notes an archived repo', async () => {
       const { client } = setup(
-        inboxResponse({
+        ...inboxReplies({
           access: { repo0: readableRepo('acme/api', true) },
           mine: [],
           reviews: [],
@@ -446,25 +496,27 @@ describe('createGithubClient', () => {
       };
       const { fake, client } = setup(
         stackRejected,
-        inboxResponse({ mine: [pr(singleNode, 1)], reviews: [] }),
+        stackRejected,
+        ...inboxReplies({ mine: [pr(singleNode, 1)], reviews: [] }),
         ...teamsResponses,
-        inboxResponse({ mine: [], reviews: [] }),
+        ...inboxReplies({ mine: [], reviews: [] }),
       );
 
       const first = await client.fetchInbox(TOKEN, ['acme/api']);
       const second = await client.fetchInbox(TOKEN, ['acme/api']);
 
       expect(queryOf(fake, 0)).toContain('stackEntry');
-      expect(queryOf(fake, 1)).not.toContain('stackEntry');
-      expect(queryOf(fake, 4)).not.toContain('stackEntry');
+      expect(queryOf(fake, 2)).not.toContain('stackEntry');
+      expect(queryOf(fake, 3)).not.toContain('stackEntry');
+      expect(queryOf(fake, 6)).not.toContain('stackEntry');
       expect(first.mine).toHaveLength(1);
       expect(first.stacksUnavailable).toBe(true);
       expect(second.stacksUnavailable).toBe(true);
-      expect(fake.requests).toHaveLength(5);
+      expect(fake.requests).toHaveLength(8);
     });
 
     it('throws when GitHub rejects the query for any other reason', async () => {
-      const { client } = setup({
+      const filesRejected: CannedResponse = {
         body: {
           errors: [
             {
@@ -473,7 +525,8 @@ describe('createGithubClient', () => {
             },
           ],
         },
-      });
+      };
+      const { client } = setup(filesRejected, filesRejected);
 
       await expect(
         client.fetchInbox(TOKEN, ['acme/api']),
@@ -499,7 +552,7 @@ describe('createGithubClient', () => {
         },
       };
       const { fake, client } = setup(
-        inboxResponse({ mine: [busyNode], reviews: [] }),
+        ...inboxReplies({ mine: [busyNode], reviews: [] }),
         {
           body: {
             data: {
@@ -517,7 +570,7 @@ describe('createGithubClient', () => {
 
       const inbox = await client.fetchInbox(TOKEN, ['acme/api']);
 
-      expect(variablesOf(fake, 1)).toEqual({
+      expect(variablesOf(fake, 2)).toEqual({
         id: busyNode.id,
         cursor: 'threads-100',
       });
@@ -526,10 +579,10 @@ describe('createGithubClient', () => {
 
     it('fetches the viewer teams once per session', async () => {
       const { fake, client } = setup(
-        inboxResponse({ mine: [], reviews: [] }),
+        ...inboxReplies({ mine: [], reviews: [] }),
         ...teamsResponses,
-        inboxResponse({ mine: [], reviews: [] }),
-        inboxResponse({ mine: [], reviews: [] }),
+        ...inboxReplies({ mine: [], reviews: [] }),
+        ...inboxReplies({ mine: [], reviews: [] }),
         ...teamsResponses,
       );
 
@@ -541,12 +594,12 @@ describe('createGithubClient', () => {
       expect(cached.viewerTeams).toEqual([
         { org: 'acme', slug: 'backend', members: ['maria', 'li'] },
       ]);
-      expect(fake.requests).toHaveLength(7);
+      expect(fake.requests).toHaveLength(10);
     });
 
     it('reports a team lookup blocked by OAuth App restrictions', async () => {
       const { client } = setup(
-        inboxResponse({ mine: [], reviews: [] }),
+        ...inboxReplies({ mine: [], reviews: [] }),
         restrictedTeamOrgsResponse,
       );
 
@@ -562,9 +615,9 @@ describe('createGithubClient', () => {
 
     it('looks the viewer teams up again after a failed lookup', async () => {
       const { fake, client } = setup(
-        inboxResponse({ mine: [], reviews: [] }),
+        ...inboxReplies({ mine: [], reviews: [] }),
         restrictedTeamOrgsResponse,
-        inboxResponse({ mine: [], reviews: [] }),
+        ...inboxReplies({ mine: [], reviews: [] }),
         ...teamsResponses,
       );
 
@@ -574,12 +627,12 @@ describe('createGithubClient', () => {
       expect(retried.viewerTeams).toEqual([
         { org: 'acme', slug: 'backend', members: ['maria', 'li'] },
       ]);
-      expect(fake.requests).toHaveLength(5);
+      expect(fake.requests).toHaveLength(7);
     });
 
     it('reads team members only in orgs where the viewer is on a team', async () => {
       const { fake, client } = setup(
-        inboxResponse({ mine: [], reviews: [] }),
+        ...inboxReplies({ mine: [], reviews: [] }),
         teamOrgsResponse([
           { login: 'solo', teamCount: 0 },
           { login: 'acme', teamCount: 1 },
@@ -589,11 +642,11 @@ describe('createGithubClient', () => {
 
       const inbox = await client.fetchInbox(TOKEN, ['acme/api']);
 
-      expect(variablesOf(fake, 2)).toEqual({ org: 'acme', login: 'maria' });
+      expect(variablesOf(fake, 3)).toEqual({ org: 'acme', login: 'maria' });
       expect(inbox.viewerTeams).toEqual([
         { org: 'acme', slug: 'backend', members: ['maria', 'li'] },
       ]);
-      expect(fake.requests).toHaveLength(3);
+      expect(fake.requests).toHaveLength(4);
     });
   });
 

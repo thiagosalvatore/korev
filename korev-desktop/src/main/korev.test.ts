@@ -41,15 +41,15 @@ const teamsResponse: CannedResponse = {
 const [OPEN_PR_NODE] = inboxPage.data.mine.nodes;
 const OPEN_PR_REF = 'acme/api#412';
 
-function inboxResponse(...names: string[]): CannedResponse {
-  return inboxResponseWith(EMPTY_SEARCH, names);
+function inboxReplies(...names: string[]): CannedResponse[] {
+  return inboxRepliesWith(EMPTY_SEARCH, names);
 }
 
 const OPEN_PR_HEAD = 'f00dcafe';
 const OPEN_PR_TARGET = { id: 'PR_412', repo: 'acme/api', number: 412 };
 
-function inboxWithOpenPr(): CannedResponse {
-  return inboxResponseWith(
+function inboxWithOpenPr(): CannedResponse[] {
+  return inboxRepliesWith(
     { ...EMPTY_SEARCH, nodes: [{ ...OPEN_PR_NODE, headRefOid: OPEN_PR_HEAD }] },
     ['acme/api'],
   );
@@ -72,15 +72,15 @@ function storedExplanation(headOid: string): Record<string, string> {
   };
 }
 
-function inboxResponseWith(
+function inboxRepliesWith(
   mine: { nodes: unknown[] },
   names: string[],
-): CannedResponse {
+): CannedResponse[] {
   const access = names.map((nameWithOwner, index) => [
     `repo${index}`,
     { nameWithOwner, viewerPermission: 'WRITE', isArchived: false },
   ]);
-  return {
+  const bothSearches: CannedResponse = {
     body: {
       data: {
         viewer: VIEWER,
@@ -90,6 +90,7 @@ function inboxResponseWith(
       },
     },
   };
+  return [bothSearches, bothSearches];
 }
 
 const USER_DATA = '/user-data';
@@ -185,9 +186,9 @@ describe('korev', () => {
   it('saves the new name of a renamed repo in the same position', async () => {
     const { korev, invoke, settingsBroadcasts } = setup([
       viewerResponse,
-      inboxResponse('acme/web', 'acme/api-v2'),
+      ...inboxReplies('acme/web', 'acme/api-v2'),
       teamsResponse,
-      inboxResponse('acme/web', 'acme/api-v2'),
+      ...inboxReplies('acme/web', 'acme/api-v2'),
     ]);
     await korev.start();
     await invoke(IpcChannel.AuthUseToken, 'ghp_token');
@@ -209,7 +210,7 @@ describe('korev', () => {
   it('reorders repos without asking GitHub again', async () => {
     const { korev, fake, invoke } = setup([
       viewerResponse,
-      inboxResponse('acme/api', 'acme/web'),
+      ...inboxReplies('acme/api', 'acme/web'),
       teamsResponse,
     ]);
     await korev.start();
@@ -231,7 +232,7 @@ describe('korev', () => {
   it('keeps a PR without asking GitHub again', async () => {
     const { korev, fake, invoke } = setup([
       viewerResponse,
-      inboxWithOpenPr(),
+      ...inboxWithOpenPr(),
       teamsResponse,
     ]);
     await korev.start();
@@ -255,7 +256,7 @@ describe('korev', () => {
   it('prunes keeps for PRs that are no longer open after a sync', async () => {
     const keptAt = new Date().toISOString();
     const { korev, invoke } = setup(
-      [viewerResponse, inboxWithOpenPr(), teamsResponse],
+      [viewerResponse, ...inboxWithOpenPr(), teamsResponse],
       {
         [`${USER_DATA}/settings.json`]: JSON.stringify({
           repos: ['acme/api'],
@@ -309,7 +310,7 @@ describe('korev', () => {
   });
 
   it('opens the saved explanation for the same head commit without running the agent', async () => {
-    const { korev, invoke } = setup([inboxWithOpenPr(), teamsResponse], {
+    const { korev, invoke } = setup([...inboxWithOpenPr(), teamsResponse], {
       ...previousSession(),
       ...storedExplanation(OPEN_PR_HEAD),
     });
@@ -335,7 +336,7 @@ describe('korev', () => {
   });
 
   it('marks an explanation made for an older head commit as stale', async () => {
-    const { korev, invoke } = setup([inboxWithOpenPr(), teamsResponse], {
+    const { korev, invoke } = setup([...inboxWithOpenPr(), teamsResponse], {
       ...previousSession(),
       ...storedExplanation('0ldhead'),
     });
