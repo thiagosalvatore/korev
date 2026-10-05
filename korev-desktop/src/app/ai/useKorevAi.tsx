@@ -27,6 +27,7 @@ const SHORT_SHA = 7;
 
 const FIX_FOR_REASON: Partial<Record<ReasonCode, AgentTaskKind>> = {
   conflicts: 'fix-conflicts',
+  'checks-failing': 'fix-ci',
 };
 
 export interface FixAction {
@@ -48,6 +49,7 @@ export interface PanelAi {
   onExplain: () => void;
   onStop: () => void;
   onRetry: () => void;
+  onRerunFailedJobs: () => void;
   onOpenSettings: () => void;
 }
 
@@ -174,6 +176,15 @@ export function useKorevAi(
     else announce(result.message);
   }
 
+  async function rerunFailedJobs(target: PrTarget) {
+    const result = await korev().ai.rerunFailedJobs(target);
+    announce(
+      result.ok
+        ? `Re-running failed jobs on #${target.number}`
+        : result.message,
+    );
+  }
+
   function panelAi(subject: PanelSubject | null): PanelAi | undefined {
     const pr = subjectPr(subject);
     if (!pr) return undefined;
@@ -198,6 +209,7 @@ export function useKorevAi(
       onRetry: () => {
         if (state) startTask(state.kind, target);
       },
+      onRerunFailedJobs: () => void rerunFailedJobs(target),
       onOpenSettings,
     };
   }

@@ -22,6 +22,7 @@ export interface RunOptions {
   model: string | null;
   access: AgentAccess;
   schema: OutputSchema | null;
+  network: boolean;
 }
 
 export interface ProviderDefinition {
@@ -42,23 +43,55 @@ const CODEX_PLANS = ['ChatGPT', 'API key'];
 
 const CLAUDE_READ_TOOLS = ['Read', 'Grep', 'Glob'];
 const CLAUDE_EDIT_TOOLS = [...CLAUDE_READ_TOOLS, 'Edit', 'Write', 'Bash'];
-const CLAUDE_SANDBOX_SETTINGS = JSON.stringify({
-  sandbox: {
-    enabled: true,
-    allowUnsandboxedCommands: false,
-    failIfUnavailable: true,
-  },
-});
+export const PACKAGE_REGISTRY_DOMAINS: readonly string[] = [
+  'registry.npmjs.org',
+  'registry.yarnpkg.com',
+  'pypi.org',
+  'files.pythonhosted.org',
+  'crates.io',
+  'index.crates.io',
+  'static.crates.io',
+  'proxy.golang.org',
+  'sum.golang.org',
+  'rubygems.org',
+  'index.rubygems.org',
+];
 
-const CLAUDE_ACCESS_ARGS: Record<AgentAccess, string[]> = {
-  'read-only': [
-    '--restricted',
-    '--tools',
-    CLAUDE_READ_TOOLS.join(','),
-    '--permission-prompts',
-    'none',
-  ],
-  edit: [
+const CLAUDE_SANDBOX = {
+  enabled: true,
+  allowUnsandboxedCommands: false,
+  failIfUnavailable: true,
+};
+
+const CLAUDE_REGISTRY_NETWORK = {
+  allowedDomains: PACKAGE_REGISTRY_DOMAINS,
+  strictAllowlist: true,
+};
+
+const CODEX_NETWORK_ARGS = [
+  '-c',
+  'sandbox_workspace_write.network_access=true',
+];
+
+function claudeSandboxSettings(network: boolean): string {
+  return JSON.stringify({
+    sandbox: network
+      ? { ...CLAUDE_SANDBOX, network: CLAUDE_REGISTRY_NETWORK }
+      : CLAUDE_SANDBOX,
+  });
+}
+
+function claudeAccessArgs(access: AgentAccess, network: boolean): string[] {
+  if (access === 'read-only') {
+    return [
+      '--restricted',
+      '--tools',
+      CLAUDE_READ_TOOLS.join(','),
+      '--permission-prompts',
+      'none',
+    ];
+  }
+  return [
     '--restricted',
     '--tools',
     CLAUDE_EDIT_TOOLS.join(','),
@@ -67,9 +100,13 @@ const CLAUDE_ACCESS_ARGS: Record<AgentAccess, string[]> = {
     '--permission-prompts',
     'none',
     '--settings',
-    CLAUDE_SANDBOX_SETTINGS,
-  ],
-};
+    claudeSandboxSettings(network),
+  ];
+}
+
+function codexNetworkArgs(access: AgentAccess, network: boolean): string[] {
+  return access === 'edit' && network ? CODEX_NETWORK_ARGS : [];
+}
 
 const CODEX_SANDBOX: Record<AgentAccess, string> = {
   'read-only': 'read-only',
@@ -198,12 +235,12 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
     parseStatus: parseClaudeStatus,
     loginArgs: null,
     listModels: async () => CLAUDE_MODELS,
-    runArgs: ({ model, access, schema }) => [
+    runArgs: ({ model, access, schema, network }) => [
       '-p',
       '--output-format',
       'json',
       '--no-session-persistence',
-      ...CLAUDE_ACCESS_ARGS[access],
+      ...claudeAccessArgs(access, network),
       ...optionArgs('--model', model),
       ...optionArgs('--json-schema', schema?.json),
     ],
@@ -217,13 +254,14 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
     loginArgs: ['login'],
     listModels: async (run) =>
       parseCodexModels((await run(['debug', 'models'])).stdout),
-    runArgs: ({ model, access, schema }) => [
+    runArgs: ({ model, access, schema, network }) => [
       'exec',
       '--json',
       '--ephemeral',
       '--skip-git-repo-check',
       '--sandbox',
       CODEX_SANDBOX[access],
+      ...codexNetworkArgs(access, network),
       ...optionArgs('--model', model),
       ...optionArgs('--output-schema', schema?.path),
       STDIN_PROMPT,

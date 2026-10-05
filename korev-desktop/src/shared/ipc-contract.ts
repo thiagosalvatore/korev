@@ -68,6 +68,7 @@ export enum IpcChannel {
   AiAnswer = 'ai:answer',
   AiCancel = 'ai:cancel',
   AiDismiss = 'ai:dismiss',
+  AiRerunFailedJobs = 'ai:rerun-failed-jobs',
   AiCheckoutsSize = 'ai:checkouts-size',
   AiRemoveCheckouts = 'ai:remove-checkouts',
 }
@@ -139,6 +140,7 @@ export interface KorevBridge {
     answer(target: PrTarget, answers: QuestionAnswers): Promise<ActionResult>;
     cancel(target: PrTarget): Promise<void>;
     dismiss(target: PrTarget): Promise<void>;
+    rerunFailedJobs(target: PrTarget): Promise<ActionResult>;
     checkoutsSize(): Promise<number>;
     removeCheckouts(): Promise<ActionResult>;
   };

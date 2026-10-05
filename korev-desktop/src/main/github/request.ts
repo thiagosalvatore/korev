@@ -19,6 +19,7 @@ export interface ResponseHeaders {
 export interface FetchResponse {
   status: number;
   headers: ResponseHeaders;
+  body?: AsyncIterable<Uint8Array> | null;
   text(): Promise<string>;
 }
 
@@ -122,7 +123,7 @@ function toFetchInit(request: GithubRequest): FetchInit {
   };
 }
 
-function buildHeaders(
+export function buildHeaders(
   request: GithubRequest,
   hasBody: boolean,
 ): Record<string, string> {

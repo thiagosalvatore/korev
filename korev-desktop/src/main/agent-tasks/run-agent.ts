@@ -14,6 +14,7 @@ export interface StructuredRun {
   cwd: string;
   access: AgentAccess;
   schema: object;
+  network?: boolean;
   timeoutMs: number;
   signal: AbortSignal;
 }

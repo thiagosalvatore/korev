@@ -33,6 +33,7 @@ export interface GithubWriter {
   reopenPullRequest(token: string, id: string): Promise<void>;
   dequeuePullRequest(token: string, id: string): Promise<void>;
   addComment(token: string, id: string, body: string): Promise<void>;
+  rerunFailedJobs(token: string, repo: string, runId: number): Promise<void>;
 }
 
 const HTTP_BAD_REQUEST = 400;
@@ -168,5 +169,12 @@ export function createGithubWriter(deps: {
     dequeuePullRequest: (token, id) => mutate(token, DEQUEUE_MUTATION, { id }),
     addComment: (token, id, body) =>
       mutate(token, ADD_COMMENT_MUTATION, { id, body }),
+    rerunFailedJobs: async (token, repo, runId) => {
+      await githubRequest(deps.fetch, {
+        url: `${deps.apiUrl}/repos/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
+        method: 'POST',
+        token,
+      });
+    },
   };
 }

@@ -56,9 +56,16 @@ export function KorevAiSection({ ai }: { ai: PanelAi }) {
   return (
     <PanelSection title="Korev AI">
       {ai.state?.status === 'done' ? (
-        <p className="m-0 mb-1.5 text-sm text-fg-2">
-          Last Korev run · {ai.state.summary}
-        </p>
+        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+          <p className="m-0 min-w-0 flex-1 text-sm text-fg-2">
+            Last Korev run · {ai.state.summary}
+          </p>
+          {ai.state.rerunRunIds?.length ? (
+            <Button size="sm" onClick={ai.onRerunFailedJobs}>
+              Re-run failed jobs
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       {ai.fixes.map((fix) => (
         <FixRow

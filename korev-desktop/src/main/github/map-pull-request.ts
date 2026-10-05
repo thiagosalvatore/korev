@@ -184,7 +184,7 @@ function toCiState(rollupState: string | undefined): CiState {
   return CI_BY_ROLLUP[rollupState] ?? 'none';
 }
 
-function toCheck(context: CheckContextNode): Check {
+export function toCheck(context: CheckContextNode): Check {
   if (context.__typename === STATUS_CONTEXT_TYPE) {
     return {
       name: context.context ?? '',

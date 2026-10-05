@@ -1,7 +1,8 @@
-export type AgentTaskKind = 'explain' | 'fix-conflicts';
+export type AgentTaskKind = 'explain' | 'fix-conflicts' | 'fix-ci';
 
 export const AGENT_TASK_KINDS: readonly AgentTaskKind[] = [
   'fix-conflicts',
+  'fix-ci',
   'explain',
 ];
 
@@ -24,6 +25,12 @@ export const AGENT_TASK_WORDS: Record<AgentTaskKind, AgentTaskWords> = {
     running: 'Fixing conflicts',
     failed: 'Fix conflicts failed',
     done: 'Fixed conflicts on',
+  },
+  'fix-ci': {
+    name: 'Fix CI',
+    running: 'Fixing CI',
+    failed: 'Fix CI failed',
+    done: 'Fixed CI on',
   },
 };
 
@@ -55,6 +62,7 @@ export type AgentTaskState =
       kind: AgentTaskKind;
       summary: string;
       commits: string[];
+      rerunRunIds?: number[];
       finishedAt: string;
     }
   | { status: 'failed'; kind: AgentTaskKind; message: string };
@@ -88,6 +96,10 @@ export const DEFAULT_INSTRUCTIONS: Record<AgentTaskKind, string> = {
     'Resolve the merge conflicts so both the pull request and the base branch keep working.',
     'Keep the intent of both sides. When the two sides changed the same code for different reasons, combine them.',
     "If the project's fast checks, such as type checking or the unit tests for the files you changed, already run offline, run them.",
+  ].join(' '),
+  'fix-ci': [
+    'Fix the failing checks with the smallest change that makes them pass.',
+    'Run the failing tests, linters or builds locally before you finish, and fix what they report.',
   ].join(' '),
 };
 

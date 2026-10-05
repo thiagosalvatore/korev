@@ -39,7 +39,12 @@ export interface TaskRun {
 }
 
 export type TaskOutcome =
-  | { status: 'done'; summary: string; commits: string[] }
+  | {
+      status: 'done';
+      summary: string;
+      commits: string[];
+      rerunRunIds?: number[];
+    }
   | { status: 'needs-input'; questions: AgentQuestion[] };
 
 export interface AgentTask {
@@ -151,6 +156,9 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       kind,
       summary: outcome.summary,
       commits: outcome.commits,
+      ...(outcome.rerunRunIds?.length
+        ? { rerunRunIds: outcome.rerunRunIds }
+        : {}),
       finishedAt: new Date(deps.now()).toISOString(),
     });
   }

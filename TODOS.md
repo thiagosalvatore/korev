@@ -19,3 +19,7 @@
 ## Merge actions
 
 - **P3 · Suggest "Merge with" from repo config files.** When a repo is added, pre-fill its "Merge with" setting from `.mergify.yml` / `.github/mergify.yml` (with `queue_rules`) or `.aviator/config.yml`, and let the user confirm it. It saves a step on the first merge in Mergify and Aviator repos without guessing. Trunk has no file-based signal. Start in `korev-desktop/src/main/github/repo-picker.ts`, where repos are added.
+
+## AI tasks
+
+- **P3 · Limit Codex to package registries in Fix CI.** Codex's sandbox only has network on or off, so a Codex Fix CI run can reach any host, while Claude runs reach only the registry list. When Codex supports a domain list, pass the same list Claude gets (`PACKAGE_REGISTRY_DOMAINS` in `korev-desktop/src/main/agents/providers.ts`) and extend the provider safety test. Until then the Settings help says so. Depends on: Codex adding per-domain network rules.

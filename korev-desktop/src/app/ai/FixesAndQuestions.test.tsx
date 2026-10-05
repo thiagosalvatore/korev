@@ -120,6 +120,48 @@ describe('fixes in the Korev AI section', () => {
   });
 });
 
+describe('Fix CI', () => {
+  const failing: MyPr = {
+    ...ITEM,
+    reasons: [
+      { code: 'checks-failing', label: 'Lint failing', severity: 'danger' },
+    ],
+  };
+
+  it('offers Fix CI for failing checks', async () => {
+    const { bridge } = renderMine(failing);
+
+    fireEvent.click(
+      await within(openPanel()).findByRole('button', { name: 'Fix CI' }),
+    );
+
+    expect(bridge.ai.start).toHaveBeenCalledWith(TARGET, 'fix-ci');
+  });
+
+  it('offers to re-run the failed jobs when the agent found nothing to fix', async () => {
+    const { bridge } = renderMine(failing, {
+      [REF]: {
+        status: 'done',
+        kind: 'fix-ci',
+        summary: 'The runner timed out',
+        commits: [],
+        rerunRunIds: [9],
+        finishedAt: '2026-10-04T10:00:00.000Z',
+      },
+    });
+    const panel = openPanel();
+
+    expect(
+      await within(panel).findByText('Last Korev run · The runner timed out'),
+    ).toBeTruthy();
+    fireEvent.click(
+      within(panel).getByRole('button', { name: 'Re-run failed jobs' }),
+    );
+
+    expect(bridge.ai.rerunFailedJobs).toHaveBeenCalledWith(TARGET);
+  });
+});
+
 describe('questions from Korev', () => {
   it('sends the answers only once every question has one', async () => {
     const { bridge } = renderMine(ITEM, { [REF]: WAITING });

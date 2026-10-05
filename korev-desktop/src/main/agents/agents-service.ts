@@ -37,6 +37,7 @@ export interface AgentRunRequest {
   provider?: AgentProvider;
   model?: string | null;
   schema?: object;
+  network?: boolean;
   timeoutMs?: number;
   signal?: AbortSignal;
 }
@@ -204,7 +205,12 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
       const schema = request.schema ? await outputSchema(request.schema) : null;
       const result = await exec(
         provider,
-        definition.runArgs({ model, access: request.access, schema }),
+        definition.runArgs({
+          model,
+          access: request.access,
+          schema,
+          network: request.network ?? false,
+        }),
         {
           cwd: request.cwd,
           stdin: request.prompt,

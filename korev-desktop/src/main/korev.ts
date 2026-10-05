@@ -38,6 +38,7 @@ import {
 } from './action-input';
 import { createAgentTasks } from './agent-tasks/engine';
 import { createExplainTask } from './agent-tasks/explain';
+import { createFixCiTask, type CiFailure } from './agent-tasks/fix-ci';
 import { createFixConflictsTask } from './agent-tasks/fix-conflicts';
 import {
   createExplanations,
@@ -86,6 +87,7 @@ const AGENT_TASKS_FILE = 'agent-tasks.bin';
 const EXPLANATIONS_FILE = 'explanations.bin';
 const EXPLANATION_COPIES_DIR = 'korev-explanations';
 const WORKFLOW_SCOPE = 'workflow';
+const CI_CHECKS_READ = 10;
 const CHECKOUTS_BUSY = 'Wait for Korev to finish its running tasks first.';
 const INVALID_ACTION: ActionResult = {
   ok: false,
@@ -181,11 +183,13 @@ export function createKorev(deps: KorevDeps): Korev {
     publish: publishInbox,
   });
 
+  const writer = createGithubWriter({
+    fetch: deps.fetch,
+    apiUrl: deps.github.apiUrl,
+  });
+
   const prActions = createPrActions({
-    writer: createGithubWriter({
-      fetch: deps.fetch,
-      apiUrl: deps.github.apiUrl,
-    }),
+    writer,
     token: () => auth.token(),
     repoMerge: (repo) => inbox.snapshot().repoMerge[repo],
     mergeWith: (repo) => settings.current().mergeWith[repo] ?? 'github',
@@ -238,6 +242,12 @@ export function createKorev(deps: KorevDeps): Korev {
         checkouts,
         runAgent: agents.run,
         canPushWorkflows,
+      }),
+      'fix-ci': createFixCiTask({
+        checkouts,
+        runAgent: agents.run,
+        canPushWorkflows,
+        readFailures: readCiFailures,
       }),
     },
     findPr,
@@ -346,6 +356,46 @@ export function createKorev(deps: KorevDeps): Korev {
   function readPrText(pr: { repo: string; number: number }) {
     const token = auth.token();
     return token ? taskReads.pullRequestText(token, pr) : Promise.resolve(null);
+  }
+
+  async function readCiFailures(pr: PullRequest): Promise<CiFailure[]> {
+    const token = auth.token();
+    if (!token) return [];
+    const checks = await taskReads.failingChecks(token, pr);
+    return Promise.all(
+      checks.slice(0, CI_CHECKS_READ).map(async (check) => ({
+        check,
+        annotations: check.checkRunId
+          ? await taskReads
+              .annotations(token, pr.repo, check.checkRunId)
+              .catch(() => [])
+          : [],
+        logTail:
+          check.isActionsJob && check.checkRunId
+            ? await taskReads
+                .jobLogTail(token, pr.repo, check.checkRunId)
+                .catch(() => null)
+            : null,
+      })),
+    );
+  }
+
+  async function rerunFailedJobs(target: PrTarget): Promise<ActionResult> {
+    const state = agentTasks.state()[prRef(target)];
+    const runIds = state?.status === 'done' ? (state.rerunRunIds ?? []) : [];
+    const token = auth.token();
+    if (!token || runIds.length === 0) return INVALID_ACTION;
+    try {
+      await Promise.all(
+        runIds.map((runId) =>
+          writer.rerunFailedJobs(token, target.repo, runId),
+        ),
+      );
+    } catch (error) {
+      return { ok: false, message: String(error) };
+    }
+    void inbox.trigger('manual');
+    return { ok: true };
   }
 
   function taskInstructions(kind: AgentTaskKind): string {
@@ -692,6 +742,10 @@ export function createKorev(deps: KorevDeps): Korev {
     [IpcChannel.AiDismiss]: withTarget(
       (target) => agentTasks.dismiss(prRef(target)),
       Promise.resolve(),
+    ),
+    [IpcChannel.AiRerunFailedJobs]: withTarget(
+      rerunFailedJobs,
+      Promise.resolve(INVALID_ACTION),
     ),
     [IpcChannel.AiCheckoutsSize]: () => checkouts.size(),
     [IpcChannel.AiRemoveCheckouts]: removeCheckouts,

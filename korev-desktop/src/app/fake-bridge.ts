@@ -152,6 +152,7 @@ export function installFakeBridge({
       answer: vi.fn(async () => ({ ok: true as const })),
       cancel: vi.fn(async () => undefined),
       dismiss: vi.fn(async () => undefined),
+      rerunFailedJobs: vi.fn(async () => ({ ok: true as const })),
       checkoutsSize: vi.fn(async () => checkoutsSize),
       removeCheckouts: vi.fn(async () => ({ ok: true as const })),
     },

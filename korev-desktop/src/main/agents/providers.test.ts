@@ -5,7 +5,11 @@ import {
   type AgentProvider,
 } from '../../shared/agents';
 import type { CommandResult } from './command-runner';
-import { PROVIDERS, type RunOptions } from './providers';
+import {
+  PACKAGE_REGISTRY_DOMAINS,
+  PROVIDERS,
+  type RunOptions,
+} from './providers';
 
 function result(stdout: string, exitCode = 0, stderr = ''): CommandResult {
   return { exitCode, stdout, stderr };
@@ -127,12 +131,23 @@ function flagValue(args: string[], flag: string): string | undefined {
   return args[args.indexOf(flag) + 1];
 }
 
+const NO_EXTRAS = { model: null, schema: null, network: false };
+const SCHEMA = { json: '{"type":"object"}', path: '/tmp/schema.json' };
+const SANDBOX = {
+  enabled: true,
+  allowUnsandboxedCommands: false,
+  failIfUnavailable: true,
+};
+
+function claudeSandbox(args: string[]) {
+  return JSON.parse(flagValue(args, '--settings') ?? '{}').sandbox;
+}
+
 describe('run access', () => {
   it('gives Claude Code only the file-reading tools for a read-only run', () => {
     const args = PROVIDERS.claude.runArgs({
-      model: null,
+      ...NO_EXTRAS,
       access: 'read-only',
-      schema: null,
     });
 
     expect(args).toContain('--restricted');
@@ -141,86 +156,92 @@ describe('run access', () => {
   });
 
   it('runs Claude Code shell commands in a sandbox that cannot be skipped for an edit run', () => {
-    const args = PROVIDERS.claude.runArgs({
-      model: null,
-      access: 'edit',
-      schema: null,
-    });
+    const args = PROVIDERS.claude.runArgs({ ...NO_EXTRAS, access: 'edit' });
 
     expect(args).toContain('--restricted');
     expect(flagValue(args, '--tools')?.split(',')).toEqual(
       expect.arrayContaining(['Edit', 'Write', 'Bash']),
     );
     expect(flagValue(args, '--permission-mode')).toBe('acceptEdits');
-    expect(JSON.parse(flagValue(args, '--settings') ?? '{}')).toEqual({
-      sandbox: {
-        enabled: true,
-        allowUnsandboxedCommands: false,
-        failIfUnavailable: true,
-      },
-    });
+    expect(claudeSandbox(args)).toEqual(SANDBOX);
   });
 
   it.each([
     ['read-only', 'read-only'],
     ['edit', 'workspace-write'],
   ] as const)('runs Codex %s in the %s sandbox', (access, sandbox) => {
-    const args = PROVIDERS.codex.runArgs({ model: null, access, schema: null });
+    const args = PROVIDERS.codex.runArgs({ ...NO_EXTRAS, access });
 
     expect(flagValue(args, '--sandbox')).toBe(sandbox);
   });
 
-  const SCHEMA = { json: '{"type":"object"}', path: '/tmp/schema.json' };
+  it('lets a Claude Code edit run with network reach only the package registries', () => {
+    const args = PROVIDERS.claude.runArgs({
+      ...NO_EXTRAS,
+      access: 'edit',
+      network: true,
+    });
+
+    expect(claudeSandbox(args)).toEqual({
+      ...SANDBOX,
+      network: {
+        allowedDomains: [...PACKAGE_REGISTRY_DOMAINS],
+        strictAllowlist: true,
+      },
+    });
+  });
+
+  type RunCase = [AgentProvider, AgentAccess, boolean, RunOptions['schema']];
   const everyRun = AGENT_PROVIDERS.flatMap((provider) =>
     ACCESS_LEVELS.flatMap((access) =>
-      [null, SCHEMA].map(
-        (schema): [AgentProvider, AgentAccess, RunOptions['schema']] => [
-          provider,
-          access,
-          schema,
-        ],
+      [false, true].flatMap((network) =>
+        [null, SCHEMA].map(
+          (schema): RunCase => [provider, access, network, schema],
+        ),
       ),
     ),
   );
 
   it.each(everyRun)(
-    'never lets %s skip its permissions or sandbox on a %s run (schema %o)',
-    (provider, access, schema) => {
-      const args = PROVIDERS[provider].runArgs({ model: null, access, schema });
+    'never lets %s leave its sandbox on a %s run (network %s, schema %o)',
+    (provider, access, network, schema) => {
+      const args = PROVIDERS[provider].runArgs({
+        model: null,
+        access,
+        schema,
+        network,
+      });
+      const networkOn = access === 'edit' && network;
 
       expect(args.join(' ')).not.toMatch(/dangerously|bypass|no-sandbox/i);
       if (provider === 'codex') {
         expect(flagValue(args, '--sandbox')).toBe(
           access === 'edit' ? 'workspace-write' : 'read-only',
         );
+        expect(args.join(' ').includes('network_access=true')).toBe(networkOn);
         return;
       }
       expect(args).toContain('--restricted');
-      if (access === 'edit') {
-        expect(
-          JSON.parse(flagValue(args, '--settings') ?? '{}').sandbox,
-        ).toEqual({
-          enabled: true,
-          allowUnsandboxedCommands: false,
-          failIfUnavailable: true,
-        });
+      if (access === 'read-only') {
+        expect(args).not.toContain('--settings');
+        return;
       }
+      const sandbox = claudeSandbox(args);
+      expect(sandbox).toMatchObject(SANDBOX);
+      expect(sandbox.network?.allowedDomains ?? []).toEqual(
+        networkOn ? [...PACKAGE_REGISTRY_DOMAINS] : [],
+      );
     },
   );
 
   it('passes the schema inline to Claude Code and as a file to Codex', () => {
-    const claude = PROVIDERS.claude.runArgs({
-      model: null,
-      access: 'read-only',
-      schema: SCHEMA,
-    });
-    const codex = PROVIDERS.codex.runArgs({
-      model: null,
-      access: 'read-only',
-      schema: SCHEMA,
-    });
+    const run = { ...NO_EXTRAS, access: 'read-only' as const, schema: SCHEMA };
 
-    expect(flagValue(claude, '--json-schema')).toBe(SCHEMA.json);
-    expect(flagValue(codex, '--output-schema')).toBe(SCHEMA.path);
+    expect(flagValue(PROVIDERS.claude.runArgs(run), '--json-schema')).toBe(
+      SCHEMA.json,
+    );
+    expect(flagValue(PROVIDERS.codex.runArgs(run), '--output-schema')).toBe(
+      SCHEMA.path,
+    );
   });
 });

@@ -29,6 +29,7 @@ function setup(tool: MergeTool = 'github', info: RepoMergeInfo = DIRECT) {
     reopenPullRequest: vi.fn<GithubWriter['reopenPullRequest']>(),
     dequeuePullRequest: vi.fn<GithubWriter['dequeuePullRequest']>(),
     addComment: vi.fn<GithubWriter['addComment']>(),
+    rerunFailedJobs: vi.fn<GithubWriter['rerunFailedJobs']>(),
   };
   const refresh = vi.fn();
   const actions = createPrActions({
