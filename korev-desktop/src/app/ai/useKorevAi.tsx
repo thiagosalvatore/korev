@@ -5,7 +5,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Button, Toast } from '../../design-system';
+import { Button, Toast, type ToastTone } from '../../design-system';
 import {
   AGENT_TASK_WORDS,
   FORK_WITHOUT_EDITS,
@@ -89,6 +89,7 @@ export interface PanelAi {
 
 interface DoneToast {
   message: string;
+  tone: ToastTone;
   commitUrl: string | null;
 }
 
@@ -193,6 +194,7 @@ export function useKorevAi(
     const [sha] = state.commits;
     toast.show({
       message,
+      tone: 'success',
       commitUrl: pr && sha ? commitUrl(pr.url, sha) : null,
     });
   });
@@ -273,11 +275,15 @@ export function useKorevAi(
 
   async function rerunFailedJobs(target: PrTarget) {
     const result = await korev().ai.rerunFailedJobs(target);
-    announce(
-      result.ok
-        ? `Re-running failed jobs on #${target.number}`
-        : result.message,
-    );
+    const message = result.ok
+      ? `Re-running failed jobs on #${target.number}`
+      : result.message;
+    announce(message);
+    toast.show({
+      message,
+      tone: result.ok ? 'success' : 'danger',
+      commitUrl: null,
+    });
   }
 
   function panelAi(subject: PanelSubject | null): PanelAi | undefined {
@@ -362,7 +368,7 @@ export function useKorevAi(
       {shown ? (
         <div className="fixed right-5 bottom-5 z-50">
           <Toast
-            tone="success"
+            tone={shown.tone}
             title={shown.message}
             onClose={toast.dismiss}
             action={

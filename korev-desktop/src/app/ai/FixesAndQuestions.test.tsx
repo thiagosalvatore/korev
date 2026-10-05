@@ -138,27 +138,50 @@ describe('Fix CI', () => {
     expect(bridge.ai.start).toHaveBeenCalledWith(TARGET, 'fix-ci');
   });
 
-  it('offers to re-run the failed jobs when the agent found nothing to fix', async () => {
-    const { bridge } = renderMine(failing, {
-      [REF]: {
-        status: 'done',
-        kind: 'fix-ci',
-        summary: 'The runner timed out',
-        commits: [],
-        rerunRunIds: [9],
-        finishedAt: '2026-10-04T10:00:00.000Z',
-      },
-    });
-    const panel = openPanel();
+  const NOTHING_TO_FIX: Record<string, AgentTaskState> = {
+    [REF]: {
+      status: 'done',
+      kind: 'fix-ci',
+      summary: 'The runner timed out',
+      commits: [],
+      rerunRunIds: [9],
+      finishedAt: '2026-10-04T10:00:00.000Z',
+    },
+  };
 
+  async function clickRerun() {
+    const panel = openPanel();
     expect(
       await within(panel).findByText('Last Korev run · The runner timed out'),
     ).toBeTruthy();
     fireEvent.click(
       within(panel).getByRole('button', { name: 'Re-run failed jobs' }),
     );
+  }
+
+  it('offers to re-run the failed jobs when the agent found nothing to fix', async () => {
+    const { bridge } = renderMine(failing, NOTHING_TO_FIX);
+
+    await clickRerun();
 
     expect(bridge.ai.rerunFailedJobs).toHaveBeenCalledWith(TARGET);
+    expect(
+      await screen.findByText('Re-running failed jobs on #320'),
+    ).toBeTruthy();
+  });
+
+  it('shows why GitHub refused to re-run the failed jobs', async () => {
+    const { bridge } = renderMine(failing, NOTHING_TO_FIX);
+    vi.mocked(bridge.ai.rerunFailedJobs).mockResolvedValue({
+      ok: false,
+      message: 'Resource not accessible by integration',
+    });
+
+    await clickRerun();
+
+    expect(
+      await screen.findByText('Resource not accessible by integration'),
+    ).toBeTruthy();
   });
 });
 
