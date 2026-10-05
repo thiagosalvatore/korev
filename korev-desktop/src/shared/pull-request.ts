@@ -86,6 +86,12 @@ export interface PullRequest {
   title: string;
   url: string;
   repo: string;
+  headRefName: string;
+  baseRefName: string;
+  headRefOid: string;
+  headRepositoryUrl: string | null;
+  isCrossRepository: boolean;
+  maintainerCanModify: boolean;
   authorLogin: string | null;
   authorAvatarUrl: string | null;
   state: PrState;

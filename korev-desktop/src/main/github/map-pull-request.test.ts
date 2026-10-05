@@ -41,6 +41,27 @@ describe('toPullRequest', () => {
     expect(pr.stack?.layers.map((layer) => layer.number)).toEqual([411, 412]);
   });
 
+  it('maps the head branch and whether a fork lets maintainers push', () => {
+    const pr = toPullRequest({
+      ...failingNode,
+      headRefName: 'fix-login',
+      baseRefName: 'main',
+      headRefOid: 'f00dcafe',
+      headRepository: { url: 'https://github.com/forker/api' },
+      isCrossRepository: true,
+      maintainerCanModify: true,
+    });
+
+    expect(pr).toMatchObject({
+      headRefName: 'fix-login',
+      baseRefName: 'main',
+      headRefOid: 'f00dcafe',
+      headRepositoryUrl: 'https://github.com/forker/api',
+      isCrossRepository: true,
+      maintainerCanModify: true,
+    });
+  });
+
   it('maps a single PR with failing checks', () => {
     const warn = vi.fn();
     const pr = toPullRequest(failingNode, warn);

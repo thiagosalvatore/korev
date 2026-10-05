@@ -70,6 +70,12 @@ export interface PullRequestNode {
   createdAt: string;
   updatedAt: string;
   repository: { nameWithOwner: string };
+  headRefName?: string;
+  baseRefName?: string;
+  headRefOid?: string;
+  headRepository?: { url?: string } | null;
+  isCrossRepository?: boolean;
+  maintainerCanModify?: boolean;
   author?: { login?: string; avatarUrl?: string } | null;
   reviewDecision?: string | null;
   mergeable?: string;

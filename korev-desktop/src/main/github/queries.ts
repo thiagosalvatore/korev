@@ -149,6 +149,12 @@ fragment PrCore on PullRequest {
   createdAt
   updatedAt
   repository { nameWithOwner }
+  headRefName
+  baseRefName
+  headRefOid
+  headRepository { url }
+  isCrossRepository
+  maintainerCanModify
   author { login avatarUrl }
   reviewDecision
   mergeable

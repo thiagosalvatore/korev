@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildInboxQuery } from './queries';
 import { createGithubClient } from './client';
 import { GITHUB_OAUTH_CLIENT_ID } from './config';
 import { GraphqlQueryError } from './errors';
@@ -477,6 +478,16 @@ describe('createGithubClient', () => {
       await expect(
         client.fetchInbox(TOKEN, ['acme/api']),
       ).rejects.toBeInstanceOf(GraphqlQueryError);
+    });
+
+    it('reads only whether each review thread is resolved, never its comments', () => {
+      const query = buildInboxQuery({ includeStacks: true, accessTargets: [] });
+      const threads = /reviewThreads\([^)]*\) \{([^}]*\}[^}]*)\}/.exec(
+        query,
+      )?.[1];
+
+      expect(threads).toContain('isResolved');
+      expect(threads).not.toMatch(/comments|body|authorAssociation/);
     });
 
     it('fetches the remaining review threads so thread #101 counts', async () => {
