@@ -21,6 +21,8 @@ const KIB = 1024;
 const DISABLED_HOOKS = ['-c', 'core.hooksPath=/dev/null'];
 const PROMPT_HELPERS = ['GIT_ASKPASS', 'SSH_ASKPASS', 'SSH_ASKPASS_REQUIRE'];
 const ACCESS_TOKEN_USER = 'x-access-token';
+const ORIGIN = 'origin';
+const PUSH_TO_UPSTREAM = ['config', 'push.default', 'upstream'];
 
 export type GitFailure =
   | 'old-git'
@@ -111,7 +113,7 @@ function lastLine(text: string): string {
 }
 
 export function pushRemote(target: PushTarget): string {
-  return target.url ? `${target.url}.git` : 'origin';
+  return target.url ? `${target.url}.git` : ORIGIN;
 }
 
 export function gitFailure(stderr: string): GitError {
@@ -311,6 +313,32 @@ export function createCheckouts(deps: CheckoutsDeps): Checkouts {
     return true;
   }
 
+  async function trackPushTarget(checkout: Checkout, target: PushTarget) {
+    const branch = await git(checkout.path, [
+      'symbolic-ref',
+      '--short',
+      'HEAD',
+    ]);
+    const remoteBranch = `refs/heads/${target.headRefName}`;
+    await git(checkout.path, [
+      'config',
+      `branch.${branch}.remote`,
+      pushRemote(target),
+    ]);
+    await git(checkout.path, [
+      'config',
+      `branch.${branch}.merge`,
+      remoteBranch,
+    ]);
+    await git(checkout.path, PUSH_TO_UPSTREAM);
+    if (target.url) return;
+    await git(checkout.path, [
+      'update-ref',
+      `refs/remotes/${ORIGIN}/${target.headRefName}`,
+      checkout.headOid,
+    ]);
+  }
+
   async function push(
     checkout: Checkout,
     target: PushTarget,
@@ -318,6 +346,7 @@ export function createCheckouts(deps: CheckoutsDeps): Checkouts {
   ): Promise<PushResult> {
     const sha = await git(checkout.path, ['rev-parse', 'HEAD']);
     if (sha === checkout.headOid) return { kind: 'unchanged' };
+    await trackPushTarget(checkout, target);
     const changed = await git(checkout.path, [
       'diff',
       '--name-only',

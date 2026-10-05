@@ -177,6 +177,24 @@ describe('checkouts', () => {
     });
   });
 
+  it('lets a plain git push send a refused workflow change to the pull request branch', async () => {
+    const { checkouts, remote } = setup();
+    const checkout = await checkouts.open(TARGET);
+    execFileSync('mkdir', ['-p', join(checkout.path, '.github/workflows')]);
+    writeFileSync(
+      join(checkout.path, '.github/workflows/ci.yml'),
+      'on: push\n',
+    );
+    await checkouts.commitAll(checkout.path, 'Touch CI');
+    await checkouts.push(checkout, PUSH, false);
+
+    expect(sh(checkout.path, 'status', '-sb')).toContain('ahead 1');
+    sh(checkout.path, 'push');
+    expect(
+      sh(join(remote, `${REPO}.git`), 'log', '-1', '--format=%s', 'feature'),
+    ).toBe('Touch CI');
+  });
+
   it('refuses to commit unsigned when signing needs a prompt', async () => {
     const { checkouts } = setup();
     const checkout = await checkouts.open(TARGET);
