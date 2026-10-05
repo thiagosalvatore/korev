@@ -44,7 +44,7 @@ export function TokenForm() {
         autoFocus
         value={token}
         error={error}
-        hint="A classic token with the repo and read:org scopes."
+        hint="Run gh auth token and paste the output, or use a classic token with the repo and read:org scopes."
         onChange={(event) => setToken(event.target.value)}
       />
       <div className="flex gap-2">

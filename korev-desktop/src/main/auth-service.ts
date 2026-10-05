@@ -56,7 +56,7 @@ export function missingScopes(granted: readonly string[]): string[] {
 }
 
 function missingScopesMessage(missing: string[]): string {
-  return `This token is missing the ${missing.join(' and ')} scope. Create a classic token with repo and read:org.`;
+  return `This token is missing the ${missing.join(' and ')} scope. Paste the output of gh auth token, or create a classic token with repo and read:org.`;
 }
 
 function errorMessage(error: unknown): string {
