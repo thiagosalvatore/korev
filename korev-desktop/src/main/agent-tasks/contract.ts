@@ -1,6 +1,7 @@
 import type { AgentQuestion } from '../../shared/agent-tasks';
 
 export interface AnsweredQuestion {
+  id: string;
   question: string;
   context: string;
   answer: string;

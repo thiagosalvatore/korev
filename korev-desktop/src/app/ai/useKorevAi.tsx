@@ -28,6 +28,7 @@ const SHORT_SHA = 7;
 const FIX_FOR_REASON: Partial<Record<ReasonCode, AgentTaskKind>> = {
   conflicts: 'fix-conflicts',
   'checks-failing': 'fix-ci',
+  'unresolved-threads': 'address-comments',
 };
 
 export interface FixAction {

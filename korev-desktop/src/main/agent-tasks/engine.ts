@@ -245,6 +245,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       return failure(ANSWER_EVERY_QUESTION);
     }
     const answered = questions.map((question) => ({
+      id: question.id,
       question: question.question,
       context: question.context,
       answer: answers[question.id].trim(),

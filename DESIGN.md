@@ -34,7 +34,7 @@ and open `#gallery`).
 | Approved | Priority column of an "Already approved" row when a person approved | success |
 | Bot approved | Priority column of an "Already approved" row when only bots approved | neutral |
 | Action chip | My PR row while Korev acts on it: "Merging…" / "Closing…" (with `loader`), "Still merging on GitHub", "Merge failed", "Close failed" | neutral, or danger for a failure |
-| Task chip | Row while Korev's agent works on the PR: "Explaining…", "Fixing conflicts…", "Fixing CI…", or "Queued" while it waits for one of the two run slots (with `loader`); "<Task> failed" | neutral, or danger for a failure |
+| Task chip | Row while Korev's agent works on the PR: "Explaining…", "Fixing conflicts…", "Fixing CI…", "Addressing comments…", or "Queued" while it waits for one of the two run slots (with `loader`); "<Task> failed" | neutral, or danger for a failure |
 | Queue chip | "In Trunk queue" / "In merge queue" (In progress); "Removed from Trunk queue" (Needs you) | neutral / warning |
 | Section count | My PRs section header count | Needs you danger, Ready to merge success, In progress and Stale mono `fg-2` |
 | Stack | Header of a stack group | accent |
@@ -221,6 +221,10 @@ and open `#gallery`).
   field. The footer gains "Send answers" (⌘↵ from a field), disabled until every field
   has text, and a ghost "I'll do it myself" that drops the task; Merge or Open on
   GitHub become secondary until then.
+- Address comments acts only on comments from the user and from people with write
+  access (OWNER, MEMBER, COLLABORATOR). A comment from anyone else becomes a question
+  in the same batch, quoting it. Korev replies on each thread it handled ("Fixed in
+  abc1234: …") and never resolves a thread; the reviewer does.
 - Fix CI that finds nothing to change (a flaky or infrastructure failure) pushes
   nothing; its "Last Korev run" line offers "Re-run failed jobs" for the GitHub Actions
   runs that failed.

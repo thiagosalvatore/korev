@@ -1,8 +1,13 @@
-export type AgentTaskKind = 'explain' | 'fix-conflicts' | 'fix-ci';
+export type AgentTaskKind =
+  | 'explain'
+  | 'fix-conflicts'
+  | 'fix-ci'
+  | 'address-comments';
 
 export const AGENT_TASK_KINDS: readonly AgentTaskKind[] = [
   'fix-conflicts',
   'fix-ci',
+  'address-comments',
   'explain',
 ];
 
@@ -31,6 +36,12 @@ export const AGENT_TASK_WORDS: Record<AgentTaskKind, AgentTaskWords> = {
     running: 'Fixing CI',
     failed: 'Fix CI failed',
     done: 'Fixed CI on',
+  },
+  'address-comments': {
+    name: 'Address comments',
+    running: 'Addressing comments',
+    failed: 'Address comments failed',
+    done: 'Addressed comments on',
   },
 };
 
@@ -100,6 +111,11 @@ export const DEFAULT_INSTRUCTIONS: Record<AgentTaskKind, string> = {
   'fix-ci': [
     'Fix the failing checks with the smallest change that makes them pass.',
     'Run the failing tests, linters or builds locally before you finish, and fix what they report.',
+  ].join(' '),
+  'address-comments': [
+    'Address each review comment.',
+    'Make the change the reviewer asked for when it is clear and safe.',
+    'When you disagree or the request is unclear, reply with your reasoning instead of changing code, or ask.',
   ].join(' '),
 };
 

@@ -1,6 +1,10 @@
 import type { PrState } from '../../shared/pull-request';
 import { splitRepoName } from '../repo-names';
-import { CHECK_CONTEXTS_LIMIT } from './config';
+import {
+  CHECK_CONTEXTS_LIMIT,
+  REVIEW_THREADS_LIMIT,
+  THREAD_COMMENTS_LIMIT,
+} from './config';
 import { graphql } from './graphql';
 import { tailLines } from './log-tail';
 import { toCheck } from './map-pull-request';
@@ -33,6 +37,20 @@ export interface CheckAnnotation {
   message: string;
 }
 
+export interface ThreadComment {
+  authorLogin: string | null;
+  association: string;
+  body: string;
+}
+
+export interface ReviewThread {
+  id: string;
+  path: string;
+  line: number | null;
+  diffHunk: string;
+  comments: ThreadComment[];
+}
+
 export interface TaskReads {
   pullRequestText(token: string, pr: PrTextRef): Promise<PrText | null>;
   failingChecks(token: string, pr: PrTextRef): Promise<FailingCheck[]>;
@@ -41,6 +59,7 @@ export interface TaskReads {
     repo: string,
     checkRunId: number,
   ): Promise<CheckAnnotation[]>;
+  unresolvedThreads(token: string, pr: PrTextRef): Promise<ReviewThread[]>;
   jobLogTail(
     token: string,
     repo: string,
@@ -75,6 +94,22 @@ query FailingChecks($owner: String!, $name: String!, $number: Int!) {
   }
 }`;
 
+const REVIEW_THREADS_QUERY = `
+query UnresolvedThreads($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: ${REVIEW_THREADS_LIMIT}) {
+        nodes {
+          id isResolved path line
+          comments(first: ${THREAD_COMMENTS_LIMIT}) {
+            nodes { author { login } authorAssociation body diffHunk }
+          }
+        }
+      }
+    }
+  }
+}`;
+
 const PR_STATES: readonly PrState[] = ['OPEN', 'CLOSED', 'MERGED'];
 const ACTIONS_APP_SLUG = 'github-actions';
 const ANNOTATIONS_PAGE_SIZE = 50;
@@ -99,6 +134,45 @@ interface FailingChecksData {
       statusCheckRollup?: { contexts?: Connection<CheckNode> } | null;
     } | null;
   } | null;
+}
+
+interface ThreadCommentNode {
+  author?: { login?: string } | null;
+  authorAssociation?: string;
+  body?: string;
+  diffHunk?: string;
+}
+
+interface ThreadNode {
+  id?: string;
+  isResolved?: boolean;
+  path?: string;
+  line?: number | null;
+  comments?: Connection<ThreadCommentNode>;
+}
+
+interface ReviewThreadsData {
+  repository?: {
+    pullRequest?: { reviewThreads?: Connection<ThreadNode> } | null;
+  } | null;
+}
+
+function toReviewThread(node: ThreadNode): ReviewThread[] {
+  const comments = presentNodes(node.comments);
+  if (!node.id || node.isResolved || comments.length === 0) return [];
+  return [
+    {
+      id: node.id,
+      path: node.path ?? '',
+      line: node.line ?? null,
+      diffHunk: comments[0].diffHunk ?? '',
+      comments: comments.map((comment) => ({
+        authorLogin: comment.author?.login ?? null,
+        association: comment.authorAssociation ?? 'NONE',
+        body: comment.body ?? '',
+      })),
+    },
+  ];
 }
 
 interface AnnotationNode {
@@ -215,5 +289,26 @@ export function createTaskReads(deps: {
     return tailLines(response.body);
   }
 
-  return { pullRequestText, failingChecks, annotations, jobLogTail };
+  async function unresolvedThreads(
+    token: string,
+    pr: PrTextRef,
+  ): Promise<ReviewThread[]> {
+    const result = await graphql<ReviewThreadsData>(deps.fetch, {
+      apiUrl: deps.apiUrl,
+      token,
+      query: REVIEW_THREADS_QUERY,
+      variables: prVariables(pr),
+    });
+    return presentNodes(
+      result.data.repository?.pullRequest?.reviewThreads,
+    ).flatMap(toReviewThread);
+  }
+
+  return {
+    pullRequestText,
+    failingChecks,
+    annotations,
+    unresolvedThreads,
+    jobLogTail,
+  };
 }

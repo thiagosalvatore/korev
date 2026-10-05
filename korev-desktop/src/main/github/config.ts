@@ -18,6 +18,7 @@ export const ORGANIZATIONS_LIMIT = 100;
 export const TEAMS_LIMIT = 100;
 export const TEAM_MEMBERS_LIMIT = 100;
 export const PR_COMMENTS_LIMIT = 20;
+export const THREAD_COMMENTS_LIMIT = 20;
 export const REPO_AVATAR_SIZE = 32;
 export const SUGGESTED_REPOS_SEARCH_SIZE = 100;
 export const NOTIFICATIONS_PAGE_SIZE = 50;

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { makePr } from '../../inbox/test-fixtures';
-import type { AgentTaskState } from '../../shared/agent-tasks';
+import {
+  AGENT_TASK_KINDS,
+  type AgentTaskKind,
+  type AgentTaskState,
+} from '../../shared/agent-tasks';
 import type { PrState } from '../../shared/pull-request';
 import { emptySnapshot } from '../github/inbox-poller';
 import { createMemoryFileSystem } from '../file-system';
@@ -48,7 +52,9 @@ function setup(fs = createMemoryFileSystem()) {
   const prState = vi.fn(async (): Promise<PrState | null> => 'OPEN');
   const onSettled = vi.fn();
   const engine = createAgentTasks({
-    tasks: { explain: task, 'fix-conflicts': task, 'fix-ci': task },
+    tasks: Object.fromEntries(
+      AGENT_TASK_KINDS.map((kind) => [kind, task]),
+    ) as Record<AgentTaskKind, AgentTask>,
     findPr: (ref) => makePr({ number: Number(ref.split('#')[1]) }),
     prState,
     instructions: () => 'Explain it.',
@@ -139,7 +145,12 @@ describe('agent tasks engine', () => {
     await settle();
 
     expect(pending[1].run.answered).toEqual([
-      { question: 'Which side wins?', context: 'a.ts', answer: 'Keep ours' },
+      {
+        id: 'q1',
+        question: 'Which side wins?',
+        context: 'a.ts',
+        answer: 'Keep ours',
+      },
     ]);
   });
 

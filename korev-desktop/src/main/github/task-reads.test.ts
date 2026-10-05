@@ -110,4 +110,61 @@ describe('task reads', () => {
       },
     ]);
   });
+
+  it('reads unresolved review threads with who wrote each comment', async () => {
+    const fake = createFakeFetch({
+      body: {
+        data: {
+          repository: {
+            pullRequest: {
+              reviewThreads: {
+                nodes: [
+                  {
+                    id: 'T_1',
+                    isResolved: false,
+                    path: 'src/cache.ts',
+                    line: 12,
+                    comments: {
+                      nodes: [
+                        {
+                          author: { login: 'li' },
+                          authorAssociation: 'MEMBER',
+                          body: 'Name this.',
+                          diffHunk: '@@ -1 +1 @@',
+                        },
+                      ],
+                    },
+                  },
+                  {
+                    id: 'T_2',
+                    isResolved: true,
+                    path: 'a.ts',
+                    line: 1,
+                    comments: { nodes: [{ body: 'old' }] },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const threads = await createTaskReads({
+      fetch: fake.fetch,
+      apiUrl: API,
+    }).unresolvedThreads('tok', PR);
+
+    expect(threads).toEqual([
+      {
+        id: 'T_1',
+        path: 'src/cache.ts',
+        line: 12,
+        diffHunk: '@@ -1 +1 @@',
+        comments: [
+          { authorLogin: 'li', association: 'MEMBER', body: 'Name this.' },
+        ],
+      },
+    ]);
+  });
 });

@@ -34,6 +34,7 @@ export interface GithubWriter {
   dequeuePullRequest(token: string, id: string): Promise<void>;
   addComment(token: string, id: string, body: string): Promise<void>;
   rerunFailedJobs(token: string, repo: string, runId: number): Promise<void>;
+  replyToThread(token: string, threadId: string, body: string): Promise<void>;
 }
 
 const HTTP_BAD_REQUEST = 400;
@@ -63,6 +64,13 @@ mutation DequeuePullRequest($id: ID!) {
 const ADD_COMMENT_MUTATION = `
 mutation AddComment($id: ID!, $body: String!) {
   addComment(input: { subjectId: $id, body: $body }) { clientMutationId }
+}`;
+
+const THREAD_REPLY_MUTATION = `
+mutation ReplyToThread($threadId: ID!, $body: String!) {
+  addPullRequestReviewThreadReply(
+    input: { pullRequestReviewThreadId: $threadId, body: $body }
+  ) { comment { id } }
 }`;
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -169,6 +177,8 @@ export function createGithubWriter(deps: {
     dequeuePullRequest: (token, id) => mutate(token, DEQUEUE_MUTATION, { id }),
     addComment: (token, id, body) =>
       mutate(token, ADD_COMMENT_MUTATION, { id, body }),
+    replyToThread: (token, threadId, body) =>
+      mutate(token, THREAD_REPLY_MUTATION, { threadId, body }),
     rerunFailedJobs: async (token, repo, runId) => {
       await githubRequest(deps.fetch, {
         url: `${deps.apiUrl}/repos/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
