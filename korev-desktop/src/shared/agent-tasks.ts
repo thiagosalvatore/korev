@@ -82,7 +82,14 @@ export type ExplainFormat = 'html' | 'markdown';
 
 export const EXPLAIN_FORMATS: readonly ExplainFormat[] = ['html', 'markdown'];
 
+export interface KeepMergeableSettings {
+  allMine: boolean;
+  prs: Record<string, boolean>;
+}
+
 export interface AiTaskSettings {
+  keepMergeable: KeepMergeableSettings;
+  keepMergeableIntroSeen: boolean;
   notify: boolean;
   explainFormat: ExplainFormat;
   instructions: Partial<Record<AgentTaskKind, string>>;
@@ -131,4 +138,11 @@ export function canPushFixes(pr: {
 
 export function isAgentTaskKind(value: unknown): value is AgentTaskKind {
   return AGENT_TASK_KINDS.includes(value as AgentTaskKind);
+}
+
+export function isKeptMergeable(
+  settings: KeepMergeableSettings,
+  ref: string,
+): boolean {
+  return settings.prs[ref] ?? settings.allMine;
 }

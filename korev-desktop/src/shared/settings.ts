@@ -50,5 +50,11 @@ export const DEFAULT_SETTINGS: Settings = {
   agent: { provider: null, models: {} },
   keptPrs: {},
   repoFilter: { review: [], mine: [] },
-  aiTasks: { notify: true, explainFormat: 'html', instructions: {} },
+  aiTasks: {
+    keepMergeable: { allMine: false, prs: {} },
+    keepMergeableIntroSeen: false,
+    notify: true,
+    explainFormat: 'html',
+    instructions: {},
+  },
 };

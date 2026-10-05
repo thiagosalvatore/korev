@@ -4,6 +4,7 @@ import {
   AGENT_TASK_WORDS,
   FORK_WITHOUT_EDITS,
   canPushFixes,
+  isKeptMergeable,
   type AgentQuestion,
   type AgentTaskKind,
   type AgentTaskState,
@@ -20,8 +21,11 @@ import { useSettings } from '../useSettings';
 import { useTimedToast } from '../useTimedToast';
 import type { PanelSubject } from '../inbox/list-model';
 import { ExplainReader } from './ExplainReader';
+import { KeepMergeableIntro } from './KeepMergeableIntro';
+import { needsIntro, saveKeepMergeable } from './keep-mergeable';
 
 export const EXPLAIN_KEY = 'E';
+export const KEEP_MERGEABLE_KEY = 'A';
 const TOAST_MS = 8000;
 const SHORT_SHA = 7;
 
@@ -37,8 +41,14 @@ export interface FixAction {
   disabledReason: string | null;
 }
 
+export interface KeepMergeableToggle {
+  on: boolean;
+  onToggle: () => void;
+}
+
 export interface PanelAi {
   available: boolean;
+  keepMergeable: KeepMergeableToggle | null;
   state: AgentTaskState | null;
   fixes: FixAction[];
   questions: AgentQuestion[] | null;
@@ -140,6 +150,7 @@ export function useKorevAi(
   const settings = useSettings();
   const [reader, setReader] = useState<PullRequest | null>(null);
   const [drafts, setDrafts] = useState<Record<string, QuestionAnswers>>({});
+  const [intro, setIntro] = useState<PullRequest | null>(null);
   const toast = useTimedToast<DoneToast>(TOAST_MS);
   const available = Boolean(settings?.agent.provider);
 
@@ -157,6 +168,29 @@ export function useKorevAi(
     if (!pr || !available) return;
     setReader(pr);
     void korev().ai.explain(targetOf(pr), false);
+  }
+
+  function toggleKeepMergeable(pr: PullRequest | null) {
+    if (!pr || !settings || !available) return;
+    const ref = prRef(pr);
+    const on = !isKeptMergeable(settings.aiTasks.keepMergeable, ref);
+    if (needsIntro(settings.aiTasks, on)) {
+      setIntro(pr);
+      return;
+    }
+    void saveKeepMergeable(settings.aiTasks, ref, on);
+    announce(`${on ? 'Keeping' : 'Stopped keeping'} #${pr.number} mergeable`);
+  }
+
+  function keepMergeableFor(
+    subject: PanelSubject | null,
+  ): KeepMergeableToggle | null {
+    if (subject?.kind !== 'mine' || !settings) return null;
+    const { pr } = subject.item;
+    return {
+      on: isKeptMergeable(settings.aiTasks.keepMergeable, prRef(pr)),
+      onToggle: () => toggleKeepMergeable(pr),
+    };
   }
 
   function setAnswer(ref: string, id: string, text: string) {
@@ -194,6 +228,7 @@ export function useKorevAi(
     const target = targetOf(pr);
     return {
       available,
+      keepMergeable: keepMergeableFor(subject),
       state,
       fixes: fixesFor(subject),
       questions: state?.status === 'needs-input' ? state.questions : null,
@@ -228,6 +263,16 @@ export function useKorevAi(
           onClose={() => setReader(null)}
         />
       ) : null}
+      {intro && settings ? (
+        <KeepMergeableIntro
+          number={intro.number}
+          onCancel={() => setIntro(null)}
+          onTurnOn={() => {
+            void saveKeepMergeable(settings.aiTasks, prRef(intro), true);
+            setIntro(null);
+          }}
+        />
+      ) : null}
       {shown ? (
         <div className="fixed right-5 bottom-5 z-50">
           <Toast
@@ -257,7 +302,12 @@ export function useKorevAi(
 
   return {
     panelAi,
-    shortcuts: { [EXPLAIN_KEY]: () => explain(subjectPr(selected)) },
+    shortcuts: {
+      [EXPLAIN_KEY]: () => explain(subjectPr(selected)),
+      [KEEP_MERGEABLE_KEY]: () => {
+        if (selected?.kind === 'mine') toggleKeepMergeable(selected.item.pr);
+      },
+    },
     overlays,
   };
 }

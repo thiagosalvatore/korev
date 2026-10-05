@@ -1,6 +1,8 @@
 import type { MyPr } from '../../shared/inbox';
 import type { PrActionState } from '../../shared/merge';
-import { formatAge } from '../format';
+import { isKeptMergeable } from '../../shared/agent-tasks';
+import { formatAge, joinMeta } from '../format';
+import { useSettings } from '../useSettings';
 import { NARROW_HIDDEN } from '../layout';
 import { MINUTE_MS, useNow } from '../useNow';
 import { AgentTaskChip, hasChip, useAgentTask } from '../ai/agent-task-state';
@@ -41,6 +43,7 @@ function RowStatus({
 }
 
 const MS_PER_DAY = 86_400_000;
+const KEEP_MERGEABLE_NOTE = 'Keep mergeable';
 
 function daysLeft(until: string, now: number): number {
   return Math.max(0, Math.round((Date.parse(until) - now) / MS_PER_DAY));
@@ -52,12 +55,21 @@ function rowNote(item: MyPr, now: number): string | null {
   return `updated ${formatAge(item.pr.updatedAt, now)}`;
 }
 
+function useKeepMergeableNote(item: MyPr): string | null {
+  const settings = useSettings();
+  if (!settings) return null;
+  const on = isKeptMergeable(settings.aiTasks.keepMergeable, prRef(item.pr));
+  return on ? KEEP_MERGEABLE_NOTE : null;
+}
+
 export function MyPrRow({ item, stackPlace }: MyPrRowProps) {
   const now = useNow(MINUTE_MS);
   const { pr } = item;
   const action = usePrAction(prRef(pr));
   const settled = settledLabel(action);
-  const note = settled ?? rowNote(item, now);
+  const keepMergeable = useKeepMergeableNote(item);
+  const note =
+    settled ?? (joinMeta([rowNote(item, now), keepMergeable]) || null);
   return (
     <PrRow
       optionKey={prRef(pr)}

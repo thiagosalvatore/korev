@@ -1,8 +1,13 @@
-import { Button } from '../../design-system';
+import { Button, Switch } from '../../design-system';
 import { AGENT_TASK_WORDS } from '../../shared/agent-tasks';
 import { PanelSection } from '../inbox/PanelSection';
 import { isRunning } from './agent-task-state';
-import { EXPLAIN_KEY, type FixAction, type PanelAi } from './useKorevAi';
+import {
+  EXPLAIN_KEY,
+  KEEP_MERGEABLE_KEY,
+  type FixAction,
+  type PanelAi,
+} from './useKorevAi';
 
 export const NO_AGENT_LINE = 'Set up Claude Code or Codex to use Korev AI';
 const ALREADY_WORKING = 'Korev is already working on this PR';
@@ -55,6 +60,19 @@ export function KorevAiSection({ ai }: { ai: PanelAi }) {
   const forkReason = ai.fixes.find((fix) => fix.disabledReason)?.disabledReason;
   return (
     <PanelSection title="Korev AI">
+      {ai.keepMergeable ? (
+        <div className="flex items-center gap-2 py-1">
+          <Switch
+            label="Keep mergeable"
+            checked={ai.keepMergeable.on}
+            onChange={ai.keepMergeable.onToggle}
+            className="flex-1"
+          />
+          <span className="font-mono text-2xs text-fg-3">
+            ⇧{KEEP_MERGEABLE_KEY}
+          </span>
+        </div>
+      ) : null}
       {ai.state?.status === 'done' ? (
         <div className="mb-1.5 flex flex-wrap items-center gap-2">
           <p className="m-0 min-w-0 flex-1 text-sm text-fg-2">

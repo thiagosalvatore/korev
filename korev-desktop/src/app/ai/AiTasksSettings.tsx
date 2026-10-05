@@ -12,6 +12,8 @@ import {
 import { korev } from '../bridge';
 import { announce } from '../LiveAnnouncer';
 import { saveAiTasks } from '../useSettings';
+import { KeepMergeableIntro } from './KeepMergeableIntro';
+import { needsIntro, saveKeepMergeable } from './keep-mergeable';
 
 const FORMAT_OPTIONS: { id: ExplainFormat; label: string }[] = [
   { id: 'html', label: 'Visual (HTML)' },
@@ -37,14 +39,46 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(value < 10 ? 1 : 0)} ${BYTE_UNITS[unit]}`;
 }
 
-function NotificationsCard({ notify }: { notify: boolean }) {
+function KeepMergeableCard({ settings }: { settings: AiTaskSettings }) {
+  const [introOpen, setIntroOpen] = useState(false);
+
+  function toggleAll(on: boolean) {
+    if (needsIntro(settings, on)) {
+      setIntroOpen(true);
+      return;
+    }
+    void saveKeepMergeable(settings, null, on);
+  }
+
   return (
-    <Card title="Notifications">
-      <Switch
-        label="Notify me when Korev needs me"
-        checked={notify}
-        onChange={(checked) => void saveAiTasks({ notify: checked })}
-      />
+    <Card title="Keep mergeable">
+      <div className="flex flex-col gap-3">
+        <Switch
+          label="Keep all my PRs mergeable"
+          checked={settings.keepMergeable.allMine}
+          onChange={toggleAll}
+        />
+        <p className="m-0 text-xs text-fg-3">
+          Korev fixes conflicts, failing checks and review comments on your PRs
+          as they happen, and asks you only what it can't decide. Turn it off
+          for one PR from its panel.
+        </p>
+        <Switch
+          label="Notify me when Korev needs me"
+          checked={settings.notify}
+          onChange={(checked) => void saveAiTasks({ notify: checked })}
+        />
+      </div>
+      {introOpen ? (
+        <KeepMergeableIntro
+          number={null}
+          onCancel={() => setIntroOpen(false)}
+          onTurnOn={() => {
+            setIntroOpen(false);
+            void saveKeepMergeable(settings, null, true);
+          }}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -197,7 +231,7 @@ export function AiTasksSettings({ settings, tasks }: AiTasksSettingsProps) {
   const busy = Object.values(tasks).some((task) => task.status === 'running');
   return (
     <>
-      <NotificationsCard notify={settings.notify} />
+      <KeepMergeableCard settings={settings} />
       <ExplainCard format={settings.explainFormat} />
       <InstructionsCard settings={settings} />
       <CheckoutsCard busy={busy} />

@@ -5,14 +5,21 @@ import type {
   AgentTaskStep,
   QuestionAnswers,
 } from '../../shared/agent-tasks';
-import { pullRequestsIn } from '../../inbox/stacks';
-import type { InboxSnapshot } from '../../shared/inbox';
+import { myPrsIn, pullRequestsIn } from '../../inbox/stacks';
+import type { InboxSnapshot, MyPr } from '../../shared/inbox';
 import { prRef } from '../../shared/pr-ref';
 import type { ActionResult } from '../../shared/merge';
 import type { PrState, PullRequest } from '../../shared/pull-request';
 import { describeError } from '../github/errors';
 import type { AnsweredQuestion } from './contract';
-import type { TaskRecord, TaskStore } from './task-store';
+import {
+  FRESH_MEMORY,
+  HELD_SUMMARY,
+  decide,
+  holdQuestions,
+  type AutopilotMemory,
+} from './keep-mergeable';
+import { NO_TASKS, type TaskRecord, type TaskStore } from './task-store';
 
 export const MAX_RUNNING_TASKS = 2;
 export const STOPPED_ON_QUIT = 'Stopped when Korev quit';
@@ -54,6 +61,7 @@ export interface AgentTask {
 export interface AgentTasksDeps {
   tasks: Record<AgentTaskKind, AgentTask>;
   findPr(ref: string): PullRequest | null;
+  isWatched(ref: string): boolean;
   prState(ref: string): Promise<PrState | null>;
   instructions(kind: AgentTaskKind): string;
   store: TaskStore;
@@ -103,6 +111,7 @@ function snapshotRefs(snapshot: InboxSnapshot): Set<string> {
 
 export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
   const records = new Map<string, TaskRecord>();
+  const memories = new Map<string, AutopilotMemory>();
   const controllers = new Map<string, AbortController>();
   let waiting: string[] = [];
   let running = 0;
@@ -112,7 +121,10 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     const login = deps.login();
     if (!login) return;
     deps.store
-      .save(login, Object.fromEntries(records))
+      .save(login, {
+        records: Object.fromEntries(records),
+        autopilot: Object.fromEntries(memories),
+      })
       .catch((error: unknown) =>
         deps.warn(`Could not save Korev's tasks: ${describeError(error)}`),
       );
@@ -142,12 +154,52 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     deps.onSettled(ref, state);
   }
 
+  function finishedAt(): string {
+    return new Date(deps.now()).toISOString();
+  }
+
+  function holdForLater(
+    ref: string,
+    kind: AgentTaskKind,
+    outcome: TaskOutcome,
+  ) {
+    if (outcome.status !== 'needs-input') return;
+    const memory = memories.get(ref) ?? FRESH_MEMORY;
+    memories.set(ref, holdQuestions(memory, kind, outcome.questions));
+    settle(ref, {
+      status: 'done',
+      kind,
+      summary: HELD_SUMMARY,
+      commits: [],
+      finishedAt: finishedAt(),
+    });
+  }
+
+  function askWithHeld(
+    ref: string,
+    questions: TaskOutcome & { status: 'needs-input' },
+  ) {
+    const memory = memories.get(ref);
+    if (!memory?.held.length) return questions.questions;
+    memories.set(ref, { ...memory, held: [], heldKind: null });
+    return [...memory.held, ...questions.questions];
+  }
+
   function finish(ref: string, kind: AgentTaskKind, outcome: TaskOutcome) {
+    const record = records.get(ref);
+    if (
+      outcome.status === 'needs-input' &&
+      record?.autopilot &&
+      kind !== 'fix-conflicts'
+    ) {
+      holdForLater(ref, kind, outcome);
+      return;
+    }
     if (outcome.status === 'needs-input') {
       settle(ref, {
         status: 'needs-input',
         kind,
-        questions: outcome.questions,
+        questions: askWithHeld(ref, outcome),
       });
       return;
     }
@@ -159,7 +211,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       ...(outcome.rerunRunIds?.length
         ? { rerunRunIds: outcome.rerunRunIds }
         : {}),
-      finishedAt: new Date(deps.now()).toISOString(),
+      finishedAt: finishedAt(),
     });
   }
 
@@ -210,10 +262,12 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     ref: string,
     kind: AgentTaskKind,
     answered: AnsweredQuestion[],
+    autopilot = false,
   ) {
     put(ref, {
       kind,
       answered,
+      autopilot,
       state: {
         status: 'running',
         kind,
@@ -250,7 +304,19 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       context: question.context,
       answer: answers[question.id].trim(),
     }));
-    begin(ref, record.kind, [...record.answered, ...answered]);
+    const memory = memories.get(ref);
+    if (memory) {
+      memories.set(ref, {
+        ...memory,
+        attempts: { ...memory.attempts, [record.kind]: 0 },
+      });
+    }
+    begin(
+      ref,
+      record.kind,
+      [...record.answered, ...answered],
+      record.autopilot,
+    );
     return OK;
   }
 
@@ -274,7 +340,54 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
 
   async function dropIfEnded(ref: string): Promise<void> {
     const state = await deps.prState(ref).catch(() => null);
-    if (state && ENDED_STATES.has(state)) await dismiss(ref);
+    if (!state || !ENDED_STATES.has(state)) return;
+    memories.delete(ref);
+    await dismiss(ref);
+  }
+
+  function ask(ref: string, memory: AutopilotMemory): void {
+    const kind = memory.heldKind;
+    if (!kind) return;
+    memories.set(ref, { ...memory, held: [], heldKind: null });
+    const state: AgentTaskState = {
+      status: 'needs-input',
+      kind,
+      questions: memory.held,
+    };
+    put(ref, {
+      kind,
+      answered: records.get(ref)?.answered ?? [],
+      autopilot: true,
+      state,
+    });
+    deps.onSettled(ref, state);
+  }
+
+  function isBlocked(record: TaskRecord | undefined): boolean {
+    return isActive(record) || record?.state.status === 'needs-input';
+  }
+
+  function keepMergeable(item: MyPr): void {
+    const ref = prRef(item.pr);
+    if (!deps.isWatched(ref)) {
+      memories.delete(ref);
+      return;
+    }
+    const record = records.get(ref);
+    if (item.queue?.kind === 'queued' || isBlocked(record)) return;
+    const decision = decide(item.pr, memories.get(ref) ?? FRESH_MEMORY);
+    memories.set(ref, decision.memory);
+    if (decision.kind === 'ask') ask(ref, decision.memory);
+    if (decision.kind === 'start') {
+      begin(ref, decision.step, record?.answered ?? [], true);
+    }
+  }
+
+  function forgetGoneMemories(snapshot: InboxSnapshot, present: Set<string>) {
+    if (snapshot.truncated.mine) return;
+    for (const ref of memories.keys()) {
+      if (!present.has(ref)) memories.delete(ref);
+    }
   }
 
   function reconcile(snapshot: InboxSnapshot): void {
@@ -284,13 +397,20 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       if (record.state.status === 'needs-input') void dropIfEnded(ref);
       else put(ref, null);
     }
+    forgetGoneMemories(snapshot, present);
+    myPrsIn(snapshot.mine).forEach(keepMergeable);
+    persist();
   }
 
   async function restore(login: string): Promise<void> {
-    const loaded = await deps.store.load(login).catch(() => ({}));
+    const loaded = await deps.store.load(login).catch(() => NO_TASKS);
     records.clear();
-    for (const [ref, record] of Object.entries(loaded)) {
+    memories.clear();
+    for (const [ref, record] of Object.entries(loaded.records)) {
       records.set(ref, restored(record));
+    }
+    for (const [ref, memory] of Object.entries(loaded.autopilot)) {
+      memories.set(ref, memory);
     }
     persist();
     deps.onChange();
@@ -304,6 +424,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
   async function clear(): Promise<void> {
     abortAll();
     records.clear();
+    memories.clear();
     deps.onChange();
     await deps.store.clear();
   }

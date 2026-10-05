@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { makePr } from '../../inbox/test-fixtures';
 import {
   AGENT_TASK_KINDS,
+  isKeptMergeable,
   type AgentTaskKind,
   type AgentTaskState,
 } from '../../shared/agent-tasks';
-import type { PrState } from '../../shared/pull-request';
+import type { InboxSnapshot } from '../../shared/inbox';
+import type { PrState, PullRequest } from '../../shared/pull-request';
 import { emptySnapshot } from '../github/inbox-poller';
 import { createMemoryFileSystem } from '../file-system';
 import type { SecretCipher } from '../encrypted-file';
@@ -42,7 +44,10 @@ interface Pending {
   reject(error: Error): void;
 }
 
-function setup(fs = createMemoryFileSystem()) {
+function setup(
+  fs = createMemoryFileSystem(),
+  isWatched: (ref: string) => boolean = () => false,
+) {
   const pending: Pending[] = [];
   const task: AgentTask = {
     run: (run) =>
@@ -57,6 +62,7 @@ function setup(fs = createMemoryFileSystem()) {
     ) as Record<AgentTaskKind, AgentTask>,
     findPr: (ref) => makePr({ number: Number(ref.split('#')[1]) }),
     prState,
+    isWatched,
     instructions: () => 'Explain it.',
     store: createTaskStore({ cipher, fs, path: STORE_PATH }),
     login: () => LOGIN,
@@ -240,5 +246,160 @@ describe('agent tasks engine', () => {
 
     expect(engine.state()).toEqual({});
     expect(fs.files.has(STORE_PATH)).toBe(false);
+  });
+});
+
+const WATCH_ALL = () => true;
+
+function mineSnapshot(...prs: PullRequest[]): InboxSnapshot {
+  return {
+    ...emptySnapshot(1),
+    status: 'live',
+    mine: [
+      {
+        bucket: 'needs-you',
+        count: prs.length,
+        entries: prs.map((pr) => ({
+          kind: 'pr' as const,
+          item: { pr, bucket: 'needs-you' as const, reasons: [], queue: null },
+        })),
+      },
+    ],
+  };
+}
+
+function watchedPr(overrides: Partial<PullRequest>): PullRequest {
+  return makePr({ number: 1, headRefOid: 'h1', ...overrides });
+}
+
+const FAILING_CI: Partial<PullRequest> = {
+  ci: 'failing',
+  checks: [{ name: 'lint', outcome: 'failing' }],
+};
+
+describe('keep mergeable', () => {
+  it('fixes the conflict first, then failing CI on a later snapshot', async () => {
+    const { engine, pending, settle } = setup(undefined, WATCH_ALL);
+
+    engine.reconcile(mineSnapshot(watchedPr({ mergeable: 'CONFLICTING' })));
+    expect(stateOf(engine, 1)).toMatchObject({ kind: 'fix-conflicts' });
+    pending[0].resolve(DONE);
+    await settle();
+
+    engine.reconcile(
+      mineSnapshot(watchedPr({ headRefOid: 'h2', ...FAILING_CI })),
+    );
+
+    expect(stateOf(engine, 1)).toMatchObject({
+      status: 'running',
+      kind: 'fix-ci',
+    });
+  });
+
+  it('asks once, with the questions from two steps together', async () => {
+    const { engine, pending, onSettled, settle } = setup(undefined, WATCH_ALL);
+    const pr = watchedPr({ ...FAILING_CI, unresolvedThreads: 2 });
+
+    engine.reconcile(mineSnapshot(pr));
+    pending[0].resolve({ status: 'needs-input', questions: [QUESTION] });
+    await settle();
+    expect(stateOf(engine, 1)).not.toMatchObject({ status: 'needs-input' });
+
+    engine.reconcile(mineSnapshot(pr));
+    expect(stateOf(engine, 1)).toMatchObject({ kind: 'address-comments' });
+    const second = { id: 'q2', question: 'Rename it?', context: 'cache.ts' };
+    pending[1].resolve({ status: 'needs-input', questions: [second] });
+    await settle();
+
+    engine.reconcile(mineSnapshot(pr));
+
+    expect(stateOf(engine, 1)).toMatchObject({
+      status: 'needs-input',
+      questions: [QUESTION, second],
+    });
+    const asked = onSettled.mock.calls.filter(
+      ([, state]) => state.status === 'needs-input',
+    );
+    expect(asked).toHaveLength(1);
+  });
+
+  it('does not ask while checks are still running', async () => {
+    const { engine, pending, settle } = setup(undefined, WATCH_ALL);
+    engine.reconcile(mineSnapshot(watchedPr({ unresolvedThreads: 1 })));
+    pending[0].resolve({ status: 'needs-input', questions: [QUESTION] });
+    await settle();
+
+    engine.reconcile(
+      mineSnapshot(
+        watchedPr({
+          unresolvedThreads: 1,
+          ci: 'running',
+          checks: [{ name: 'test', outcome: 'pending' }],
+        }),
+      ),
+    );
+
+    expect(stateOf(engine, 1)).not.toMatchObject({ status: 'needs-input' });
+  });
+
+  it('stops after two attempts at the same step and asks what to try next', async () => {
+    const { engine, pending, settle } = setup(undefined, WATCH_ALL);
+
+    engine.reconcile(
+      mineSnapshot(watchedPr({ headRefOid: 'h1', ...FAILING_CI })),
+    );
+    pending[0].resolve({ status: 'done', summary: 'Fixed', commits: ['h2'] });
+    await settle();
+    engine.reconcile(
+      mineSnapshot(watchedPr({ headRefOid: 'h2', ...FAILING_CI })),
+    );
+    pending[1].resolve({ status: 'done', summary: 'Fixed', commits: ['h3'] });
+    await settle();
+
+    engine.reconcile(
+      mineSnapshot(watchedPr({ headRefOid: 'h3', ...FAILING_CI })),
+    );
+
+    expect(pending).toHaveLength(2);
+    expect(stateOf(engine, 1)).toMatchObject({
+      status: 'needs-input',
+      questions: [{ id: 'gave-up:fix-ci' }],
+    });
+  });
+
+  it('watches every PR of mine when "all" is on, except one turned off', () => {
+    const settings = { allMine: true, prs: { [refOf(2)]: false } };
+    const { engine } = setup(undefined, (ref) =>
+      isKeptMergeable(settings, ref),
+    );
+
+    engine.reconcile(
+      mineSnapshot(
+        watchedPr({ number: 1, mergeable: 'CONFLICTING' }),
+        watchedPr({ number: 2, mergeable: 'CONFLICTING' }),
+      ),
+    );
+
+    expect(stateOf(engine, 1)).toMatchObject({ status: 'running' });
+    expect(stateOf(engine, 2)).toBeUndefined();
+  });
+
+  it('leaves a PR alone while it sits in a merge queue', () => {
+    const { engine } = setup(undefined, WATCH_ALL);
+    const snapshot = mineSnapshot(watchedPr({ mergeable: 'CONFLICTING' }));
+    const [entry] = snapshot.mine[0].entries;
+    if (entry.kind === 'pr') {
+      entry.item.queue = {
+        kind: 'queued',
+        tool: 'github',
+        by: null,
+        at: null,
+        url: null,
+      };
+    }
+
+    engine.reconcile(snapshot);
+
+    expect(engine.state()).toEqual({});
   });
 });

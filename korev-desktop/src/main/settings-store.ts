@@ -19,6 +19,7 @@ import {
   EXPLAIN_FORMATS,
   type AgentTaskKind,
   type AiTaskSettings,
+  type KeepMergeableSettings,
 } from '../shared/agent-tasks';
 import type { MergeTool } from '../shared/merge';
 import type { FileSystem } from './file-system';
@@ -124,9 +125,26 @@ function pickInstructions(
   );
 }
 
+function pickKeepMergeable(value: unknown): KeepMergeableSettings {
+  const raw = (value ?? {}) as Partial<
+    Record<keyof KeepMergeableSettings, unknown>
+  >;
+  const prs = raw.prs && typeof raw.prs === 'object' ? raw.prs : {};
+  return {
+    allMine: raw.allMine === true,
+    prs: Object.fromEntries(
+      Object.entries(prs).filter(
+        ([ref, watched]) => isPrRef(ref) && typeof watched === 'boolean',
+      ),
+    ),
+  };
+}
+
 function pickAiTasks(value: unknown): AiTaskSettings {
   const raw = (value ?? {}) as Partial<Record<keyof AiTaskSettings, unknown>>;
   return {
+    keepMergeable: pickKeepMergeable(raw.keepMergeable),
+    keepMergeableIntroSeen: raw.keepMergeableIntroSeen === true,
     notify:
       typeof raw.notify === 'boolean'
         ? raw.notify

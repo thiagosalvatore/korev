@@ -6,45 +6,52 @@ import {
 } from '../encrypted-file';
 import type { FileSystem } from '../file-system';
 import type { AnsweredQuestion } from './contract';
+import type { AutopilotMemory } from './keep-mergeable';
 
 export interface TaskRecord {
   kind: AgentTaskKind;
   state: AgentTaskState;
   answered: AnsweredQuestion[];
+  autopilot?: boolean;
 }
 
-export type TaskRecords = Record<string, TaskRecord>;
+export interface StoredTasks {
+  records: Record<string, TaskRecord>;
+  autopilot: Record<string, AutopilotMemory>;
+}
+
+export const NO_TASKS: StoredTasks = { records: {}, autopilot: {} };
 
 export interface TaskStore {
-  load(login: string): Promise<TaskRecords>;
-  save(login: string, records: TaskRecords): Promise<void>;
+  load(login: string): Promise<StoredTasks>;
+  save(login: string, tasks: StoredTasks): Promise<void>;
   clear(): Promise<void>;
 }
 
-interface StoreFile {
+interface StoreFile extends StoredTasks {
   version: number;
   login: string;
-  records: TaskRecords;
 }
 
-export const TASK_STORE_VERSION = 1;
+export const TASK_STORE_VERSION = 2;
 
 function sameLogin(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
 
-function parseRecords(text: string, login: string): TaskRecords {
+function parseTasks(text: string, login: string): StoredTasks {
   try {
     const parsed = JSON.parse(text) as Partial<StoreFile>;
-    if (parsed.version !== TASK_STORE_VERSION) return {};
+    if (parsed.version !== TASK_STORE_VERSION) return NO_TASKS;
     if (typeof parsed.login !== 'string' || !sameLogin(parsed.login, login)) {
-      return {};
+      return NO_TASKS;
     }
-    return parsed.records && typeof parsed.records === 'object'
-      ? parsed.records
-      : {};
+    return {
+      records: parsed.records ?? {},
+      autopilot: parsed.autopilot ?? {},
+    };
   } catch {
-    return {};
+    return NO_TASKS;
   }
 }
 
@@ -61,24 +68,24 @@ export function createTaskStore(deps: {
     return lastWrite;
   }
 
-  async function load(login: string): Promise<TaskRecords> {
+  async function load(login: string): Promise<StoredTasks> {
     const read = await file.read();
-    return read.status === 'read' ? parseRecords(read.text, login) : {};
+    return read.status === 'read' ? parseTasks(read.text, login) : NO_TASKS;
   }
 
-  async function write(login: string, records: TaskRecords): Promise<void> {
+  async function write(login: string, tasks: StoredTasks): Promise<void> {
     if (!(await hasSecureStorage(deps.cipher))) return;
     const contents: StoreFile = {
       version: TASK_STORE_VERSION,
       login,
-      records,
+      ...tasks,
     };
     await file.write(JSON.stringify(contents));
   }
 
   return {
     load,
-    save: (login, records) => afterLastWrite(() => write(login, records)),
+    save: (login, tasks) => afterLastWrite(() => write(login, tasks)),
     clear: () => afterLastWrite(() => file.remove()),
   };
 }

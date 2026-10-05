@@ -164,6 +164,7 @@ describe('Settings → AI tasks', () => {
     const bridge = openAiTasks({
       ...WITH_AGENT,
       aiTasks: {
+        ...WITH_AGENT.aiTasks,
         notify: true,
         explainFormat: 'html',
         instructions: { explain: '/pr-review' },

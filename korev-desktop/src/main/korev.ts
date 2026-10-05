@@ -3,6 +3,7 @@ import {
   AGENT_TASK_WORDS,
   DEFAULT_INSTRUCTIONS,
   isAgentTaskKind,
+  isKeptMergeable,
 } from '../shared/agent-tasks';
 import type {
   AgentTaskKind,
@@ -266,6 +267,8 @@ export function createKorev(deps: KorevDeps): Korev {
       }),
     },
     findPr,
+    isWatched: (ref) =>
+      isKeptMergeable(settings.current().aiTasks.keepMergeable, ref),
     prState: async (ref) => {
       const [repo, number] = ref.split('#');
       return (
@@ -435,6 +438,32 @@ export function createKorev(deps: KorevDeps): Korev {
     });
   }
 
+  function pruneKeepMergeable(snapshot: InboxSnapshot): void {
+    if (snapshot.truncated.mine) return;
+    const { aiTasks } = settings.current();
+    const open = new Set(myPrsIn(snapshot.mine).map((item) => prRef(item.pr)));
+    const prs = Object.fromEntries(
+      Object.entries(aiTasks.keepMergeable.prs).filter(([ref]) =>
+        open.has(ref),
+      ),
+    );
+    if (
+      Object.keys(prs).length === Object.keys(aiTasks.keepMergeable.prs).length
+    ) {
+      return;
+    }
+    settings
+      .update({
+        aiTasks: {
+          ...aiTasks,
+          keepMergeable: { ...aiTasks.keepMergeable, prs },
+        },
+      })
+      .catch((error: unknown) => {
+        deps.warn(`Could not prune Keep mergeable PRs: ${String(error)}`);
+      });
+  }
+
   function publishInbox(snapshot: InboxSnapshot): void {
     if (snapshot.status === 'live') {
       prActions.reconcile(snapshot);
@@ -443,6 +472,7 @@ export function createKorev(deps: KorevDeps): Korev {
     broadcastInbox(snapshot);
     if (snapshot.status !== 'live') return;
     pruneKeeps(snapshot);
+    pruneKeepMergeable(snapshot);
     inboxCache.save(snapshot).catch((error: unknown) => {
       deps.warn(`Could not cache the inbox: ${String(error)}`);
     });
@@ -620,15 +650,18 @@ export function createKorev(deps: KorevDeps): Korev {
     await deps.openExternal(AGENT_INFO[provider].installUrl);
   }
 
-  function setAiTasks(patch: unknown): Promise<Settings> {
-    if (typeof patch !== 'object' || patch === null) {
-      return Promise.resolve(settings.current());
-    }
+  async function setAiTasks(patch: unknown): Promise<Settings> {
+    if (typeof patch !== 'object' || patch === null) return settings.current();
     const aiTasks: AiTaskSettings = {
       ...settings.current().aiTasks,
       ...(patch as Partial<AiTaskSettings>),
     };
-    return settings.update({ aiTasks });
+    const updated = await settings.update({ aiTasks });
+    const snapshot = inbox.snapshot();
+    if ('keepMergeable' in patch && snapshot.status === 'live') {
+      agentTasks.reconcile(snapshot);
+    }
+    return updated;
   }
 
   function explain(target: PrTarget, regenerate: unknown): ActionResult {

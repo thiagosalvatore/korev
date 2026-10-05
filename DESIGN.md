@@ -234,6 +234,17 @@ and open `#gallery`).
   questions ("Korev needs your answer on #301") and failures. Clicking it focuses
   Korev, switches to the PR's view and opens its panel. Settings → AI tasks has "Notify
   me when Korev needs me", on by default.
+- Keep mergeable is a `Switch` at the top of the section (⇧A in My PRs). A watched PR's
+  row line 2 ends with "· Keep mergeable", like "· Kept · 26d left"; there is no badge.
+  The first time it is turned on, per PR or for all PRs, a `Dialog` ("Keep #301
+  mergeable?") lists what Korev will do and offers "Turn on" or "Cancel". Settings → AI
+  tasks has a "Keep mergeable" card with "Keep all my PRs mergeable" (a PR's own switch
+  then works as an opt-out) and "Notify me when Korev needs me".
+- With Keep mergeable on, Korev takes one step per run: conflicts first, then failing
+  checks once they have finished, then review comments. Questions from every step are
+  held and asked together once nothing automatic is left and no check is running. After
+  two attempts at the same step it stops and asks what to try next. PRs in a merge
+  queue are left alone.
 - With no agent chosen in Settings, the section shows one line, "Set up Claude Code or
   Codex to use Korev AI", and an "Open Settings" button instead of actions.
 - While a task runs, the row carries the task chip and the panel shows the step and
@@ -259,7 +270,7 @@ and open `#gallery`).
 - Enter opens the PR, ⌘Enter opens it on GitHub, Esc closes the side panel and returns
   focus to the row. In My PRs, ⇧M and ⇧X open the merge and close confirms for the
   selected PR, and ⇧K keeps or stops keeping a stale one, even with the panel closed.
-  In both views ⇧E explains the selected PR.
+  In both views ⇧E explains the selected PR; in My PRs ⇧A toggles Keep mergeable.
 - ⌘1 / ⌘2 switch views, ⌘, opens Settings, ⌘R refreshes, `?` shows the shortcut sheet.
 - Single-letter shortcuts are ignored while a text field has focus.
 - Tab order: sidebar → list → panel. Every focusable element shows `--focus-ring` on

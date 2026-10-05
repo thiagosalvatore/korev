@@ -81,6 +81,8 @@ describe('settings store', () => {
     });
     const { settings } = await createSettingsStore({ fs, path: PATH }).load();
     expect(settings.aiTasks).toEqual({
+      keepMergeable: { allMine: false, prs: {} },
+      keepMergeableIntroSeen: false,
       notify: true,
       explainFormat: 'html',
       instructions: { explain: '/pr-review' },
