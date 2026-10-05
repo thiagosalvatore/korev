@@ -3,15 +3,13 @@ export type AgentTaskKind =
   | 'fix-conflicts'
   | 'fix-ci'
   | 'address-comments'
-  | 'review'
-  | 'review-fix';
+  | 'review';
 
 export const AGENT_TASK_KINDS: readonly AgentTaskKind[] = [
   'fix-conflicts',
   'fix-ci',
   'address-comments',
   'review',
-  'review-fix',
   'explain',
 ];
 
@@ -52,12 +50,6 @@ export const AGENT_TASK_WORDS: Record<AgentTaskKind, AgentTaskWords> = {
     running: 'Reviewing',
     failed: 'Review failed',
     done: 'Review draft ready for',
-  },
-  'review-fix': {
-    name: 'Review & fix',
-    running: 'Reviewing',
-    failed: 'Review & fix failed',
-    done: 'Reviewed and fixed',
   },
 };
 
@@ -220,10 +212,6 @@ export const DEFAULT_INSTRUCTIONS: Record<AgentTaskKind, string> = {
     'Review this pull request the way a careful senior engineer on the team would.',
     'Look for bugs, missing tests for changed behaviour, security problems, and code that does not do what the description says.',
     'Skip style nits that a linter would catch. Every comment must point at a line in the diff and say what to change.',
-  ].join(' '),
-  'review-fix': [
-    'Review this pull request for bugs, missing tests and security problems, then fix what you found.',
-    'Skip style nits that a linter would catch.',
   ].join(' '),
   'address-comments': [
     'Address each review comment.',

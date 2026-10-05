@@ -40,7 +40,13 @@ function runResult(pr: PullRequest, ai: PanelAi): ReactNode {
     );
   }
   if (ai.draft) {
-    return <ReviewDraftEditor target={targetOf(pr)} draft={ai.draft} />;
+    return (
+      <ReviewDraftEditor
+        target={targetOf(pr)}
+        draft={ai.draft}
+        mine={ai.mine}
+      />
+    );
   }
   if (state?.status === 'done') {
     return (

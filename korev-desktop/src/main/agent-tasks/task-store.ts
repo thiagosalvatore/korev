@@ -1,7 +1,8 @@
-import type {
-  AgentTaskKind,
-  AgentTaskState,
-  KorevRun,
+import {
+  isAgentTaskKind,
+  type AgentTaskKind,
+  type AgentTaskState,
+  type KorevRun,
 } from '../../shared/agent-tasks';
 import {
   createEncryptedFile,
@@ -44,6 +45,22 @@ function sameLogin(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
 
+function knownRecords(
+  records: Record<string, TaskRecord>,
+): Record<string, TaskRecord> {
+  return Object.fromEntries(
+    Object.entries(records)
+      .filter(([, record]) => isAgentTaskKind(record.kind))
+      .map(([ref, record]) => [
+        ref,
+        {
+          ...record,
+          history: record.history?.filter((run) => isAgentTaskKind(run.kind)),
+        },
+      ]),
+  );
+}
+
 function parseTasks(text: string, login: string): StoredTasks {
   try {
     const parsed = JSON.parse(text) as Partial<StoreFile>;
@@ -52,7 +69,7 @@ function parseTasks(text: string, login: string): StoredTasks {
       return NO_TASKS;
     }
     return {
-      records: parsed.records ?? {},
+      records: knownRecords(parsed.records ?? {}),
       autopilot: parsed.autopilot ?? {},
     };
   } catch {

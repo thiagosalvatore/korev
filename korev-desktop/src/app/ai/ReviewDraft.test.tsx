@@ -10,9 +10,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentTaskState, ReviewDraft } from '../../shared/agent-tasks';
 import type { Settings } from '../../shared/settings';
 import { installFakeBridge, installMatchMedia } from '../fake-bridge';
+import { MyPrs } from '../MyPrs';
 import { ReviewInbox } from '../ReviewInbox';
 import {
   INVOICE_REVIEW,
+  LINT_PR,
   WATCHING_SETTINGS,
   makeSnapshot,
 } from '../test-fixtures';
@@ -178,41 +180,41 @@ describe('review draft', () => {
     );
   });
 
-  it('lets the user answer the questions a review asks, on a review request', async () => {
+  it('drafts a plain review of my own PR, without Request changes', async () => {
     const { bridge } = installFakeBridge({ settings: WITH_AGENT });
+    const mine = LINT_PR.pr;
+    const target = { id: mine.id, repo: mine.repo, number: mine.number };
     render(
-      <ReviewInbox
+      <MyPrs
         snapshot={makeSnapshot({
-          agentTasks: {
-            [REF]: {
-              status: 'needs-input',
-              kind: 'review',
-              questions: [
-                {
-                  id: 'finding:1',
-                  question: 'Keep this finding?',
-                  context: '',
-                },
-              ],
-            },
-          },
+          agentTasks: { [`${mine.repo}#${mine.number}`]: doneWith(DRAFT) },
         })}
         onOpenSettings={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByRole('option', { name: new RegExp(pr.title) }));
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Answer questions' }),
+      screen.getByRole('option', { name: new RegExp(mine.title) }),
     );
-    const page = screen.getByRole('region', { name: `Korev on #${pr.number}` });
-
-    fireEvent.change(within(page).getByLabelText('Your answer'), {
-      target: { value: 'Yes' },
+    const panel = screen.getByRole('complementary', {
+      name: 'Pull request details',
     });
-    fireEvent.click(within(page).getByRole('button', { name: /Send answers/ }));
 
-    expect(bridge.ai.answer).toHaveBeenCalledWith(TARGET, {
-      'finding:1': 'Yes',
+    fireEvent.click(
+      await within(panel).findByRole('button', { name: /^Review/ }),
+    );
+    fireEvent.click(
+      within(panel).getByRole('button', { name: 'Open review draft' }),
+    );
+    const page = screen.getByRole('region', {
+      name: `Korev on #${mine.number}`,
     });
+
+    expect(bridge.ai.start).toHaveBeenCalledWith(target, 'review');
+    expect(
+      within(page).queryByRole('button', { name: 'Request changes' }),
+    ).toBeNull();
+    expect(
+      within(page).getByRole('button', { name: 'Submit as comment' }),
+    ).toBeTruthy();
   });
 });

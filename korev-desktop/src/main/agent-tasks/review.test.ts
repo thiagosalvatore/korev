@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { makePr } from '../../inbox/test-fixtures';
 import type { Checkouts } from '../checkouts';
 import type { TaskRun } from './engine';
-import { createReviewFixTask, createReviewTask, reviewPrompt } from './review';
+import { createReviewTask, reviewPrompt } from './review';
 import type { RunAgent } from './run-agent';
 
 const PR = makePr({
@@ -66,7 +66,6 @@ const BUG = {
   line: 10,
   body: 'This retries forever.',
   severity: 'high',
-  confidence: 'high',
 };
 
 describe('review task', () => {
@@ -134,50 +133,19 @@ describe('review task', () => {
     });
   });
 
-  it('asks about a finding it is unsure of instead of drafting it', async () => {
+  it('drafts the review instead of asking the user when the agent has questions', async () => {
     const task = createReviewTask({
       checkouts: fakeCheckouts(),
-      runAgent: agentReplies({ comments: [{ ...BUG, confidence: 'low' }] }),
+      runAgent: agentReplies({
+        comments: [BUG],
+        questions: [{ id: 'q1', question: 'Is this on purpose?', context: '' }],
+      }),
       prBody: async () => '',
     });
 
     expect(await task.run(runOf())).toMatchObject({
-      status: 'needs-input',
-      questions: [{ context: 'src/retry.ts:10' }],
-    });
-  });
-
-  it('feeds the findings on my own PR to an edit run and pushes the fix', async () => {
-    const runAgent = agentReplies(
-      { comments: [BUG] },
-      {
-        changed: true,
-        commitMessage: 'Cap webhook retries',
-        summary: 'Capped retries',
-      },
-    );
-    const checkouts = fakeCheckouts();
-    const task = createReviewFixTask({
-      checkouts,
-      runAgent,
-      prBody: async () => '',
-      canPushWorkflows: async () => false,
-    });
-
-    const outcome = await task.run(runOf());
-
-    expect(outcome).toEqual({
       status: 'done',
-      summary: 'Capped retries',
-      commits: ['beef'],
+      review: { comments: [{ path: 'src/retry.ts', line: 10 }] },
     });
-    expect(runAgent).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        access: 'edit',
-        prompt: expect.stringContaining(
-          'src/retry.ts:10 (high) This retries forever.',
-        ),
-      }),
-    );
   });
 });

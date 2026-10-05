@@ -217,7 +217,7 @@ and open `#gallery`).
   buttons are disabled and one line says why.
 - The side panel only sums up a Korev task. The work itself happens on the **Korev run
   page**, which replaces the list and the panel in the main area. It opens when the user
-  starts a fix, Review or Review & fix, from "Open" / "Answer questions" / "Open review
+  starts a fix or Review, from "Open" / "Answer questions" / "Open review
   draft" in the panel, and from a question notification. "Back" (Esc) returns to the
   list with the row focused. Explain keeps its reader.
 - The run page header shows the PR, the task line (with Stop and Open terminal) and a
@@ -262,7 +262,7 @@ and open `#gallery`).
 - With no agent chosen in Settings, the section shows one line, "Set up Claude Code or
   Codex to use Korev AI", and an "Open Settings" button instead of actions.
 - While a task runs, the row carries the task chip and the panel shows the latest step
-  and the elapsed time ("Review & fix · Ran npm test · 4m") with "Open" and a ghost Stop
+  and the elapsed time ("Fix CI · Ran npm test · 4m") with "Open" and a ghost Stop
   that needs no confirm. The section's other buttons are disabled with "Korev is already working on
   this PR". A failure shows the danger chip, the plain message and Retry. The last
   finished run stays as "Last Korev run · <summary>".
@@ -273,14 +273,16 @@ and open `#gallery`).
   app. Loading shows skeleton lines with "Explaining #301 · usually 1–3 min" and Stop.
   An explanation made for an older head shows the warning banner "This PR changed since
   this explanation (abc1234 → def5678)" with Regenerate.
-- Review (⇧R) runs on review requests; on My PRs it is "Review & fix", which reviews and
-  then pushes fixes for what it found. A review draft opens from "Open review draft" on
+- Review (⇧R) runs on review requests and on My PRs. It only reviews; it never pushes
+  fixes. A review draft opens from "Open review draft" on
   the run page: the summary in an editable field, then one `Finding` card per
   comment with path:line, the code around the line in a `DiffHunk`, the comment text
   (click to edit), and Accept / Dismiss. The footer counts "4 of 6 comments" and offers
-  "Request changes" and "Submit as comment" (primary). Approve is never offered. With
+  "Request changes" and "Submit as comment" (primary). Approve is never offered, and on
+  the user's own PR Request changes is hidden, because GitHub rejects it. With
   no findings the body starts with "Nothing to flag." Leaving the page keeps the edited draft.
-  Findings the agent is unsure of arrive as questions instead of cards.
+  Review never stops to ask the user. A finding the agent is unsure of, or a question it
+  has for the author, arrives as a card phrased as a question to the author.
 - A collapsed "Korev activity" section lists the last five runs on the PR: when, which
   task, the result, and links to the commits.
 - Wording says "Korev", never "magic" or "AI assistant". Done and failed tasks are

@@ -118,6 +118,7 @@ function CommentCard({ comment, onChange }: CommentCardProps) {
 export interface ReviewDraftEditorProps {
   target: PrTarget;
   draft: ReviewDraft;
+  mine: boolean;
 }
 
 function useSaveOnLeave(target: PrTarget, draft: ReviewDraft) {
@@ -140,6 +141,7 @@ function useSaveOnLeave(target: PrTarget, draft: ReviewDraft) {
 export function ReviewDraftEditor({
   target,
   draft: initial,
+  mine,
 }: ReviewDraftEditorProps) {
   const [draft, setDraft] = useState(initial);
   const [problem, setProblem] = useState<string | null>(null);
@@ -205,12 +207,14 @@ export function ReviewDraftEditor({
         <span className="mr-auto text-xs text-fg-3">
           {posted.length} of {pluralize(draft.comments.length, 'comment')}
         </span>
-        <Button
-          disabled={sending}
-          onClick={() => void submit('REQUEST_CHANGES')}
-        >
-          Request changes
-        </Button>
+        {mine ? null : (
+          <Button
+            disabled={sending}
+            onClick={() => void submit('REQUEST_CHANGES')}
+          >
+            Request changes
+          </Button>
+        )}
         <Button
           variant="primary"
           disabled={sending}

@@ -72,7 +72,7 @@ export interface PanelAi {
   onDismiss: () => void;
   onFix: (kind: AgentTaskKind) => void;
   onExplain: () => void;
-  reviewKind: 'review' | 'review-fix';
+  mine: boolean;
   draft: ReviewDraft | null;
   history: KorevRun[];
   activity: AgentActivity[];
@@ -197,10 +197,6 @@ export function useKorevAi(
     });
   });
 
-  function reviewKindOf(subject: PanelSubject | null) {
-    return subject?.kind === 'mine' ? 'review-fix' : 'review';
-  }
-
   function openRun(pr: PullRequest) {
     setRunRef(prRef(pr));
     agentActivity.load(targetOf(pr));
@@ -214,7 +210,7 @@ export function useKorevAi(
   function review(subject: PanelSubject | null) {
     const pr = subjectPr(subject);
     if (!pr || !available) return;
-    void korev().ai.start(targetOf(pr), reviewKindOf(subject));
+    void korev().ai.start(targetOf(pr), 'review');
     openRun(pr);
   }
 
@@ -310,7 +306,7 @@ export function useKorevAi(
         openRun(pr);
       },
       onExplain: () => explain(pr),
-      reviewKind: reviewKindOf(subject),
+      mine: subject?.kind === 'mine',
       draft: draftOf(pr),
       history: history[ref] ?? [],
       activity,

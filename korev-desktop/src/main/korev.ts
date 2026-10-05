@@ -50,7 +50,7 @@ import {
 import { createAgentTasks } from './agent-tasks/engine';
 import { createExplainTask } from './agent-tasks/explain';
 import { createAddressCommentsTask } from './agent-tasks/address-comments';
-import { createReviewFixTask, createReviewTask } from './agent-tasks/review';
+import { createReviewTask } from './agent-tasks/review';
 import { createFixCiTask, type CiFailure } from './agent-tasks/fix-ci';
 import { createFixConflictsTask } from './agent-tasks/fix-conflicts';
 import {
@@ -285,12 +285,6 @@ export function createKorev(deps: KorevDeps): Korev {
         readFailures: readCiFailures,
       }),
       review: createReviewTask({ checkouts, runAgent: agents.run, prBody }),
-      'review-fix': createReviewFixTask({
-        checkouts,
-        runAgent: agents.run,
-        prBody,
-        canPushWorkflows,
-      }),
       'address-comments': createAddressCommentsTask({
         checkouts,
         runAgent: agents.run,

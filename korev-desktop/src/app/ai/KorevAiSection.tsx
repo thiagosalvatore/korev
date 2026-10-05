@@ -122,7 +122,7 @@ export function KorevAiSection({ ai }: { ai: PanelAi }) {
           title={busy ? ALREADY_WORKING : undefined}
           onClick={ai.onReview}
         >
-          {AGENT_TASK_WORDS[ai.reviewKind].name}
+          {AGENT_TASK_WORDS.review.name}
         </Button>
       </div>
       {ai.draft ? (
