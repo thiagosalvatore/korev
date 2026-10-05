@@ -18,6 +18,7 @@ import {
   type AgentTask,
   type TaskOutcome,
   type TaskRun,
+  UnpushedChangesError,
 } from './engine';
 import { createTaskStore } from './task-store';
 
@@ -191,6 +192,26 @@ describe('agent tasks engine', () => {
     expect(releaseCheckout).toHaveBeenCalled();
   });
 
+  it('keeps the checkout of a commit Korev could not push until the failure is dismissed', async () => {
+    const { engine, pending, releaseCheckout, settle } = setup();
+    engine.start(refOf(1), 'fix-ci');
+    pending[0].reject(new UnpushedChangesError('Push it from your terminal.'));
+    await settle();
+
+    expect(stateOf(engine, 1)).toEqual({
+      status: 'failed',
+      kind: 'fix-ci',
+      message: 'Push it from your terminal.',
+      unpushed: true,
+    });
+    expect(releaseCheckout).not.toHaveBeenCalled();
+    expect(engine.keptRefs()).toEqual([refOf(1)]);
+
+    await engine.dismiss(refOf(1));
+
+    expect(releaseCheckout).toHaveBeenCalledWith(refOf(1));
+  });
+
   it('brings back waiting questions after a restart and fails the run that was in flight', async () => {
     const fs = createMemoryFileSystem();
     const first = setup(fs);
@@ -295,6 +316,20 @@ const FAILING_CI: Partial<PullRequest> = {
 };
 
 describe('keep mergeable', () => {
+  it('does not re-run a PR while it holds a commit Korev could not push', async () => {
+    const { engine, pending, settle } = setup(undefined, WATCH_ALL);
+    const conflicted = mineSnapshot(watchedPr({ mergeable: 'CONFLICTING' }));
+    engine.reconcile(conflicted);
+    pending[0].reject(new UnpushedChangesError('Push it from your terminal.'));
+    await settle();
+
+    engine.reconcile(conflicted);
+    await settle();
+
+    expect(pending).toHaveLength(1);
+    expect(stateOf(engine, 1)).toMatchObject({ unpushed: true });
+  });
+
   it('fixes the conflict first, then failing CI on a later snapshot', async () => {
     const { engine, pending, settle } = setup(undefined, WATCH_ALL);
 

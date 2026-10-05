@@ -5,8 +5,9 @@ import {
   type Checkout,
   type Checkouts,
   type PushTarget,
+  pushRemote,
 } from '../checkouts';
-import { TaskError } from './engine';
+import { TaskError, UnpushedChangesError } from './engine';
 
 export const FIX_TIMEOUT_MS = 30 * 60_000;
 const CONFLICT_MARKER = 'conflict marker';
@@ -32,9 +33,14 @@ export function openForFix(checkouts: Checkouts, pr: PullRequest) {
   });
 }
 
-function workflowRefusal(files: string[]): TaskError {
-  return new TaskError(
-    `This change touches ${files.join(', ')}. Korev's GitHub sign-in can't push workflow files; push it from your terminal.`,
+function workflowRefusal(
+  files: string[],
+  checkout: Checkout,
+  target: PushTarget,
+): TaskError {
+  const command = `cd '${checkout.path}' && git push ${pushRemote(target)} HEAD:${target.headRefName}`;
+  return new UnpushedChangesError(
+    `This change touches ${files.join(', ')}. Korev's GitHub sign-in can't push workflow files; push it from your terminal with \`${command}\`.`,
   );
 }
 
@@ -45,12 +51,15 @@ export async function commitAndPush(
   message: string,
 ): Promise<string[]> {
   await deps.checkouts.commitAll(checkout.path, message);
+  const target = pushTarget(pr);
   const result = await deps.checkouts.push(
     checkout,
-    pushTarget(pr),
+    target,
     await deps.canPushWorkflows(),
   );
-  if (result.kind === 'workflow-files') throw workflowRefusal(result.files);
+  if (result.kind === 'workflow-files') {
+    throw workflowRefusal(result.files, checkout, target);
+  }
   return result.kind === 'pushed' ? [result.sha] : [];
 }
 

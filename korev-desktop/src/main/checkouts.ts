@@ -107,6 +107,10 @@ function lastLine(text: string): string {
   return text.trim().split('\n').at(-1)?.trim() ?? '';
 }
 
+export function pushRemote(target: PushTarget): string {
+  return target.url ? `${target.url}.git` : 'origin';
+}
+
 export function gitFailure(stderr: string): GitError {
   if (NO_IDENTITY_PATTERN.test(stderr)) {
     return new GitError(GIT_MESSAGES.noIdentity, 'no-identity');
@@ -325,11 +329,7 @@ export function createCheckouts(deps: CheckoutsDeps): Checkouts {
     }
     await git(
       checkout.path,
-      [
-        'push',
-        target.url ? `${target.url}.git` : 'origin',
-        `HEAD:refs/heads/${target.headRefName}`,
-      ],
+      ['push', pushRemote(target), `HEAD:refs/heads/${target.headRefName}`],
       NETWORK_TIMEOUT_MS,
     );
     return { kind: 'pushed', sha };

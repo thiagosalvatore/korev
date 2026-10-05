@@ -4,6 +4,7 @@ import {
   type AgentTaskState,
   type AgentTaskStep,
   KOREV_RUNS_KEPT,
+  keepsCheckout,
   type QuestionAnswers,
   type ReviewDraft,
   type KorevRun,
@@ -36,6 +37,13 @@ export class TaskError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'TaskError';
+  }
+}
+
+export class UnpushedChangesError extends TaskError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnpushedChangesError';
   }
 }
 
@@ -101,6 +109,13 @@ function failure(message: string): ActionResult {
 
 function isActive(record: TaskRecord | undefined): boolean {
   return record?.state.status === 'running';
+}
+
+function failedState(kind: AgentTaskKind, error: unknown): AgentTaskState {
+  const message = describeError(error);
+  return error instanceof UnpushedChangesError
+    ? { status: 'failed', kind, message, unpushed: true }
+    : { status: 'failed', kind, message };
 }
 
 function restored(record: TaskRecord): TaskRecord {
@@ -173,7 +188,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     const record = records.get(ref);
     if (record) put(ref, withRun(record, state));
     setState(ref, state);
-    if (state.status !== 'needs-input') release(ref);
+    if (!keepsCheckout(state)) release(ref);
     deps.onSettled(ref, state);
   }
 
@@ -267,7 +282,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     } catch (error) {
       if (stopped) return;
       if (controller.signal.aborted) return;
-      settle(ref, { status: 'failed', kind, message: describeError(error) });
+      settle(ref, failedState(kind, error));
     } finally {
       running -= 1;
       controllers.delete(ref);
@@ -389,7 +404,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
   }
 
   function isBlocked(record: TaskRecord | undefined): boolean {
-    return isActive(record) || record?.state.status === 'needs-input';
+    return isActive(record) || (!!record && keepsCheckout(record.state));
   }
 
   function keepMergeable(item: MyPr): void {
@@ -419,7 +434,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     const present = snapshotRefs(snapshot);
     for (const [ref, record] of records) {
       if (present.has(ref) || isActive(record)) continue;
-      if (record.state.status === 'needs-input') void dropIfEnded(ref);
+      if (keepsCheckout(record.state)) void dropIfEnded(ref);
       else put(ref, null);
     }
     forgetGoneMemories(snapshot, present);
@@ -493,7 +508,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     clear,
     keptRefs: () =>
       [...records]
-        .filter(([, record]) => record.state.status === 'needs-input')
+        .filter(([, record]) => keepsCheckout(record.state))
         .map(([ref]) => ref),
     isBusy: () => running > 0 || waiting.length > 0,
     stop: () => {

@@ -93,7 +93,19 @@ export type AgentTaskState =
       review?: ReviewDraft;
       finishedAt: string;
     }
-  | { status: 'failed'; kind: AgentTaskKind; message: string };
+  | {
+      status: 'failed';
+      kind: AgentTaskKind;
+      message: string;
+      unpushed?: true;
+    };
+
+export function keepsCheckout(state: AgentTaskState): boolean {
+  return (
+    state.status === 'needs-input' ||
+    (state.status === 'failed' && state.unpushed === true)
+  );
+}
 
 export type ReviewEvent = 'COMMENT' | 'REQUEST_CHANGES';
 

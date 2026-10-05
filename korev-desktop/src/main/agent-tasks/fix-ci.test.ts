@@ -8,6 +8,7 @@ import {
   fixCiPrompt,
   type CiFailure,
 } from './fix-ci';
+import { UnpushedChangesError } from './engine';
 import type { RunAgent } from './run-agent';
 
 const PR = makePr({
@@ -115,6 +116,21 @@ describe('fix CI task', () => {
     expect(checkouts.commitAll).toHaveBeenCalledWith(
       '/worktrees/acme/api/77',
       'Remove unused variable',
+    );
+  });
+
+  it('keeps a fix that touches workflow files and says how to push it by hand', async () => {
+    const { outcome, checkouts } = runTask(agentSays({}));
+    checkouts.push.mockResolvedValueOnce({
+      kind: 'workflow-files',
+      files: ['.github/workflows/deploy.yml'],
+    });
+
+    const failure = await outcome.catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(UnpushedChangesError);
+    expect((failure as Error).message).toContain(
+      "cd '/worktrees/acme/api/77' && git push origin HEAD:tenant-limits",
     );
   });
 
