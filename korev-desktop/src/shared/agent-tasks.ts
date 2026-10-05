@@ -169,8 +169,11 @@ export type QuestionAnswers = Record<string, string>;
 
 export const DEFAULT_INSTRUCTIONS: Record<AgentTaskKind, string> = {
   explain: [
-    'Explain this pull request to a reviewer who has not seen it.',
-    'Start with what it changes and why, in two or three sentences.',
+    'Explain this pull request to a reviewer who is smart but new to this codebase.',
+    'Start with what it changes and why, in two or three plain sentences a non-specialist could follow.',
+    'Keep the real technical terms, such as the names of functions, files and concepts,',
+    'but the first time each one appears, say in a few plain words what it is or does.',
+    'Prefer short sentences and concrete examples over jargon.',
     'Then walk through the changes in the order a reviewer should read them,',
     'and call out anything risky, surprising or worth testing by hand.',
   ].join(' '),
