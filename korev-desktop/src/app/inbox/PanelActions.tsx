@@ -1,4 +1,4 @@
-import { Badge, Button } from '../../design-system';
+import { Badge, Button, IconButton } from '../../design-system';
 import type { PrActionState, QueueStatus } from '../../shared/merge';
 import { KEEP_DAYS } from '../../inbox/keep';
 import { formatAge, joinMeta } from '../format';
@@ -11,6 +11,7 @@ export const MERGE_KEY = 'M';
 export const CLOSE_KEY = 'X';
 export const KEEP_KEY = 'K';
 const LOCKED_HINT = 'Waiting for GitHub sync';
+const OPEN_ON_GITHUB = 'Open on GitHub';
 
 export interface KeepAction {
   kept: boolean;
@@ -65,6 +66,7 @@ export function ActionFooter({
   const primary = demoted ? 'secondary' : 'primary';
   const disabled = actions.locked || isBusy(actions.state);
   const queued = actions.queue?.kind === 'queued';
+  const githubIsSecondary = queued || actions.ready;
   const { keep } = actions;
   return (
     <div className="flex flex-col gap-2">
@@ -96,7 +98,7 @@ export function ActionFooter({
             kbd={demoted ? undefined : '⌘↵'}
             onClick={actions.onOpenGithub}
           >
-            Open on GitHub
+            {OPEN_ON_GITHUB}
           </Button>
         )}
         <Button
@@ -108,6 +110,14 @@ export function ActionFooter({
         >
           Close
         </Button>
+        {githubIsSecondary ? (
+          <IconButton
+            icon="external-link"
+            label={OPEN_ON_GITHUB}
+            variant="secondary"
+            onClick={actions.onOpenGithub}
+          />
+        ) : null}
         {keep ? <KeepButton keep={keep} /> : null}
       </div>
       {keep?.failed ? <KeepFailure keep={keep} /> : null}

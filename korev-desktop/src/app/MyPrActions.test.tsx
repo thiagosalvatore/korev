@@ -117,6 +117,14 @@ describe('My PR actions', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('opens a ready PR on GitHub from the panel', () => {
+    const bridge = setupReady();
+    select(OTEL_PR.pr.title);
+    fireEvent.click(screen.getByRole('button', { name: 'Open on GitHub' }));
+
+    expect(bridge.shell.openGithub).toHaveBeenCalledWith(OTEL_PR.pr.url);
+  });
+
   it('shows the comment a third-party queue receives before sending it', async () => {
     setupReady({ ...WATCHING_SETTINGS, mergeWith: { 'acme/api': 'trunk' } });
     select(OTEL_PR.pr.title);
