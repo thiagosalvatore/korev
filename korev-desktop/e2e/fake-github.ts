@@ -48,9 +48,11 @@ interface PrSpec {
   quietDays?: number;
 }
 
+export const FAILING_PR_NUMBER = 491;
+
 const FAILING_PR: PrSpec = {
   repo: API_REPO,
-  number: 491,
+  number: FAILING_PR_NUMBER,
   title: FAILING_PR_TITLE,
   mergeStateStatus: 'BLOCKED',
   rollup: 'FAILURE',
@@ -105,7 +107,7 @@ interface PrState {
   comments: FakeComment[];
 }
 
-function prNode(spec: PrSpec, state: PrState) {
+function prNode(spec: PrSpec, state: PrState, headOid: string) {
   return {
     id: `PR_${spec.number}`,
     number: spec.number,
@@ -120,7 +122,7 @@ function prNode(spec: PrSpec, state: PrState) {
     repository: { nameWithOwner: spec.repo },
     headRefName: `feature-${spec.number}`,
     baseRefName: 'main',
-    headRefOid: `head${spec.number}`,
+    headRefOid: headOid,
     headRepository: { url: `https://github.com/${spec.repo}` },
     isCrossRepository: false,
     maintainerCanModify: false,
@@ -223,7 +225,11 @@ function sendJson(
   response.end(JSON.stringify(body));
 }
 
+export const PR_BODY =
+  'Limits ingestion per tenant so one tenant cannot starve the rest.';
+
 export interface FakeGithubOptions {
+  headOids?: Record<number, string>;
   mergeQueueRepos?: string[];
   ownerAvatarUrl?: string;
   includeNewPr?: boolean;
@@ -326,6 +332,11 @@ export async function startFakeGithub(
     if (query.includes('query RepoOwners')) {
       return { viewer: { login: VIEWER_LOGIN, organizations: { nodes: [] } } };
     }
+    if (query.includes('query PullRequestText')) {
+      return {
+        repository: { pullRequest: { body: PR_BODY, state: 'OPEN' } },
+      };
+    }
     const mutation = mutate(request);
     if (mutation) return mutation;
     if (query.includes('query Inbox')) {
@@ -336,7 +347,15 @@ export async function startFakeGithub(
           mergeQueueRepos,
           options.ownerAvatarUrl ?? null,
         ),
-        mine: connection(myPrs.map((spec) => prNode(spec, stateOf(spec)))),
+        mine: connection(
+          myPrs.map((spec) =>
+            prNode(
+              spec,
+              stateOf(spec),
+              options.headOids?.[spec.number] ?? `head${spec.number}`,
+            ),
+          ),
+        ),
         reviews: connection([]),
       };
     }

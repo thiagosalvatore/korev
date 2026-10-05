@@ -5,6 +5,11 @@ import type {
   AgentRunResult,
   AgentStatus,
 } from './agents';
+import type {
+  AiTaskSettings,
+  ExplanationView,
+  QuestionAnswers,
+} from './agent-tasks';
 import type { AuthState, LoginState, TokenResult } from './auth';
 import type { InboxSnapshot } from './inbox';
 import type { ActionResult, MergeRequest, MergeTool, PrTarget } from './merge';
@@ -53,6 +58,15 @@ export enum IpcChannel {
   AgentsCancelSignIn = 'agents:cancel-sign-in',
   AgentsModels = 'agents:models',
   AgentsTest = 'agents:test',
+  SettingsSetAiTasks = 'settings:set-ai-tasks',
+  AiExplain = 'ai:explain',
+  AiExplanation = 'ai:explanation',
+  AiOpenExplanation = 'ai:open-explanation',
+  AiAnswer = 'ai:answer',
+  AiCancel = 'ai:cancel',
+  AiDismiss = 'ai:dismiss',
+  AiCheckoutsSize = 'ai:checkouts-size',
+  AiRemoveCheckouts = 'ai:remove-checkouts',
 }
 
 export type AppCommand =
@@ -92,6 +106,7 @@ export interface KorevBridge {
     setAgent(agent: AgentPreference): Promise<Settings>;
     setKept(refs: string[], kept: boolean): Promise<Settings>;
     setRepoFilter(view: InboxView, repos: string[]): Promise<Settings>;
+    setAiTasks(patch: Partial<AiTaskSettings>): Promise<Settings>;
     suggestedRepos(): Promise<string[]>;
     onChanged(listener: (settings: Settings) => void): Unsubscribe;
   };
@@ -112,6 +127,16 @@ export interface KorevBridge {
     cancelSignIn(): Promise<void>;
     models(provider: AgentProvider): Promise<AgentModel[]>;
     test(provider: AgentProvider): Promise<AgentRunResult>;
+  };
+  ai: {
+    explain(target: PrTarget, regenerate: boolean): Promise<ActionResult>;
+    explanation(target: PrTarget): Promise<ExplanationView | null>;
+    openExplanation(target: PrTarget): Promise<void>;
+    answer(target: PrTarget, answers: QuestionAnswers): Promise<ActionResult>;
+    cancel(target: PrTarget): Promise<void>;
+    dismiss(target: PrTarget): Promise<void>;
+    checkoutsSize(): Promise<number>;
+    removeCheckouts(): Promise<ActionResult>;
   };
   shell: {
     openGithub(url: string): Promise<void>;

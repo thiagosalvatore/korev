@@ -3,6 +3,7 @@ import type { PrActionState } from '../../shared/merge';
 import { formatAge } from '../format';
 import { NARROW_HIDDEN } from '../layout';
 import { MINUTE_MS, useNow } from '../useNow';
+import { AgentTaskChip, hasChip, useAgentTask } from '../ai/agent-task-state';
 import { ActionChip, settledLabel, usePrAction } from './action-state';
 import { CiIcon } from './CiIcon';
 import { LAYER_GRID, MINE_GRID } from './grid';
@@ -21,12 +22,22 @@ function RowStatus({
   item: MyPr;
   action: PrActionState | null;
 }) {
-  if (!action) return <ReasonChips reasons={item.reasons} />;
-  return (
-    <span className="flex justify-end">
-      <ActionChip state={action} />
-    </span>
-  );
+  const task = useAgentTask(prRef(item.pr));
+  if (action) {
+    return (
+      <span className="flex justify-end">
+        <ActionChip state={action} />
+      </span>
+    );
+  }
+  if (hasChip(task)) {
+    return (
+      <span className="flex justify-end">
+        <AgentTaskChip state={task} />
+      </span>
+    );
+  }
+  return <ReasonChips reasons={item.reasons} />;
 }
 
 const MS_PER_DAY = 86_400_000;

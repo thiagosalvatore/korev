@@ -45,10 +45,31 @@ function inboxResponse(...names: string[]): CannedResponse {
   return inboxResponseWith(EMPTY_SEARCH, names);
 }
 
+const OPEN_PR_HEAD = 'f00dcafe';
+const OPEN_PR_TARGET = { id: 'PR_412', repo: 'acme/api', number: 412 };
+
 function inboxWithOpenPr(): CannedResponse {
-  return inboxResponseWith({ ...EMPTY_SEARCH, nodes: [OPEN_PR_NODE] }, [
-    'acme/api',
-  ]);
+  return inboxResponseWith(
+    { ...EMPTY_SEARCH, nodes: [{ ...OPEN_PR_NODE, headRefOid: OPEN_PR_HEAD }] },
+    ['acme/api'],
+  );
+}
+
+function storedExplanation(headOid: string): Record<string, string> {
+  return {
+    [`${USER_DATA}/explanations.bin`]: JSON.stringify({
+      version: 1,
+      login: VIEWER.login,
+      entries: {
+        [OPEN_PR_REF]: {
+          headOid,
+          format: 'markdown',
+          document: '# Why',
+          createdAt: '2026-10-04T10:00:00.000Z',
+        },
+      },
+    }),
+  };
 }
 
 function inboxResponseWith(
@@ -124,6 +145,8 @@ function setup(
     github: githubEndpoints(true, {}),
     sleep: async () => undefined,
     openExternal: async () => undefined,
+    openPath: async () => undefined,
+    prefersDark: () => false,
     applyTheme: () => undefined,
     broadcast,
     warn: () => undefined,
@@ -268,5 +291,66 @@ describe('korev', () => {
     await invoke(IpcChannel.AuthDisconnect);
 
     expect(fs.files.has(`${USER_DATA}/inbox-cache.bin`)).toBe(false);
+  });
+
+  it('opens the saved explanation for the same head commit without running the agent', async () => {
+    const { korev, invoke } = setup([inboxWithOpenPr(), teamsResponse], {
+      ...previousSession(),
+      ...storedExplanation(OPEN_PR_HEAD),
+    });
+    await korev.start();
+    await vi.waitFor(() =>
+      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
+        status: 'live',
+        fromCache: false,
+      }),
+    );
+
+    expect(await invoke(IpcChannel.AiExplain, OPEN_PR_TARGET, false)).toEqual({
+      ok: true,
+    });
+    expect(await invoke(IpcChannel.InboxLoad)).toMatchObject({
+      agentTasks: {},
+    });
+    expect(await invoke(IpcChannel.AiExplanation, OPEN_PR_TARGET)).toEqual({
+      headOid: OPEN_PR_HEAD,
+      body: '<h1>Why</h1>\n',
+      stale: false,
+    });
+  });
+
+  it('marks an explanation made for an older head commit as stale', async () => {
+    const { korev, invoke } = setup([inboxWithOpenPr(), teamsResponse], {
+      ...previousSession(),
+      ...storedExplanation('0ldhead'),
+    });
+    await korev.start();
+    await vi.waitFor(() =>
+      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
+        fromCache: false,
+      }),
+    );
+
+    expect(
+      await invoke(IpcChannel.AiExplanation, OPEN_PR_TARGET),
+    ).toMatchObject({ stale: true });
+  });
+
+  it("deletes saved explanations and Korev's task records on disconnect", async () => {
+    const { korev, fs, invoke } = setup([neverAnswers], {
+      ...previousSession(),
+      ...storedExplanation(OPEN_PR_HEAD),
+      [`${USER_DATA}/agent-tasks.bin`]: JSON.stringify({
+        version: 1,
+        login: VIEWER.login,
+        records: {},
+      }),
+    });
+    await korev.start();
+
+    await invoke(IpcChannel.AuthDisconnect);
+
+    expect(fs.files.has(`${USER_DATA}/explanations.bin`)).toBe(false);
+    expect(fs.files.has(`${USER_DATA}/agent-tasks.bin`)).toBe(false);
   });
 });

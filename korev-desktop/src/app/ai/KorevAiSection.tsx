@@ -1,0 +1,50 @@
+import { Button } from '../../design-system';
+import { PanelSection } from '../inbox/PanelSection';
+import { isRunning } from './agent-task-state';
+import { EXPLAIN_KEY, type PanelAi } from './useKorevAi';
+
+export const NO_AGENT_LINE = 'Set up Claude Code or Codex to use Korev AI';
+const ALREADY_WORKING = 'Korev is already working on this PR';
+
+function NoAgent({ onOpenSettings }: { onOpenSettings: () => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <p className="m-0 min-w-0 flex-1 text-sm text-fg-2">{NO_AGENT_LINE}</p>
+      <Button size="sm" onClick={onOpenSettings}>
+        Open Settings
+      </Button>
+    </div>
+  );
+}
+
+export function KorevAiSection({ ai }: { ai: PanelAi }) {
+  if (!ai.available) {
+    return (
+      <PanelSection title="Korev AI">
+        <NoAgent onOpenSettings={ai.onOpenSettings} />
+      </PanelSection>
+    );
+  }
+  const busy = isRunning(ai.state);
+  return (
+    <PanelSection title="Korev AI">
+      {ai.state?.status === 'done' ? (
+        <p className="m-0 mb-1.5 text-sm text-fg-2">
+          Last Korev run · {ai.state.summary}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="ghost"
+          kbd={`⇧${EXPLAIN_KEY}`}
+          disabled={busy}
+          title={busy ? ALREADY_WORKING : undefined}
+          onClick={ai.onExplain}
+        >
+          Explain
+        </Button>
+      </div>
+    </PanelSection>
+  );
+}

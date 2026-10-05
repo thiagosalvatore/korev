@@ -1,3 +1,4 @@
+import type { QuestionAnswers } from '../shared/agent-tasks';
 import type {
   MergeMethod,
   MergeRequest,
@@ -51,4 +52,11 @@ export function parseMergeRequest(value: unknown): MergeRequest | null {
 
 export function parseMergeTool(value: unknown): MergeTool | null {
   return MERGE_TOOLS.find((tool) => tool === value) ?? null;
+}
+
+export function parseAnswers(value: unknown): QuestionAnswers | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const entries = Object.entries(value);
+  if (!entries.every(([, answer]) => typeof answer === 'string')) return null;
+  return Object.fromEntries(entries) as QuestionAnswers;
 }

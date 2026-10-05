@@ -77,6 +77,11 @@ function createKorevApp(): Korev {
     github: githubEndpoints(app.isPackaged, process.env),
     sleep: (milliseconds, signal) => delay(milliseconds, undefined, { signal }),
     openExternal: (url) => shell.openExternal(url),
+    openPath: async (filePath) => {
+      const problem = await shell.openPath(filePath);
+      if (problem) console.warn(problem);
+    },
+    prefersDark: () => nativeTheme.shouldUseDarkColors,
     applyTheme: (theme) => {
       nativeTheme.themeSource = theme;
     },

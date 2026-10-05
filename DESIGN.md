@@ -34,6 +34,7 @@ and open `#gallery`).
 | Approved | Priority column of an "Already approved" row when a person approved | success |
 | Bot approved | Priority column of an "Already approved" row when only bots approved | neutral |
 | Action chip | My PR row while Korev acts on it: "Merging…" / "Closing…" (with `loader`), "Still merging on GitHub", "Merge failed", "Close failed" | neutral, or danger for a failure |
+| Task chip | Row while Korev's agent works on the PR: "Explaining…", or "Queued" while it waits for one of the two run slots (with `loader`); "Explain failed" | neutral, or danger for a failure |
 | Queue chip | "In Trunk queue" / "In merge queue" (In progress); "Removed from Trunk queue" (Needs you) | neutral / warning |
 | Section count | My PRs section header count | Needs you danger, Ready to merge success, In progress and Stale mono `fg-2` |
 | Stack | Header of a stack group | accent |
@@ -204,6 +205,29 @@ and open `#gallery`).
   #301–#303", or "Closed #301 and #303" after a failure), and Reopen reopens only
   those. Outside Stale, Close stays per layer.
 
+## Korev AI
+
+- AI actions live in a "Korev AI" panel section, right under "Why it needs you" in My
+  PRs and under the priority or approval section in Review requests. The panel footer
+  never changes for AI. Buttons are plain verbs with no icons; no sparkles, purple,
+  gradients or glow. The heading is `type-overline` like every other section.
+- With no agent chosen in Settings, the section shows one line, "Set up Claude Code or
+  Codex to use Korev AI", and an "Open Settings" button instead of actions.
+- While a task runs, the row carries the task chip and the panel shows the step and
+  the elapsed time ("Explain · Running the agent · 4m") with a ghost Stop that needs no
+  confirm. The section's other buttons are disabled with "Korev is already working on
+  this PR". A failure shows the danger chip, the plain message and Retry. The last
+  finished run stays as "Last Korev run · <summary>".
+- Explanations open in a wide reader `Dialog` (`min(960px, 100vw − 32px)`): title
+  "Explain #301 · <title>", the head commit as a short mono sha, "Regenerate" and "Open
+  in browser". The body is a sandboxed `iframe` without scripts, styled with Korev's
+  prose stylesheet built from `tokens.css` at a 72ch measure, light or dark with the
+  app. Loading shows skeleton lines with "Explaining #301 · usually 1–3 min" and Stop.
+  An explanation made for an older head shows the warning banner "This PR changed since
+  this explanation (abc1234 → def5678)" with Regenerate.
+- Wording says "Korev", never "magic" or "AI assistant". Done and failed tasks are
+  announced: "Explanation ready for #301", "Explain failed on #301".
+
 ## Keyboard model
 
 - Each list is one `listbox` with roving focus. `j`/`k` or ↓/↑ move between rows,
@@ -212,6 +236,7 @@ and open `#gallery`).
 - Enter opens the PR, ⌘Enter opens it on GitHub, Esc closes the side panel and returns
   focus to the row. In My PRs, ⇧M and ⇧X open the merge and close confirms for the
   selected PR, and ⇧K keeps or stops keeping a stale one, even with the panel closed.
+  In both views ⇧E explains the selected PR.
 - ⌘1 / ⌘2 switch views, ⌘, opens Settings, ⌘R refreshes, `?` shows the shortcut sheet.
 - Single-letter shortcuts are ignored while a text field has focus.
 - Tab order: sidebar → list → panel. Every focusable element shows `--focus-ring` on

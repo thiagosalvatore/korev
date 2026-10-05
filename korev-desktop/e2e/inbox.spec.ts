@@ -1,94 +1,26 @@
+import { expect, test } from '@playwright/test';
 import {
-  _electron as electron,
-  expect,
-  test,
-  type ElectronApplication,
-  type Page,
-} from '@playwright/test';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+  appWindow,
+  confirmDialog,
+  connectAndOpenMyPrs,
+  launch,
+  openRow,
+  panel,
+  sectionRows,
+  withSession,
+} from './app';
 import {
   API_REPO,
   FAILING_PR_TITLE,
   NEW_PR_TITLE,
   STALE_PR_TITLE,
-  VIEWER_LOGIN,
   WEB_PR_TITLE,
   WEB_REPO,
-  startFakeGithub,
-  type FakeGithub,
-  type FakeGithubOptions,
 } from './fake-github';
 
-const APP_ENTRY = '.vite/build/main.cjs';
-const APP_PAGE_PROTOCOL = 'file:';
-const FAKE_TOKEN = 'ghp_e2e_fake_token';
 const NOTIFICATION_REFRESH_TIMEOUT_MS = 90_000;
 
 test.setTimeout(150_000);
-
-async function appWindow(app: ElectronApplication): Promise<Page> {
-  const isAppPage = (page: Page) => page.url().startsWith(APP_PAGE_PROTOCOL);
-  const existing = app.windows().find(isAppPage);
-  if (existing) return existing;
-  return app.waitForEvent('window', { predicate: isAppPage });
-}
-
-function launch(github: FakeGithub, userDataDir: string) {
-  return electron.launch({
-    args: [APP_ENTRY, '--use-mock-keychain', `--user-data-dir=${userDataDir}`],
-    env: {
-      ...process.env,
-      KOREV_GITHUB_API_URL: github.url,
-      KOREV_GITHUB_WEB_URL: github.url,
-    },
-  });
-}
-
-async function connectAndOpenMyPrs(window: Page) {
-  await window.getByText('Use a personal access token instead').click();
-  await window.getByLabel('Personal access token').fill(FAKE_TOKEN);
-  await window.getByRole('button', { name: 'Save', exact: true }).click();
-
-  await expect(window.getByText(`Connected as @${VIEWER_LOGIN}`)).toBeVisible();
-  await window.getByRole('button', { name: /Open inbox/ }).click();
-
-  await window.getByRole('button', { name: /My PRs/ }).click();
-  await expect(window.getByText(FAILING_PR_TITLE)).toBeVisible();
-}
-
-function panel(window: Page) {
-  return window.getByRole('complementary', { name: 'Pull request details' });
-}
-
-function confirmDialog(window: Page) {
-  return window.getByRole('dialog');
-}
-
-async function openRow(window: Page, title: string) {
-  await window.getByRole('option', { name: new RegExp(title) }).click();
-}
-
-function sectionRows(window: Page, section: string) {
-  return window
-    .getByRole('group', { name: section, exact: true })
-    .locator('[role="option"]:not([aria-expanded])');
-}
-
-async function withSession(
-  run: (github: FakeGithub, userDataDir: string) => Promise<void>,
-  options: FakeGithubOptions = {},
-) {
-  const github = await startFakeGithub(options);
-  const userDataDir = await mkdtemp(join(tmpdir(), 'korev-e2e-'));
-  try {
-    await run(github, userDataDir);
-  } finally {
-    await github.close();
-    await rm(userDataDir, { recursive: true, force: true });
-  }
-}
 
 test('connects with a token, shows My PRs and picks up a change from notifications', async () => {
   await withSession(async (github, userDataDir) => {
@@ -153,7 +85,9 @@ test('shows each section once and sorts repos inside it in the order chosen in S
           sectionRows(window, 'Ready to merge').first(),
         ).toContainText(NEW_PR_TITLE);
 
-        await window.getByRole('button', { name: 'Settings' }).click();
+        await window
+          .getByRole('button', { name: 'Settings', exact: true })
+          .click();
         await window.getByRole('button', { name: 'Repositories' }).click();
         await window
           .getByRole('button', { name: `Reorder ${API_REPO}, 1 of 2` })
@@ -300,7 +234,9 @@ test("sends PRs to GitHub's merge queue and to Trunk", async () => {
             .getByText('In merge queue'),
         ).toBeVisible();
 
-        await window.getByRole('button', { name: 'Settings' }).click();
+        await window
+          .getByRole('button', { name: 'Settings', exact: true })
+          .click();
         await window.getByRole('button', { name: 'Repositories' }).click();
         await window.getByLabel(`Merge ${WEB_REPO} with`).selectOption('trunk');
         await window.getByRole('button', { name: /My PRs/ }).click();

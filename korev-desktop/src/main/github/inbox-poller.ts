@@ -112,6 +112,7 @@ export function emptySnapshot(repoCount = 0): InboxSnapshot {
     repoMerge: {},
     repoAvatars: {},
     actions: {},
+    agentTasks: {},
     truncated: { mine: false, reviews: false },
     stacksUnavailable: false,
     error: null,

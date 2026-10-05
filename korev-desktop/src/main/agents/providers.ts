@@ -13,9 +13,15 @@ export interface SignInState {
 
 export type RunProviderCommand = (args: string[]) => Promise<CommandResult>;
 
+export interface OutputSchema {
+  json: string;
+  path: string;
+}
+
 export interface RunOptions {
   model: string | null;
   access: AgentAccess;
+  schema: OutputSchema | null;
 }
 
 export interface ProviderDefinition {
@@ -91,8 +97,8 @@ function capitalize(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
-function modelArgs(flag: string, model: string | null): string[] {
-  return model ? [flag, model] : [];
+function optionArgs(flag: string, value: string | null | undefined): string[] {
+  return value ? [flag, value] : [];
 }
 
 export function extractVersion(output: string): string | null {
@@ -112,9 +118,15 @@ function parseClaudeStatus({ stdout }: CommandResult): SignInState {
 function parseClaudeRun(stdout: string): AgentRunResult | null {
   const result = parseJson(stdout);
   if (typeof result?.result !== 'string') return null;
-  return result.is_error === true
-    ? { ok: false, message: result.result }
-    : { ok: true, output: result.result };
+  if (result.is_error === true) return { ok: false, message: result.result };
+  const structured = result.structured_output;
+  return {
+    ok: true,
+    output:
+      structured && typeof structured === 'object'
+        ? JSON.stringify(structured)
+        : result.result,
+  };
 }
 
 function parseCodexStatus(result: CommandResult): SignInState {
@@ -186,13 +198,14 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
     parseStatus: parseClaudeStatus,
     loginArgs: null,
     listModels: async () => CLAUDE_MODELS,
-    runArgs: ({ model, access }) => [
+    runArgs: ({ model, access, schema }) => [
       '-p',
       '--output-format',
       'json',
       '--no-session-persistence',
       ...CLAUDE_ACCESS_ARGS[access],
-      ...modelArgs('--model', model),
+      ...optionArgs('--model', model),
+      ...optionArgs('--json-schema', schema?.json),
     ],
     parseRun: parseClaudeRun,
   },
@@ -204,14 +217,15 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
     loginArgs: ['login'],
     listModels: async (run) =>
       parseCodexModels((await run(['debug', 'models'])).stdout),
-    runArgs: ({ model, access }) => [
+    runArgs: ({ model, access, schema }) => [
       'exec',
       '--json',
       '--ephemeral',
       '--skip-git-repo-check',
       '--sandbox',
       CODEX_SANDBOX[access],
-      ...modelArgs('--model', model),
+      ...optionArgs('--model', model),
+      ...optionArgs('--output-schema', schema?.path),
       STDIN_PROMPT,
     ],
     parseRun: parseCodexRun,

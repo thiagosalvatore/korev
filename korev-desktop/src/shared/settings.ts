@@ -1,3 +1,4 @@
+import type { AiTaskSettings } from './agent-tasks';
 import type { AgentPreference } from './agents';
 import type { MergeTool } from './merge';
 
@@ -36,6 +37,7 @@ export interface Settings {
   agent: AgentPreference;
   keptPrs: Record<string, string>;
   repoFilter: RepoFilter;
+  aiTasks: AiTaskSettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -48,4 +50,5 @@ export const DEFAULT_SETTINGS: Settings = {
   agent: { provider: null, models: {} },
   keptPrs: {},
   repoFilter: { review: [], mine: [] },
+  aiTasks: { explainFormat: 'html', instructions: {} },
 };

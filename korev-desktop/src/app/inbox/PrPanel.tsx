@@ -27,6 +27,10 @@ import { subjectSummary, type PanelSubject } from './list-model';
 import { layerStateLabel } from './OtherLayerRow';
 import { authorHandle } from './PrRow';
 import { ActionFooter, ActionStatus, type PanelActions } from './PanelActions';
+import { AgentTaskStatus } from '../ai/agent-task-state';
+import { KorevAiSection } from '../ai/KorevAiSection';
+import type { PanelAi } from '../ai/useKorevAi';
+import { PanelSection } from './PanelSection';
 import { PriorityBadge } from './PriorityBadge';
 import { ApprovalBadge, approvalText } from './ReviewRow';
 
@@ -60,21 +64,6 @@ const REVIEW_WORDS: Record<ReviewState, string> = {
 };
 
 const LINE = 'flex min-w-0 items-center gap-2 py-1 text-sm text-fg-2';
-
-function PanelSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section>
-      <h3 className="mt-4.5 mb-1.5 type-overline text-fg-3">{title}</h3>
-      {children}
-    </section>
-  );
-}
 
 function Line({ children }: { children: ReactNode }) {
   return <div className={LINE}>{children}</div>;
@@ -328,20 +317,30 @@ function LayerDetails({
   );
 }
 
-function SubjectDetails({ subject }: { subject: PanelSubject }) {
+function SubjectDetails({
+  subject,
+  ai,
+}: {
+  subject: PanelSubject;
+  ai: PanelAi | undefined;
+}) {
   if (subject.kind === 'layer') return <LayerDetails subject={subject} />;
   const { pr } = subject.item;
+  const aiSection = ai ? <KorevAiSection ai={ai} /> : null;
   if (subject.kind === 'review') {
     return (
       <PullRequestDetails
         pr={pr}
         size={subject.item.size}
         why={
-          subject.approval ? (
-            <ApprovalSection approval={subject.approval} />
-          ) : (
-            <PrioritySection item={subject.item} />
-          )
+          <>
+            {subject.approval ? (
+              <ApprovalSection approval={subject.approval} />
+            ) : (
+              <PrioritySection item={subject.item} />
+            )}
+            {aiSection}
+          </>
         }
       />
     );
@@ -350,7 +349,12 @@ function SubjectDetails({ subject }: { subject: PanelSubject }) {
     <PullRequestDetails
       pr={pr}
       size={prSize(pr)}
-      why={<ReasonsSection item={subject.item} />}
+      why={
+        <>
+          <ReasonsSection item={subject.item} />
+          {aiSection}
+        </>
+      }
     />
   );
 }
@@ -359,6 +363,7 @@ export interface PrPanelProps {
   subject: PanelSubject;
   goneLabel: string | null;
   actions?: PanelActions;
+  ai?: PanelAi;
   mode: SidePanelMode;
   onClose: () => void;
   onOpenGithub: (url: string) => void;
@@ -368,6 +373,7 @@ export function PrPanel({
   subject,
   goneLabel,
   actions,
+  ai,
   mode,
   onClose,
   onOpenGithub,
@@ -398,7 +404,14 @@ export function PrPanel({
         <p className="mt-3 mb-0 text-xs text-fg-3">{goneLabel}</p>
       ) : null}
       {actions ? <ActionStatus actions={actions} /> : null}
-      <SubjectDetails subject={subject} />
+      {ai?.state ? (
+        <AgentTaskStatus
+          state={ai.state}
+          onStop={ai.onStop}
+          onRetry={ai.onRetry}
+        />
+      ) : null}
+      <SubjectDetails subject={subject} ai={ai} />
     </SidePanel>
   );
 }

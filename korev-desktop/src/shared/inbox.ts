@@ -1,3 +1,4 @@
+import type { AgentTaskState } from './agent-tasks';
 import type { PrActionState, QueueStatus, RepoMergeInfo } from './merge';
 import type { PullRequest, StackLayer } from './pull-request';
 
@@ -167,6 +168,7 @@ export interface InboxSnapshot {
   repoMerge: Record<string, RepoMergeInfo>;
   repoAvatars: Record<string, string>;
   actions: Record<string, PrActionState>;
+  agentTasks: Record<string, AgentTaskState>;
   truncated: { mine: boolean; reviews: boolean };
   stacksUnavailable: boolean;
   error: string | null;

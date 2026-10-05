@@ -15,12 +15,18 @@ import {
   type CommandResult,
   type CommandRunner,
 } from './command-runner';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
+import type { FileSystem } from '../file-system';
 import { childEnv, resolveLoginPath } from './login-path';
-import { extractVersion, PROVIDERS } from './providers';
+import { extractVersion, PROVIDERS, type OutputSchema } from './providers';
 
 const STATUS_TIMEOUT_MS = 15_000;
 const SIGN_IN_TIMEOUT_MS = 5 * 60_000;
-const RUN_TIMEOUT_MS = 10 * 60_000;
+export const RUN_TIMEOUT_MS = 10 * 60_000;
+const MS_PER_MINUTE = 60_000;
+const SCHEMA_DIR = 'korev-schemas';
+const SCHEMA_EXTENSION = '.json';
 const TEST_PROMPT = 'Reply with exactly: OK';
 const NO_AGENT_CHOSEN = 'Choose an AI agent in Settings first.';
 
@@ -30,6 +36,8 @@ export interface AgentRunRequest {
   access: AgentAccess;
   provider?: AgentProvider;
   model?: string | null;
+  schema?: object;
+  timeoutMs?: number;
   signal?: AbortSignal;
 }
 
@@ -37,6 +45,7 @@ export interface AgentsServiceDeps {
   run: CommandRunner;
   env: NodeJS.ProcessEnv;
   scratchDir: string;
+  fs: FileSystem;
   preference(): AgentPreference;
 }
 
@@ -62,6 +71,11 @@ function failureMessage(provider: AgentProvider, result: CommandResult) {
   return (
     lastLine(result.stderr) ?? `${AGENT_INFO[provider].label} gave no answer.`
   );
+}
+
+export function stoppedAfter(timeoutMs: number): string {
+  const minutes = Math.round(timeoutMs / MS_PER_MINUTE);
+  return `Stopped after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
 }
 
 function notInstalled(provider: AgentProvider): AgentStatus {
@@ -164,6 +178,18 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
     }
   }
 
+  async function outputSchema(schema: object): Promise<OutputSchema> {
+    const json = JSON.stringify(schema);
+    const name = createHash('sha256').update(json).digest('hex');
+    const path = join(
+      deps.scratchDir,
+      SCHEMA_DIR,
+      `${name}${SCHEMA_EXTENSION}`,
+    );
+    await deps.fs.writeAtomic(path, json);
+    return { json, path };
+  }
+
   async function run(request: AgentRunRequest): Promise<AgentRunResult> {
     const preference = deps.preference();
     const provider = request.provider ?? preference.provider;
@@ -173,14 +199,16 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
         ? (preference.models[provider] ?? null)
         : request.model;
     const definition = PROVIDERS[provider];
+    const timeoutMs = request.timeoutMs ?? RUN_TIMEOUT_MS;
     try {
+      const schema = request.schema ? await outputSchema(request.schema) : null;
       const result = await exec(
         provider,
-        definition.runArgs({ model, access: request.access }),
+        definition.runArgs({ model, access: request.access, schema }),
         {
           cwd: request.cwd,
           stdin: request.prompt,
-          timeoutMs: RUN_TIMEOUT_MS,
+          timeoutMs,
           signal: request.signal,
         },
       );
@@ -191,6 +219,9 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
         }
       );
     } catch (error) {
+      if (error instanceof CommandTimeoutError) {
+        return { ok: false, message: stoppedAfter(timeoutMs) };
+      }
       return { ok: false, message: errorMessage(error) };
     }
   }

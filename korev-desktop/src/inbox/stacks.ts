@@ -1,5 +1,6 @@
 import type {
   Bucket,
+  InboxSnapshot,
   ApprovedReview,
   MyEntry,
   MyPr,
@@ -282,4 +283,12 @@ export function reviewItemsIn(entries: ReviewEntry[]): ReviewItem[] {
           layer.kind === 'requested' ? [layer.item] : [],
         ),
   );
+}
+
+export function pullRequestsIn(snapshot: InboxSnapshot): PullRequest[] {
+  return [
+    ...myPrsIn(snapshot.mine),
+    ...reviewItemsIn(snapshot.reviews.entries),
+    ...snapshot.reviews.approved.map(({ item }) => item),
+  ].map((item) => item.pr);
 }

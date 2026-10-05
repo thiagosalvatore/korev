@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import type { AiTaskSettings } from '../shared/agent-tasks';
 import type { AgentPreference } from '../shared/agents';
 import type { MergeTool } from '../shared/merge';
 import type {
@@ -64,4 +65,8 @@ export function saveCollapsedSection(
   return applySettings(
     korev().settings.setCollapsedSection(section, collapsed),
   );
+}
+
+export function saveAiTasks(patch: Partial<AiTaskSettings>): Promise<void> {
+  return applySettings(korev().settings.setAiTasks(patch));
 }

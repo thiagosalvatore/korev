@@ -14,6 +14,12 @@ import {
   isModelId,
   type AgentPreference,
 } from '../shared/agents';
+import {
+  AGENT_TASK_KINDS,
+  EXPLAIN_FORMATS,
+  type AgentTaskKind,
+  type AiTaskSettings,
+} from '../shared/agent-tasks';
 import type { MergeTool } from '../shared/merge';
 import type { FileSystem } from './file-system';
 import { isPrRef, isRepoName } from './repo-names';
@@ -101,6 +107,35 @@ function pickAgent(value: unknown): AgentPreference {
   };
 }
 
+const INSTRUCTIONS_MAX_CHARS = 20_000;
+
+function pickInstructions(
+  value: unknown,
+): Partial<Record<AgentTaskKind, string>> {
+  if (!value || typeof value !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([kind, text]) =>
+        AGENT_TASK_KINDS.includes(kind as AgentTaskKind) &&
+        typeof text === 'string' &&
+        text.trim().length > 0 &&
+        text.length <= INSTRUCTIONS_MAX_CHARS,
+    ),
+  );
+}
+
+function pickAiTasks(value: unknown): AiTaskSettings {
+  const raw = (value ?? {}) as Partial<Record<keyof AiTaskSettings, unknown>>;
+  return {
+    explainFormat: pickOneOf(
+      EXPLAIN_FORMATS,
+      raw.explainFormat,
+      DEFAULT_SETTINGS.aiTasks.explainFormat,
+    ),
+    instructions: pickInstructions(raw.instructions),
+  };
+}
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
@@ -124,6 +159,7 @@ function sanitize(raw: Record<string, unknown>): Settings {
     agent: pickAgent(raw.agent),
     keptPrs: pickKeptPrs(raw.keptPrs),
     repoFilter: pickRepoFilter(raw.repoFilter, repos),
+    aiTasks: pickAiTasks(raw.aiTasks),
   };
 }
 

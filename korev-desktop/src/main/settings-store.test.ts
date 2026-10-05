@@ -66,6 +66,26 @@ describe('settings store', () => {
     });
   });
 
+  it('keeps instructions only for known tasks and an explain format it knows', async () => {
+    const fs = createMemoryFileSystem({
+      [PATH]: JSON.stringify({
+        aiTasks: {
+          explainFormat: 'pdf',
+          instructions: {
+            explain: '/pr-review',
+            deploy: 'ship it',
+            review: '  ',
+          },
+        },
+      }),
+    });
+    const { settings } = await createSettingsStore({ fs, path: PATH }).load();
+    expect(settings.aiTasks).toEqual({
+      explainFormat: 'html',
+      instructions: { explain: '/pr-review' },
+    });
+  });
+
   it('persists updates so a new store reads them back', async () => {
     const fs = createMemoryFileSystem();
     await createSettingsStore({ fs, path: PATH }).update({

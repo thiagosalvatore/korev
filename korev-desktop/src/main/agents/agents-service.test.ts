@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '../../shared/settings';
 import type { AgentPreference } from '../../shared/agents';
+import { createMemoryFileSystem } from '../file-system';
 import { createAgentsService } from './agents-service';
 import {
   CommandNotFoundError,
@@ -34,15 +35,17 @@ function setup(
       return reply;
     },
   );
+  const fs = createMemoryFileSystem();
   const agents = createAgentsService({
     run,
     env: ENV,
     scratchDir: SCRATCH,
+    fs,
     preference: () => preference,
   });
   const callTo = (binary: string) =>
     run.mock.calls.find(([file]) => file === binary);
-  return { agents, callTo };
+  return { agents, callTo, fs };
 }
 
 describe('agents service', () => {
@@ -145,5 +148,45 @@ describe('agents service', () => {
       signedIn: false,
       problem: 'Sign-in timed out.',
     });
+  });
+
+  it('writes the output schema to a file Codex can read and gives the run its own time limit', async () => {
+    const { agents, callTo, fs } = setup(
+      {
+        codex: ok(
+          '{"type":"item.completed","item":{"type":"agent_message","text":"{}"}}',
+        ),
+      },
+      { provider: 'codex', models: {} },
+    );
+
+    await agents.run({
+      prompt: 'Explain',
+      cwd: '/repo',
+      access: 'read-only',
+      schema: { type: 'object' },
+      timeoutMs: 30 * 60_000,
+    });
+
+    const [, args, options] = callTo('codex') ?? [];
+    const schemaPath = args?.[args.indexOf('--output-schema') + 1] ?? '';
+    expect(fs.files.get(schemaPath)?.toString()).toBe('{"type":"object"}');
+    expect(options?.timeoutMs).toBe(30 * 60_000);
+  });
+
+  it('reports a run that hit its time limit in minutes', async () => {
+    const { agents } = setup(
+      { claude: new CommandTimeoutError('claude') },
+      { provider: 'claude', models: {} },
+    );
+
+    expect(
+      await agents.run({
+        prompt: 'Fix CI',
+        cwd: '/repo',
+        access: 'edit',
+        timeoutMs: 30 * 60_000,
+      }),
+    ).toEqual({ ok: false, message: 'Stopped after 30 minutes' });
   });
 });

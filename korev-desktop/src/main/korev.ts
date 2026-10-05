@@ -1,4 +1,10 @@
 import { join } from 'node:path';
+import { DEFAULT_INSTRUCTIONS } from '../shared/agent-tasks';
+import type {
+  AgentTaskKind,
+  AiTaskSettings,
+  ExplanationView,
+} from '../shared/agent-tasks';
 import {
   AGENT_INFO,
   isAgentProvider,
@@ -8,23 +14,35 @@ import {
 } from '../shared/agents';
 import type { AuthState, Connection } from '../shared/auth';
 import type { InboxSnapshot } from '../shared/inbox';
-import type { ActionResult } from '../shared/merge';
+import type { ActionResult, PrTarget } from '../shared/merge';
+import { prRef } from '../shared/pr-ref';
+import type { PullRequest } from '../shared/pull-request';
+import { explanationDocument } from '../shared/explanation-document';
 import { IpcChannel } from '../shared/ipc-contract';
 import type { RepoOwner, RepoPage } from '../shared/repos';
 import type { InboxView, Settings, ThemePreference } from '../shared/settings';
 import { buildInbox } from '../inbox/build-inbox';
 import { liveKeeps } from '../inbox/keep';
-import { myPrsIn } from '../inbox/stacks';
+import { myPrsIn, pullRequestsIn } from '../inbox/stacks';
 import {
+  parseAnswers,
   parseMergeRequest,
   parseMergeTool,
   parseTarget,
   parseTargets,
 } from './action-input';
+import { createAgentTasks } from './agent-tasks/engine';
+import { createExplainTask } from './agent-tasks/explain';
+import {
+  createExplanations,
+  explanationBody,
+} from './agent-tasks/explanations';
+import { createTaskStore } from './agent-tasks/task-store';
 import { createAgentsService } from './agents/agents-service';
 import type { CommandRunner } from './agents/command-runner';
 import { isGithubUrl } from './app-origin';
-import { isPrRef } from './repo-names';
+import { createCheckouts } from './checkouts';
+import { isPrRef, splitRepoName } from './repo-names';
 import { createAuthService } from './auth-service';
 import type { SecretCipher } from './encrypted-file';
 import type { FileSystem } from './file-system';
@@ -43,6 +61,7 @@ import {
   type GithubEndpoints,
 } from './github/config';
 import { applyRenames, type RepoRename } from './github/repo-access';
+import { createTaskReads } from './github/task-reads';
 import { emptyRepoPage } from './github/repo-picker';
 import type { FetchLike } from './github/request';
 import { createInboxCache } from './inbox-cache';
@@ -57,6 +76,10 @@ import { createTokenStore } from './token-store';
 const SETTINGS_FILE = 'settings.json';
 const TOKEN_FILE = 'github-token.bin';
 const INBOX_CACHE_FILE = 'inbox-cache.bin';
+const AGENT_TASKS_FILE = 'agent-tasks.bin';
+const EXPLANATIONS_FILE = 'explanations.bin';
+const EXPLANATION_COPIES_DIR = 'korev-explanations';
+const CHECKOUTS_BUSY = 'Wait for Korev to finish its running tasks first.';
 const INVALID_ACTION: ActionResult = {
   ok: false,
   message: 'Korev could not read that request.',
@@ -79,6 +102,8 @@ export interface KorevDeps {
   github: GithubEndpoints;
   sleep(milliseconds: number, signal: AbortSignal): Promise<void>;
   openExternal(url: string): Promise<void>;
+  openPath(path: string): Promise<void>;
+  prefersDark(): boolean;
   applyTheme(theme: ThemePreference): void;
   broadcast(
     channel: IpcChannel,
@@ -159,7 +184,64 @@ export function createKorev(deps: KorevDeps): Korev {
     run: deps.runCommand,
     env: deps.env,
     scratchDir: deps.tempPath,
+    fs: deps.fs,
     preference: () => settings.current().agent,
+  });
+
+  const checkouts = createCheckouts({
+    run: deps.runCommand,
+    env: deps.env,
+    root: deps.userDataPath,
+    gitUrl: deps.github.gitUrl,
+    token: () => auth.token(),
+    now: () => Date.now(),
+  });
+
+  const taskReads = createTaskReads({
+    fetch: deps.fetch,
+    apiUrl: deps.github.apiUrl,
+  });
+
+  const explanations = createExplanations({
+    cipher: deps.cipher,
+    fs: deps.fs,
+    path: join(deps.userDataPath, EXPLANATIONS_FILE),
+  });
+  const explanationCopies = new Set<string>();
+
+  const agentTasks = createAgentTasks({
+    tasks: {
+      explain: createExplainTask({
+        checkouts,
+        runAgent: agents.run,
+        prBody: async (pr) => (await readPrText(pr))?.body ?? '',
+        format: () => settings.current().aiTasks.explainFormat,
+        save: (ref, explanation) => explanations.save(ref, explanation),
+        now: () => Date.now(),
+      }),
+    },
+    findPr,
+    prState: async (ref) => {
+      const [repo, number] = ref.split('#');
+      return (
+        (await readPrText({ repo, number: Number(number) }))?.state ?? null
+      );
+    },
+    instructions: taskInstructions,
+    store: createTaskStore({
+      cipher: deps.cipher,
+      fs: deps.fs,
+      path: join(deps.userDataPath, AGENT_TASKS_FILE),
+    }),
+    login: () => auth.state().connection?.login ?? null,
+    releaseCheckout: (ref) => {
+      const [repo, number] = ref.split('#');
+      return checkouts.remove({ repo, number: Number(number) });
+    },
+    now: () => Date.now(),
+    onChange: () => broadcastInbox(inbox.snapshot()),
+    onSettled: () => undefined,
+    warn: deps.warn,
   });
 
   const auth = createAuthService({
@@ -181,7 +263,29 @@ export function createKorev(deps: KorevDeps): Korev {
   });
 
   function withActions(snapshot: InboxSnapshot): InboxSnapshot {
-    return { ...snapshot, actions: prActions.state() };
+    return {
+      ...snapshot,
+      actions: prActions.state(),
+      agentTasks: agentTasks.state(),
+    };
+  }
+
+  function findPr(ref: string): PullRequest | null {
+    return (
+      pullRequestsIn(inbox.snapshot()).find((pr) => prRef(pr) === ref) ?? null
+    );
+  }
+
+  function readPrText(pr: { repo: string; number: number }) {
+    const token = auth.token();
+    return token ? taskReads.pullRequestText(token, pr) : Promise.resolve(null);
+  }
+
+  function taskInstructions(kind: AgentTaskKind): string {
+    return (
+      settings.current().aiTasks.instructions[kind] ??
+      DEFAULT_INSTRUCTIONS[kind]
+    );
   }
 
   function broadcastInbox(snapshot: InboxSnapshot): void {
@@ -200,7 +304,10 @@ export function createKorev(deps: KorevDeps): Korev {
   }
 
   function publishInbox(snapshot: InboxSnapshot): void {
-    if (snapshot.status === 'live') prActions.reconcile(snapshot);
+    if (snapshot.status === 'live') {
+      prActions.reconcile(snapshot);
+      agentTasks.reconcile(snapshot);
+    }
     broadcastInbox(snapshot);
     if (snapshot.status !== 'live') return;
     pruneKeeps(snapshot);
@@ -219,14 +326,49 @@ export function createKorev(deps: KorevDeps): Korev {
     if (cached) inbox.restore(cached);
   }
 
+  async function removeExplanationCopies(): Promise<void> {
+    const copies = [...explanationCopies];
+    explanationCopies.clear();
+    await Promise.all(copies.map((path) => deps.fs.remove(path)));
+  }
+
+  async function forgetAiWork(): Promise<void> {
+    await agentTasks.clear();
+    await explanations.clear();
+    await removeExplanationCopies();
+    await checkouts.removeAll([]);
+  }
+
+  function sweepCheckouts(): void {
+    checkouts
+      .sweep(settings.current().repos, agentTasks.keptRefs())
+      .catch((error: unknown) => {
+        deps.warn(`Could not clean up checkouts: ${String(error)}`);
+      });
+  }
+
+  async function restoreAiWork(): Promise<void> {
+    const login = auth.state().connection?.login;
+    if (!login) return;
+    await agentTasks.restore(login);
+    await explanations.load(login).catch((error: unknown) => {
+      deps.warn(`Could not read saved explanations: ${String(error)}`);
+    });
+    sweepCheckouts();
+  }
+
   async function followConnection(connection: Connection | null) {
     github.clearSessionCache();
     if (!connection) {
       inbox.reset();
       await inboxCache.clear();
+      await forgetAiWork().catch((error: unknown) => {
+        deps.warn(`Could not remove Korev's AI work: ${String(error)}`);
+      });
       return;
     }
     await restoreCachedInbox();
+    await restoreAiWork();
     void inbox.restart();
   }
 
@@ -234,7 +376,10 @@ export function createKorev(deps: KorevDeps): Korev {
     const previous = settings.current().repos;
     const updated = await settings.update({ repos });
     if (sameRepoSet(previous, updated.repos)) inbox.rebuild();
-    else void inbox.restart();
+    else {
+      void inbox.restart();
+      sweepCheckouts();
+    }
     return updated;
   }
 
@@ -342,6 +487,70 @@ export function createKorev(deps: KorevDeps): Korev {
     await deps.openExternal(AGENT_INFO[provider].installUrl);
   }
 
+  function setAiTasks(patch: unknown): Promise<Settings> {
+    if (typeof patch !== 'object' || patch === null) {
+      return Promise.resolve(settings.current());
+    }
+    const aiTasks: AiTaskSettings = {
+      ...settings.current().aiTasks,
+      ...(patch as Partial<AiTaskSettings>),
+    };
+    return settings.update({ aiTasks });
+  }
+
+  function explain(target: PrTarget, regenerate: unknown): ActionResult {
+    const ref = prRef(target);
+    const stored = explanations.get(ref);
+    const current = findPr(ref)?.headRefOid;
+    if (regenerate !== true && stored && stored.headOid === current) {
+      return { ok: true };
+    }
+    return agentTasks.start(ref, 'explain');
+  }
+
+  function explanationView(target: PrTarget): ExplanationView | null {
+    const ref = prRef(target);
+    const stored = explanations.get(ref);
+    if (!stored) return null;
+    const current = findPr(ref)?.headRefOid;
+    return {
+      headOid: stored.headOid,
+      body: explanationBody(stored),
+      stale: current !== undefined && current !== stored.headOid,
+    };
+  }
+
+  async function openExplanation(target: PrTarget): Promise<void> {
+    const view = explanationView(target);
+    if (!view) return;
+    const { owner, name } = splitRepoName(target.repo);
+    const path = join(
+      deps.tempPath,
+      EXPLANATION_COPIES_DIR,
+      `${owner}-${name}-${target.number}.html`,
+    );
+    const theme = deps.prefersDark() ? 'dark' : 'light';
+    await deps.fs.writeAtomic(path, explanationDocument(view.body, theme));
+    explanationCopies.add(path);
+    await deps.openPath(path);
+  }
+
+  async function removeCheckouts(): Promise<ActionResult> {
+    if (agentTasks.isBusy()) return { ok: false, message: CHECKOUTS_BUSY };
+    await checkouts.removeAll(agentTasks.keptRefs());
+    return { ok: true };
+  }
+
+  function withTarget<T>(
+    run: (target: PrTarget, ...rest: unknown[]) => T,
+    invalid: T,
+  ): (value: unknown, ...rest: unknown[]) => T {
+    return (value, ...rest) => {
+      const target = parseTarget(value);
+      return target ? run(target, ...rest) : invalid;
+    };
+  }
+
   async function useToken(token: unknown) {
     if (typeof token !== 'string') {
       return { ok: false as const, message: 'Paste a GitHub token.' };
@@ -390,6 +599,27 @@ export function createKorev(deps: KorevDeps): Korev {
       async () => NO_AGENT_MODELS,
     ),
     [IpcChannel.AgentsTest]: forAgent(agents.test, async () => INVALID_ACTION),
+    [IpcChannel.SettingsSetAiTasks]: setAiTasks,
+    [IpcChannel.AiExplain]: withTarget(explain, INVALID_ACTION),
+    [IpcChannel.AiExplanation]: withTarget(explanationView, null),
+    [IpcChannel.AiOpenExplanation]: withTarget(
+      openExplanation,
+      Promise.resolve(),
+    ),
+    [IpcChannel.AiAnswer]: withTarget((target, answers) => {
+      const parsed = parseAnswers(answers);
+      return parsed ? agentTasks.answer(prRef(target), parsed) : INVALID_ACTION;
+    }, INVALID_ACTION),
+    [IpcChannel.AiCancel]: withTarget(
+      (target) => agentTasks.cancel(prRef(target)),
+      undefined,
+    ),
+    [IpcChannel.AiDismiss]: withTarget(
+      (target) => agentTasks.dismiss(prRef(target)),
+      Promise.resolve(),
+    ),
+    [IpcChannel.AiCheckoutsSize]: () => checkouts.size(),
+    [IpcChannel.AiRemoveCheckouts]: removeCheckouts,
   };
 
   async function start(): Promise<void> {
@@ -398,6 +628,7 @@ export function createKorev(deps: KorevDeps): Korev {
     deps.applyTheme(loaded.theme);
     await auth.init();
     await restoreCachedInbox();
+    await restoreAiWork();
     void inbox.start();
   }
 
@@ -408,7 +639,9 @@ export function createKorev(deps: KorevDeps): Korev {
     stop: () => {
       inbox.stop();
       prActions.stop();
+      agentTasks.stop();
       agents.stop();
+      void removeExplanationCopies();
     },
   };
 

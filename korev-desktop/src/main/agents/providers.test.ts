@@ -5,7 +5,7 @@ import {
   type AgentProvider,
 } from '../../shared/agents';
 import type { CommandResult } from './command-runner';
-import { PROVIDERS } from './providers';
+import { PROVIDERS, type RunOptions } from './providers';
 
 function result(stdout: string, exitCode = 0, stderr = ''): CommandResult {
   return { exitCode, stdout, stderr };
@@ -33,6 +33,17 @@ describe('claude provider', () => {
     ['unreadable', result('Error: something broke', 1)],
   ])('treats a %s status as signed out', (_case, status) => {
     expect(claude.parseStatus(status)).toEqual({ signedIn: false, plan: null });
+  });
+
+  it('returns the structured output when a schema was given', () => {
+    const stdout = JSON.stringify({
+      result: 'Here it is',
+      structured_output: { summary: 'Done' },
+    });
+    expect(claude.parseRun(stdout)).toEqual({
+      ok: true,
+      output: '{"summary":"Done"}',
+    });
   });
 
   it('returns the answer, or the error Claude Code reported', () => {
@@ -118,7 +129,11 @@ function flagValue(args: string[], flag: string): string | undefined {
 
 describe('run access', () => {
   it('gives Claude Code only the file-reading tools for a read-only run', () => {
-    const args = PROVIDERS.claude.runArgs({ model: null, access: 'read-only' });
+    const args = PROVIDERS.claude.runArgs({
+      model: null,
+      access: 'read-only',
+      schema: null,
+    });
 
     expect(args).toContain('--restricted');
     expect(flagValue(args, '--tools')).toBe('Read,Grep,Glob');
@@ -126,7 +141,11 @@ describe('run access', () => {
   });
 
   it('runs Claude Code shell commands in a sandbox that cannot be skipped for an edit run', () => {
-    const args = PROVIDERS.claude.runArgs({ model: null, access: 'edit' });
+    const args = PROVIDERS.claude.runArgs({
+      model: null,
+      access: 'edit',
+      schema: null,
+    });
 
     expect(args).toContain('--restricted');
     expect(flagValue(args, '--tools')?.split(',')).toEqual(
@@ -146,25 +165,62 @@ describe('run access', () => {
     ['read-only', 'read-only'],
     ['edit', 'workspace-write'],
   ] as const)('runs Codex %s in the %s sandbox', (access, sandbox) => {
-    const args = PROVIDERS.codex.runArgs({ model: null, access });
+    const args = PROVIDERS.codex.runArgs({ model: null, access, schema: null });
 
     expect(flagValue(args, '--sandbox')).toBe(sandbox);
   });
 
-  const everyRun: [AgentProvider, AgentAccess][] = AGENT_PROVIDERS.flatMap(
-    (provider) =>
-      ACCESS_LEVELS.map((access): [AgentProvider, AgentAccess] => [
-        provider,
-        access,
-      ]),
+  const SCHEMA = { json: '{"type":"object"}', path: '/tmp/schema.json' };
+  const everyRun = AGENT_PROVIDERS.flatMap((provider) =>
+    ACCESS_LEVELS.flatMap((access) =>
+      [null, SCHEMA].map(
+        (schema): [AgentProvider, AgentAccess, RunOptions['schema']] => [
+          provider,
+          access,
+          schema,
+        ],
+      ),
+    ),
   );
 
   it.each(everyRun)(
-    'never lets %s skip its permissions on a %s run',
-    (provider, access) => {
-      const args = PROVIDERS[provider].runArgs({ model: null, access });
+    'never lets %s skip its permissions or sandbox on a %s run (schema %o)',
+    (provider, access, schema) => {
+      const args = PROVIDERS[provider].runArgs({ model: null, access, schema });
 
-      expect(args.join(' ')).not.toMatch(/dangerously|bypass/i);
+      expect(args.join(' ')).not.toMatch(/dangerously|bypass|no-sandbox/i);
+      if (provider === 'codex') {
+        expect(flagValue(args, '--sandbox')).toBe(
+          access === 'edit' ? 'workspace-write' : 'read-only',
+        );
+        return;
+      }
+      expect(args).toContain('--restricted');
+      if (access === 'edit') {
+        expect(
+          JSON.parse(flagValue(args, '--settings') ?? '{}').sandbox,
+        ).toEqual({
+          enabled: true,
+          allowUnsandboxedCommands: false,
+          failIfUnavailable: true,
+        });
+      }
     },
   );
+
+  it('passes the schema inline to Claude Code and as a file to Codex', () => {
+    const claude = PROVIDERS.claude.runArgs({
+      model: null,
+      access: 'read-only',
+      schema: SCHEMA,
+    });
+    const codex = PROVIDERS.codex.runArgs({
+      model: null,
+      access: 'read-only',
+      schema: SCHEMA,
+    });
+
+    expect(flagValue(claude, '--json-schema')).toBe(SCHEMA.json);
+    expect(flagValue(codex, '--output-schema')).toBe(SCHEMA.path);
+  });
 });

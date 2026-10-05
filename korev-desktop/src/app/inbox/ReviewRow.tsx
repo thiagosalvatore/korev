@@ -8,6 +8,7 @@ import type {
 import { formatAge, pluralize } from '../format';
 import { NARROW_HIDDEN } from '../layout';
 import { MINUTE_MS, useNow } from '../useNow';
+import { AgentTaskChip, hasChip, useAgentTask } from '../ai/agent-task-state';
 import { CiIcon } from './CiIcon';
 import { approvedKey } from './entries';
 import { REVIEW_GRID, REVIEW_LAYER_GRID } from './grid';
@@ -127,6 +128,7 @@ interface ReviewColumnsProps {
 
 function ReviewColumns({ item }: ReviewColumnsProps) {
   const { pr, size } = item;
+  const task = useAgentTask(prRef(pr));
   return (
     <>
       <span
@@ -136,7 +138,13 @@ function ReviewColumns({ item }: ReviewColumnsProps) {
         <span className="sr-only"> files</span>
       </span>
       <SizeBadge {...size} />
-      <span>{pr.isDraft ? <Badge outline>Draft</Badge> : null}</span>
+      <span>
+        {hasChip(task) ? (
+          <AgentTaskChip state={task} />
+        ) : pr.isDraft ? (
+          <Badge outline>Draft</Badge>
+        ) : null}
+      </span>
       <CiIcon state={pr.ci} checks={pr.checks} />
     </>
   );

@@ -1,0 +1,2 @@
+#!/bin/sh
+printf '__KOREV_PATH_START__%s__KOREV_PATH_END__' "$PATH"

@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import type { ExplanationView } from '../shared/agent-tasks';
 import type { AgentModel, AgentStatus } from '../shared/agents';
 import type { AuthState } from '../shared/auth';
 import type { InboxSnapshot } from '../shared/inbox';
@@ -22,6 +23,8 @@ export interface FakeBridgeOptions {
   pages?: RepoPage[];
   agents?: AgentStatus[];
   agentModels?: AgentModel[];
+  explanation?: ExplanationView | null;
+  checkoutsSize?: number;
 }
 
 export interface FakeBridge {
@@ -54,6 +57,8 @@ export function installFakeBridge({
   pages = [],
   agents = [],
   agentModels = [],
+  explanation = null,
+  checkoutsSize = 0,
 }: FakeBridgeOptions = {}): FakeBridge {
   const inboxListeners = new Set<(next: InboxSnapshot) => void>();
   const settingsListeners = new Set<(next: Settings) => void>();
@@ -107,6 +112,10 @@ export function installFakeBridge({
         },
       })),
       setAgent: vi.fn(async (agent) => ({ ...settings, agent })),
+      setAiTasks: vi.fn(async (patch) => ({
+        ...settings,
+        aiTasks: { ...settings.aiTasks, ...patch },
+      })),
       suggestedRepos: vi.fn(async () => suggestedRepos),
       onChanged: vi.fn((listener) => {
         settingsListeners.add(listener);
@@ -132,6 +141,16 @@ export function installFakeBridge({
       cancelSignIn: vi.fn(async () => undefined),
       models: vi.fn(async () => agentModels),
       test: vi.fn(async () => ({ ok: true as const, output: 'OK' })),
+    },
+    ai: {
+      explain: vi.fn(async () => ({ ok: true as const })),
+      explanation: vi.fn(async () => explanation),
+      openExplanation: vi.fn(async () => undefined),
+      answer: vi.fn(async () => ({ ok: true as const })),
+      cancel: vi.fn(async () => undefined),
+      dismiss: vi.fn(async () => undefined),
+      checkoutsSize: vi.fn(async () => checkoutsSize),
+      removeCheckouts: vi.fn(async () => ({ ok: true as const })),
     },
     shell: {
       openGithub: vi.fn(async () => undefined),

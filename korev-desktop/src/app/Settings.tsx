@@ -13,6 +13,7 @@ import type { AuthState, Connection, ConnectionMethod } from '../shared/auth';
 import type { InboxSnapshot } from '../shared/inbox';
 import type { Settings, ThemePreference } from '../shared/settings';
 import { AgentsCard } from './agents/AgentsCard';
+import { AiTasksSettings } from './ai/AiTasksSettings';
 import { korev } from './bridge';
 import { pluralize } from './format';
 import { InboxOrder } from './repos/InboxOrder';
@@ -43,7 +44,12 @@ const THEME_TABS: { id: ThemePreference; label: string }[] = [
   { id: 'dark', label: 'Dark' },
 ];
 
-type SettingsSection = 'github' | 'repositories' | 'agents' | 'general';
+type SettingsSection =
+  | 'github'
+  | 'repositories'
+  | 'agents'
+  | 'ai-tasks'
+  | 'general';
 
 const GITHUB_SECTION: SidebarNavItem<SettingsSection> = {
   id: 'github',
@@ -54,6 +60,7 @@ const GITHUB_SECTION: SidebarNavItem<SettingsSection> = {
 const APP_SECTIONS: SidebarNavItem<SettingsSection>[] = [
   { id: 'repositories', label: 'Repositories', icon: 'folder-git-2' },
   { id: 'agents', label: 'AI agents', icon: 'bot-message-square' },
+  { id: 'ai-tasks', label: 'AI tasks', icon: 'list-checks' },
   { id: 'general', label: 'General', icon: 'sliders-horizontal' },
 ];
 
@@ -241,6 +248,14 @@ function SectionContent({
   }
   if (section === 'agents') {
     return <AgentsCard preference={settings.agent} />;
+  }
+  if (section === 'ai-tasks') {
+    return (
+      <AiTasksSettings
+        settings={settings.aiTasks}
+        tasks={snapshot?.agentTasks ?? {}}
+      />
+    );
   }
   if (section === 'general') {
     return (

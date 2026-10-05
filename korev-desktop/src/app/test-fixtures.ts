@@ -427,6 +427,7 @@ export function makeSnapshot(
     repoMerge: {},
     repoAvatars: {},
     actions: {},
+    agentTasks: {},
     truncated: { mine: false, reviews: false },
     stacksUnavailable: false,
     error: null,

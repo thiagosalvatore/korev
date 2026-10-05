@@ -44,6 +44,7 @@ const bridge: KorevBridge = {
     setKept: (refs, kept) => invoke(IpcChannel.SettingsSetKept, refs, kept),
     setRepoFilter: (view, repos) =>
       invoke(IpcChannel.SettingsSetRepoFilter, view, repos),
+    setAiTasks: (patch) => invoke(IpcChannel.SettingsSetAiTasks, patch),
     suggestedRepos: () => invoke(IpcChannel.SettingsSuggestedRepos),
     onChanged: (listener) => subscribe(IpcChannel.SettingsChanged, listener),
   },
@@ -64,6 +65,17 @@ const bridge: KorevBridge = {
     cancelSignIn: () => invoke(IpcChannel.AgentsCancelSignIn),
     models: (provider) => invoke(IpcChannel.AgentsModels, provider),
     test: (provider) => invoke(IpcChannel.AgentsTest, provider),
+  },
+  ai: {
+    explain: (target, regenerate) =>
+      invoke(IpcChannel.AiExplain, target, regenerate),
+    explanation: (target) => invoke(IpcChannel.AiExplanation, target),
+    openExplanation: (target) => invoke(IpcChannel.AiOpenExplanation, target),
+    answer: (target, answers) => invoke(IpcChannel.AiAnswer, target, answers),
+    cancel: (target) => invoke(IpcChannel.AiCancel, target),
+    dismiss: (target) => invoke(IpcChannel.AiDismiss, target),
+    checkoutsSize: () => invoke(IpcChannel.AiCheckoutsSize),
+    removeCheckouts: () => invoke(IpcChannel.AiRemoveCheckouts),
   },
   shell: {
     openGithub: (url) => invoke(IpcChannel.ShellOpenGithub, url),

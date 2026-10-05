@@ -4,6 +4,7 @@ export * from './components/core/Kbd';
 export * from './components/core/Button';
 export * from './components/core/IconButton';
 export * from './components/brand/Logo';
+export * from './components/forms/Field';
 export * from './components/forms/Input';
 export * from './components/forms/Select';
 export * from './components/forms/Checkbox';
