@@ -70,6 +70,22 @@ export const AGENT_TASK_STEP_LABELS: Record<AgentTaskStep, string> = {
   pushing: 'Pushing',
 };
 
+export type AgentActivityKind = 'step' | 'message';
+
+export interface AgentActivityLine {
+  kind: AgentActivityKind;
+  text: string;
+}
+
+export interface AgentActivity extends AgentActivityLine {
+  at: string;
+}
+
+export interface AgentActivityEvent {
+  ref: string;
+  entry: AgentActivity;
+}
+
 export interface AgentQuestion {
   id: string;
   question: string;

@@ -57,6 +57,7 @@ function setup(
   const releaseCheckout = vi.fn(async () => undefined);
   const prState = vi.fn(async (): Promise<PrState | null> => 'OPEN');
   const onSettled = vi.fn();
+  const onActivity = vi.fn();
   const engine = createAgentTasks({
     tasks: Object.fromEntries(
       AGENT_TASK_KINDS.map((kind) => [kind, task]),
@@ -71,13 +72,23 @@ function setup(
     now: () => Date.parse('2026-10-04T10:00:00Z'),
     onChange: () => undefined,
     onSettled,
+    onActivity,
     warn: () => undefined,
   });
   const settle = async () => {
     await vi.waitFor(() => undefined);
     await new Promise((resolve) => setTimeout(resolve, 0));
   };
-  return { engine, pending, releaseCheckout, prState, onSettled, fs, settle };
+  return {
+    engine,
+    pending,
+    releaseCheckout,
+    prState,
+    onSettled,
+    onActivity,
+    fs,
+    settle,
+  };
 }
 
 const DONE: TaskOutcome = { status: 'done', summary: 'Explained', commits: [] };
@@ -104,6 +115,27 @@ describe('agent tasks engine', () => {
       summary: 'Explained',
     });
     expect(releaseCheckout).toHaveBeenCalledWith(refOf(1));
+  });
+
+  it('passes on what the agent does and keeps it until the next run starts', async () => {
+    const { engine, pending, onActivity, settle } = setup();
+    engine.start(refOf(1), 'review');
+    await settle();
+
+    pending[0].run.activity({ kind: 'step', text: 'Read a.ts' });
+    pending[0].resolve(DONE);
+    await settle();
+
+    const entry = {
+      at: '2026-10-04T10:00:00.000Z',
+      kind: 'step',
+      text: 'Read a.ts',
+    };
+    expect(onActivity).toHaveBeenCalledWith({ ref: refOf(1), entry });
+    expect(engine.activity(refOf(1))).toEqual([entry]);
+
+    engine.start(refOf(1), 'review');
+    expect(engine.activity(refOf(1))).toEqual([]);
   });
 
   it('remembers the last five runs on a PR, newest first', async () => {

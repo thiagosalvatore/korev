@@ -25,13 +25,14 @@ function setup(
   preference: AgentPreference = DEFAULT_SETTINGS.agent,
 ) {
   const run = vi.fn(
-    async (file: string, args: readonly string[], _options: CommandOptions) => {
+    async (file: string, args: readonly string[], options: CommandOptions) => {
       if (file === ENV.SHELL) {
         return ok(`__KOREV_PATH_START__${LOGIN_PATH}__KOREV_PATH_END__`);
       }
       const reply = replies[[file, ...args].join(' ')] ?? replies[file];
       if (!reply) throw new Error(`Unexpected command: ${file} ${args}`);
       if (reply instanceof Error) throw reply;
+      reply.stdout.split('\n').forEach((line) => options.onStdoutLine?.(line));
       return reply;
     },
   );
@@ -109,13 +110,52 @@ describe('agents service', () => {
   });
 
   it('leaves the model to the CLI when none is saved', async () => {
-    const { agents, callTo } = setup({ claude: ok('{"result":"OK"}') });
+    const { agents, callTo } = setup({
+      claude: ok('{"type":"result","result":"OK"}'),
+    });
 
     expect(await agents.test('claude')).toEqual({ ok: true, output: 'OK' });
 
     const [, args, options] = callTo('claude') ?? [];
     expect(args).not.toContain('--model');
     expect(options?.cwd).toBe(SCRATCH);
+  });
+
+  it('reports what the agent does while it runs, with paths relative to the checkout', async () => {
+    const readFile = {
+      type: 'assistant',
+      message: {
+        content: [
+          {
+            type: 'tool_use',
+            name: 'Read',
+            input: { file_path: '/repo/src/a.ts' },
+          },
+        ],
+      },
+    };
+    const { agents } = setup(
+      {
+        claude: ok(
+          [JSON.stringify(readFile), '{"type":"result","result":"OK"}'].join(
+            '\n',
+          ),
+        ),
+      },
+      { provider: 'claude', models: {} },
+    );
+    const onActivity = vi.fn();
+
+    await agents.run({
+      prompt: 'Review',
+      cwd: '/repo',
+      access: 'read-only',
+      onActivity,
+    });
+
+    expect(onActivity.mock.calls).toEqual([
+      [{ kind: 'step', text: 'Read src/a.ts' }],
+    ]);
   });
 
   it('asks the user to choose an agent before running one', async () => {

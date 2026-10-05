@@ -82,6 +82,8 @@ const bridge: KorevBridge = {
       invoke(IpcChannel.AiSubmitReview, target, review),
     checkoutsSize: () => invoke(IpcChannel.AiCheckoutsSize),
     removeCheckouts: () => invoke(IpcChannel.AiRemoveCheckouts),
+    activityLog: (target) => invoke(IpcChannel.AiActivityLog, target),
+    onActivity: (listener) => subscribe(IpcChannel.AiActivity, listener),
   },
   terminal: {
     open: (target, size) => invoke(IpcChannel.TerminalOpen, target, size),

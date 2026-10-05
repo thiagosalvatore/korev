@@ -89,6 +89,7 @@ function run(runAgent: RunAgent) {
     answered: [],
     signal: new AbortController().signal,
     step: () => undefined,
+    activity: () => undefined,
   });
 }
 

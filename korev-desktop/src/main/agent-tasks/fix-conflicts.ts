@@ -6,7 +6,12 @@ import {
   readTaskOutput,
   type AnsweredQuestion,
 } from './contract';
-import { TaskError, type AgentTask, type TaskOutcome } from './engine';
+import {
+  TaskError,
+  type AgentTask,
+  type TaskOutcome,
+  type TaskRun,
+} from './engine';
 import {
   FIX_TIMEOUT_MS,
   commitAndPush,
@@ -95,6 +100,7 @@ export function createFixConflictsTask(deps: FixConflictsDeps): AgentTask {
     answered: AnsweredQuestion[],
     signal: AbortSignal,
     step: (step: 'running' | 'pushing') => void,
+    activity: TaskRun['activity'],
   ): Promise<TaskOutcome> {
     const checkout = await openForFix(deps.checkouts, pr);
     if (!(await isMerging(deps, checkout.path))) {
@@ -122,6 +128,7 @@ export function createFixConflictsTask(deps: FixConflictsDeps): AgentTask {
         schema: FIX_CONFLICTS_SCHEMA,
         timeoutMs: FIX_CONFLICTS_TIMEOUT_MS,
         signal,
+        onActivity: activity,
       });
       const output = readTaskOutput(fields);
       if (!output) throw new TaskError(MALFORMED_OUTPUT);
@@ -146,9 +153,9 @@ export function createFixConflictsTask(deps: FixConflictsDeps): AgentTask {
   }
 
   return {
-    run: ({ pr, instructions, answered, signal, step }) =>
+    run: ({ pr, instructions, answered, signal, step, activity }) =>
       retryIfHeadMoved(deps.checkouts, pr, () =>
-        attempt(pr, instructions, answered, signal, step),
+        attempt(pr, instructions, answered, signal, step, activity),
       ),
   };
 }

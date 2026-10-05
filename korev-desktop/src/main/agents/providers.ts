@@ -1,3 +1,4 @@
+import type { AgentActivityLine } from '../../shared/agent-tasks';
 import type {
   AgentAccess,
   AgentModel,
@@ -34,6 +35,7 @@ export interface ProviderDefinition {
   listModels(run: RunProviderCommand): Promise<AgentModel[]>;
   runArgs(options: RunOptions): string[];
   parseRun(stdout: string): AgentRunResult | null;
+  parseActivity(line: string): AgentActivityLine[];
 }
 
 const VERSION_PATTERN = /\d+\.\d+\.\d+\S*/;
@@ -152,8 +154,63 @@ function parseClaudeStatus({ stdout }: CommandResult): SignInState {
   };
 }
 
+const CLAUDE_RESULT_EVENT = 'result';
+const CLAUDE_ASSISTANT_EVENT = 'assistant';
+const CODEX_ITEM_COMPLETED = 'item.completed';
+
+const CLAUDE_TOOL_VERBS: Record<string, { verb: string; field: string }> = {
+  Read: { verb: 'Read', field: 'file_path' },
+  Grep: { verb: 'Searched for', field: 'pattern' },
+  Glob: { verb: 'Listed', field: 'pattern' },
+  Edit: { verb: 'Edited', field: 'file_path' },
+  Write: { verb: 'Wrote', field: 'file_path' },
+  Bash: { verb: 'Ran', field: 'command' },
+};
+
+function jsonLines(stdout: string): JsonRecord[] {
+  return stdout.split('\n').flatMap((line): JsonRecord[] => {
+    const event = parseJson(line);
+    return event ? [event] : [];
+  });
+}
+
+function step(text: string): AgentActivityLine {
+  return { kind: 'step', text };
+}
+
+function message(text: string): AgentActivityLine {
+  return { kind: 'message', text };
+}
+
+function claudeToolStep(block: JsonRecord): AgentActivityLine | null {
+  const tool = CLAUDE_TOOL_VERBS[String(block.name)];
+  const input = block.input as JsonRecord | undefined;
+  const target = tool ? input?.[tool.field] : undefined;
+  return typeof target === 'string' ? step(`${tool.verb} ${target}`) : null;
+}
+
+function claudeBlockActivity(block: JsonRecord): AgentActivityLine | null {
+  if (block.type === 'tool_use') return claudeToolStep(block);
+  if (block.type === 'text' && typeof block.text === 'string') {
+    return block.text.trim() ? message(block.text.trim()) : null;
+  }
+  return null;
+}
+
+function parseClaudeActivity(line: string): AgentActivityLine[] {
+  const event = parseJson(line);
+  if (event?.type !== CLAUDE_ASSISTANT_EVENT) return [];
+  const content = (event.message as JsonRecord | undefined)?.content;
+  if (!Array.isArray(content)) return [];
+  return content.flatMap(
+    (block: JsonRecord) => claudeBlockActivity(block) ?? [],
+  );
+}
+
 function parseClaudeRun(stdout: string): AgentRunResult | null {
-  const result = parseJson(stdout);
+  const result =
+    jsonLines(stdout).findLast((event) => event.type === CLAUDE_RESULT_EVENT) ??
+    null;
   if (typeof result?.result !== 'string') return null;
   if (result.is_error === true) return { ok: false, message: result.result };
   const structured = result.structured_output;
@@ -214,6 +271,33 @@ function codexAgentMessage(event: JsonRecord): string | null {
   return typeof item.text === 'string' ? item.text : null;
 }
 
+function codexFileChange(item: JsonRecord): AgentActivityLine | null {
+  if (!Array.isArray(item.changes)) return null;
+  const paths = item.changes.flatMap((change: JsonRecord) =>
+    typeof change.path === 'string' ? [change.path] : [],
+  );
+  return paths.length > 0 ? step(`Edited ${paths.join(', ')}`) : null;
+}
+
+function codexItemActivity(item: JsonRecord): AgentActivityLine | null {
+  if (item.type === 'command_execution' && typeof item.command === 'string') {
+    return step(`Ran ${item.command}`);
+  }
+  if (item.type === 'file_change') return codexFileChange(item);
+  if (item.type === 'agent_message' && typeof item.text === 'string') {
+    return message(item.text);
+  }
+  return null;
+}
+
+function parseCodexActivity(line: string): AgentActivityLine[] {
+  const event = parseJson(line);
+  const item = event?.item as JsonRecord | undefined;
+  if (event?.type !== CODEX_ITEM_COMPLETED || !item) return [];
+  const activity = codexItemActivity(item);
+  return activity ? [activity] : [];
+}
+
 function parseCodexRun(stdout: string): AgentRunResult | null {
   let outcome: AgentRunResult | null = null;
   for (const line of stdout.split('\n')) {
@@ -238,13 +322,15 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
     runArgs: ({ model, access, schema, network }) => [
       '-p',
       '--output-format',
-      'json',
+      'stream-json',
+      '--verbose',
       '--no-session-persistence',
       ...claudeAccessArgs(access, network),
       ...optionArgs('--model', model),
       ...optionArgs('--json-schema', schema?.json),
     ],
     parseRun: parseClaudeRun,
+    parseActivity: parseClaudeActivity,
   },
   codex: {
     binary: 'codex',
@@ -267,5 +353,6 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
       STDIN_PROMPT,
     ],
     parseRun: parseCodexRun,
+    parseActivity: parseCodexActivity,
   },
 };

@@ -9,6 +9,7 @@ export interface CommandOptions {
   stdin?: string;
   env?: NodeJS.ProcessEnv;
   signal?: AbortSignal;
+  onStdoutLine?: (line: string) => void;
 }
 
 export interface CommandResult {
@@ -56,6 +57,23 @@ function outputCollector() {
   };
 }
 
+const NEWLINE = '\n';
+
+function lineSplitter(onLine: (line: string) => void) {
+  let partial = '';
+  return {
+    append(chunk: Buffer) {
+      const lines = (partial + chunk.toString('utf8')).split(NEWLINE);
+      partial = lines.pop() ?? '';
+      lines.forEach(onLine);
+    },
+    flush() {
+      if (partial) onLine(partial);
+      partial = '';
+    },
+  };
+}
+
 function spawnError(file: string, error: NodeJS.ErrnoException): Error {
   return error.code === MISSING_COMMAND_CODE
     ? new CommandNotFoundError(file)
@@ -71,6 +89,9 @@ export const runProcess: CommandRunner = (file, args, options) =>
     const child = spawn(file, args, { cwd: options.cwd, env: options.env });
     const stdout = outputCollector();
     const stderr = outputCollector();
+    const lines = options.onStdoutLine
+      ? lineSplitter(options.onStdoutLine)
+      : null;
     let stopReason: Error | null = null;
 
     function stop(reason: Error) {
@@ -90,6 +111,7 @@ export const runProcess: CommandRunner = (file, args, options) =>
     }
 
     child.stdout.on('data', stdout.append);
+    if (lines) child.stdout.on('data', lines.append);
     child.stderr.on('data', stderr.append);
     child.stdin.on('error', ignoreClosedStdin);
     child.on('error', (error) => {
@@ -98,6 +120,7 @@ export const runProcess: CommandRunner = (file, args, options) =>
     });
     child.on('close', (exitCode) => {
       settle();
+      lines?.flush();
       if (stopReason) reject(stopReason);
       else resolve({ exitCode, stdout: stdout.text(), stderr: stderr.text() });
     });

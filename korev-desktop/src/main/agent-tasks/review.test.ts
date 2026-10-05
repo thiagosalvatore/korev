@@ -57,6 +57,7 @@ function runOf(): TaskRun {
     answered: [],
     signal: new AbortController().signal,
     step: () => undefined,
+    activity: () => undefined,
   };
 }
 

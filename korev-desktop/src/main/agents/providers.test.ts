@@ -39,8 +39,19 @@ describe('claude provider', () => {
     expect(claude.parseStatus(status)).toEqual({ signedIn: false, plan: null });
   });
 
+  function claudeResult(fields: object): string {
+    return jsonl(
+      { type: 'system', subtype: 'init' },
+      {
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'Hi' }] },
+      },
+      { type: 'result', ...fields },
+    );
+  }
+
   it('returns the structured output when a schema was given', () => {
-    const stdout = JSON.stringify({
+    const stdout = claudeResult({
       result: 'Here it is',
       structured_output: { summary: 'Done' },
     });
@@ -51,15 +62,48 @@ describe('claude provider', () => {
   });
 
   it('returns the answer, or the error Claude Code reported', () => {
-    expect(claude.parseRun(JSON.stringify({ result: 'OK' }))).toEqual({
+    expect(claude.parseRun(claudeResult({ result: 'OK' }))).toEqual({
       ok: true,
       output: 'OK',
     });
     expect(
       claude.parseRun(
-        JSON.stringify({ is_error: true, result: 'Usage limit reached' }),
+        claudeResult({ is_error: true, result: 'Usage limit reached' }),
       ),
     ).toEqual({ ok: false, message: 'Usage limit reached' });
+  });
+
+  it('streams its output so Korev can show the steps while it runs', () => {
+    const args = claude.runArgs({ ...NO_EXTRAS, access: 'read-only' });
+
+    expect(flagValue(args, '--output-format')).toBe('stream-json');
+    expect(args).toContain('--verbose');
+  });
+
+  it('describes each tool call and message in an assistant event', () => {
+    const line = JSON.stringify({
+      type: 'assistant',
+      message: {
+        content: [
+          { type: 'text', text: 'Checking the queue first.' },
+          { type: 'tool_use', name: 'Read', input: { file_path: 'src/q.ts' } },
+          { type: 'tool_use', name: 'Bash', input: { command: 'npm test' } },
+        ],
+      },
+    });
+
+    expect(claude.parseActivity(line)).toEqual([
+      { kind: 'message', text: 'Checking the queue first.' },
+      { kind: 'step', text: 'Read src/q.ts' },
+      { kind: 'step', text: 'Ran npm test' },
+    ]);
+  });
+
+  it('shows nothing for events that are not the agent acting', () => {
+    expect(claude.parseActivity('{"type":"system","subtype":"init"}')).toEqual(
+      [],
+    );
+    expect(claude.parseActivity('not json')).toEqual([]);
   });
 });
 
@@ -111,6 +155,31 @@ describe('codex provider', () => {
       { type: 'turn.completed' },
     );
     expect(codex.parseRun(stdout)).toEqual({ ok: true, output: 'OK' });
+  });
+
+  it('describes commands, file changes and messages as they complete', () => {
+    const lines = [
+      {
+        type: 'item.completed',
+        item: { type: 'command_execution', command: 'npm test' },
+      },
+      {
+        type: 'item.completed',
+        item: {
+          type: 'file_change',
+          changes: [{ path: 'a.ts' }, { path: 'b.ts' }],
+        },
+      },
+      { type: 'item.completed', item: { type: 'agent_message', text: 'Done' } },
+      { type: 'item.completed', item: { type: 'reasoning', text: 'hmm' } },
+    ].map((event) => codex.parseActivity(JSON.stringify(event)));
+
+    expect(lines).toEqual([
+      [{ kind: 'step', text: 'Ran npm test' }],
+      [{ kind: 'step', text: 'Edited a.ts, b.ts' }],
+      [{ kind: 'message', text: 'Done' }],
+      [],
+    ]);
   });
 
   it('returns the failure when the turn fails', () => {

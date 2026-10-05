@@ -1,4 +1,7 @@
 import {
+  type AgentActivity,
+  type AgentActivityEvent,
+  type AgentActivityLine,
   type AgentQuestion,
   type AgentTaskKind,
   type AgentTaskState,
@@ -26,6 +29,7 @@ import {
 import { NO_TASKS, type TaskRecord, type TaskStore } from './task-store';
 
 export const MAX_RUNNING_TASKS = 2;
+export const ACTIVITY_KEPT = 300;
 export const STOPPED_ON_QUIT = 'Stopped when Korev quit';
 export const ALREADY_WORKING = 'Korev is already working on this PR';
 const PR_NOT_FOUND = "Korev can't find this pull request in your inbox.";
@@ -57,6 +61,7 @@ export interface TaskRun {
   answered: AnsweredQuestion[];
   signal: AbortSignal;
   step(step: AgentTaskStep): void;
+  activity(line: AgentActivityLine): void;
 }
 
 export type TaskOutcome =
@@ -85,6 +90,7 @@ export interface AgentTasksDeps {
   now(): number;
   onChange(): void;
   onSettled(ref: string, state: AgentTaskState): void;
+  onActivity(event: AgentActivityEvent): void;
   warn(message: string): void;
 }
 
@@ -96,6 +102,7 @@ export interface AgentTasks {
   dismiss(ref: string): Promise<void>;
   reconcile(snapshot: InboxSnapshot): void;
   history(): Record<string, KorevRun[]>;
+  activity(ref: string): AgentActivity[];
   updateReview(ref: string, review: ReviewDraft | null, summary?: string): void;
   restore(login: string): Promise<void>;
   clear(): Promise<void>;
@@ -137,6 +144,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
   const records = new Map<string, TaskRecord>();
   const memories = new Map<string, AutopilotMemory>();
   const controllers = new Map<string, AbortController>();
+  const activityLogs = new Map<string, AgentActivity[]>();
   let waiting: string[] = [];
   let running = 0;
   let stopped = false;
@@ -269,6 +277,13 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       if (current?.status !== 'running' || controller.signal.aborted) return;
       setState(ref, { ...current, step: next });
     };
+    const activity = (line: AgentActivityLine) => {
+      if (controller.signal.aborted) return;
+      const entry = { at: new Date(deps.now()).toISOString(), ...line };
+      const log = [...(activityLogs.get(ref) ?? []), entry];
+      activityLogs.set(ref, log.slice(-ACTIVITY_KEPT));
+      deps.onActivity({ ref, entry });
+    };
     try {
       const pr = deps.findPr(ref);
       if (!pr) throw new TaskError(PR_NOT_FOUND);
@@ -280,6 +295,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
         answered: record.answered,
         signal: controller.signal,
         step,
+        activity,
       });
       if (!controller.signal.aborted) finish(ref, kind, outcome);
     } catch (error) {
@@ -306,6 +322,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     answered: AnsweredQuestion[],
     autopilot = false,
   ) {
+    activityLogs.delete(ref);
     put(ref, {
       kind,
       answered,
@@ -501,6 +518,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
 
   return {
     updateReview,
+    activity: (ref) => activityLogs.get(ref) ?? [],
     history: () =>
       Object.fromEntries(
         [...records].flatMap(([ref, record]) =>

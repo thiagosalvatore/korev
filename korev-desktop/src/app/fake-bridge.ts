@@ -1,5 +1,9 @@
 import { vi } from 'vitest';
-import type { ExplanationView } from '../shared/agent-tasks';
+import type {
+  AgentActivity,
+  AgentActivityEvent,
+  ExplanationView,
+} from '../shared/agent-tasks';
 import type { AgentModel, AgentStatus } from '../shared/agents';
 import type { AuthState } from '../shared/auth';
 import type { InboxSnapshot } from '../shared/inbox';
@@ -26,6 +30,7 @@ export interface FakeBridgeOptions {
   agentModels?: AgentModel[];
   explanation?: ExplanationView | null;
   checkoutsSize?: number;
+  activityLog?: AgentActivity[];
 }
 
 export interface FakeBridge {
@@ -36,6 +41,7 @@ export interface FakeBridge {
   emitFocusPr: (ref: string) => void;
   emitTerminalOutput: (output: TerminalOutput) => void;
   emitTerminalExit: (exit: TerminalExit) => void;
+  emitActivity: (event: AgentActivityEvent) => void;
   stopInbox: ReturnType<typeof vi.fn>;
 }
 
@@ -63,6 +69,7 @@ export function installFakeBridge({
   agentModels = [],
   explanation = null,
   checkoutsSize = 0,
+  activityLog = [],
 }: FakeBridgeOptions = {}): FakeBridge {
   const inboxListeners = new Set<(next: InboxSnapshot) => void>();
   const settingsListeners = new Set<(next: Settings) => void>();
@@ -71,6 +78,7 @@ export function installFakeBridge({
   const focusListeners = new Set<(ref: string) => void>();
   const terminalOutputListeners = new Set<(output: TerminalOutput) => void>();
   const terminalExitListeners = new Set<(exit: TerminalExit) => void>();
+  const activityListeners = new Set<(event: AgentActivityEvent) => void>();
   const bridge: KorevBridge = {
     inbox: {
       load: vi.fn(async () => snapshot),
@@ -162,6 +170,11 @@ export function installFakeBridge({
       submitReview: vi.fn(async () => ({ ok: true as const })),
       checkoutsSize: vi.fn(async () => checkoutsSize),
       removeCheckouts: vi.fn(async () => ({ ok: true as const })),
+      activityLog: vi.fn(async () => activityLog),
+      onActivity: vi.fn((listener) => {
+        activityListeners.add(listener);
+        return () => activityListeners.delete(listener);
+      }),
     },
     terminal: {
       open: vi.fn(async () => ({ ok: true as const, scrollback: '' })),
@@ -205,6 +218,8 @@ export function installFakeBridge({
       terminalOutputListeners.forEach((listener) => listener(output)),
     emitTerminalExit: (exit) =>
       terminalExitListeners.forEach((listener) => listener(exit)),
+    emitActivity: (event) =>
+      activityListeners.forEach((listener) => listener(event)),
     stopInbox,
   };
 }

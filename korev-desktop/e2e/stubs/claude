@@ -14,10 +14,25 @@ if (args[0] === 'auth') {
 const prompt = readFileSync(0, 'utf8');
 const base = { changed: false, commitMessage: null, questions: [] };
 
+function event(fields) {
+  process.stdout.write(`${JSON.stringify(fields)}\n`);
+}
+
 function reply(structured) {
-  process.stdout.write(
-    JSON.stringify({ type: 'result', result: '', structured_output: structured }),
-  );
+  event({
+    type: 'assistant',
+    message: {
+      content: [
+        { type: 'text', text: 'Reading the change first.' },
+        {
+          type: 'tool_use',
+          name: 'Read',
+          input: { file_path: `${process.cwd()}/ingest.ts` },
+        },
+      ],
+    },
+  });
+  event({ type: 'result', result: '', structured_output: structured });
 }
 
 if (prompt.includes("Korev's explain agent")) {

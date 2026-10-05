@@ -1,3 +1,4 @@
+import type { AgentActivityLine } from '../../shared/agent-tasks';
 import type { AgentAccess } from '../../shared/agents';
 import type { AgentRunRequest } from '../agents/agents-service';
 import type { AgentRunResult } from '../../shared/agents';
@@ -17,6 +18,7 @@ export interface StructuredRun {
   network?: boolean;
   timeoutMs: number;
   signal: AbortSignal;
+  onActivity?: (line: AgentActivityLine) => void;
 }
 
 export async function runStructured(

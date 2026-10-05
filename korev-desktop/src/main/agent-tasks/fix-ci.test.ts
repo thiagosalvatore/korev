@@ -81,6 +81,7 @@ function runTask(runAgent: RunAgent, failures: CiFailure[] = [LINT_FAILURE]) {
     answered: [],
     signal: new AbortController().signal,
     step: () => undefined,
+    activity: () => undefined,
   });
   return { outcome, checkouts };
 }

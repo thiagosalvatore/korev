@@ -41,6 +41,7 @@ const CONFIDENCES = ['high', 'low'] as const;
 const LOW_CONFIDENCE = 'low';
 const FINDING_QUESTION_PREFIX = 'finding:';
 const DEFAULT_FIX_MESSAGE = 'Fix review findings';
+const FIXING_FINDINGS = 'Fixing what it found';
 
 export const REVIEW_SCHEMA = outputSchema({
   event: { type: 'string', enum: REVIEW_EVENTS },
@@ -240,6 +241,7 @@ async function runReview(
     schema: REVIEW_SCHEMA,
     timeoutMs: REVIEW_TIMEOUT_MS,
     signal: run.signal,
+    onActivity: run.activity,
   });
   const output = readTaskOutput(fields);
   if (!output) throw new TaskError(MALFORMED_OUTPUT);
@@ -294,6 +296,7 @@ export function createReviewFixTask(deps: ReviewFixDeps): AgentTask {
     if (result.findings.length === 0) {
       return { status: 'done', summary: NOTHING_TO_FIX, commits: [] };
     }
+    run.activity({ kind: 'step', text: FIXING_FINDINGS });
     const fields = await runStructured(deps.runAgent, {
       prompt: reviewFixPrompt(
         run.pr,
@@ -306,6 +309,7 @@ export function createReviewFixTask(deps: ReviewFixDeps): AgentTask {
       schema: REVIEW_FIX_SCHEMA,
       timeoutMs: REVIEW_FIX_TIMEOUT_MS,
       signal: run.signal,
+      onActivity: run.activity,
     });
     const output = readTaskOutput(fields);
     if (!output) throw new TaskError(MALFORMED_OUTPUT);

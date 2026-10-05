@@ -1,3 +1,4 @@
+import type { AgentActivityLine } from '../../shared/agent-tasks';
 import {
   AGENT_INFO,
   AGENT_PROVIDERS,
@@ -40,6 +41,7 @@ export interface AgentRunRequest {
   network?: boolean;
   timeoutMs?: number;
   signal?: AbortSignal;
+  onActivity?: (activity: AgentActivityLine) => void;
 }
 
 export interface AgentsServiceDeps {
@@ -72,6 +74,22 @@ function failureMessage(provider: AgentProvider, result: CommandResult) {
   return (
     lastLine(result.stderr) ?? `${AGENT_INFO[provider].label} gave no answer.`
   );
+}
+
+function relativeTo(cwd: string, activity: AgentActivityLine) {
+  return { ...activity, text: activity.text.replaceAll(`${cwd}/`, '') };
+}
+
+function activityReader(
+  provider: AgentProvider,
+  request: AgentRunRequest,
+): ((line: string) => void) | undefined {
+  const { onActivity, cwd } = request;
+  if (!onActivity) return undefined;
+  return (line) =>
+    PROVIDERS[provider]
+      .parseActivity(line)
+      .forEach((activity) => onActivity(relativeTo(cwd, activity)));
 }
 
 export function stoppedAfter(timeoutMs: number): string {
@@ -216,6 +234,7 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
           stdin: request.prompt,
           timeoutMs,
           signal: request.signal,
+          onStdoutLine: activityReader(provider, request),
         },
       );
       return (

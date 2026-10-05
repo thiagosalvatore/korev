@@ -6,6 +6,7 @@ import {
   isKeptMergeable,
 } from '../shared/agent-tasks';
 import type {
+  AgentActivityEvent,
   AgentTaskKind,
   AgentTaskState,
   AiTaskSettings,
@@ -142,7 +143,8 @@ export interface KorevDeps {
       | AuthState
       | Settings
       | TerminalOutput
-      | TerminalExit,
+      | TerminalExit
+      | AgentActivityEvent,
   ): void;
   warn(message: string): void;
 }
@@ -328,6 +330,7 @@ export function createKorev(deps: KorevDeps): Korev {
     now: () => Date.now(),
     onChange: followTasks,
     onSettled: noteSettledTask,
+    onActivity: (event) => deps.broadcast(IpcChannel.AiActivity, event),
     warn: deps.warn,
   });
 
@@ -902,6 +905,10 @@ export function createKorev(deps: KorevDeps): Korev {
     ),
     [IpcChannel.AiCheckoutsSize]: () => checkouts.size(),
     [IpcChannel.AiRemoveCheckouts]: removeCheckouts,
+    [IpcChannel.AiActivityLog]: withTarget(
+      (target) => agentTasks.activity(prRef(target)),
+      [],
+    ),
     [IpcChannel.TerminalOpen]: withTarget(
       openTerminal,
       Promise.resolve(INVALID_ACTION),

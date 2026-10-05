@@ -98,6 +98,7 @@ function run(task: AgentTask, kind: AgentTaskKind, pr: PullRequest) {
     pr,
     instructions: DEFAULT_INSTRUCTIONS[kind],
     answered: [],
+    activity: () => undefined,
     signal: new AbortController().signal,
     step: () => undefined,
   });

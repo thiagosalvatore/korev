@@ -77,7 +77,7 @@ export interface ExplainTaskDeps {
 
 export function createExplainTask(deps: ExplainTaskDeps): AgentTask {
   return {
-    async run({ ref, pr, instructions, answered, signal, step }) {
+    async run({ ref, pr, instructions, answered, signal, step, activity }) {
       const checkout = await deps.checkouts.open({
         repo: pr.repo,
         number: pr.number,
@@ -103,6 +103,7 @@ export function createExplainTask(deps: ExplainTaskDeps): AgentTask {
         schema: EXPLAIN_SCHEMA,
         timeoutMs: EXPLAIN_TIMEOUT_MS,
         signal,
+        onActivity: activity,
       });
       const output = readTaskOutput(fields);
       if (!output || typeof fields.document !== 'string' || !fields.document) {

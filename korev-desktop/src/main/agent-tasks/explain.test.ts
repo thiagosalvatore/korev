@@ -60,6 +60,7 @@ function runWith(output: string) {
     answered: [],
     signal: new AbortController().signal,
     step: () => undefined,
+    activity: () => undefined,
   });
   return { run, runAgent, save };
 }
