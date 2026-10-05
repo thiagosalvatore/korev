@@ -27,6 +27,7 @@ import { subjectSummary, type PanelSubject } from './list-model';
 import { layerStateLabel } from './OtherLayerRow';
 import { authorHandle } from './PrRow';
 import { ActionFooter, ActionStatus, type PanelActions } from './PanelActions';
+import { AgentActivityLog } from '../ai/AgentActivityLog';
 import { AgentTaskStatus } from '../ai/agent-task-state';
 import { KorevActivity } from '../ai/KorevActivity';
 import { KorevAiSection } from '../ai/KorevAiSection';
@@ -420,6 +421,14 @@ export function PrPanel({
           state={ai.state}
           onStop={ai.onStop}
           onRetry={ai.onRetry}
+        />
+      ) : null}
+      {ai ? (
+        <AgentActivityLog
+          target={ai.target}
+          runKey={
+            ai.state?.status === 'running' ? ai.state.startedAt : 'settled'
+          }
         />
       ) : null}
       <SubjectDetails subject={subject} ai={ai} />

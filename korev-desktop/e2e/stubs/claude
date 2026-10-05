@@ -14,7 +14,17 @@ if (args[0] === 'auth') {
 const prompt = readFileSync(0, 'utf8');
 const base = { changed: false, commitMessage: null, questions: [] };
 
+function event(content) {
+  process.stdout.write(
+    `${JSON.stringify({ type: 'assistant', message: { content } })}\n`,
+  );
+}
+
 function reply(structured) {
+  event([
+    { type: 'text', text: 'Reading the change first.' },
+    { type: 'tool_use', name: 'Read', input: { file_path: 'ingest.ts' } },
+  ]);
   process.stdout.write(
     JSON.stringify({ type: 'result', result: '', structured_output: structured }),
   );
@@ -60,5 +70,7 @@ if (prompt.includes("Korev's explain agent")) {
     });
   }
 } else {
-  process.stdout.write(JSON.stringify({ is_error: true, result: 'Unknown task' }));
+  process.stdout.write(
+    JSON.stringify({ type: 'result', is_error: true, result: 'Unknown task' }),
+  );
 }

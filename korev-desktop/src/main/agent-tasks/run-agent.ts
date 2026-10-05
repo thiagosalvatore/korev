@@ -17,6 +17,7 @@ export interface StructuredRun {
   network?: boolean;
   timeoutMs: number;
   signal: AbortSignal;
+  onActivity(line: string): void;
 }
 
 export async function runStructured(

@@ -1,4 +1,5 @@
 import {
+  ACTIVITY_LINES_KEPT,
   type AgentQuestion,
   type AgentTaskKind,
   type AgentTaskState,
@@ -46,6 +47,7 @@ export interface TaskRun {
   answered: AnsweredQuestion[];
   signal: AbortSignal;
   step(step: AgentTaskStep): void;
+  onActivity(line: string): void;
 }
 
 export type TaskOutcome =
@@ -74,6 +76,7 @@ export interface AgentTasksDeps {
   now(): number;
   onChange(): void;
   onSettled(ref: string, state: AgentTaskState): void;
+  onActivity(ref: string, line: string): void;
   warn(message: string): void;
 }
 
@@ -89,6 +92,7 @@ export interface AgentTasks {
   restore(login: string): Promise<void>;
   clear(): Promise<void>;
   keptRefs(): string[];
+  activity(ref: string): string[];
   isBusy(): boolean;
   stop(): void;
 }
@@ -119,6 +123,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
   const records = new Map<string, TaskRecord>();
   const memories = new Map<string, AutopilotMemory>();
   const controllers = new Map<string, AbortController>();
+  const activity = new Map<string, string[]>();
   let waiting: string[] = [];
   let running = 0;
   let stopped = false;
@@ -251,6 +256,12 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       if (current?.status !== 'running' || controller.signal.aborted) return;
       setState(ref, { ...current, step: next });
     };
+    const onActivity = (line: string) => {
+      if (controller.signal.aborted) return;
+      const lines = [...(activity.get(ref) ?? []), line];
+      activity.set(ref, lines.slice(-ACTIVITY_LINES_KEPT));
+      deps.onActivity(ref, line);
+    };
     try {
       const pr = deps.findPr(ref);
       if (!pr) throw new TaskError(PR_NOT_FOUND);
@@ -262,6 +273,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
         answered: record.answered,
         signal: controller.signal,
         step,
+        onActivity,
       });
       if (!controller.signal.aborted) finish(ref, kind, outcome);
     } catch (error) {
@@ -288,6 +300,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     answered: AnsweredQuestion[],
     autopilot = false,
   ) {
+    activity.delete(ref);
     put(ref, {
       kind,
       answered,
@@ -495,6 +508,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       [...records]
         .filter(([, record]) => record.state.status === 'needs-input')
         .map(([ref]) => ref),
+    activity: (ref) => activity.get(ref) ?? [],
     isBusy: () => running > 0 || waiting.length > 0,
     stop: () => {
       stopped = true;

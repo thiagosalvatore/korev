@@ -240,6 +240,7 @@ async function runReview(
     schema: REVIEW_SCHEMA,
     timeoutMs: REVIEW_TIMEOUT_MS,
     signal: run.signal,
+    onActivity: run.onActivity,
   });
   const output = readTaskOutput(fields);
   if (!output) throw new TaskError(MALFORMED_OUTPUT);
@@ -306,6 +307,7 @@ export function createReviewFixTask(deps: ReviewFixDeps): AgentTask {
       schema: REVIEW_FIX_SCHEMA,
       timeoutMs: REVIEW_FIX_TIMEOUT_MS,
       signal: run.signal,
+      onActivity: run.onActivity,
     });
     const output = readTaskOutput(fields);
     if (!output) throw new TaskError(MALFORMED_OUTPUT);

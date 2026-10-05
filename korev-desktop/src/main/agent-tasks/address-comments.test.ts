@@ -76,6 +76,7 @@ function setup(threads: ReviewThread[], output: object) {
       answered,
       signal: new AbortController().signal,
       step: () => undefined,
+      onActivity: () => undefined,
     });
   return { run, runAgent, checkouts, reply };
 }

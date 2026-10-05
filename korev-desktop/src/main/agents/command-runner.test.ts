@@ -17,6 +17,17 @@ describe('runProcess', () => {
     expect(result).toEqual({ exitCode: 3, stdout: 'hello', stderr: 'oops\n' });
   });
 
+  it('hands over each stdout line as it arrives, joining lines split across chunks', async () => {
+    const lines: string[] = [];
+    await runProcess(
+      '/bin/sh',
+      ['-c', 'printf "one\\ntw"; sleep 0.05; printf "o\\nthree"'],
+      { timeoutMs: 5000, onLine: (line) => lines.push(line) },
+    );
+
+    expect(lines).toEqual(['one', 'two', 'three']);
+  });
+
   it('reports a command that is not on the PATH as not installed', async () => {
     await expect(
       runProcess('korev-no-such-cli', [], { timeoutMs: 5000 }),

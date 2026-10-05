@@ -95,6 +95,13 @@ export type AgentTaskState =
     }
   | { status: 'failed'; kind: AgentTaskKind; message: string };
 
+export const ACTIVITY_LINES_KEPT = 500;
+
+export interface AgentActivity {
+  ref: string;
+  line: string;
+}
+
 export type ReviewEvent = 'COMMENT' | 'REQUEST_CHANGES';
 
 export type ReviewSeverity = 'critical' | 'high' | 'medium' | 'low';

@@ -19,7 +19,12 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type { FileSystem } from '../file-system';
 import { childEnv, resolveLoginPath } from './login-path';
-import { extractVersion, PROVIDERS, type OutputSchema } from './providers';
+import {
+  extractVersion,
+  PROVIDERS,
+  type OutputSchema,
+  type ProviderDefinition,
+} from './providers';
 
 const STATUS_TIMEOUT_MS = 15_000;
 const SIGN_IN_TIMEOUT_MS = 5 * 60_000;
@@ -40,6 +45,15 @@ export interface AgentRunRequest {
   network?: boolean;
   timeoutMs?: number;
   signal?: AbortSignal;
+  onActivity?: (line: string) => void;
+}
+
+function describeTo(
+  definition: ProviderDefinition,
+  onActivity: ((line: string) => void) | undefined,
+): ((line: string) => void) | undefined {
+  if (!onActivity) return undefined;
+  return (line) => definition.describeEvent(line).forEach(onActivity);
 }
 
 export interface AgentsServiceDeps {
@@ -216,6 +230,7 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
           stdin: request.prompt,
           timeoutMs,
           signal: request.signal,
+          onLine: describeTo(definition, request.onActivity),
         },
       );
       return (

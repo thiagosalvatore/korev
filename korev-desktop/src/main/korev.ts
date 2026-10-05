@@ -6,6 +6,7 @@ import {
   isKeptMergeable,
 } from '../shared/agent-tasks';
 import type {
+  AgentActivity,
   AgentTaskKind,
   AgentTaskState,
   AiTaskSettings,
@@ -128,7 +129,7 @@ export interface KorevDeps {
   applyTheme(theme: ThemePreference): void;
   broadcast(
     channel: IpcChannel,
-    payload: InboxSnapshot | AuthState | Settings,
+    payload: InboxSnapshot | AuthState | Settings | AgentActivity,
   ): void;
   warn(message: string): void;
 }
@@ -305,6 +306,8 @@ export function createKorev(deps: KorevDeps): Korev {
     now: () => Date.now(),
     onChange: followTasks,
     onSettled: noteSettledTask,
+    onActivity: (ref, line) =>
+      deps.broadcast(IpcChannel.AiActivity, { ref, line }),
     warn: deps.warn,
   });
 
@@ -856,6 +859,10 @@ export function createKorev(deps: KorevDeps): Korev {
     ),
     [IpcChannel.AiCheckoutsSize]: () => checkouts.size(),
     [IpcChannel.AiRemoveCheckouts]: removeCheckouts,
+    [IpcChannel.AiActivityLog]: withTarget(
+      (target) => agentTasks.activity(prRef(target)),
+      [],
+    ),
   };
 
   async function start(): Promise<void> {

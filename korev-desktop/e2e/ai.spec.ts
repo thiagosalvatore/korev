@@ -118,6 +118,12 @@ test('fixes a merge conflict after asking one question, and pushes the merge', a
           await expect(
             panel(window).getByText('Which ingestion limit should win?'),
           ).toBeVisible({ timeout: 30_000 });
+          await panel(window)
+            .getByRole('button', { name: 'Show activity' })
+            .click();
+          await expect(
+            panel(window).getByRole('list', { name: 'Agent activity' }),
+          ).toContainText('Read ingest.ts');
           await panel(window).getByLabel('Your answer').fill('Use 75');
           await panel(window)
             .getByRole('button', { name: /Send answers/ })

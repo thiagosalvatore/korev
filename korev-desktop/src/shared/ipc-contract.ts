@@ -6,6 +6,7 @@ import type {
   AgentStatus,
 } from './agents';
 import type {
+  AgentActivity,
   AgentTaskKind,
   AiTaskSettings,
   ExplanationView,
@@ -75,6 +76,8 @@ export enum IpcChannel {
   AiSubmitReview = 'ai:submit-review',
   AiCheckoutsSize = 'ai:checkouts-size',
   AiRemoveCheckouts = 'ai:remove-checkouts',
+  AiActivity = 'ai:activity',
+  AiActivityLog = 'ai:activity-log',
 }
 
 export type AppCommand =
@@ -152,6 +155,8 @@ export interface KorevBridge {
     ): Promise<ActionResult>;
     checkoutsSize(): Promise<number>;
     removeCheckouts(): Promise<ActionResult>;
+    activityLog(target: PrTarget): Promise<string[]>;
+    onActivity(listener: (activity: AgentActivity) => void): Unsubscribe;
   };
   shell: {
     openGithub(url: string): Promise<void>;

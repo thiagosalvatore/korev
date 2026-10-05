@@ -34,6 +34,7 @@ export interface ProviderDefinition {
   listModels(run: RunProviderCommand): Promise<AgentModel[]>;
   runArgs(options: RunOptions): string[];
   parseRun(stdout: string): AgentRunResult | null;
+  describeEvent(line: string): string[];
 }
 
 const VERSION_PATTERN = /\d+\.\d+\.\d+\S*/;
@@ -142,6 +143,87 @@ export function extractVersion(output: string): string | null {
   return VERSION_PATTERN.exec(output)?.[0] ?? null;
 }
 
+const CLAUDE_RESULT_EVENT = 'result';
+const CLAUDE_SHELL_TOOL = 'Bash';
+const CODEX_FINISHED_ITEM = 'item.completed';
+const EDIT_LINE_PREFIX = 'Edit';
+
+function asJsonRecord(value: unknown): JsonRecord {
+  return value && typeof value === 'object' ? (value as JsonRecord) : {};
+}
+
+function textOf(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function isLine(value: string | null): value is string {
+  return value !== null;
+}
+
+function commandLine(command: unknown): string | null {
+  const text = textOf(command);
+  return text ? `$ ${text}` : null;
+}
+
+function claudeToolLine(name: string, input: JsonRecord): string | null {
+  if (name === CLAUDE_SHELL_TOOL) return commandLine(input.command);
+  const target =
+    textOf(input.file_path) ?? textOf(input.pattern) ?? textOf(input.path);
+  return target ? `${name} ${target}` : name;
+}
+
+function describeClaudeBlock(block: JsonRecord): string | null {
+  if (block.type === 'text') return textOf(block.text);
+  if (block.type !== 'tool_use' || typeof block.name !== 'string') return null;
+  return claudeToolLine(block.name, asJsonRecord(block.input));
+}
+
+function describeClaudeEvent(line: string): string[] {
+  const event = parseJson(line);
+  if (event?.type !== 'assistant') return [];
+  const content = asJsonRecord(event.message).content;
+  if (!Array.isArray(content)) return [];
+  return content
+    .map((block) => describeClaudeBlock(asJsonRecord(block)))
+    .filter(isLine);
+}
+
+function codexFileChanges(changes: unknown): string[] {
+  if (!Array.isArray(changes)) return [];
+  return changes
+    .map((change) => textOf(asJsonRecord(change).path))
+    .filter(isLine)
+    .map((path) => `${EDIT_LINE_PREFIX} ${path}`);
+}
+
+function describeCodexItem(item: JsonRecord): string[] {
+  switch (item.type) {
+    case 'agent_message':
+    case 'reasoning':
+      return [textOf(item.text)].filter(isLine);
+    case 'command_execution':
+      return [commandLine(item.command)].filter(isLine);
+    case 'file_change':
+      return codexFileChanges(item.changes);
+    default:
+      return [];
+  }
+}
+
+function describeCodexEvent(line: string): string[] {
+  const event = parseJson(line);
+  if (event?.type !== CODEX_FINISHED_ITEM) return [];
+  return describeCodexItem(asJsonRecord(event.item));
+}
+
+function lastClaudeResult(stdout: string): JsonRecord | null {
+  const results = stdout
+    .split('\n')
+    .map(parseJson)
+    .filter((event) => event?.type === CLAUDE_RESULT_EVENT);
+  return results.at(-1) ?? null;
+}
+
 function parseClaudeStatus({ stdout }: CommandResult): SignInState {
   const status = parseJson(stdout);
   const plan = status?.subscriptionType;
@@ -153,7 +235,7 @@ function parseClaudeStatus({ stdout }: CommandResult): SignInState {
 }
 
 function parseClaudeRun(stdout: string): AgentRunResult | null {
-  const result = parseJson(stdout);
+  const result = lastClaudeResult(stdout);
   if (typeof result?.result !== 'string') return null;
   if (result.is_error === true) return { ok: false, message: result.result };
   const structured = result.structured_output;
@@ -208,7 +290,7 @@ function codexEventMessage(event: JsonRecord): string | null {
 
 function codexAgentMessage(event: JsonRecord): string | null {
   const item = event.item as JsonRecord | undefined;
-  if (event.type !== 'item.completed' || item?.type !== 'agent_message') {
+  if (event.type !== CODEX_FINISHED_ITEM || item?.type !== 'agent_message') {
     return null;
   }
   return typeof item.text === 'string' ? item.text : null;
@@ -238,13 +320,15 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
     runArgs: ({ model, access, schema, network }) => [
       '-p',
       '--output-format',
-      'json',
+      'stream-json',
+      '--verbose',
       '--no-session-persistence',
       ...claudeAccessArgs(access, network),
       ...optionArgs('--model', model),
       ...optionArgs('--json-schema', schema?.json),
     ],
     parseRun: parseClaudeRun,
+    describeEvent: describeClaudeEvent,
   },
   codex: {
     binary: 'codex',
@@ -267,5 +351,6 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
       STDIN_PROMPT,
     ],
     parseRun: parseCodexRun,
+    describeEvent: describeCodexEvent,
   },
 };

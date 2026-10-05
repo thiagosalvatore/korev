@@ -101,6 +101,7 @@ export function createFixCiTask(deps: FixCiDeps): AgentTask {
     answered,
     signal,
     step,
+    onActivity,
   }: TaskRun): Promise<TaskOutcome> {
     const failures = await deps.readFailures(pr);
     if (failures.length === 0) throw new TaskError(NO_FAILING_CHECKS);
@@ -114,6 +115,7 @@ export function createFixCiTask(deps: FixCiDeps): AgentTask {
       schema: FIX_CI_SCHEMA,
       timeoutMs: FIX_CI_TIMEOUT_MS,
       signal,
+      onActivity,
     });
     const output = readTaskOutput(fields);
     if (!output) throw new TaskError(MALFORMED_OUTPUT);

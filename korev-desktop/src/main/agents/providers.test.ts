@@ -40,10 +40,14 @@ describe('claude provider', () => {
   });
 
   it('returns the structured output when a schema was given', () => {
-    const stdout = JSON.stringify({
-      result: 'Here it is',
-      structured_output: { summary: 'Done' },
-    });
+    const stdout = jsonl(
+      { type: 'system', subtype: 'init' },
+      {
+        type: 'result',
+        result: 'Here it is',
+        structured_output: { summary: 'Done' },
+      },
+    );
     expect(claude.parseRun(stdout)).toEqual({
       ok: true,
       output: '{"summary":"Done"}',
@@ -51,15 +55,44 @@ describe('claude provider', () => {
   });
 
   it('returns the answer, or the error Claude Code reported', () => {
-    expect(claude.parseRun(JSON.stringify({ result: 'OK' }))).toEqual({
+    expect(claude.parseRun(jsonl({ type: 'result', result: 'OK' }))).toEqual({
       ok: true,
       output: 'OK',
     });
     expect(
       claude.parseRun(
-        JSON.stringify({ is_error: true, result: 'Usage limit reached' }),
+        jsonl({
+          type: 'result',
+          is_error: true,
+          result: 'Usage limit reached',
+        }),
       ),
     ).toEqual({ ok: false, message: 'Usage limit reached' });
+  });
+
+  it('describes what the agent says and each tool it uses', () => {
+    const event = JSON.stringify({
+      type: 'assistant',
+      message: {
+        content: [
+          { type: 'text', text: 'The lint failure is an unused import.' },
+          { type: 'tool_use', name: 'Bash', input: { command: 'npm test' } },
+          {
+            type: 'tool_use',
+            name: 'Edit',
+            input: { file_path: 'src/limits.ts' },
+          },
+        ],
+      },
+    });
+
+    expect(claude.describeEvent(event)).toEqual([
+      'The lint failure is an unused import.',
+      '$ npm test',
+      'Edit src/limits.ts',
+    ]);
+    expect(claude.describeEvent('{"type":"user"}')).toEqual([]);
+    expect(claude.describeEvent('not json')).toEqual([]);
   });
 });
 
@@ -111,6 +144,23 @@ describe('codex provider', () => {
       { type: 'turn.completed' },
     );
     expect(codex.parseRun(stdout)).toEqual({ ok: true, output: 'OK' });
+  });
+
+  it('describes the commands, file changes and messages of finished items', () => {
+    const completed = (item: object) =>
+      JSON.stringify({ type: 'item.completed', item });
+
+    expect(
+      [
+        completed({ type: 'command_execution', command: 'npm test' }),
+        completed({
+          type: 'file_change',
+          changes: [{ path: 'src/limits.ts', kind: 'update' }],
+        }),
+        completed({ type: 'agent_message', text: 'Fixed it.' }),
+        JSON.stringify({ type: 'turn.started' }),
+      ].flatMap(codex.describeEvent),
+    ).toEqual(['$ npm test', 'Edit src/limits.ts', 'Fixed it.']);
   });
 
   it('returns the failure when the turn fails', () => {

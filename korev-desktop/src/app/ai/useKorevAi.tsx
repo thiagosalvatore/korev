@@ -72,6 +72,7 @@ export interface PanelAi {
   onRetry: () => void;
   onRerunFailedJobs: () => void;
   onOpenSettings: () => void;
+  target: PrTarget;
 }
 
 interface DoneToast {
@@ -280,6 +281,7 @@ export function useKorevAi(
       },
       onRerunFailedJobs: () => void rerunFailedJobs(target),
       onOpenSettings,
+      target,
     };
   }
 

@@ -109,7 +109,9 @@ describe('agents service', () => {
   });
 
   it('leaves the model to the CLI when none is saved', async () => {
-    const { agents, callTo } = setup({ claude: ok('{"result":"OK"}') });
+    const { agents, callTo } = setup({
+      claude: ok('{"type":"result","result":"OK"}'),
+    });
 
     expect(await agents.test('claude')).toEqual({ ok: true, output: 'OK' });
 

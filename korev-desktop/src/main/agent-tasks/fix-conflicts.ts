@@ -6,7 +6,12 @@ import {
   readTaskOutput,
   type AnsweredQuestion,
 } from './contract';
-import { TaskError, type AgentTask, type TaskOutcome } from './engine';
+import {
+  TaskError,
+  type AgentTask,
+  type TaskOutcome,
+  type TaskRun,
+} from './engine';
 import {
   FIX_TIMEOUT_MS,
   commitAndPush,
@@ -89,13 +94,14 @@ function mergeMessage(pr: PullRequest): string {
 }
 
 export function createFixConflictsTask(deps: FixConflictsDeps): AgentTask {
-  async function attempt(
-    pr: PullRequest,
-    instructions: string,
-    answered: AnsweredQuestion[],
-    signal: AbortSignal,
-    step: (step: 'running' | 'pushing') => void,
-  ): Promise<TaskOutcome> {
+  async function attempt({
+    pr,
+    instructions,
+    answered,
+    signal,
+    step,
+    onActivity,
+  }: TaskRun): Promise<TaskOutcome> {
     const checkout = await openForFix(deps.checkouts, pr);
     if (!(await isMerging(deps, checkout.path))) {
       await mergeBase(deps, checkout.path, pr);
@@ -122,6 +128,7 @@ export function createFixConflictsTask(deps: FixConflictsDeps): AgentTask {
         schema: FIX_CONFLICTS_SCHEMA,
         timeoutMs: FIX_CONFLICTS_TIMEOUT_MS,
         signal,
+        onActivity,
       });
       const output = readTaskOutput(fields);
       if (!output) throw new TaskError(MALFORMED_OUTPUT);
@@ -146,9 +153,6 @@ export function createFixConflictsTask(deps: FixConflictsDeps): AgentTask {
   }
 
   return {
-    run: ({ pr, instructions, answered, signal, step }) =>
-      retryIfHeadMoved(deps.checkouts, pr, () =>
-        attempt(pr, instructions, answered, signal, step),
-      ),
+    run: (run) => retryIfHeadMoved(deps.checkouts, run.pr, () => attempt(run)),
   };
 }

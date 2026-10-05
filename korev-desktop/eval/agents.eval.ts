@@ -100,6 +100,7 @@ function run(task: AgentTask, kind: AgentTaskKind, pr: PullRequest) {
     answered: [],
     signal: new AbortController().signal,
     step: () => undefined,
+    onActivity: () => undefined,
   });
 }
 

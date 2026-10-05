@@ -206,6 +206,7 @@ export function createAddressCommentsTask(
     answered,
     signal,
     step,
+    onActivity,
   }: TaskRun): Promise<TaskOutcome> {
     const threads = await deps.readThreads(pr);
     if (threads.length === 0) throw new TaskError(NO_OPEN_THREADS);
@@ -231,6 +232,7 @@ export function createAddressCommentsTask(
       schema: ADDRESS_COMMENTS_SCHEMA,
       timeoutMs: ADDRESS_COMMENTS_TIMEOUT_MS,
       signal,
+      onActivity,
     });
     const output = readTaskOutput(fields);
     if (!output) throw new TaskError(MALFORMED_OUTPUT);

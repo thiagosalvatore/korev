@@ -56,6 +56,7 @@ function setup(
   const releaseCheckout = vi.fn(async () => undefined);
   const prState = vi.fn(async (): Promise<PrState | null> => 'OPEN');
   const onSettled = vi.fn();
+  const onActivity = vi.fn();
   const engine = createAgentTasks({
     tasks: Object.fromEntries(
       AGENT_TASK_KINDS.map((kind) => [kind, task]),
@@ -70,13 +71,23 @@ function setup(
     now: () => Date.parse('2026-10-04T10:00:00Z'),
     onChange: () => undefined,
     onSettled,
+    onActivity,
     warn: () => undefined,
   });
   const settle = async () => {
     await vi.waitFor(() => undefined);
     await new Promise((resolve) => setTimeout(resolve, 0));
   };
-  return { engine, pending, releaseCheckout, prState, onSettled, fs, settle };
+  return {
+    engine,
+    pending,
+    releaseCheckout,
+    prState,
+    onSettled,
+    onActivity,
+    fs,
+    settle,
+  };
 }
 
 const DONE: TaskOutcome = { status: 'done', summary: 'Explained', commits: [] };
@@ -120,6 +131,22 @@ describe('agent tasks engine', () => {
       'Run 3',
       'Run 2',
     ]);
+  });
+
+  it('keeps what the agent did on a PR until its next run starts', async () => {
+    const { engine, pending, onActivity, settle } = setup();
+    engine.start(refOf(1), 'explain');
+    await settle();
+    pending[0].run.onActivity('$ npm test');
+    pending[0].resolve(DONE);
+    await settle();
+
+    expect(onActivity).toHaveBeenCalledWith(refOf(1), '$ npm test');
+    expect(engine.activity(refOf(1))).toEqual(['$ npm test']);
+
+    engine.start(refOf(1), 'explain');
+
+    expect(engine.activity(refOf(1))).toEqual([]);
   });
 
   it('runs two tasks at once and queues the third', async () => {
