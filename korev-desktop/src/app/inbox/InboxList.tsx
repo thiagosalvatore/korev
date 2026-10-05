@@ -232,65 +232,68 @@ export function InboxList({
       <ActionsProvider value={held.displayed.actions}>
         <AgentTasksProvider value={held.displayed.agentTasks}>
           <RepoAvatarsProvider value={held.displayed.repoAvatars}>
-            <div className="relative flex h-full min-h-0">
-              <div
-                ref={scroller}
-                className="min-w-0 flex-1 overflow-auto pb-6"
-                onMouseEnter={() => setPointerInside(true)}
-                onMouseLeave={() => setPointerInside(false)}
-                onMouseMove={noteInteraction}
-                onWheel={noteInteraction}
-                onKeyDown={noteInteraction}
-              >
-                {held.pendingCount > 0 ? (
-                  <UpdatesPill count={held.pendingCount} onShow={applyHeld} />
+            <div className="flex h-full min-h-0 flex-col">
+              <div className="relative flex min-h-0 flex-1">
+                <div
+                  ref={scroller}
+                  className="min-w-0 flex-1 overflow-auto pb-6"
+                  onMouseEnter={() => setPointerInside(true)}
+                  onMouseLeave={() => setPointerInside(false)}
+                  onMouseMove={noteInteraction}
+                  onWheel={noteInteraction}
+                  onKeyDown={noteInteraction}
+                >
+                  {held.pendingCount > 0 ? (
+                    <UpdatesPill count={held.pendingCount} onShow={applyHeld} />
+                  ) : null}
+                  <BannerSlot
+                    snapshot={held.displayed}
+                    view={view}
+                    onOpenSettings={onOpenSettings}
+                  />
+                  {showList ? (
+                    <>
+                      {header}
+                      <div
+                        ref={listbox}
+                        role="listbox"
+                        aria-label={label}
+                        onKeyDown={(event) => handleListboxKey(event, api)}
+                        onFocus={focusWithin.onFocus}
+                        onBlur={focusWithin.onBlur}
+                      >
+                        {selection.goneRow ? (
+                          <GoneRow
+                            subject={selection.goneRow}
+                            label={actions.goneLabel(selection.goneRow.key)}
+                          />
+                        ) : null}
+                        {children(held.displayed)}
+                      </div>
+                    </>
+                  ) : model.isEmpty(snapshot) ? (
+                    empty
+                  ) : (
+                    filteredOut
+                  )}
+                </div>
+                {panelOpen && selection.subject ? (
+                  <PrPanel
+                    subject={selection.subject}
+                    goneLabel={
+                      selection.subjectGone
+                        ? actions.goneLabel(selection.subject.key)
+                        : null
+                    }
+                    actions={actions.panelActions(selection.subject)}
+                    ai={ai.panelAi(selection.subject)}
+                    mode={docked ? 'docked' : 'overlay'}
+                    onClose={closePanel}
+                    onOpenGithub={openExternal}
+                  />
                 ) : null}
-                <BannerSlot
-                  snapshot={held.displayed}
-                  view={view}
-                  onOpenSettings={onOpenSettings}
-                />
-                {showList ? (
-                  <>
-                    {header}
-                    <div
-                      ref={listbox}
-                      role="listbox"
-                      aria-label={label}
-                      onKeyDown={(event) => handleListboxKey(event, api)}
-                      onFocus={focusWithin.onFocus}
-                      onBlur={focusWithin.onBlur}
-                    >
-                      {selection.goneRow ? (
-                        <GoneRow
-                          subject={selection.goneRow}
-                          label={actions.goneLabel(selection.goneRow.key)}
-                        />
-                      ) : null}
-                      {children(held.displayed)}
-                    </div>
-                  </>
-                ) : model.isEmpty(snapshot) ? (
-                  empty
-                ) : (
-                  filteredOut
-                )}
               </div>
-              {panelOpen && selection.subject ? (
-                <PrPanel
-                  subject={selection.subject}
-                  goneLabel={
-                    selection.subjectGone
-                      ? actions.goneLabel(selection.subject.key)
-                      : null
-                  }
-                  actions={actions.panelActions(selection.subject)}
-                  ai={ai.panelAi(selection.subject)}
-                  mode={docked ? 'docked' : 'overlay'}
-                  onClose={closePanel}
-                  onOpenGithub={openExternal}
-                />
-              ) : null}
+              {ai.terminal}
             </div>
           </RepoAvatarsProvider>
           {actions.overlays}

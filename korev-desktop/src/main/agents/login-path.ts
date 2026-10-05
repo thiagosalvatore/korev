@@ -4,7 +4,7 @@ const PATH_START = '__KOREV_PATH_START__';
 const PATH_END = '__KOREV_PATH_END__';
 const PRINT_PATH = `printf ${PATH_START}; /usr/bin/printenv PATH; printf ${PATH_END}`;
 const SHELL_TIMEOUT_MS = 5000;
-const DEFAULT_SHELL = '/bin/zsh';
+export const DEFAULT_SHELL = '/bin/zsh';
 const PATH_SEPARATOR = ':';
 const SYSTEM_DIRS = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'];
 const HOME_DIRS = ['.local/bin', '.npm-global/bin', '.bun/bin'];
@@ -56,14 +56,16 @@ export async function resolveLoginPath(
   return [...new Set(dirs.filter(Boolean))].join(PATH_SEPARATOR);
 }
 
+export function isElectronVariable(name: string): boolean {
+  return name.startsWith(ELECTRON_VARIABLE_PREFIX);
+}
+
 export function childEnv(
   env: NodeJS.ProcessEnv,
   path: string,
 ): NodeJS.ProcessEnv {
   const inherited = Object.entries(env).filter(
-    ([name]) =>
-      !name.startsWith(ELECTRON_VARIABLE_PREFIX) &&
-      !GITHUB_TOKEN_VARIABLES.has(name),
+    ([name]) => !isElectronVariable(name) && !GITHUB_TOKEN_VARIABLES.has(name),
   );
   return { ...Object.fromEntries(inherited), PATH: path };
 }

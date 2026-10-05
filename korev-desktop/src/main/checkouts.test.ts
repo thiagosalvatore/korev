@@ -98,6 +98,17 @@ describe('checkouts', () => {
     expect(sh(origin, 'rev-parse', 'feature^')).toBe(checkout.headOid);
   });
 
+  it('finds the worktree of a pull request it checked out, until it is removed', async () => {
+    const { checkouts } = setup();
+    expect(await checkouts.pathOf(TARGET)).toBeNull();
+
+    const checkout = await checkouts.open(TARGET);
+    expect(await checkouts.pathOf(TARGET)).toBe(checkout.path);
+
+    await checkouts.remove(TARGET);
+    expect(await checkouts.pathOf(TARGET)).toBeNull();
+  });
+
   it('pushes a fork pull request to the head repository URL', async () => {
     const { checkouts, remote } = setup();
     const fork = join(remote, 'forker/app.git');

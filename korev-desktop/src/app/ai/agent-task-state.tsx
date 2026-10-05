@@ -3,10 +3,18 @@ import { Badge, Button, Icon } from '../../design-system';
 import {
   AGENT_TASK_STEP_LABELS,
   AGENT_TASK_WORDS,
+  keepsCheckout,
   type AgentTaskState,
+  type AgentTaskStep,
 } from '../../shared/agent-tasks';
 import { formatAge } from '../format';
 import { MINUTE_MS, useNow } from '../useNow';
+
+const OPEN_TERMINAL = 'Open terminal';
+const STEPS_WITH_WORKTREE: ReadonlySet<AgentTaskStep> = new Set([
+  'running',
+  'pushing',
+]);
 
 const AgentTasksContext = createContext<Record<string, AgentTaskState>>({});
 
@@ -20,6 +28,12 @@ export function isRunning(
   state: AgentTaskState | null,
 ): state is Extract<AgentTaskState, { status: 'running' }> {
   return state?.status === 'running';
+}
+
+export function hasWorktree(state: AgentTaskState | null): boolean {
+  if (!state) return false;
+  if (isRunning(state)) return STEPS_WITH_WORKTREE.has(state.step);
+  return keepsCheckout(state);
 }
 
 export function runningLabel(
@@ -58,14 +72,26 @@ interface AgentTaskStatusProps {
   state: AgentTaskState;
   onStop: () => void;
   onRetry: () => void;
+  onOpenTerminal?: () => void;
+}
+
+function OpenTerminalButton({ onOpen }: { onOpen?: () => void }) {
+  if (!onOpen) return null;
+  return (
+    <Button size="sm" variant="ghost" onClick={onOpen}>
+      {OPEN_TERMINAL}
+    </Button>
+  );
 }
 
 function RunningLine({
   state,
   onStop,
+  onOpenTerminal,
 }: {
   state: Extract<AgentTaskState, { status: 'running' }>;
   onStop: () => void;
+  onOpenTerminal?: () => void;
 }) {
   const now = useNow(MINUTE_MS);
   const words = AGENT_TASK_WORDS[state.kind];
@@ -75,6 +101,7 @@ function RunningLine({
         {words.name} · {AGENT_TASK_STEP_LABELS[state.step]} ·{' '}
         {formatAge(state.startedAt, now)}
       </p>
+      <OpenTerminalButton onOpen={onOpenTerminal} />
       <Button size="sm" variant="ghost" onClick={onStop}>
         Stop
       </Button>
@@ -86,11 +113,23 @@ export function AgentTaskStatus({
   state,
   onStop,
   onRetry,
+  onOpenTerminal,
 }: AgentTaskStatusProps) {
   if (isRunning(state)) {
     return (
       <section className="mt-4.5">
-        <RunningLine state={state} onStop={onStop} />
+        <RunningLine
+          state={state}
+          onStop={onStop}
+          onOpenTerminal={onOpenTerminal}
+        />
+      </section>
+    );
+  }
+  if (state.status === 'needs-input' && onOpenTerminal) {
+    return (
+      <section className="mt-4.5 flex justify-end">
+        <OpenTerminalButton onOpen={onOpenTerminal} />
       </section>
     );
   }
@@ -104,6 +143,7 @@ export function AgentTaskStatus({
         <p className="m-0 min-w-0 flex-1 text-sm text-danger-text">
           {state.message}
         </p>
+        <OpenTerminalButton onOpen={onOpenTerminal} />
         <Button size="sm" onClick={onRetry}>
           Retry
         </Button>

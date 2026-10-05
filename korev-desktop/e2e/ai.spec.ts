@@ -148,6 +148,42 @@ test('fixes a merge conflict after asking one question, and pushes the merge', a
   });
 });
 
+test('opens a terminal in the worktree of a conflict fix waiting for an answer', async () => {
+  await withRemote(async (remote) => {
+    remote.commit(
+      'main',
+      { 'ingest.ts': 'export const limit = 50;\n' },
+      'Lower the limit',
+    );
+    await withSession(
+      async (github, userDataDir) => {
+        await chooseClaude(userDataDir);
+        const app = await launch(github, userDataDir, aiEnv(remote));
+        try {
+          const window = await appWindow(app);
+          await connectAndOpenMyPrs(window);
+          await openRow(window, FAILING_PR_TITLE);
+          await panel(window)
+            .getByRole('button', { name: 'Fix conflicts' })
+            .click();
+          await panel(window)
+            .getByRole('button', { name: 'Open terminal' })
+            .click({ timeout: 30_000 });
+
+          const terminal = window.getByRole('region', { name: /Terminal/ });
+          await terminal.locator('.xterm').click();
+          await window.keyboard.type('git rev-parse --abbrev-ref HEAD\n');
+
+          await expect(terminal).toContainText(`korev/${FAILING_PR_NUMBER}`);
+        } finally {
+          await app.close();
+        }
+      },
+      { headOids: remote.headOids, conflicting: [FAILING_PR_NUMBER] },
+    );
+  });
+});
+
 test('drafts a review of a teammate PR and submits it as a comment', async () => {
   await withRemote((remote) =>
     withSession(

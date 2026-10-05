@@ -14,6 +14,7 @@ import {
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import started from 'electron-squirrel-startup';
+import { spawn as spawnPty } from 'node-pty';
 import { IpcChannel, type AppCommand } from './shared/ipc-contract';
 import type { WindowBounds } from './shared/settings';
 import { appMenuTemplate } from './main/app-menu';
@@ -85,6 +86,7 @@ function createKorevApp(): Korev {
     tempPath: app.getPath('temp'),
     env: process.env,
     runCommand: runProcess,
+    spawnPty,
     fs: nodeFileSystem,
     cipher: createSafeStorageCipher(safeStorage, process.platform),
     fetch: (input, init) => fetch(input, init),

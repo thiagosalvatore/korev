@@ -6,15 +6,38 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { cp } from 'node:fs/promises';
+import path from 'node:path';
 
 const ICON = 'assets/icon';
+const NODE_PTY = 'node_modules/node-pty';
+
+function nodePtyRuntimeFiles(platform: string, arch: string): string[] {
+  return ['package.json', 'lib', `prebuilds/${platform}-${arch}`];
+}
+
+async function copyNodePty(buildPath: string, platform: string, arch: string) {
+  for (const entry of nodePtyRuntimeFiles(platform, arch)) {
+    await cp(
+      path.join(NODE_PTY, entry),
+      path.join(buildPath, NODE_PTY, entry),
+      {
+        recursive: true,
+      },
+    );
+  }
+}
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
+    asar: { unpack: `**/${NODE_PTY}/**` },
     icon: ICON,
   },
   rebuildConfig: {},
+  hooks: {
+    packageAfterCopy: (_config, buildPath, _electronVersion, platform, arch) =>
+      copyNodePty(buildPath, platform, arch),
+  },
   makers: [
     new MakerSquirrel({ setupIcon: `${ICON}.ico` }),
     new MakerZIP({}, ['darwin']),

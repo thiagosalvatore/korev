@@ -139,6 +139,9 @@ function setup(
     runCommand: async () => {
       throw new Error('No CLI in tests');
     },
+    spawnPty: () => {
+      throw new Error('No terminal in tests');
+    },
     fs,
     cipher: plainCipher,
     fetch: fake.fetch,
@@ -292,6 +295,17 @@ describe('korev', () => {
     await invoke(IpcChannel.AuthDisconnect);
 
     expect(fs.files.has(`${USER_DATA}/inbox-cache.bin`)).toBe(false);
+  });
+
+  it('does not open a terminal for a pull request Korev has no checkout of', async () => {
+    const { invoke } = setup();
+
+    expect(
+      await invoke(IpcChannel.TerminalOpen, OPEN_PR_TARGET, {
+        cols: 80,
+        rows: 24,
+      }),
+    ).toEqual({ ok: false, message: expect.stringContaining('no longer') });
   });
 
   it('opens the saved explanation for the same head commit without running the agent', async () => {

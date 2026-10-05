@@ -12,8 +12,10 @@ import type {
   MergeTool,
   PrTarget,
 } from '../shared/merge';
+import type { TerminalSize } from '../shared/terminal';
 import { isRepoName } from './repo-names';
 
+const MAX_TERMINAL_CELLS = 1000;
 const MERGE_METHODS: readonly MergeMethod[] = ['merge', 'squash', 'rebase'];
 const MERGE_TOOLS: readonly MergeTool[] = [
   'github',
@@ -38,6 +40,20 @@ export function parseTarget(value: unknown): PrTarget | null {
   if (typeof repo !== 'string' || !isRepoName(repo)) return null;
   if (!isPrNumber(number)) return null;
   return { id, repo, number };
+}
+
+function isTerminalCells(value: unknown): value is number {
+  return (
+    Number.isInteger(value) &&
+    (value as number) > 0 &&
+    (value as number) <= MAX_TERMINAL_CELLS
+  );
+}
+
+export function parseTerminalSize(value: unknown): TerminalSize | null {
+  const { cols, rows } = asRecord(value);
+  if (!isTerminalCells(cols) || !isTerminalCells(rows)) return null;
+  return { cols, rows };
 }
 
 export function parseTargets(value: unknown): PrTarget[] | null {

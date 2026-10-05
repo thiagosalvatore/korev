@@ -98,6 +98,9 @@ export interface Checkouts {
     canPushWorkflows: boolean,
   ): Promise<PushResult>;
   remove(target: Pick<CheckoutTarget, 'repo' | 'number'>): Promise<void>;
+  pathOf(
+    target: Pick<CheckoutTarget, 'repo' | 'number'>,
+  ): Promise<string | null>;
   sweep(watched: string[], keptRefs: string[]): Promise<void>;
   removeAll(keptRefs: string[]): Promise<void>;
   size(): Promise<number>;
@@ -345,6 +348,11 @@ export function createCheckouts(deps: CheckoutsDeps): Checkouts {
     if (await exists(clone)) await tryGit(clone, ['worktree', 'prune']);
   }
 
+  async function pathOf(target: Pick<CheckoutTarget, 'repo' | 'number'>) {
+    const path = worktreePath(target);
+    return (await exists(path)) ? path : null;
+  }
+
   async function remove(target: Pick<CheckoutTarget, 'repo' | 'number'>) {
     await removeWorktree(
       target.repo,
@@ -423,6 +431,7 @@ export function createCheckouts(deps: CheckoutsDeps): Checkouts {
     commitAll,
     push,
     remove,
+    pathOf,
     sweep,
     removeAll,
     size,

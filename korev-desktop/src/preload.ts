@@ -83,6 +83,14 @@ const bridge: KorevBridge = {
     checkoutsSize: () => invoke(IpcChannel.AiCheckoutsSize),
     removeCheckouts: () => invoke(IpcChannel.AiRemoveCheckouts),
   },
+  terminal: {
+    open: (target, size) => invoke(IpcChannel.TerminalOpen, target, size),
+    write: (target, data) => invoke(IpcChannel.TerminalWrite, target, data),
+    resize: (target, size) => invoke(IpcChannel.TerminalResize, target, size),
+    close: (target) => invoke(IpcChannel.TerminalClose, target),
+    onOutput: (listener) => subscribe(IpcChannel.TerminalOutput, listener),
+    onExit: (listener) => subscribe(IpcChannel.TerminalExit, listener),
+  },
   shell: {
     openGithub: (url) => invoke(IpcChannel.ShellOpenGithub, url),
     openAgentInstall: (provider) =>

@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Button, Toast } from '../../design-system';
 import {
   AGENT_TASK_WORDS,
@@ -22,6 +28,8 @@ import { announce } from '../LiveAnnouncer';
 import { useSettings } from '../useSettings';
 import { useTimedToast } from '../useTimedToast';
 import type { PanelSubject } from '../inbox/list-model';
+import { TerminalDrawer } from '../terminal/TerminalDrawer';
+import { hasWorktree } from './agent-task-state';
 import { ExplainReader } from './ExplainReader';
 import { ReviewDraftReader } from './ReviewDraftReader';
 import { KeepMergeableIntro } from './KeepMergeableIntro';
@@ -72,6 +80,7 @@ export interface PanelAi {
   onRetry: () => void;
   onRerunFailedJobs: () => void;
   onOpenSettings: () => void;
+  onOpenTerminal?: () => void;
 }
 
 interface DoneToast {
@@ -149,6 +158,7 @@ export interface KorevAi {
   panelAi(subject: PanelSubject | null): PanelAi | undefined;
   shortcuts: ShortcutMap;
   overlays: ReactNode;
+  terminal: ReactNode;
 }
 
 export function useKorevAi(
@@ -163,6 +173,8 @@ export function useKorevAi(
   const [draftFor, setDraftFor] = useState<PullRequest | null>(null);
   const [drafts, setDrafts] = useState<Record<string, QuestionAnswers>>({});
   const [intro, setIntro] = useState<PullRequest | null>(null);
+  const [terminalFor, setTerminalFor] = useState<PrTarget | null>(null);
+  const hideTerminal = useCallback(() => setTerminalFor(null), []);
   const toast = useTimedToast<DoneToast>(TOAST_MS);
   const available = Boolean(settings?.agent.provider);
 
@@ -280,6 +292,9 @@ export function useKorevAi(
       },
       onRerunFailedJobs: () => void rerunFailedJobs(target),
       onOpenSettings,
+      onOpenTerminal: hasWorktree(state)
+        ? () => setTerminalFor(target)
+        : undefined,
     };
   }
 
@@ -353,5 +368,12 @@ export function useKorevAi(
       },
     },
     overlays,
+    terminal: terminalFor ? (
+      <TerminalDrawer
+        key={prRef(terminalFor)}
+        target={terminalFor}
+        onHide={hideTerminal}
+      />
+    ) : null,
   };
 }

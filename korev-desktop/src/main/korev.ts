@@ -26,6 +26,11 @@ import { prRef } from '../shared/pr-ref';
 import type { PullRequest } from '../shared/pull-request';
 import { explanationDocument } from '../shared/explanation-document';
 import { IpcChannel } from '../shared/ipc-contract';
+import type {
+  TerminalExit,
+  TerminalOpenResult,
+  TerminalOutput,
+} from '../shared/terminal';
 import type { RepoOwner, RepoPage } from '../shared/repos';
 import type { InboxView, Settings, ThemePreference } from '../shared/settings';
 import { buildInbox } from '../inbox/build-inbox';
@@ -39,6 +44,7 @@ import {
   parseMergeTool,
   parseTarget,
   parseTargets,
+  parseTerminalSize,
 } from './action-input';
 import { createAgentTasks } from './agent-tasks/engine';
 import { createExplainTask } from './agent-tasks/explain';
@@ -55,6 +61,7 @@ import { createAgentsService } from './agents/agents-service';
 import type { CommandRunner } from './agents/command-runner';
 import { isGithubUrl } from './app-origin';
 import { createCheckouts } from './checkouts';
+import { createTerminals, type SpawnPty } from './terminals';
 import { isPrRef, splitRepoName } from './repo-names';
 import { createAuthService } from './auth-service';
 import type { SecretCipher } from './encrypted-file';
@@ -100,7 +107,8 @@ const SUBMITTED_REVIEW: Record<ReviewEvent, string> = {
   REQUEST_CHANGES: 'Submitted your review requesting changes',
 };
 const CHECKOUTS_BUSY = 'Wait for Korev to finish its running tasks first.';
-const INVALID_ACTION: ActionResult = {
+const NO_CHECKOUT = 'Korev no longer has a checkout of this pull request.';
+const INVALID_ACTION: Extract<ActionResult, { ok: false }> = {
   ok: false,
   message: 'Korev could not read that request.',
 };
@@ -116,6 +124,7 @@ export interface KorevDeps {
   tempPath: string;
   env: NodeJS.ProcessEnv;
   runCommand: CommandRunner;
+  spawnPty: SpawnPty;
   fs: FileSystem;
   cipher: SecretCipher;
   fetch: FetchLike;
@@ -128,7 +137,12 @@ export interface KorevDeps {
   applyTheme(theme: ThemePreference): void;
   broadcast(
     channel: IpcChannel,
-    payload: InboxSnapshot | AuthState | Settings,
+    payload:
+      | InboxSnapshot
+      | AuthState
+      | Settings
+      | TerminalOutput
+      | TerminalExit,
   ): void;
   warn(message: string): void;
 }
@@ -227,6 +241,14 @@ export function createKorev(deps: KorevDeps): Korev {
     now: () => Date.now(),
   });
 
+  const terminals = createTerminals({
+    spawnPty: deps.spawnPty,
+    env: deps.env,
+    onOutput: (ref, data) =>
+      deps.broadcast(IpcChannel.TerminalOutput, { ref, data }),
+    onExit: (ref) => deps.broadcast(IpcChannel.TerminalExit, { ref }),
+  });
+
   const taskReads = createTaskReads({
     fetch: deps.fetch,
     apiUrl: deps.github.apiUrl,
@@ -299,6 +321,7 @@ export function createKorev(deps: KorevDeps): Korev {
     }),
     login: () => auth.state().connection?.login ?? null,
     releaseCheckout: (ref) => {
+      terminals.close(ref);
       const [repo, number] = ref.split('#');
       return checkouts.remove({ repo, number: Number(number) });
     },
@@ -755,6 +778,29 @@ export function createKorev(deps: KorevDeps): Korev {
     await deps.openPath(path);
   }
 
+  async function openTerminal(
+    target: PrTarget,
+    size: unknown,
+  ): Promise<TerminalOpenResult> {
+    const parsedSize = parseTerminalSize(size);
+    if (!parsedSize) return INVALID_ACTION;
+    const path = await checkouts.pathOf(target);
+    if (!path) return { ok: false, message: NO_CHECKOUT };
+    return {
+      ok: true,
+      scrollback: terminals.open(prRef(target), path, parsedSize),
+    };
+  }
+
+  function writeTerminal(target: PrTarget, data: unknown): void {
+    if (typeof data === 'string') terminals.write(prRef(target), data);
+  }
+
+  function resizeTerminal(target: PrTarget, size: unknown): void {
+    const parsedSize = parseTerminalSize(size);
+    if (parsedSize) terminals.resize(prRef(target), parsedSize);
+  }
+
   async function removeCheckouts(): Promise<ActionResult> {
     if (agentTasks.isBusy()) return { ok: false, message: CHECKOUTS_BUSY };
     await checkouts.removeAll(agentTasks.keptRefs());
@@ -856,6 +902,16 @@ export function createKorev(deps: KorevDeps): Korev {
     ),
     [IpcChannel.AiCheckoutsSize]: () => checkouts.size(),
     [IpcChannel.AiRemoveCheckouts]: removeCheckouts,
+    [IpcChannel.TerminalOpen]: withTarget(
+      openTerminal,
+      Promise.resolve(INVALID_ACTION),
+    ),
+    [IpcChannel.TerminalWrite]: withTarget(writeTerminal, undefined),
+    [IpcChannel.TerminalResize]: withTarget(resizeTerminal, undefined),
+    [IpcChannel.TerminalClose]: withTarget(
+      (target) => terminals.close(prRef(target)),
+      undefined,
+    ),
   };
 
   async function start(): Promise<void> {
@@ -877,6 +933,7 @@ export function createKorev(deps: KorevDeps): Korev {
       prActions.stop();
       agentTasks.stop();
       agents.stop();
+      terminals.closeAll();
       void removeExplanationCopies();
     },
   };

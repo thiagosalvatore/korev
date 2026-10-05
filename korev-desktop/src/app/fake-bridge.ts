@@ -6,6 +6,7 @@ import type { InboxSnapshot } from '../shared/inbox';
 import type { AppCommand, KorevBridge } from '../shared/ipc-contract';
 import type { RepoOwner, RepoPage } from '../shared/repos';
 import type { Settings } from '../shared/settings';
+import type { TerminalExit, TerminalOutput } from '../shared/terminal';
 import {
   CONNECTED_AUTH,
   SYNCED_AT,
@@ -33,6 +34,8 @@ export interface FakeBridge {
   emitSettings: (settings: Settings) => void;
   emitCommand: (command: AppCommand) => void;
   emitFocusPr: (ref: string) => void;
+  emitTerminalOutput: (output: TerminalOutput) => void;
+  emitTerminalExit: (exit: TerminalExit) => void;
   stopInbox: ReturnType<typeof vi.fn>;
 }
 
@@ -66,6 +69,8 @@ export function installFakeBridge({
   const stopInbox = vi.fn();
   const commandListeners = new Set<(command: AppCommand) => void>();
   const focusListeners = new Set<(ref: string) => void>();
+  const terminalOutputListeners = new Set<(output: TerminalOutput) => void>();
+  const terminalExitListeners = new Set<(exit: TerminalExit) => void>();
   const bridge: KorevBridge = {
     inbox: {
       load: vi.fn(async () => snapshot),
@@ -158,6 +163,20 @@ export function installFakeBridge({
       checkoutsSize: vi.fn(async () => checkoutsSize),
       removeCheckouts: vi.fn(async () => ({ ok: true as const })),
     },
+    terminal: {
+      open: vi.fn(async () => ({ ok: true as const, scrollback: '' })),
+      write: vi.fn(async () => undefined),
+      resize: vi.fn(async () => undefined),
+      close: vi.fn(async () => undefined),
+      onOutput: vi.fn((listener) => {
+        terminalOutputListeners.add(listener);
+        return () => terminalOutputListeners.delete(listener);
+      }),
+      onExit: vi.fn((listener) => {
+        terminalExitListeners.add(listener);
+        return () => terminalExitListeners.delete(listener);
+      }),
+    },
     shell: {
       openGithub: vi.fn(async () => undefined),
       openAgentInstall: vi.fn(async () => undefined),
@@ -182,6 +201,10 @@ export function installFakeBridge({
     emitCommand: (command) =>
       commandListeners.forEach((listener) => listener(command)),
     emitFocusPr: (ref) => focusListeners.forEach((listener) => listener(ref)),
+    emitTerminalOutput: (output) =>
+      terminalOutputListeners.forEach((listener) => listener(output)),
+    emitTerminalExit: (exit) =>
+      terminalExitListeners.forEach((listener) => listener(exit)),
     stopInbox,
   };
 }

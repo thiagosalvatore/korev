@@ -420,6 +420,7 @@ export function PrPanel({
           state={ai.state}
           onStop={ai.onStop}
           onRetry={ai.onRetry}
+          onOpenTerminal={ai.onOpenTerminal}
         />
       ) : null}
       <SubjectDetails subject={subject} ai={ai} />

@@ -23,6 +23,12 @@ import type {
   Settings,
   ThemePreference,
 } from './settings';
+import type {
+  TerminalExit,
+  TerminalOpenResult,
+  TerminalOutput,
+  TerminalSize,
+} from './terminal';
 
 export enum IpcChannel {
   InboxLoad = 'inbox:load',
@@ -75,6 +81,12 @@ export enum IpcChannel {
   AiSubmitReview = 'ai:submit-review',
   AiCheckoutsSize = 'ai:checkouts-size',
   AiRemoveCheckouts = 'ai:remove-checkouts',
+  TerminalOpen = 'terminal:open',
+  TerminalWrite = 'terminal:write',
+  TerminalResize = 'terminal:resize',
+  TerminalClose = 'terminal:close',
+  TerminalOutput = 'terminal:output',
+  TerminalExit = 'terminal:exit',
 }
 
 export type AppCommand =
@@ -152,6 +164,14 @@ export interface KorevBridge {
     ): Promise<ActionResult>;
     checkoutsSize(): Promise<number>;
     removeCheckouts(): Promise<ActionResult>;
+  };
+  terminal: {
+    open(target: PrTarget, size: TerminalSize): Promise<TerminalOpenResult>;
+    write(target: PrTarget, data: string): Promise<void>;
+    resize(target: PrTarget, size: TerminalSize): Promise<void>;
+    close(target: PrTarget): Promise<void>;
+    onOutput(listener: (output: TerminalOutput) => void): Unsubscribe;
+    onExit(listener: (exit: TerminalExit) => void): Unsubscribe;
   };
   shell: {
     openGithub(url: string): Promise<void>;
