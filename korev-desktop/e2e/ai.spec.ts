@@ -8,6 +8,7 @@ import {
   launch,
   openRow,
   panel,
+  runPage,
   withSession,
 } from './app';
 import {
@@ -115,13 +116,17 @@ test('fixes a merge conflict after asking one question, and pushes the merge', a
             .getByRole('button', { name: 'Fix conflicts' })
             .click();
 
+          const page = runPage(window, FAILING_PR_NUMBER);
           await expect(
-            panel(window).getByText('Which ingestion limit should win?'),
+            page.getByText('Which ingestion limit should win?'),
           ).toBeVisible({ timeout: 30_000 });
-          await panel(window).getByLabel('Your answer').fill('Use 75');
-          await panel(window)
-            .getByRole('button', { name: /Send answers/ })
-            .click();
+          await expect(
+            page.getByRole('log').getByText('Read ingest.ts'),
+          ).toBeVisible();
+          await page
+            .getByRole('textbox', { name: 'Your answer' })
+            .fill('Use 75');
+          await page.getByRole('button', { name: /Send answers/ }).click();
 
           await expect(
             window.getByText(/Fixed conflicts on #491 · pushed/).first(),
@@ -166,7 +171,7 @@ test('opens a terminal in the worktree of a conflict fix waiting for an answer',
           await panel(window)
             .getByRole('button', { name: 'Fix conflicts' })
             .click();
-          await panel(window)
+          await runPage(window, FAILING_PR_NUMBER)
             .getByRole('button', { name: 'Open terminal' })
             .click({ timeout: 30_000 });
 
@@ -199,15 +204,14 @@ test('drafts a review of a teammate PR and submits it as a comment', async () =>
             .getByRole('button', { name: /^Review/ })
             .click();
 
-          await panel(window)
-            .getByRole('button', { name: 'Open review draft' })
-            .click({ timeout: 30_000 });
-          const draft = window.getByRole('dialog');
+          const draft = runPage(window, REVIEW_PR_NUMBER).getByRole('region', {
+            name: 'Review draft',
+          });
           await expect(
             draft.getByText(
               'Read the limit from config instead of hard-coding it.',
             ),
-          ).toBeVisible();
+          ).toBeVisible({ timeout: 30_000 });
           await expect(
             draft.getByRole('button', { name: /Approve/ }),
           ).toHaveCount(0);

@@ -87,6 +87,20 @@ function useFocusWithin() {
   return { focused, onFocus, onBlur };
 }
 
+function useFocusRowAfterRun(
+  showingRun: boolean,
+  listbox: ElementRef,
+  selectedKey: string | null,
+) {
+  const wasShowing = useRef(showingRun);
+  useLayoutEffect(() => {
+    if (wasShowing.current && !showingRun) {
+      focusOption(listbox.current, selectedKey);
+    }
+    wasShowing.current = showingRun;
+  }, [showingRun, listbox, selectedKey]);
+}
+
 function openExternal(url: string) {
   void korev().shell.openGithub(url);
 }
@@ -180,16 +194,6 @@ export function InboxList({
 
   useLayoutEffect(() => updateRovingStop(listbox.current, selectedKey));
 
-  const focusRequest = useFocusRequest();
-  const [handledFocus, setHandledFocus] = useState<FocusRequest | null>(null);
-  if (focusRequest !== handledFocus && focusRequest) {
-    setHandledFocus(focusRequest);
-    if (subjects.has(focusRequest.ref)) {
-      selection.select(focusRequest.ref);
-      setPanelOpen(true);
-    }
-  }
-
   const actions = useMyPrActions(
     view === 'mine',
     held.displayed,
@@ -206,6 +210,24 @@ export function InboxList({
       pullRequestsIn(held.displayed).find((pr) => prRef(pr) === ref) ?? null,
     onOpenSettings,
   );
+
+  const focusRequest = useFocusRequest();
+  const [handledFocus, setHandledFocus] = useState<FocusRequest | null>(null);
+  if (focusRequest !== handledFocus && focusRequest) {
+    setHandledFocus(focusRequest);
+    if (subjects.has(focusRequest.ref)) {
+      selection.select(focusRequest.ref);
+      setPanelOpen(true);
+      if (
+        held.displayed.agentTasks[focusRequest.ref]?.status === 'needs-input'
+      ) {
+        ai.showRun(focusRequest.ref);
+      }
+    }
+  }
+
+  const runSubject = ai.runRef ? subjects.get(ai.runRef) : undefined;
+  useFocusRowAfterRun(Boolean(runSubject), listbox, selectedKey);
 
   useKeyShortcuts({
     [APPLY_UPDATES_KEY]: applyHeld,
@@ -233,66 +255,73 @@ export function InboxList({
         <AgentTasksProvider value={held.displayed.agentTasks}>
           <RepoAvatarsProvider value={held.displayed.repoAvatars}>
             <div className="flex h-full min-h-0 flex-col">
-              <div className="relative flex min-h-0 flex-1">
-                <div
-                  ref={scroller}
-                  className="min-w-0 flex-1 overflow-auto pb-6"
-                  onMouseEnter={() => setPointerInside(true)}
-                  onMouseLeave={() => setPointerInside(false)}
-                  onMouseMove={noteInteraction}
-                  onWheel={noteInteraction}
-                  onKeyDown={noteInteraction}
-                >
-                  {held.pendingCount > 0 ? (
-                    <UpdatesPill count={held.pendingCount} onShow={applyHeld} />
+              {runSubject ? (
+                ai.runPage(runSubject)
+              ) : (
+                <div className="relative flex min-h-0 flex-1">
+                  <div
+                    ref={scroller}
+                    className="min-w-0 flex-1 overflow-auto pb-6"
+                    onMouseEnter={() => setPointerInside(true)}
+                    onMouseLeave={() => setPointerInside(false)}
+                    onMouseMove={noteInteraction}
+                    onWheel={noteInteraction}
+                    onKeyDown={noteInteraction}
+                  >
+                    {held.pendingCount > 0 ? (
+                      <UpdatesPill
+                        count={held.pendingCount}
+                        onShow={applyHeld}
+                      />
+                    ) : null}
+                    <BannerSlot
+                      snapshot={held.displayed}
+                      view={view}
+                      onOpenSettings={onOpenSettings}
+                    />
+                    {showList ? (
+                      <>
+                        {header}
+                        <div
+                          ref={listbox}
+                          role="listbox"
+                          aria-label={label}
+                          onKeyDown={(event) => handleListboxKey(event, api)}
+                          onFocus={focusWithin.onFocus}
+                          onBlur={focusWithin.onBlur}
+                        >
+                          {selection.goneRow ? (
+                            <GoneRow
+                              subject={selection.goneRow}
+                              label={actions.goneLabel(selection.goneRow.key)}
+                            />
+                          ) : null}
+                          {children(held.displayed)}
+                        </div>
+                      </>
+                    ) : model.isEmpty(snapshot) ? (
+                      empty
+                    ) : (
+                      filteredOut
+                    )}
+                  </div>
+                  {panelOpen && selection.subject ? (
+                    <PrPanel
+                      subject={selection.subject}
+                      goneLabel={
+                        selection.subjectGone
+                          ? actions.goneLabel(selection.subject.key)
+                          : null
+                      }
+                      actions={actions.panelActions(selection.subject)}
+                      ai={ai.panelAi(selection.subject)}
+                      mode={docked ? 'docked' : 'overlay'}
+                      onClose={closePanel}
+                      onOpenGithub={openExternal}
+                    />
                   ) : null}
-                  <BannerSlot
-                    snapshot={held.displayed}
-                    view={view}
-                    onOpenSettings={onOpenSettings}
-                  />
-                  {showList ? (
-                    <>
-                      {header}
-                      <div
-                        ref={listbox}
-                        role="listbox"
-                        aria-label={label}
-                        onKeyDown={(event) => handleListboxKey(event, api)}
-                        onFocus={focusWithin.onFocus}
-                        onBlur={focusWithin.onBlur}
-                      >
-                        {selection.goneRow ? (
-                          <GoneRow
-                            subject={selection.goneRow}
-                            label={actions.goneLabel(selection.goneRow.key)}
-                          />
-                        ) : null}
-                        {children(held.displayed)}
-                      </div>
-                    </>
-                  ) : model.isEmpty(snapshot) ? (
-                    empty
-                  ) : (
-                    filteredOut
-                  )}
                 </div>
-                {panelOpen && selection.subject ? (
-                  <PrPanel
-                    subject={selection.subject}
-                    goneLabel={
-                      selection.subjectGone
-                        ? actions.goneLabel(selection.subject.key)
-                        : null
-                    }
-                    actions={actions.panelActions(selection.subject)}
-                    ai={ai.panelAi(selection.subject)}
-                    mode={docked ? 'docked' : 'overlay'}
-                    onClose={closePanel}
-                    onOpenGithub={openExternal}
-                  />
-                ) : null}
-              </div>
+              )}
               {ai.terminal}
             </div>
           </RepoAvatarsProvider>

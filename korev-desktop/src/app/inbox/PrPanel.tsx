@@ -31,7 +31,6 @@ import { ActionFooter, ActionStatus, type PanelActions } from './PanelActions';
 import { AgentTaskStatus } from '../ai/agent-task-state';
 import { KorevActivity } from '../ai/KorevActivity';
 import { KorevAiSection } from '../ai/KorevAiSection';
-import { AnswersFooter, QuestionsSection } from '../ai/QuestionsSection';
 import type { PanelAi } from '../ai/useKorevAi';
 import { PanelSection } from './PanelSection';
 import { PriorityBadge } from './PriorityBadge';
@@ -395,10 +394,7 @@ export function PrPanel({
       header={<PanelHeader subject={subject} />}
       footer={
         actions && !goneLabel ? (
-          <div className="flex flex-col gap-2">
-            {ai?.questions ? <AnswersFooter ai={ai} /> : null}
-            <ActionFooter actions={actions} demoted={Boolean(ai?.questions)} />
-          </div>
+          <ActionFooter actions={actions} demoted={Boolean(ai?.questions)} />
         ) : (
           <Button
             variant="primary"
@@ -414,14 +410,14 @@ export function PrPanel({
       {goneLabel ? (
         <p className="mt-3 mb-0 text-xs text-fg-3">{goneLabel}</p>
       ) : null}
-      {ai ? <QuestionsSection ai={ai} /> : null}
       {actions ? <ActionStatus actions={actions} /> : null}
       {ai?.state ? (
         <AgentTaskStatus
           state={ai.state}
+          latestStep={ai.latestStep}
           onStop={ai.onStop}
           onRetry={ai.onRetry}
-          onOpenTerminal={ai.onOpenTerminal}
+          onOpenRun={ai.onOpenRun}
         />
       ) : null}
       {runs.length > 0 ? (

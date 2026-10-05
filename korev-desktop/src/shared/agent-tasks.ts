@@ -170,6 +170,8 @@ export interface KorevRun {
 
 export const KOREV_RUNS_KEPT = 5;
 
+export const ACTIVITY_KEPT = 300;
+
 export type ExplainFormat = 'html' | 'markdown';
 
 export const EXPLAIN_FORMATS: readonly ExplainFormat[] = ['html', 'markdown'];

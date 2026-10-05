@@ -215,12 +215,25 @@ and open `#gallery`).
   secondary `sm` button ("Merge conflicts · Fix conflicts"). Fixes that don't apply
   are hidden, not disabled. On a fork whose author didn't allow maintainer edits the
   buttons are disabled and one line says why.
-- When Korev has questions, "Korev needs your answer" is the first section of the
-  panel and the first reason of the row (danger), so the PR sits in Needs you. Each
-  question shows its context in `fg-2`, the question in `fg-1` and a "Your answer"
-  field. The footer gains "Send answers" (⌘↵ from a field), disabled until every field
-  has text, and a ghost "I'll do it myself" that drops the task; Merge or Open on
-  GitHub become secondary until then.
+- The side panel only sums up a Korev task. The work itself happens on the **Korev run
+  page**, which replaces the list and the panel in the main area. It opens when the user
+  starts a fix, Review or Review & fix, from "Open" / "Answer questions" / "Open review
+  draft" in the panel, and from a question notification. "Back" (Esc) returns to the
+  list with the row focused. Explain keeps its reader.
+- The run page header shows the PR, the task line (with Stop and Open terminal) and a
+  failure with Retry. Below it, the "Activity" feed lists what the agent does as it
+  happens: steps ("Read src/a.ts", "Ran npm test") in mono `fg-2`, the agent's own text
+  in `fg-1`. It follows the newest line unless the user scrolled up. While the task
+  runs the feed fills the page; once it needs the user or is done, the result takes the
+  main column and the feed moves to a 380px side column (stacked below 900px).
+- When Korev has questions, the panel shows "Korev needs your answer" with "2 questions
+  from Fix conflicts" (danger) and a primary "Answer questions", and the row's first
+  reason is danger, so the PR sits in Needs you. Merge or Open on GitHub become
+  secondary until then. The run page asks one question at a time: "Question 1 of 2",
+  step dots, the context in `fg-2`, the question in `type-h3`, and a "Your answer"
+  field. Next (⌘↵) is disabled until the field has text; the last question offers
+  "Send answers", disabled until every question has an answer. Back keeps answers, and
+  a ghost "I'll do it myself" drops the task.
 - Address comments acts only on comments from the user and from people with write
   access (OWNER, MEMBER, COLLABORATOR). A comment from anyone else becomes a question
   in the same batch, quoting it. Korev replies on each thread it handled ("Fixed in
@@ -232,7 +245,8 @@ and open `#gallery`).
   "View commit".
 - A macOS notification appears only when the Korev window is not focused, for
   questions ("Korev needs your answer on #301") and failures. Clicking it focuses
-  Korev, switches to the PR's view and opens its panel. Settings → AI tasks has "Notify
+  Korev, switches to the PR's view and opens its panel, or the run page when Korev has
+  questions. Settings → AI tasks has "Notify
   me when Korev needs me", on by default.
 - Keep mergeable is a `Switch` at the top of the section (⇧A in My PRs). A watched PR's
   row line 2 ends with "· Keep mergeable", like "· Kept · 26d left"; there is no badge.
@@ -247,9 +261,9 @@ and open `#gallery`).
   queue are left alone.
 - With no agent chosen in Settings, the section shows one line, "Set up Claude Code or
   Codex to use Korev AI", and an "Open Settings" button instead of actions.
-- While a task runs, the row carries the task chip and the panel shows the step and
-  the elapsed time ("Explain · Running the agent · 4m") with a ghost Stop that needs no
-  confirm. The section's other buttons are disabled with "Korev is already working on
+- While a task runs, the row carries the task chip and the panel shows the latest step
+  and the elapsed time ("Review & fix · Ran npm test · 4m") with "Open" and a ghost Stop
+  that needs no confirm. The section's other buttons are disabled with "Korev is already working on
   this PR". A failure shows the danger chip, the plain message and Retry. The last
   finished run stays as "Last Korev run · <summary>".
 - Explanations open in a wide reader `Dialog` (`min(960px, 100vw − 32px)`): title
@@ -260,12 +274,12 @@ and open `#gallery`).
   An explanation made for an older head shows the warning banner "This PR changed since
   this explanation (abc1234 → def5678)" with Regenerate.
 - Review (⇧R) runs on review requests; on My PRs it is "Review & fix", which reviews and
-  then pushes fixes for what it found. A review draft opens from "Open review draft" in
-  the same wide overlay: the summary in an editable field, then one `Finding` card per
+  then pushes fixes for what it found. A review draft opens from "Open review draft" on
+  the run page: the summary in an editable field, then one `Finding` card per
   comment with path:line, the code around the line in a `DiffHunk`, the comment text
   (click to edit), and Accept / Dismiss. The footer counts "4 of 6 comments" and offers
   "Request changes" and "Submit as comment" (primary). Approve is never offered. With
-  no findings the body starts with "Nothing to flag." Esc keeps the edited draft.
+  no findings the body starts with "Nothing to flag." Leaving the page keeps the edited draft.
   Findings the agent is unsure of arrive as questions instead of cards.
 - A collapsed "Korev activity" section lists the last five runs on the PR: when, which
   task, the result, and links to the commits.

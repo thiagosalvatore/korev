@@ -80,6 +80,11 @@ export function KorevAiSection({ ai }: { ai: PanelAi }) {
           <p className="m-0 min-w-0 flex-1 text-sm text-fg-2">
             Last Korev run · {ai.state.summary}
           </p>
+          {ai.draft ? null : (
+            <Button size="sm" variant="ghost" onClick={ai.onOpenRun}>
+              Open
+            </Button>
+          )}
           {ai.state.rerunRunIds?.length ? (
             <Button size="sm" onClick={ai.onRerunFailedJobs}>
               Re-run failed jobs
@@ -125,7 +130,7 @@ export function KorevAiSection({ ai }: { ai: PanelAi }) {
           <p className="m-0 min-w-0 flex-1 text-sm text-fg-2">
             Review draft · {pluralize(ai.draft.comments.length, 'comment')}
           </p>
-          <Button size="sm" variant="primary" onClick={ai.onOpenDraft}>
+          <Button size="sm" variant="primary" onClick={ai.onOpenRun}>
             Open review draft
           </Button>
         </div>

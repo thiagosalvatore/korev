@@ -58,6 +58,10 @@ export function panel(window: Page) {
   return window.getByRole('complementary', { name: 'Pull request details' });
 }
 
+export function runPage(window: Page, number: number) {
+  return window.getByRole('region', { name: `Korev on #${number}` });
+}
+
 export function confirmDialog(window: Page) {
   return window.getByRole('dialog');
 }

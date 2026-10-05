@@ -11,6 +11,7 @@ import {
   FORK_WITHOUT_EDITS,
   canPushFixes,
   isKeptMergeable,
+  type AgentActivity,
   type AgentQuestion,
   type AgentTaskKind,
   type AgentTaskState,
@@ -31,7 +32,8 @@ import type { PanelSubject } from '../inbox/list-model';
 import { TerminalDrawer } from '../terminal/TerminalDrawer';
 import { hasWorktree } from './agent-task-state';
 import { ExplainReader } from './ExplainReader';
-import { ReviewDraftReader } from './ReviewDraftReader';
+import { KorevRunPage } from './KorevRunPage';
+import { useAgentActivity } from './useAgentActivity';
 import { KeepMergeableIntro } from './KeepMergeableIntro';
 import { needsIntro, saveKeepMergeable } from './keep-mergeable';
 
@@ -73,9 +75,11 @@ export interface PanelAi {
   reviewKind: 'review' | 'review-fix';
   draft: ReviewDraft | null;
   history: KorevRun[];
+  activity: AgentActivity[];
+  latestStep?: string;
   prUrl: string;
   onReview: () => void;
-  onOpenDraft: () => void;
+  onOpenRun: () => void;
   onStop: () => void;
   onRetry: () => void;
   onRerunFailedJobs: () => void;
@@ -156,6 +160,9 @@ function useSettledAnnouncements(
 
 export interface KorevAi {
   panelAi(subject: PanelSubject | null): PanelAi | undefined;
+  runRef: string | null;
+  showRun(ref: string): void;
+  runPage(subject: PanelSubject): ReactNode;
   shortcuts: ShortcutMap;
   overlays: ReactNode;
   terminal: ReactNode;
@@ -170,7 +177,9 @@ export function useKorevAi(
 ): KorevAi {
   const settings = useSettings();
   const [reader, setReader] = useState<PullRequest | null>(null);
-  const [draftFor, setDraftFor] = useState<PullRequest | null>(null);
+  const [runRef, setRunRef] = useState<string | null>(null);
+  const closeRun = useCallback(() => setRunRef(null), []);
+  const agentActivity = useAgentActivity(tasks);
   const [drafts, setDrafts] = useState<Record<string, QuestionAnswers>>({});
   const [intro, setIntro] = useState<PullRequest | null>(null);
   const [terminalFor, setTerminalFor] = useState<PrTarget | null>(null);
@@ -192,10 +201,26 @@ export function useKorevAi(
     return subject?.kind === 'mine' ? 'review-fix' : 'review';
   }
 
+  function openRun(pr: PullRequest) {
+    setRunRef(prRef(pr));
+    agentActivity.load(targetOf(pr));
+  }
+
+  function showRun(ref: string) {
+    const pr = pullRequests(ref);
+    if (pr) openRun(pr);
+  }
+
   function review(subject: PanelSubject | null) {
     const pr = subjectPr(subject);
     if (!pr || !available) return;
     void korev().ai.start(targetOf(pr), reviewKindOf(subject));
+    openRun(pr);
+  }
+
+  function retry(pr: PullRequest, state: AgentTaskState) {
+    startTask(state.kind, targetOf(pr));
+    if (state.kind !== 'explain') openRun(pr);
   }
 
   function draftOf(pr: PullRequest): ReviewDraft | null {
@@ -265,6 +290,7 @@ export function useKorevAi(
     const ref = prRef(pr);
     const state = tasks[ref] ?? null;
     const target = targetOf(pr);
+    const activity = agentActivity.activity[ref] ?? [];
     return {
       available,
       keepMergeable: keepMergeableFor(subject),
@@ -276,19 +302,28 @@ export function useKorevAi(
       onSendAnswers: () => void sendAnswers(pr),
       onDismiss: () => {
         forget(ref);
+        closeRun();
         void korev().ai.dismiss(target);
       },
-      onFix: (kind) => startTask(kind, target),
+      onFix: (kind) => {
+        startTask(kind, target);
+        openRun(pr);
+      },
       onExplain: () => explain(pr),
       reviewKind: reviewKindOf(subject),
       draft: draftOf(pr),
       history: history[ref] ?? [],
+      activity,
+      latestStep: activity.findLast((entry) => entry.kind === 'step')?.text,
       prUrl: pr.url,
       onReview: () => review(subject),
-      onOpenDraft: () => setDraftFor(pr),
-      onStop: () => void korev().ai.cancel(target),
+      onOpenRun: () => openRun(pr),
+      onStop: () => {
+        closeRun();
+        void korev().ai.cancel(target);
+      },
       onRetry: () => {
-        if (state) startTask(state.kind, target);
+        if (state) retry(pr, state);
       },
       onRerunFailedJobs: () => void rerunFailedJobs(target),
       onOpenSettings,
@@ -298,8 +333,14 @@ export function useKorevAi(
     };
   }
 
+  function runPage(subject: PanelSubject): ReactNode {
+    const pr = subjectPr(subject);
+    const ai = panelAi(subject);
+    if (!pr || !ai) return null;
+    return <KorevRunPage key={prRef(pr)} pr={pr} ai={ai} onClose={closeRun} />;
+  }
+
   const readerTask = reader ? tasks[prRef(reader)] : undefined;
-  const openDraft = draftFor ? draftOf(draftFor) : null;
   const shown = toast.toast;
   const overlays = (
     <>
@@ -310,15 +351,6 @@ export function useKorevAi(
           headOid={reader.headRefOid}
           state={readerTask?.kind === 'explain' ? readerTask : null}
           onClose={() => setReader(null)}
-        />
-      ) : null}
-      {draftFor && openDraft ? (
-        <ReviewDraftReader
-          key={prRef(draftFor)}
-          target={targetOf(draftFor)}
-          title={draftFor.title}
-          draft={openDraft}
-          onClose={() => setDraftFor(null)}
         />
       ) : null}
       {intro && settings ? (
@@ -360,6 +392,9 @@ export function useKorevAi(
 
   return {
     panelAi,
+    runRef,
+    showRun,
+    runPage,
     shortcuts: {
       [EXPLAIN_KEY]: () => explain(subjectPr(selected)),
       [REVIEW_KEY]: () => review(selected),

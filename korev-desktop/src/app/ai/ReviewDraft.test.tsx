@@ -3,6 +3,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -63,7 +64,7 @@ function doneWith(review: ReviewDraft): AgentTaskState {
 
 async function openDraft(review: ReviewDraft) {
   const { bridge } = installFakeBridge({ settings: WITH_AGENT });
-  render(
+  const { rerender } = render(
     <ReviewInbox
       snapshot={makeSnapshot({ agentTasks: { [REF]: doneWith(review) } })}
       onOpenSettings={vi.fn()}
@@ -76,28 +77,30 @@ async function openDraft(review: ReviewDraft) {
   fireEvent.click(
     await within(panel).findByRole('button', { name: 'Open review draft' }),
   );
-  return { bridge, dialog: screen.getByRole('dialog') };
+  return {
+    bridge,
+    rerender,
+    page: screen.getByRole('region', { name: `Korev on #${pr.number}` }),
+  };
 }
 
 describe('review draft', () => {
   it('submits the kept comments as a comment, never offering Approve', async () => {
-    const { bridge, dialog } = await openDraft(DRAFT);
-    const [, second] = within(dialog).getAllByRole('button', {
+    const { bridge, page } = await openDraft(DRAFT);
+    const [, second] = within(page).getAllByRole('button', {
       name: 'Dismiss',
     });
 
     fireEvent.click(second);
-    fireEvent.change(within(dialog).getByLabelText('Summary'), {
+    fireEvent.change(within(page).getByLabelText('Summary'), {
       target: { value: 'One problem with retries.' },
     });
     fireEvent.click(
-      within(dialog).getByRole('button', { name: 'Submit as comment' }),
+      within(page).getByRole('button', { name: 'Submit as comment' }),
     );
 
-    expect(
-      within(dialog).queryByRole('button', { name: /Approve/ }),
-    ).toBeNull();
-    expect(within(dialog).getByText('1 of 2 comments')).toBeTruthy();
+    expect(within(page).queryByRole('button', { name: /Approve/ })).toBeNull();
+    expect(within(page).getByText('1 of 2 comments')).toBeTruthy();
     expect(bridge.ai.submitReview).toHaveBeenCalledWith(TARGET, {
       summary: 'One problem with retries.',
       event: 'COMMENT',
@@ -112,23 +115,54 @@ describe('review draft', () => {
   });
 
   it('says there is nothing to flag when the review found nothing', async () => {
-    const { dialog } = await openDraft({ ...DRAFT, comments: [] });
+    const { page } = await openDraft({ ...DRAFT, comments: [] });
 
-    expect(within(dialog).getByText('Nothing to flag.')).toBeTruthy();
+    expect(within(page).getByText('Nothing to flag.')).toBeTruthy();
     expect(
-      within(dialog).getByRole('button', { name: 'Submit as comment' }),
+      within(page).getByRole('button', { name: 'Submit as comment' }),
     ).toBeTruthy();
   });
 
-  it('keeps edits when the draft is closed', async () => {
-    const { bridge, dialog } = await openDraft(DRAFT);
+  it('does not save the draft back once it is submitted', async () => {
+    const { bridge, rerender, page } = await openDraft(DRAFT);
+    const submitted: AgentTaskState = {
+      status: 'done',
+      kind: 'review',
+      summary: 'Submitted the review',
+      commits: [],
+      finishedAt: '2026-10-04T10:05:00.000Z',
+    };
+    vi.mocked(bridge.ai.submitReview).mockImplementation(async () => {
+      rerender(
+        <ReviewInbox
+          snapshot={makeSnapshot({ agentTasks: { [REF]: submitted } })}
+          onOpenSettings={vi.fn()}
+        />,
+      );
+      return { ok: true };
+    });
+
     fireEvent.click(
-      within(dialog).getByRole('button', {
+      within(page).getByRole('button', { name: 'Submit as comment' }),
+    );
+
+    await waitFor(() =>
+      expect(
+        within(page).queryByRole('region', { name: 'Review draft' }),
+      ).toBeNull(),
+    );
+    expect(bridge.ai.saveReviewDraft).not.toHaveBeenCalled();
+  });
+
+  it('keeps edits when the user leaves the review page', async () => {
+    const { bridge, page } = await openDraft(DRAFT);
+    fireEvent.click(
+      within(page).getByRole('button', {
         name: 'This charges twice on retry.',
       }),
     );
     fireEvent.change(
-      within(dialog).getByLabelText('Comment on billing/retry.ts:12'),
+      within(page).getByLabelText('Comment on billing/retry.ts:12'),
       { target: { value: 'This charges the card twice.' } },
     );
 
@@ -142,5 +176,43 @@ describe('review draft', () => {
         ]),
       }),
     );
+  });
+
+  it('lets the user answer the questions a review asks, on a review request', async () => {
+    const { bridge } = installFakeBridge({ settings: WITH_AGENT });
+    render(
+      <ReviewInbox
+        snapshot={makeSnapshot({
+          agentTasks: {
+            [REF]: {
+              status: 'needs-input',
+              kind: 'review',
+              questions: [
+                {
+                  id: 'finding:1',
+                  question: 'Keep this finding?',
+                  context: '',
+                },
+              ],
+            },
+          },
+        })}
+        onOpenSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('option', { name: new RegExp(pr.title) }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Answer questions' }),
+    );
+    const page = screen.getByRole('region', { name: `Korev on #${pr.number}` });
+
+    fireEvent.change(within(page).getByLabelText('Your answer'), {
+      target: { value: 'Yes' },
+    });
+    fireEvent.click(within(page).getByRole('button', { name: /Send answers/ }));
+
+    expect(bridge.ai.answer).toHaveBeenCalledWith(TARGET, {
+      'finding:1': 'Yes',
+    });
   });
 });

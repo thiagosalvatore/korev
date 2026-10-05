@@ -1,4 +1,5 @@
 import {
+  ACTIVITY_KEPT,
   type AgentActivity,
   type AgentActivityEvent,
   type AgentActivityLine,
@@ -29,7 +30,6 @@ import {
 import { NO_TASKS, type TaskRecord, type TaskStore } from './task-store';
 
 export const MAX_RUNNING_TASKS = 2;
-export const ACTIVITY_KEPT = 300;
 export const STOPPED_ON_QUIT = 'Stopped when Korev quit';
 export const ALREADY_WORKING = 'Korev is already working on this PR';
 const PR_NOT_FOUND = "Korev can't find this pull request in your inbox.";

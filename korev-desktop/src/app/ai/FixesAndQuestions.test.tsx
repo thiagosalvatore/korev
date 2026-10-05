@@ -203,21 +203,80 @@ describe('Korev activity', () => {
   });
 });
 
+function runPage() {
+  return screen.getByRole('region', { name: 'Korev on #320' });
+}
+
+function answerQuestions() {
+  fireEvent.click(
+    within(openPanel()).getByRole('button', { name: 'Answer questions' }),
+  );
+  return runPage();
+}
+
+describe('the Korev run page', () => {
+  it('opens when a fix starts and shows what the agent does as it happens', async () => {
+    const { emitActivity } = renderMine();
+    fireEvent.click(
+      await within(openPanel()).findByRole('button', { name: 'Fix conflicts' }),
+    );
+
+    act(() =>
+      emitActivity({
+        ref: REF,
+        entry: {
+          at: '2026-10-04T10:00:00.000Z',
+          kind: 'step',
+          text: 'Read worker.ts',
+        },
+      }),
+    );
+
+    const log = within(runPage()).getByRole('log');
+    expect(within(log).getByText('Read worker.ts')).toBeTruthy();
+  });
+
+  it('goes back to the list on Esc', () => {
+    renderMine(ITEM, { [REF]: WAITING });
+    answerQuestions();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    expect(screen.queryByRole('region', { name: 'Korev on #320' })).toBeNull();
+    expect(
+      screen.getByRole('option', { name: /Move ingestion to the new queue/ }),
+    ).toBeTruthy();
+  });
+});
+
 describe('questions from Korev', () => {
-  it('sends the answers only once every question has one', async () => {
+  it('asks one question at a time and sends the answers once every question has one', () => {
     const { bridge } = renderMine(ITEM, { [REF]: WAITING });
-    const panel = openPanel();
-    const send = within(panel).getByRole('button', {
+    const page = answerQuestions();
+    const next = () => within(page).getByRole('button', { name: /Next/ });
+
+    expect(within(page).getByText('Question 1 of 2')).toBeTruthy();
+    expect(within(page).getByText(WAITING.questions[0].context)).toBeTruthy();
+    expect((next() as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(within(page).getByLabelText('Your answer'), {
+      target: { value: '60s' },
+    });
+    fireEvent.click(next());
+
+    expect(within(page).getByText('Keep the old retry helper?')).toBeTruthy();
+    const send = within(page).getByRole('button', {
       name: /Send answers/,
     }) as HTMLButtonElement;
-    const [first, second] = within(panel).getAllByLabelText('Your answer');
-
-    expect(within(panel).getByText(WAITING.questions[0].context)).toBeTruthy();
-    fireEvent.change(first, { target: { value: '60s' } });
     expect(send.disabled).toBe(true);
-
-    fireEvent.change(second, { target: { value: 'No, drop it' } });
-    fireEvent.click(send);
+    fireEvent.click(within(page).getByRole('button', { name: 'Back' }));
+    expect(
+      (within(page).getByLabelText('Your answer') as HTMLTextAreaElement).value,
+    ).toBe('60s');
+    fireEvent.click(next());
+    fireEvent.change(within(page).getByLabelText('Your answer'), {
+      target: { value: 'No, drop it' },
+    });
+    fireEvent.click(within(page).getByRole('button', { name: /Send answers/ }));
 
     expect(bridge.ai.answer).toHaveBeenCalledWith(TARGET, {
       q1: '60s',
@@ -229,13 +288,15 @@ describe('questions from Korev', () => {
     const { bridge } = renderMine(ITEM, { [REF]: WAITING });
 
     fireEvent.click(
-      within(openPanel()).getByRole('button', { name: "I'll do it myself" }),
+      within(answerQuestions()).getByRole('button', {
+        name: "I'll do it myself",
+      }),
     );
 
     expect(bridge.ai.dismiss).toHaveBeenCalledWith(TARGET);
   });
 
-  it('opens the PR a notification points at, in its view', async () => {
+  it('opens the questions a notification points at, in its view', async () => {
     const { emitFocusPr } = installFakeBridge({
       settings: { ...WITH_AGENT, lastView: 'review' },
       snapshot: makeSnapshot({
@@ -259,9 +320,7 @@ describe('questions from Korev', () => {
 
     act(() => emitFocusPr(REF));
 
-    const panel = await screen.findByRole('complementary', {
-      name: 'Pull request details',
-    });
-    expect(within(panel).getByText('Korev needs your answer')).toBeTruthy();
+    const page = await screen.findByRole('region', { name: 'Korev on #320' });
+    expect(within(page).getByText('Which timeout wins?')).toBeTruthy();
   });
 });

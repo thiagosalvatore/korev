@@ -93,8 +93,12 @@ function renderMine(state: AgentTaskState) {
   return fake;
 }
 
-function panel() {
-  return screen.getByRole('complementary', { name: 'Pull request details' });
+function openRunPage() {
+  const panel = screen.getByRole('complementary', {
+    name: 'Pull request details',
+  });
+  fireEvent.click(within(panel).getByRole('button', { name: 'Open' }));
+  return screen.getByRole('region', { name: 'Korev on #320' });
 }
 
 describe('terminal on a kept checkout', () => {
@@ -102,7 +106,7 @@ describe('terminal on a kept checkout', () => {
     const { bridge, emitTerminalOutput } = renderMine(UNPUSHED);
 
     fireEvent.click(
-      within(panel()).getByRole('button', { name: 'Open terminal' }),
+      within(openRunPage()).getByRole('button', { name: 'Open terminal' }),
     );
 
     const drawer = await screen.findByRole('region', { name: /Terminal/ });
@@ -125,7 +129,7 @@ describe('terminal on a kept checkout', () => {
     renderMine({ status: 'failed', kind: 'fix-ci', message: 'Timed out' });
 
     expect(
-      within(panel()).queryByRole('button', { name: 'Open terminal' }),
+      within(openRunPage()).queryByRole('button', { name: 'Open terminal' }),
     ).toBeNull();
   });
 });

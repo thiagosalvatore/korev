@@ -7,10 +7,14 @@ import {
   type AgentTaskState,
   type AgentTaskStep,
 } from '../../shared/agent-tasks';
-import { formatAge } from '../format';
+import { formatAge, pluralize } from '../format';
+import { PanelSection } from '../inbox/PanelSection';
 import { MINUTE_MS, useNow } from '../useNow';
 
 const OPEN_TERMINAL = 'Open terminal';
+const OPEN_RUN = 'Open';
+export const ANSWER_QUESTIONS = 'Answer questions';
+export const NEEDS_ANSWER_TITLE = 'Korev needs your answer';
 const STEPS_WITH_WORKTREE: ReadonlySet<AgentTaskStep> = new Set([
   'running',
   'pushing',
@@ -70,9 +74,11 @@ export function hasChip(state: AgentTaskState | null): state is AgentTaskState {
 
 interface AgentTaskStatusProps {
   state: AgentTaskState;
+  latestStep?: string;
   onStop: () => void;
   onRetry: () => void;
   onOpenTerminal?: () => void;
+  onOpenRun?: () => void;
 }
 
 function OpenTerminalButton({ onOpen }: { onOpen?: () => void }) {
@@ -84,23 +90,45 @@ function OpenTerminalButton({ onOpen }: { onOpen?: () => void }) {
   );
 }
 
+function OpenRunButton({ onOpen }: { onOpen?: () => void }) {
+  if (!onOpen) return null;
+  return (
+    <Button size="sm" onClick={onOpen}>
+      {OPEN_RUN}
+    </Button>
+  );
+}
+
+function currentStep(
+  state: Extract<AgentTaskState, { status: 'running' }>,
+  latestStep: string | undefined,
+): string {
+  if (state.step === 'running' && latestStep) return latestStep;
+  return AGENT_TASK_STEP_LABELS[state.step];
+}
+
 function RunningLine({
   state,
+  latestStep,
   onStop,
   onOpenTerminal,
+  onOpenRun,
 }: {
   state: Extract<AgentTaskState, { status: 'running' }>;
+  latestStep?: string;
   onStop: () => void;
   onOpenTerminal?: () => void;
+  onOpenRun?: () => void;
 }) {
   const now = useNow(MINUTE_MS);
   const words = AGENT_TASK_WORDS[state.kind];
+  const line = `${words.name} · ${currentStep(state, latestStep)} · ${formatAge(state.startedAt, now)}`;
   return (
     <div className="flex items-center gap-2">
-      <p className="m-0 min-w-0 flex-1 text-sm text-fg-2">
-        {words.name} · {AGENT_TASK_STEP_LABELS[state.step]} ·{' '}
-        {formatAge(state.startedAt, now)}
+      <p className="m-0 min-w-0 flex-1 truncate text-sm text-fg-2" title={line}>
+        {line}
       </p>
+      <OpenRunButton onOpen={onOpenRun} />
       <OpenTerminalButton onOpen={onOpenTerminal} />
       <Button size="sm" variant="ghost" onClick={onStop}>
         Stop
@@ -109,22 +137,51 @@ function RunningLine({
   );
 }
 
+function QuestionsWaiting({
+  state,
+  onOpenRun,
+}: {
+  state: Extract<AgentTaskState, { status: 'needs-input' }>;
+  onOpenRun: () => void;
+}) {
+  return (
+    <PanelSection title={NEEDS_ANSWER_TITLE}>
+      <div className="flex items-center gap-2">
+        <p className="m-0 min-w-0 flex-1 text-sm text-danger-text">
+          {pluralize(state.questions.length, 'question')} from{' '}
+          {AGENT_TASK_WORDS[state.kind].name}
+        </p>
+        <Button size="sm" variant="primary" onClick={onOpenRun}>
+          {ANSWER_QUESTIONS}
+        </Button>
+      </div>
+    </PanelSection>
+  );
+}
+
 export function AgentTaskStatus({
   state,
+  latestStep,
   onStop,
   onRetry,
   onOpenTerminal,
+  onOpenRun,
 }: AgentTaskStatusProps) {
   if (isRunning(state)) {
     return (
       <section className="mt-4.5">
         <RunningLine
           state={state}
+          latestStep={latestStep}
           onStop={onStop}
           onOpenTerminal={onOpenTerminal}
+          onOpenRun={onOpenRun}
         />
       </section>
     );
+  }
+  if (state.status === 'needs-input' && onOpenRun) {
+    return <QuestionsWaiting state={state} onOpenRun={onOpenRun} />;
   }
   if (state.status === 'needs-input' && onOpenTerminal) {
     return (
@@ -143,6 +200,7 @@ export function AgentTaskStatus({
         <p className="m-0 min-w-0 flex-1 text-sm text-danger-text">
           {state.message}
         </p>
+        <OpenRunButton onOpen={onOpenRun} />
         <OpenTerminalButton onOpen={onOpenTerminal} />
         <Button size="sm" onClick={onRetry}>
           Retry
