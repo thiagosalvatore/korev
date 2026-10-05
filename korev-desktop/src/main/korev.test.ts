@@ -146,6 +146,7 @@ function setup(
     sleep: async () => undefined,
     openExternal: async () => undefined,
     openPath: async () => undefined,
+    notify: () => undefined,
     prefersDark: () => false,
     applyTheme: () => undefined,
     broadcast,

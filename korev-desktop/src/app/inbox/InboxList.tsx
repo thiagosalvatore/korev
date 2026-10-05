@@ -29,12 +29,15 @@ import {
 } from './listbox';
 import { AgentTasksProvider } from '../ai/agent-task-state';
 import { useKorevAi } from '../ai/useKorevAi';
+import { pullRequestsIn } from '../../inbox/stacks';
+import { prRef } from '../../shared/pr-ref';
 import { ActionsProvider } from './action-state';
 import { RepoAvatarsProvider } from './OwnerAvatar';
 import { PrPanel } from './PrPanel';
 import { APPLY_UPDATES_KEY, UpdatesPill } from './UpdatesPill';
 import { useHeldSnapshot, useIdleApply } from './useHeldSnapshot';
 import { useMyPrActions } from './useMyPrActions';
+import { useFocusRequest, type FocusRequest } from './focus-request';
 import { useSelection } from './useSelection';
 
 type ElementRef = RefObject<HTMLDivElement | null>;
@@ -177,6 +180,16 @@ export function InboxList({
 
   useLayoutEffect(() => updateRovingStop(listbox.current, selectedKey));
 
+  const focusRequest = useFocusRequest();
+  const [handledFocus, setHandledFocus] = useState<FocusRequest | null>(null);
+  if (focusRequest !== handledFocus && focusRequest) {
+    setHandledFocus(focusRequest);
+    if (subjects.has(focusRequest.ref)) {
+      selection.select(focusRequest.ref);
+      setPanelOpen(true);
+    }
+  }
+
   const actions = useMyPrActions(
     view === 'mine',
     held.displayed,
@@ -188,6 +201,8 @@ export function InboxList({
   const ai = useKorevAi(
     held.displayed.agentTasks,
     selection.subject,
+    (ref) =>
+      pullRequestsIn(held.displayed).find((pr) => prRef(pr) === ref) ?? null,
     onOpenSettings,
   );
 

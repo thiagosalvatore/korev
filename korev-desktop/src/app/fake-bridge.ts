@@ -32,6 +32,7 @@ export interface FakeBridge {
   emitInbox: (snapshot: InboxSnapshot) => void;
   emitSettings: (settings: Settings) => void;
   emitCommand: (command: AppCommand) => void;
+  emitFocusPr: (ref: string) => void;
   stopInbox: ReturnType<typeof vi.fn>;
 }
 
@@ -64,6 +65,7 @@ export function installFakeBridge({
   const settingsListeners = new Set<(next: Settings) => void>();
   const stopInbox = vi.fn();
   const commandListeners = new Set<(command: AppCommand) => void>();
+  const focusListeners = new Set<(ref: string) => void>();
   const bridge: KorevBridge = {
     inbox: {
       load: vi.fn(async () => snapshot),
@@ -143,6 +145,7 @@ export function installFakeBridge({
       test: vi.fn(async () => ({ ok: true as const, output: 'OK' })),
     },
     ai: {
+      start: vi.fn(async () => ({ ok: true as const })),
       explain: vi.fn(async () => ({ ok: true as const })),
       explanation: vi.fn(async () => explanation),
       openExplanation: vi.fn(async () => undefined),
@@ -161,6 +164,10 @@ export function installFakeBridge({
         commandListeners.add(listener);
         return () => commandListeners.delete(listener);
       }),
+      onFocusPr: vi.fn((listener) => {
+        focusListeners.add(listener);
+        return () => focusListeners.delete(listener);
+      }),
     },
   };
   window.korev = bridge;
@@ -171,6 +178,7 @@ export function installFakeBridge({
       settingsListeners.forEach((listener) => listener(next)),
     emitCommand: (command) =>
       commandListeners.forEach((listener) => listener(command)),
+    emitFocusPr: (ref) => focusListeners.forEach((listener) => listener(ref)),
     stopInbox,
   };
 }

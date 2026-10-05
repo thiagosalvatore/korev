@@ -100,6 +100,7 @@ function setup() {
     repos: () => session.repos,
     mergeWith: () => ({}),
     keptPrs: () => ({}),
+    needsAnswer: () => [],
     renameRepos: async (renames) => {
       session.repos = session.repos.map(
         (repo) => renames.find((rename) => rename.from === repo)?.to ?? repo,

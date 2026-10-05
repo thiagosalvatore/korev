@@ -14,3 +14,11 @@ export function useAppCommands(handlers: AppCommandHandlers) {
     [],
   );
 }
+
+export function useFocusPrRequests(onFocus: (ref: string) => void) {
+  const latest = useRef(onFocus);
+  useEffect(() => {
+    latest.current = onFocus;
+  });
+  useEffect(() => korev().app.onFocusPr((ref) => latest.current(ref)), []);
+}

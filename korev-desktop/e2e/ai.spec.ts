@@ -11,7 +11,7 @@ import {
   withSession,
 } from './app';
 import { API_REPO, FAILING_PR_NUMBER, FAILING_PR_TITLE } from './fake-github';
-import { createGitRemote, type GitRemote } from './git-remote';
+import { createGitRemote, type GitRemote } from '../src/main/test-git-remote';
 
 const STUBS = resolve('e2e/stubs');
 
@@ -83,4 +83,56 @@ test('explains a PR in the reader with the agent running in a Korev checkout', a
       { headOids: remote.headOids },
     ),
   );
+});
+
+test('fixes a merge conflict after asking one question, and pushes the merge', async () => {
+  await withRemote(async (remote) => {
+    remote.commit(
+      'main',
+      { 'ingest.ts': 'export const limit = 50;\n' },
+      'Lower the limit',
+    );
+    await withSession(
+      async (github, userDataDir) => {
+        await chooseClaude(userDataDir);
+        const app = await launch(github, userDataDir, aiEnv(remote));
+        try {
+          const window = await appWindow(app);
+          await connectAndOpenMyPrs(window);
+          await openRow(window, FAILING_PR_TITLE);
+          await panel(window)
+            .getByRole('button', { name: 'Fix conflicts' })
+            .click();
+
+          await expect(
+            panel(window).getByText('Which ingestion limit should win?'),
+          ).toBeVisible({ timeout: 30_000 });
+          await panel(window).getByLabel('Your answer').fill('Use 75');
+          await panel(window)
+            .getByRole('button', { name: /Send answers/ })
+            .click();
+
+          await expect(
+            window.getByText(/Fixed conflicts on #491 · pushed/).first(),
+          ).toBeVisible({
+            timeout: 30_000,
+          });
+          expect(
+            remote.git('show', `feature-${FAILING_PR_NUMBER}:ingest.ts`),
+          ).toBe('export const limit = 75;');
+          expect(
+            remote.git(
+              'log',
+              '-1',
+              '--format=%s',
+              `feature-${FAILING_PR_NUMBER}`,
+            ),
+          ).toBe(`Merge main into feature-${FAILING_PR_NUMBER}`);
+        } finally {
+          await app.close();
+        }
+      },
+      { headOids: remote.headOids, conflicting: [FAILING_PR_NUMBER] },
+    );
+  });
 });

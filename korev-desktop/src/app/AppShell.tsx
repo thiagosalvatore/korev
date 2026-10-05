@@ -30,7 +30,10 @@ import { ReviewInbox } from './ReviewInbox';
 import { SettingsPage } from './Settings';
 import { SHORTCUT_SHEET_KEY, ShortcutSheet } from './ShortcutSheet';
 import { Topbar } from './Topbar';
-import { useAppCommands } from './useAppCommands';
+import { useAppCommands, useFocusPrRequests } from './useAppCommands';
+import { FocusRequestProvider, type FocusRequest } from './inbox/focus-request';
+import { myPrsIn } from '../inbox/stacks';
+import { prRef } from '../shared/pr-ref';
 import { refreshInbox, useInboxSnapshot } from './useInboxSnapshot';
 import { useMediaQuery } from './useMediaQuery';
 import { saveLastView, useSettings } from './useSettings';
@@ -211,6 +214,13 @@ export function AppShell({ auth, settings }: AppShellProps) {
     if (next !== SETTINGS_VIEW) void saveLastView(next);
   }
 
+  const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
+  useFocusPrRequests((ref) => {
+    const mine = snapshot ? myPrsIn(snapshot.mine) : [];
+    selectView(mine.some(({ pr }) => prRef(pr) === ref) ? 'mine' : 'review');
+    setFocusRequest({ ref, at: Date.now() });
+  });
+
   useKeyShortcuts({ [SHORTCUT_SHEET_KEY]: showShortcuts });
   useAppCommands({
     'show-review': () => selectView('review'),
@@ -240,14 +250,16 @@ export function AppShell({ auth, settings }: AppShellProps) {
           onShowShortcuts={view === SETTINGS_VIEW ? undefined : showShortcuts}
         />
         <main className="min-h-0 flex-1 overflow-hidden">
-          <ViewContent
-            key={view}
-            view={view}
-            auth={auth}
-            settings={settings}
-            snapshot={snapshot}
-            onOpenSettings={openSettings}
-          />
+          <FocusRequestProvider value={focusRequest}>
+            <ViewContent
+              key={view}
+              view={view}
+              auth={auth}
+              settings={settings}
+              snapshot={snapshot}
+              onOpenSettings={openSettings}
+            />
+          </FocusRequestProvider>
         </main>
       </div>
       <LiveAnnouncer snapshot={snapshot} />

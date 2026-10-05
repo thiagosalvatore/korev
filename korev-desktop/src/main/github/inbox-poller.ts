@@ -44,6 +44,7 @@ export interface InboxPollerDeps {
   repos(): string[];
   mergeWith(): Record<string, MergeTool>;
   keptPrs(): Record<string, string>;
+  needsAnswer(): string[];
   renameRepos(renames: RepoRename[]): Promise<void>;
   now(): Date;
   scheduler: Scheduler;
@@ -349,6 +350,7 @@ class GithubInboxPoller implements InboxPoller {
         repoOrder: this.deps.repos(),
         mergeWith: this.deps.mergeWith(),
         keptPrs: this.deps.keptPrs(),
+        needsAnswer: this.deps.needsAnswer(),
       }),
       repoMerge: fetched.repoMerge,
       repoAvatars: fetched.repoAvatars,

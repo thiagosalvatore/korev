@@ -4,6 +4,7 @@ import {
   ipcMain,
   Menu,
   nativeTheme,
+  Notification,
   powerMonitor,
   safeStorage,
   screen,
@@ -21,7 +22,7 @@ import { nodeFileSystem } from './main/file-system';
 import { registerIpcHandlers } from './main/ipc';
 import { githubEndpoints } from './main/github/config';
 import { runProcess } from './main/agents/command-runner';
-import { createKorev, type Korev } from './main/korev';
+import { createKorev, type Korev, type TaskNote } from './main/korev';
 import { createSafeStorageCipher } from './main/safe-storage-cipher';
 import { restorableBounds } from './main/window-bounds';
 
@@ -65,6 +66,19 @@ function installAppMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+function showTaskNote(note: TaskNote) {
+  if (BrowserWindow.getFocusedWindow() || !Notification.isSupported()) return;
+  const notification = new Notification({ title: note.title, body: note.body });
+  notification.on('click', () => {
+    const [window] = BrowserWindow.getAllWindows();
+    if (!window) return;
+    window.show();
+    window.focus();
+    window.webContents.send(IpcChannel.AppFocusPr, note.ref);
+  });
+  notification.show();
+}
+
 function createKorevApp(): Korev {
   return createKorev({
     userDataPath: app.getPath('userData'),
@@ -82,6 +96,7 @@ function createKorevApp(): Korev {
       if (problem) console.warn(problem);
     },
     prefersDark: () => nativeTheme.shouldUseDarkColors,
+    notify: showTaskNote,
     applyTheme: (theme) => {
       nativeTheme.themeSource = theme;
     },

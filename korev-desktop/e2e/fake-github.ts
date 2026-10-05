@@ -107,7 +107,12 @@ interface PrState {
   comments: FakeComment[];
 }
 
-function prNode(spec: PrSpec, state: PrState, headOid: string) {
+function prNode(
+  spec: PrSpec,
+  state: PrState,
+  headOid: string,
+  conflicting: boolean,
+) {
   return {
     id: `PR_${spec.number}`,
     number: spec.number,
@@ -128,8 +133,8 @@ function prNode(spec: PrSpec, state: PrState, headOid: string) {
     maintainerCanModify: false,
     author: { login: VIEWER_LOGIN, avatarUrl: null },
     reviewDecision: null,
-    mergeable: 'MERGEABLE',
-    mergeStateStatus: spec.mergeStateStatus,
+    mergeable: conflicting ? 'CONFLICTING' : 'MERGEABLE',
+    mergeStateStatus: conflicting ? 'DIRTY' : spec.mergeStateStatus,
     additions: 12,
     deletions: 3,
     changedFiles: 2,
@@ -230,6 +235,7 @@ export const PR_BODY =
 
 export interface FakeGithubOptions {
   headOids?: Record<number, string>;
+  conflicting?: number[];
   mergeQueueRepos?: string[];
   ownerAvatarUrl?: string;
   includeNewPr?: boolean;
@@ -353,6 +359,7 @@ export async function startFakeGithub(
               spec,
               stateOf(spec),
               options.headOids?.[spec.number] ?? `head${spec.number}`,
+              options.conflicting?.includes(spec.number) ?? false,
             ),
           ),
         ),

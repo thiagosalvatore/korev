@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runProcess, type CommandOptions } from './agents/command-runner';
+import { createGitRemote } from './test-git-remote';
 import {
   GIT_MESSAGES,
   UNUSED_CLONE_MS,
@@ -44,22 +45,14 @@ function writeGitConfig(contents: string) {
 }
 
 function createOrigin(): string {
-  const remote = join(scratch, 'remote');
-  const origin = join(remote, `${REPO}.git`);
-  const seed = join(scratch, 'seed');
-  execFileSync('mkdir', ['-p', origin, seed]);
-  sh(origin, 'init', '--bare', '-b', 'main');
-  sh(seed, 'init', '-b', 'main');
-  writeFileSync(join(seed, 'README.md'), 'hello\n');
-  sh(seed, 'add', '-A');
-  sh(seed, 'commit', '-m', 'first');
-  sh(seed, 'push', origin, 'main');
-  sh(seed, 'switch', '-c', 'feature');
-  writeFileSync(join(seed, 'feature.txt'), 'feature\n');
-  sh(seed, 'add', '-A');
-  sh(seed, 'commit', '-m', 'feature');
-  sh(seed, 'push', origin, 'feature', 'feature:refs/pull/7/head');
-  return remote;
+  const remote = createGitRemote(scratch, REPO, { 'README.md': 'hello\n' }, [
+    {
+      number: 7,
+      headRefName: 'feature',
+      files: { 'feature.txt': 'feature\n' },
+    },
+  ]);
+  return remote.gitUrl.replace('file://', '');
 }
 
 function setup(token: string | null = null, now = Date.now()) {
@@ -122,7 +115,7 @@ describe('checkouts', () => {
     expect(sh(fork, 'log', '-1', '--format=%s', 'feature')).toBe('Fix fork');
     expect(
       sh(join(remote, `${REPO}.git`), 'log', '-1', '--format=%s', 'feature'),
-    ).toBe('feature');
+    ).toBe('Change for #7');
   });
 
   it('never runs the repo hooks', async () => {

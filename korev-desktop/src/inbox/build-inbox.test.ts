@@ -20,6 +20,7 @@ function build(input: Partial<InboxInput>) {
     repoOrder: [],
     mergeWith: {},
     keptPrs: {},
+    needsAnswer: [],
     ...input,
   });
 }
@@ -91,5 +92,23 @@ describe('buildInbox', () => {
     expect(inbox.reviews.approved).toMatchObject([
       { item: { pr: { number: 40 } }, approval: { kind: 'teammate' } },
     ]);
+  });
+
+  it('puts a PR Korev has questions about in Needs you, with that reason first', () => {
+    const pr = makePr({
+      number: 7,
+      mergeStateStatus: 'DIRTY',
+      mergeable: 'CONFLICTING',
+      lastActivityAt: daysAgo(40),
+    });
+
+    const [section] = build({ mine: [pr], needsAnswer: ['acme/web#7'] }).mine;
+
+    expect(section.bucket).toBe('needs-you');
+    const [entry] = section.entries;
+    expect(entry.kind === 'pr' && entry.item.reasons[0]).toMatchObject({
+      code: 'needs-answer',
+      label: 'Korev needs your answer',
+    });
   });
 });

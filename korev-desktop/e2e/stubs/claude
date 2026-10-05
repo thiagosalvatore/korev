@@ -27,6 +27,23 @@ if (prompt.includes("Korev's explain agent")) {
     document:
       '<h2>What changes</h2><p>Each tenant gets its own ingestion rate limit.</p>',
   });
+} else if (prompt.includes("Korev's merge-conflict agent")) {
+  if (prompt.includes('The user already answered')) {
+    require('node:fs').writeFileSync('ingest.ts', 'export const limit = 75;\n');
+    reply({ ...base, changed: true, summary: 'Set the limit to 75' });
+  } else {
+    reply({
+      ...base,
+      summary: 'One conflict needs a decision',
+      questions: [
+        {
+          id: 'limit',
+          question: 'Which ingestion limit should win?',
+          context: 'ingest.ts: 100 on this PR, 50 on main',
+        },
+      ],
+    });
+  }
 } else {
   process.stdout.write(JSON.stringify({ is_error: true, result: 'Unknown task' }));
 }

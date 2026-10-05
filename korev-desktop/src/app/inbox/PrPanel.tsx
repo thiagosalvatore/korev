@@ -29,6 +29,7 @@ import { authorHandle } from './PrRow';
 import { ActionFooter, ActionStatus, type PanelActions } from './PanelActions';
 import { AgentTaskStatus } from '../ai/agent-task-state';
 import { KorevAiSection } from '../ai/KorevAiSection';
+import { AnswersFooter, QuestionsSection } from '../ai/QuestionsSection';
 import type { PanelAi } from '../ai/useKorevAi';
 import { PanelSection } from './PanelSection';
 import { PriorityBadge } from './PriorityBadge';
@@ -387,7 +388,10 @@ export function PrPanel({
       header={<PanelHeader subject={subject} />}
       footer={
         actions && !goneLabel ? (
-          <ActionFooter actions={actions} />
+          <div className="flex flex-col gap-2">
+            {ai?.questions ? <AnswersFooter ai={ai} /> : null}
+            <ActionFooter actions={actions} demoted={Boolean(ai?.questions)} />
+          </div>
         ) : (
           <Button
             variant="primary"
@@ -403,6 +407,7 @@ export function PrPanel({
       {goneLabel ? (
         <p className="mt-3 mb-0 text-xs text-fg-3">{goneLabel}</p>
       ) : null}
+      {ai ? <QuestionsSection ai={ai} /> : null}
       {actions ? <ActionStatus actions={actions} /> : null}
       {ai?.state ? (
         <AgentTaskStatus

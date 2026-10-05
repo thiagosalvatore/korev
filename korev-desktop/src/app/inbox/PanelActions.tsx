@@ -55,7 +55,14 @@ function KeepFailure({ keep }: { keep: KeepAction }) {
   );
 }
 
-export function ActionFooter({ actions }: { actions: PanelActions }) {
+export function ActionFooter({
+  actions,
+  demoted = false,
+}: {
+  actions: PanelActions;
+  demoted?: boolean;
+}) {
+  const primary = demoted ? 'secondary' : 'primary';
   const disabled = actions.locked || isBusy(actions.state);
   const queued = actions.queue?.kind === 'queued';
   const { keep } = actions;
@@ -73,7 +80,7 @@ export function ActionFooter({ actions }: { actions: PanelActions }) {
           </Button>
         ) : actions.ready ? (
           <Button
-            variant="primary"
+            variant={primary}
             className="flex-1"
             kbd={`⇧${MERGE_KEY}`}
             disabled={disabled}
@@ -84,9 +91,9 @@ export function ActionFooter({ actions }: { actions: PanelActions }) {
           </Button>
         ) : (
           <Button
-            variant="primary"
+            variant={primary}
             className="flex-1"
-            kbd="⌘↵"
+            kbd={demoted ? undefined : '⌘↵'}
             onClick={actions.onOpenGithub}
           >
             Open on GitHub

@@ -7,6 +7,7 @@ export type Bucket = 'needs-you' | 'in-progress' | 'ready' | 'stale' | 'kept';
 export type ReasonSeverity = 'danger' | 'warning' | 'neutral' | 'success';
 
 export type ReasonCode =
+  | 'needs-answer'
   | 'checks-failing'
   | 'changes-requested'
   | 'unresolved-threads'

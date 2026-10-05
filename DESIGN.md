@@ -34,7 +34,7 @@ and open `#gallery`).
 | Approved | Priority column of an "Already approved" row when a person approved | success |
 | Bot approved | Priority column of an "Already approved" row when only bots approved | neutral |
 | Action chip | My PR row while Korev acts on it: "Merging…" / "Closing…" (with `loader`), "Still merging on GitHub", "Merge failed", "Close failed" | neutral, or danger for a failure |
-| Task chip | Row while Korev's agent works on the PR: "Explaining…", or "Queued" while it waits for one of the two run slots (with `loader`); "Explain failed" | neutral, or danger for a failure |
+| Task chip | Row while Korev's agent works on the PR: "Explaining…", "Fixing conflicts…", or "Queued" while it waits for one of the two run slots (with `loader`); "<Task> failed" | neutral, or danger for a failure |
 | Queue chip | "In Trunk queue" / "In merge queue" (In progress); "Removed from Trunk queue" (Needs you) | neutral / warning |
 | Section count | My PRs section header count | Needs you danger, Ready to merge success, In progress and Stale mono `fg-2` |
 | Stack | Header of a stack group | accent |
@@ -211,6 +211,22 @@ and open `#gallery`).
   PRs and under the priority or approval section in Review requests. The panel footer
   never changes for AI. Buttons are plain verbs with no icons; no sparkles, purple,
   gradients or glow. The heading is `type-overline` like every other section.
+- In My PRs, each reason Korev can fix gets one row: the reason text in `fg-2` and a
+  secondary `sm` button ("Merge conflicts · Fix conflicts"). Fixes that don't apply
+  are hidden, not disabled. On a fork whose author didn't allow maintainer edits the
+  buttons are disabled and one line says why.
+- When Korev has questions, "Korev needs your answer" is the first section of the
+  panel and the first reason of the row (danger), so the PR sits in Needs you. Each
+  question shows its context in `fg-2`, the question in `fg-1` and a "Your answer"
+  field. The footer gains "Send answers" (⌘↵ from a field), disabled until every field
+  has text, and a ghost "I'll do it myself" that drops the task; Merge or Open on
+  GitHub become secondary until then.
+- A fix that pushed shows the toast "Fixed conflicts on #301 · pushed abc1234" with
+  "View commit".
+- A macOS notification appears only when the Korev window is not focused, for
+  questions ("Korev needs your answer on #301") and failures. Clicking it focuses
+  Korev, switches to the PR's view and opens its panel. Settings → AI tasks has "Notify
+  me when Korev needs me", on by default.
 - With no agent chosen in Settings, the section shows one line, "Set up Claude Code or
   Codex to use Korev AI", and an "Open Settings" button instead of actions.
 - While a task runs, the row carries the task chip and the panel shows the step and

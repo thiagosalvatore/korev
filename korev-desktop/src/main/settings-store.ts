@@ -127,6 +127,10 @@ function pickInstructions(
 function pickAiTasks(value: unknown): AiTaskSettings {
   const raw = (value ?? {}) as Partial<Record<keyof AiTaskSettings, unknown>>;
   return {
+    notify:
+      typeof raw.notify === 'boolean'
+        ? raw.notify
+        : DEFAULT_SETTINGS.aiTasks.notify,
     explainFormat: pickOneOf(
       EXPLAIN_FORMATS,
       raw.explainFormat,

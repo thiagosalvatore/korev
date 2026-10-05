@@ -50,5 +50,5 @@ export const DEFAULT_SETTINGS: Settings = {
   agent: { provider: null, models: {} },
   keptPrs: {},
   repoFilter: { review: [], mine: [] },
-  aiTasks: { explainFormat: 'html', instructions: {} },
+  aiTasks: { notify: true, explainFormat: 'html', instructions: {} },
 };

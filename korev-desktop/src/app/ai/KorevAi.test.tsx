@@ -164,10 +164,12 @@ describe('Settings → AI tasks', () => {
     const bridge = openAiTasks({
       ...WITH_AGENT,
       aiTasks: {
+        notify: true,
         explainFormat: 'html',
         instructions: { explain: '/pr-review' },
       },
     });
+    fireEvent.click(screen.getByRole('tab', { name: 'Explain' }));
     const box = screen.getByLabelText(/Instructions for Explain/);
     expect((box as HTMLTextAreaElement).value).toBe('/pr-review');
 

@@ -48,7 +48,7 @@ function setup(fs = createMemoryFileSystem()) {
   const prState = vi.fn(async (): Promise<PrState | null> => 'OPEN');
   const onSettled = vi.fn();
   const engine = createAgentTasks({
-    tasks: { explain: task },
+    tasks: { explain: task, 'fix-conflicts': task },
     findPr: (ref) => makePr({ number: Number(ref.split('#')[1]) }),
     prState,
     instructions: () => 'Explain it.',

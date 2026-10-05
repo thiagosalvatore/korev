@@ -81,6 +81,7 @@ describe('settings store', () => {
     });
     const { settings } = await createSettingsStore({ fs, path: PATH }).load();
     expect(settings.aiTasks).toEqual({
+      notify: true,
       explainFormat: 'html',
       instructions: { explain: '/pr-review' },
     });

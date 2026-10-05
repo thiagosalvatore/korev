@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Card, Field, Radio, Tabs } from '../../design-system';
+import { Button, Card, Field, Radio, Switch, Tabs } from '../../design-system';
 import {
   AGENT_TASK_KINDS,
   AGENT_TASK_WORDS,
@@ -32,6 +32,18 @@ export function formatBytes(bytes: number): string {
     unit += 1;
   }
   return `${value.toFixed(value < 10 ? 1 : 0)} ${BYTE_UNITS[unit]}`;
+}
+
+function NotificationsCard({ notify }: { notify: boolean }) {
+  return (
+    <Card title="Notifications">
+      <Switch
+        label="Notify me when Korev needs me"
+        checked={notify}
+        onChange={(checked) => void saveAiTasks({ notify: checked })}
+      />
+    </Card>
+  );
 }
 
 function ExplainCard({ format }: { format: ExplainFormat }) {
@@ -179,6 +191,7 @@ export function AiTasksSettings({ settings, tasks }: AiTasksSettingsProps) {
   const busy = Object.values(tasks).some((task) => task.status === 'running');
   return (
     <>
+      <NotificationsCard notify={settings.notify} />
       <ExplainCard format={settings.explainFormat} />
       <InstructionsCard settings={settings} />
       <CheckoutsCard busy={busy} />

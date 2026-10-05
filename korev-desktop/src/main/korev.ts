@@ -1,7 +1,12 @@
 import { join } from 'node:path';
-import { DEFAULT_INSTRUCTIONS } from '../shared/agent-tasks';
+import {
+  AGENT_TASK_WORDS,
+  DEFAULT_INSTRUCTIONS,
+  isAgentTaskKind,
+} from '../shared/agent-tasks';
 import type {
   AgentTaskKind,
+  AgentTaskState,
   AiTaskSettings,
   ExplanationView,
 } from '../shared/agent-tasks';
@@ -33,6 +38,7 @@ import {
 } from './action-input';
 import { createAgentTasks } from './agent-tasks/engine';
 import { createExplainTask } from './agent-tasks/explain';
+import { createFixConflictsTask } from './agent-tasks/fix-conflicts';
 import {
   createExplanations,
   explanationBody,
@@ -79,6 +85,7 @@ const INBOX_CACHE_FILE = 'inbox-cache.bin';
 const AGENT_TASKS_FILE = 'agent-tasks.bin';
 const EXPLANATIONS_FILE = 'explanations.bin';
 const EXPLANATION_COPIES_DIR = 'korev-explanations';
+const WORKFLOW_SCOPE = 'workflow';
 const CHECKOUTS_BUSY = 'Wait for Korev to finish its running tasks first.';
 const INVALID_ACTION: ActionResult = {
   ok: false,
@@ -103,6 +110,7 @@ export interface KorevDeps {
   sleep(milliseconds: number, signal: AbortSignal): Promise<void>;
   openExternal(url: string): Promise<void>;
   openPath(path: string): Promise<void>;
+  notify(note: TaskNote): void;
   prefersDark(): boolean;
   applyTheme(theme: ThemePreference): void;
   broadcast(
@@ -110,6 +118,12 @@ export interface KorevDeps {
     payload: InboxSnapshot | AuthState | Settings,
   ): void;
   warn(message: string): void;
+}
+
+export interface TaskNote {
+  title: string;
+  body: string;
+  ref: string;
 }
 
 export interface Korev {
@@ -160,6 +174,7 @@ export function createKorev(deps: KorevDeps): Korev {
     repos: () => settings.current().repos,
     mergeWith: () => settings.current().mergeWith,
     keptPrs: () => settings.current().keptPrs,
+    needsAnswer: () => agentTasks.keptRefs(),
     renameRepos: followRepoRenames,
     now: () => new Date(),
     scheduler: timers,
@@ -219,6 +234,11 @@ export function createKorev(deps: KorevDeps): Korev {
         save: (ref, explanation) => explanations.save(ref, explanation),
         now: () => Date.now(),
       }),
+      'fix-conflicts': createFixConflictsTask({
+        checkouts,
+        runAgent: agents.run,
+        canPushWorkflows,
+      }),
     },
     findPr,
     prState: async (ref) => {
@@ -239,8 +259,8 @@ export function createKorev(deps: KorevDeps): Korev {
       return checkouts.remove({ repo, number: Number(number) });
     },
     now: () => Date.now(),
-    onChange: () => broadcastInbox(inbox.snapshot()),
-    onSettled: () => undefined,
+    onChange: followTasks,
+    onSettled: noteSettledTask,
     warn: deps.warn,
   });
 
@@ -268,6 +288,53 @@ export function createKorev(deps: KorevDeps): Korev {
       actions: prActions.state(),
       agentTasks: agentTasks.state(),
     };
+  }
+
+  function noteSettledTask(ref: string, state: AgentTaskState): void {
+    if (!settings.current().aiTasks.notify) return;
+    const number = ref.slice(ref.lastIndexOf('#'));
+    const pr = findPr(ref);
+    if (state.status === 'needs-input') {
+      deps.notify({
+        title: `Korev needs your answer on ${number}`,
+        body: pr?.title ?? ref,
+        ref,
+      });
+    }
+    if (state.status === 'failed') {
+      deps.notify({
+        title: `${AGENT_TASK_WORDS[state.kind].failed} on ${number}`,
+        body: state.message,
+        ref,
+      });
+    }
+  }
+
+  let waitingOnAnswers = '';
+
+  function followTasks(): void {
+    const waiting = agentTasks.keptRefs().sort().join(' ');
+    if (waiting === waitingOnAnswers) {
+      broadcastInbox(inbox.snapshot());
+      return;
+    }
+    waitingOnAnswers = waiting;
+    inbox.rebuild();
+  }
+
+  const workflowScopes = new Map<string, Promise<boolean>>();
+
+  function canPushWorkflows(): Promise<boolean> {
+    const token = auth.token();
+    if (!token) return Promise.resolve(false);
+    const known = workflowScopes.get(token);
+    if (known) return known;
+    const checking = github
+      .fetchViewer(token)
+      .then((viewer) => viewer.scopes.includes(WORKFLOW_SCOPE))
+      .catch(() => false);
+    workflowScopes.set(token, checking);
+    return checking;
   }
 
   function findPr(ref: string): PullRequest | null {
@@ -333,6 +400,7 @@ export function createKorev(deps: KorevDeps): Korev {
   }
 
   async function forgetAiWork(): Promise<void> {
+    workflowScopes.clear();
     await agentTasks.clear();
     await explanations.clear();
     await removeExplanationCopies();
@@ -600,6 +668,13 @@ export function createKorev(deps: KorevDeps): Korev {
     ),
     [IpcChannel.AgentsTest]: forAgent(agents.test, async () => INVALID_ACTION),
     [IpcChannel.SettingsSetAiTasks]: setAiTasks,
+    [IpcChannel.AiStart]: withTarget(
+      (target, kind) =>
+        isAgentTaskKind(kind)
+          ? agentTasks.start(prRef(target), kind)
+          : INVALID_ACTION,
+      INVALID_ACTION,
+    ),
     [IpcChannel.AiExplain]: withTarget(explain, INVALID_ACTION),
     [IpcChannel.AiExplanation]: withTarget(explanationView, null),
     [IpcChannel.AiOpenExplanation]: withTarget(

@@ -15,6 +15,11 @@ export interface GitRemote {
   home: string;
   headOids: Record<number, string>;
   git(...args: string[]): string;
+  commit(
+    branch: string,
+    files: Record<string, string>,
+    message: string,
+  ): string;
 }
 
 function writeFiles(dir: string, files: Record<string, string>) {
@@ -68,10 +73,26 @@ export function createGitRemote(
     );
     headOids[pull.number] = run(seed, 'rev-parse', 'HEAD');
   }
+  function commit(
+    branch: string,
+    files: Record<string, string>,
+    message: string,
+  ): string {
+    run(seed, 'fetch', origin, `${branch}:${branch}`, '--update-head-ok');
+    run(seed, 'switch', branch);
+    run(seed, 'reset', '--hard', branch);
+    writeFiles(seed, files);
+    run(seed, 'add', '-A');
+    run(seed, 'commit', '-m', message);
+    run(seed, 'push', origin, branch);
+    return run(seed, 'rev-parse', 'HEAD');
+  }
+
   return {
     gitUrl: `file://${remotes}`,
     home,
     headOids,
     git: (...args) => run(origin, ...args),
+    commit,
   };
 }

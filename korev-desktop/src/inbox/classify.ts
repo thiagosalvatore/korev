@@ -10,6 +10,7 @@ export interface ClassifyContext {
   queue?: QueueStatus | null;
   now?: Date;
   keptAt?: string | null;
+  needsAnswer?: boolean;
 }
 
 type ReasonRule = (pr: PullRequest, context: ClassifyContext) => Reason | null;
@@ -30,6 +31,7 @@ const QUEUE_NAMES: Record<MergeTool, string> = {
 };
 
 const REASON_SEVERITY: Record<ReasonCode, ReasonSeverity> = {
+  'needs-answer': 'danger',
   'removed-from-queue': 'warning',
   'in-queue': 'neutral',
   'checks-failing': 'danger',
@@ -176,7 +178,15 @@ function mergeabilityReason(
   return reason('checking-mergeability', 'Checking mergeability…');
 }
 
+function needsAnswerReason(
+  _pr: PullRequest,
+  { needsAnswer }: ClassifyContext,
+): Reason | null {
+  return needsAnswer ? reason('needs-answer', 'Korev needs your answer') : null;
+}
+
 const NEEDS_YOU_RULES: readonly ReasonRule[] = [
+  needsAnswerReason,
   checksFailingReason,
   changesRequestedReason,
   conflictsReason,
@@ -226,6 +236,7 @@ function staleDays(item: MyPr, { now }: ClassifyContext): number | null {
 }
 
 function withStaleness(item: MyPr, context: ClassifyContext): MyPr {
+  if (context.needsAnswer) return item;
   const days = staleDays(item, context);
   if (days === null || !context.now) return item;
   const { keptAt } = context;

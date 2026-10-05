@@ -67,6 +67,7 @@ const bridge: KorevBridge = {
     test: (provider) => invoke(IpcChannel.AgentsTest, provider),
   },
   ai: {
+    start: (target, kind) => invoke(IpcChannel.AiStart, target, kind),
     explain: (target, regenerate) =>
       invoke(IpcChannel.AiExplain, target, regenerate),
     explanation: (target) => invoke(IpcChannel.AiExplanation, target),
@@ -84,6 +85,7 @@ const bridge: KorevBridge = {
   },
   app: {
     onCommand: (listener) => subscribe(IpcChannel.AppCommand, listener),
+    onFocusPr: (listener) => subscribe(IpcChannel.AppFocusPr, listener),
   },
 };
 

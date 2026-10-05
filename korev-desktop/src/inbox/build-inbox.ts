@@ -25,6 +25,7 @@ export interface InboxInput {
   repoOrder: string[];
   mergeWith: Record<string, MergeTool>;
   keptPrs: Record<string, string>;
+  needsAnswer: string[];
 }
 
 export interface Inbox {
@@ -82,13 +83,16 @@ export function buildInbox({
   repoOrder,
   mergeWith,
   keptPrs,
+  needsAnswer,
 }: InboxInput): Inbox {
+  const waiting = new Set(needsAnswer);
   const classified = mine.map((pr) =>
     classifyMyPr(pr, {
       unknownMergeStreak: unknownMergeStreaks[pr.id] ?? 0,
       queue: queueStatusFor(pr, mergeWith[pr.repo] ?? 'github'),
       now,
       keptAt: keptPrs[prRef(pr)] ?? null,
+      needsAnswer: waiting.has(prRef(pr)),
     }),
   );
   const sorted = reviews.map((pr) =>

@@ -6,6 +6,7 @@ import type {
   AgentStatus,
 } from './agents';
 import type {
+  AgentTaskKind,
   AiTaskSettings,
   ExplanationView,
   QuestionAnswers,
@@ -53,12 +54,14 @@ export enum IpcChannel {
   ShellOpenGithub = 'shell:open-github',
   ShellOpenAgentInstall = 'shell:open-agent-install',
   AppCommand = 'app:command',
+  AppFocusPr = 'app:focus-pr',
   AgentsStatuses = 'agents:statuses',
   AgentsSignIn = 'agents:sign-in',
   AgentsCancelSignIn = 'agents:cancel-sign-in',
   AgentsModels = 'agents:models',
   AgentsTest = 'agents:test',
   SettingsSetAiTasks = 'settings:set-ai-tasks',
+  AiStart = 'ai:start',
   AiExplain = 'ai:explain',
   AiExplanation = 'ai:explanation',
   AiOpenExplanation = 'ai:open-explanation',
@@ -129,6 +132,7 @@ export interface KorevBridge {
     test(provider: AgentProvider): Promise<AgentRunResult>;
   };
   ai: {
+    start(target: PrTarget, kind: AgentTaskKind): Promise<ActionResult>;
     explain(target: PrTarget, regenerate: boolean): Promise<ActionResult>;
     explanation(target: PrTarget): Promise<ExplanationView | null>;
     openExplanation(target: PrTarget): Promise<void>;
@@ -144,5 +148,6 @@ export interface KorevBridge {
   };
   app: {
     onCommand(listener: (command: AppCommand) => void): Unsubscribe;
+    onFocusPr(listener: (ref: string) => void): Unsubscribe;
   };
 }
