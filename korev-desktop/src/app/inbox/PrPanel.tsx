@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Badge,
   Button,
   DiffStat,
   SidePanel,
   SizeBadge,
+  Tabs,
   cn,
   type SidePanelMode,
 } from '../../design-system';
@@ -39,6 +40,8 @@ import { ApprovalBadge, approvalText } from './ReviewRow';
 const PANEL_LABEL = 'Pull request details';
 const OPEN_ON_GITHUB = 'Open on GitHub';
 const OPEN_SHORTCUT = '⌘↵';
+const DETAILS_TAB = 'details';
+const ACTIVITY_TAB = 'activity';
 
 const OUTCOME_CI: Record<CheckOutcome, CiState> = {
   failing: 'failing',
@@ -328,12 +331,7 @@ function SubjectDetails({
 }) {
   if (subject.kind === 'layer') return <LayerDetails subject={subject} />;
   const { pr } = subject.item;
-  const aiSection = ai ? (
-    <>
-      <KorevAiSection ai={ai} />
-      <KorevActivity runs={ai.history} prUrl={ai.prUrl} />
-    </>
-  ) : null;
+  const aiSection = ai ? <KorevAiSection ai={ai} /> : null;
   if (subject.kind === 'review') {
     return (
       <PullRequestDetails
@@ -386,6 +384,9 @@ export function PrPanel({
   onOpenGithub,
 }: PrPanelProps) {
   const { url } = subjectSummary(subject);
+  const [tab, setTab] = useState(DETAILS_TAB);
+  const runs = ai?.history ?? [];
+  const showsActivity = ai && runs.length > 0 && tab === ACTIVITY_TAB;
   return (
     <SidePanel
       label={PANEL_LABEL}
@@ -423,7 +424,22 @@ export function PrPanel({
           onOpenTerminal={ai.onOpenTerminal}
         />
       ) : null}
-      <SubjectDetails subject={subject} ai={ai} />
+      {runs.length > 0 ? (
+        <Tabs
+          className="mt-4.5"
+          value={showsActivity ? ACTIVITY_TAB : DETAILS_TAB}
+          onChange={setTab}
+          tabs={[
+            { id: DETAILS_TAB, label: 'Details' },
+            { id: ACTIVITY_TAB, label: 'Activity', count: runs.length },
+          ]}
+        />
+      ) : null}
+      {showsActivity ? (
+        <KorevActivity runs={runs} prUrl={ai.prUrl} />
+      ) : (
+        <SubjectDetails subject={subject} ai={ai} />
+      )}
     </SidePanel>
   );
 }

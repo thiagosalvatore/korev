@@ -191,7 +191,11 @@ describe('Korev activity', () => {
       />,
     );
     const panel = openPanel();
+    fireEvent.click(
+      await within(panel).findByRole('tab', { name: /Activity/ }),
+    );
 
+    expect(within(panel).queryByText('Checks')).toBeNull();
     expect(await within(panel).findByText('Kept both timeouts')).toBeTruthy();
     expect(
       within(panel).getByRole('link', { name: 'abc1234' }).getAttribute('href'),
