@@ -154,12 +154,15 @@ describe('fix CI task', () => {
     expect(checkouts.push).not.toHaveBeenCalled();
   });
 
-  it('does not start an agent when no check is failing', async () => {
+  it('finishes with nothing to do and no agent when no check is failing', async () => {
     const runAgent = agentSays({});
 
-    await expect(runTask(runAgent, []).outcome).rejects.toThrow(
-      NO_FAILING_CHECKS,
-    );
+    expect(await runTask(runAgent, []).outcome).toEqual({
+      status: 'done',
+      summary: NO_FAILING_CHECKS,
+      commits: [],
+      nothingToDo: true,
+    });
     expect(runAgent).not.toHaveBeenCalled();
   });
 });

@@ -8,6 +8,7 @@ import {
   type CannedReply,
   type CannedResponse,
   createFakeFetch,
+  graphqlBody,
 } from './github/test-fetch';
 import inboxPage from './github/fixtures/inbox-page.json';
 import { createKorev, type Korev } from './korev';
@@ -350,6 +351,45 @@ describe('korev', () => {
     expect(
       await invoke(IpcChannel.AiExplanation, OPEN_PR_TARGET),
     ).toMatchObject({ stale: true });
+  });
+
+  it('finishes Fix CI with nothing to do and fetches the inbox again when no check is failing', async () => {
+    const noChecks: CannedResponse = {
+      body: {
+        data: { repository: { pullRequest: { statusCheckRollup: null } } },
+      },
+    };
+    const { korev, fake, invoke } = setup(
+      [...inboxWithOpenPr(), teamsResponse, noChecks, ...inboxWithOpenPr()],
+      previousSession(),
+    );
+    await korev.start();
+    await vi.waitFor(() =>
+      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
+        status: 'live',
+        fromCache: false,
+      }),
+    );
+    const requestsBefore = fake.requests.length;
+
+    await invoke(IpcChannel.AiStart, OPEN_PR_TARGET, 'fix-ci');
+
+    await vi.waitFor(() =>
+      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
+        agentTasks: {
+          [OPEN_PR_REF]: { status: 'done', nothingToDo: true },
+        },
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(fake.requests.length).toBeGreaterThan(requestsBefore + 1),
+    );
+    expect(graphqlBody(fake.requests[requestsBefore]).query).toContain(
+      'FailingChecks',
+    );
+    expect(graphqlBody(fake.requests[requestsBefore + 1]).query).toContain(
+      'mine',
+    );
   });
 
   it("deletes saved explanations and Korev's task records on disconnect", async () => {

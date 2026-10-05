@@ -3,6 +3,7 @@ import { makePr } from '../../inbox/test-fixtures';
 import type { Checkouts } from '../checkouts';
 import type { ReviewThread } from '../github/task-reads';
 import {
+  NO_OPEN_THREADS,
   addressCommentsPrompt,
   createAddressCommentsTask,
 } from './address-comments';
@@ -177,5 +178,17 @@ describe('address comments task', () => {
     expect(await run()).toMatchObject({ status: 'done', commits: [] });
     expect(checkouts.push).not.toHaveBeenCalled();
     expect(reply).toHaveBeenCalledWith('T_team', 'It is already named on L3.');
+  });
+
+  it('finishes with nothing to do and no agent when no thread is open', async () => {
+    const { run, runAgent } = setup([], {});
+
+    expect(await run()).toEqual({
+      status: 'done',
+      summary: NO_OPEN_THREADS,
+      commits: [],
+      nothingToDo: true,
+    });
+    expect(runAgent).not.toHaveBeenCalled();
   });
 });

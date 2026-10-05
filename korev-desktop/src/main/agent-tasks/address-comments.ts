@@ -10,6 +10,7 @@ import {
 } from './contract';
 import {
   TaskError,
+  nothingToDo,
   type AgentTask,
   type TaskOutcome,
   type TaskRun,
@@ -209,7 +210,7 @@ export function createAddressCommentsTask(
     activity,
   }: TaskRun): Promise<TaskOutcome> {
     const threads = await deps.readThreads(pr);
-    if (threads.length === 0) throw new TaskError(NO_OPEN_THREADS);
+    if (threads.length === 0) return nothingToDo(NO_OPEN_THREADS);
     const { trusted, outsiderQuestions } = splitThreads(
       threads,
       deps.viewerLogin(),

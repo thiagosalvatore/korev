@@ -37,6 +37,12 @@ const EXPLAINING: AgentTaskState = {
   step: 'running',
   startedAt: '2026-10-03T14:00:00.000Z',
 };
+const AGENT_CRASHED = 'Claude Code exited with code 1';
+const CI_FIX_FAILED: Extract<AgentTaskState, { status: 'failed' }> = {
+  status: 'failed',
+  kind: 'fix-ci',
+  message: AGENT_CRASHED,
+};
 
 function renderMine(
   options: Parameters<typeof installFakeBridge>[0] = {},
@@ -132,6 +138,28 @@ describe('Korev AI in the panel', () => {
     fireEvent.click(within(panel).getByRole('button', { name: 'Stop' }));
 
     expect(bridge.ai.cancel).toHaveBeenCalledWith(LINT_TARGET);
+  });
+
+  it('shows the PR status on the row after a failed run and the failure in the panel', async () => {
+    renderMine({}, { [LINT_REF]: CI_FIX_FAILED });
+
+    const row = screen.getByRole('option', {
+      name: new RegExp(LINT_PR.pr.title),
+    });
+    expect(within(row).getByText('Lint failing')).toBeTruthy();
+    expect(within(row).queryByText('Fix CI failed')).toBeNull();
+    const panel = openLintPr();
+    expect(await within(panel).findByText('Fix CI failed')).toBeTruthy();
+    expect(within(panel).getByText(AGENT_CRASHED)).toBeTruthy();
+  });
+
+  it('keeps the failed chip on the row while a fix waits to be pushed', () => {
+    renderMine({}, { [LINT_REF]: { ...CI_FIX_FAILED, unpushed: 'abc1234' } });
+
+    const row = screen.getByRole('option', {
+      name: new RegExp(LINT_PR.pr.title),
+    });
+    expect(within(row).getByText('Fix CI failed')).toBeTruthy();
   });
 });
 

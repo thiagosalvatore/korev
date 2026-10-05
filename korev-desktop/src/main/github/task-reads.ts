@@ -75,11 +75,12 @@ query PullRequestText($owner: String!, $name: String!, $number: Int!) {
 }`;
 
 const FAILING_CHECKS_QUERY = `
-query FailingChecks($owner: String!, $name: String!, $number: Int!) {
+query FailingChecks($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       statusCheckRollup {
-        contexts(first: ${CHECK_CONTEXTS_LIMIT}) {
+        contexts(first: ${CHECK_CONTEXTS_LIMIT}, after: $after) {
+          pageInfo { hasNextPage endCursor }
           nodes {
             __typename
             ... on CheckRun {
@@ -238,19 +239,34 @@ export function createTaskReads(deps: {
     return { body: node.body ?? '', state };
   }
 
-  async function failingChecks(
+  async function checkContextsPage(
     token: string,
     pr: PrTextRef,
-  ): Promise<FailingCheck[]> {
+    after: string | null,
+  ): Promise<Connection<CheckNode> | undefined> {
     const result = await graphql<FailingChecksData>(deps.fetch, {
       apiUrl: deps.apiUrl,
       token,
       query: FAILING_CHECKS_QUERY,
-      variables: prVariables(pr),
+      variables: { ...prVariables(pr), after },
     });
-    const contexts =
-      result.data.repository?.pullRequest?.statusCheckRollup?.contexts;
-    return presentNodes(contexts)
+    return result.data.repository?.pullRequest?.statusCheckRollup?.contexts;
+  }
+
+  async function failingChecks(
+    token: string,
+    pr: PrTextRef,
+  ): Promise<FailingCheck[]> {
+    const contexts: CheckNode[] = [];
+    let after: string | null = null;
+    do {
+      const page = await checkContextsPage(token, pr, after);
+      contexts.push(...presentNodes(page));
+      after = page?.pageInfo?.hasNextPage
+        ? (page.pageInfo.endCursor ?? null)
+        : null;
+    } while (after);
+    return contexts
       .filter((node) => toCheck(node).outcome === 'failing')
       .map(toFailingCheck);
   }

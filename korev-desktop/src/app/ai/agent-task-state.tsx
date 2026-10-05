@@ -69,7 +69,10 @@ export function AgentTaskChip({ state }: { state: AgentTaskState }) {
 }
 
 export function hasChip(state: AgentTaskState | null): state is AgentTaskState {
-  return state?.status === 'running' || state?.status === 'failed';
+  if (!state) return false;
+  return (
+    isRunning(state) || (state.status === 'failed' && keepsCheckout(state))
+  );
 }
 
 interface AgentTaskStatusProps {

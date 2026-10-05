@@ -133,6 +133,7 @@ function settledMessage(ref: string, state: AgentTaskState): string | null {
     return `Korev needs your answer on ${number}`;
   }
   if (state.status !== 'done') return null;
+  if (state.nothingToDo) return `${words.name} on ${number} · ${state.summary}`;
   const [sha] = state.commits;
   const pushed = sha ? ` · pushed ${shortSha(sha)}` : '';
   return `${words.done} ${number}${pushed}`;
@@ -194,7 +195,7 @@ export function useKorevAi(
     const [sha] = state.commits;
     toast.show({
       message,
-      tone: 'success',
+      tone: state.nothingToDo ? 'neutral' : 'success',
       commitUrl: pr && sha ? commitUrl(pr.url, sha) : null,
     });
   });

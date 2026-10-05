@@ -329,7 +329,10 @@ export function createKorev(deps: KorevDeps): Korev {
     },
     now: () => Date.now(),
     onChange: followTasks,
-    onSettled: noteSettledTask,
+    onSettled: (ref, state) => {
+      void inbox.trigger('manual');
+      noteSettledTask(ref, state);
+    },
     onActivity: (event) => deps.broadcast(IpcChannel.AiActivity, event),
     warn: deps.warn,
   });

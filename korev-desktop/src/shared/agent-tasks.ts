@@ -99,6 +99,7 @@ export type AgentTaskState =
       commits: string[];
       rerunRunIds?: number[];
       review?: ReviewDraft;
+      nothingToDo?: boolean;
       finishedAt: string;
     }
   | {

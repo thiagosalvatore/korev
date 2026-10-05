@@ -81,6 +81,57 @@ describe('task reads', () => {
     });
   });
 
+  it('reads failing checks past the first page of check contexts', async () => {
+    const page = (
+      nodes: object[],
+      pageInfo: { hasNextPage: boolean; endCursor: string | null },
+    ) => ({
+      body: {
+        data: {
+          repository: {
+            pullRequest: {
+              statusCheckRollup: { contexts: { pageInfo, nodes } },
+            },
+          },
+        },
+      },
+    });
+    const fake = createFakeFetch(
+      page(
+        [
+          {
+            __typename: 'CheckRun',
+            name: 'test',
+            status: 'COMPLETED',
+            conclusion: 'SUCCESS',
+          },
+        ],
+        { hasNextPage: true, endCursor: 'c1' },
+      ),
+      page(
+        [
+          {
+            __typename: 'CheckRun',
+            name: 'e2e',
+            status: 'COMPLETED',
+            conclusion: 'FAILURE',
+          },
+        ],
+        { hasNextPage: false, endCursor: null },
+      ),
+    );
+
+    const checks = await createTaskReads({
+      fetch: fake.fetch,
+      apiUrl: API,
+    }).failingChecks('tok', PR);
+
+    expect(checks.map((check) => check.name)).toEqual(['e2e']);
+    expect(fake.requests[1].body).toMatchObject({
+      variables: { after: 'c1' },
+    });
+  });
+
   it('reads the annotations of a check run', async () => {
     const fake = createFakeFetch({
       body: [

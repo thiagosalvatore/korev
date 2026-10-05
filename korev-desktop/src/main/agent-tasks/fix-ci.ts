@@ -9,6 +9,7 @@ import {
 } from './contract';
 import {
   TaskError,
+  nothingToDo,
   type AgentTask,
   type TaskOutcome,
   type TaskRun,
@@ -104,7 +105,7 @@ export function createFixCiTask(deps: FixCiDeps): AgentTask {
     activity,
   }: TaskRun): Promise<TaskOutcome> {
     const failures = await deps.readFailures(pr);
-    if (failures.length === 0) throw new TaskError(NO_FAILING_CHECKS);
+    if (failures.length === 0) return nothingToDo(NO_FAILING_CHECKS);
     const checkout = await openForFix(deps.checkouts, pr);
     step('running');
     const fields = await runStructured(deps.runAgent, {

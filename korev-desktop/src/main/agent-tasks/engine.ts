@@ -71,8 +71,13 @@ export type TaskOutcome =
       commits: string[];
       rerunRunIds?: number[];
       review?: ReviewDraft;
+      nothingToDo?: boolean;
     }
   | { status: 'needs-input'; questions: AgentQuestion[] };
+
+export function nothingToDo(summary: string): TaskOutcome {
+  return { status: 'done', summary, commits: [], nothingToDo: true };
+}
 
 export interface AgentTask {
   run(run: TaskRun): Promise<TaskOutcome>;
@@ -271,6 +276,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
         ? { rerunRunIds: outcome.rerunRunIds }
         : {}),
       ...(outcome.review ? { review: outcome.review } : {}),
+      ...(outcome.nothingToDo ? { nothingToDo: true } : {}),
       finishedAt: finishedAt(),
     });
   }

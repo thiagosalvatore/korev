@@ -60,12 +60,8 @@ const WAITING: AgentTaskState = {
   ],
 };
 
-function renderMine(
-  item: MyPr = ITEM,
-  agentTasks: Record<string, AgentTaskState> = {},
-) {
-  const fake = installFakeBridge({ settings: WITH_AGENT });
-  render(
+function myPrsWith(item: MyPr, agentTasks: Record<string, AgentTaskState>) {
+  return (
     <MyPrs
       view="open"
       snapshot={makeSnapshot({
@@ -79,9 +75,21 @@ function renderMine(
         agentTasks,
       })}
       onOpenSettings={vi.fn()}
-    />,
+    />
   );
-  return fake;
+}
+
+function renderMine(
+  item: MyPr = ITEM,
+  agentTasks: Record<string, AgentTaskState> = {},
+) {
+  const fake = installFakeBridge({ settings: WITH_AGENT });
+  const { rerender } = render(myPrsWith(item, agentTasks));
+  return {
+    ...fake,
+    settle: (settled: Record<string, AgentTaskState>) =>
+      rerender(myPrsWith(item, settled)),
+  };
 }
 
 function openPanel() {
@@ -183,6 +191,34 @@ describe('Fix CI', () => {
     expect(
       await screen.findByText('Resource not accessible by integration'),
     ).toBeTruthy();
+  });
+  it('says plainly that there was nothing to fix when no check was failing', async () => {
+    const { settle } = renderMine(failing, {
+      [REF]: {
+        status: 'running',
+        kind: 'fix-ci',
+        step: 'preparing',
+        startedAt: '2026-10-04T10:00:00.000Z',
+      },
+    });
+
+    settle({
+      [REF]: {
+        status: 'done',
+        kind: 'fix-ci',
+        summary: 'No checks are failing on this PR right now.',
+        commits: [],
+        nothingToDo: true,
+        finishedAt: '2026-10-04T10:00:05.000Z',
+      },
+    });
+
+    expect(
+      await screen.findByText(
+        'Fix CI on #320 · No checks are failing on this PR right now.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Fixed CI on/)).toBeNull();
   });
 });
 
