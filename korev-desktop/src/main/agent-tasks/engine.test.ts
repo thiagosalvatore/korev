@@ -105,6 +105,23 @@ describe('agent tasks engine', () => {
     expect(releaseCheckout).toHaveBeenCalledWith(refOf(1));
   });
 
+  it('remembers the last five runs on a PR, newest first', async () => {
+    const { engine, pending, settle } = setup();
+    for (let run = 1; run <= 6; run += 1) {
+      engine.start(refOf(1), 'explain');
+      pending[run - 1].resolve({ ...DONE, summary: `Run ${run}` });
+      await settle();
+    }
+
+    expect(engine.history()[refOf(1)].map((entry) => entry.summary)).toEqual([
+      'Run 6',
+      'Run 5',
+      'Run 4',
+      'Run 3',
+      'Run 2',
+    ]);
+  });
+
   it('runs two tasks at once and queues the third', async () => {
     const { engine, pending, settle } = setup();
     engine.start(refOf(1), 'explain');

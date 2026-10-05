@@ -1,4 +1,4 @@
-import type { AgentTaskState } from './agent-tasks';
+import type { AgentTaskState, KorevRun } from './agent-tasks';
 import type { PrActionState, QueueStatus, RepoMergeInfo } from './merge';
 import type { PullRequest, StackLayer } from './pull-request';
 
@@ -170,6 +170,7 @@ export interface InboxSnapshot {
   repoAvatars: Record<string, string>;
   actions: Record<string, PrActionState>;
   agentTasks: Record<string, AgentTaskState>;
+  agentHistory: Record<string, KorevRun[]>;
   truncated: { mine: boolean; reviews: boolean };
   stacksUnavailable: boolean;
   error: string | null;

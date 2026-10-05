@@ -58,4 +58,38 @@ describe('GitHub writer', () => {
       message: 'Pull request is in draft state',
     });
   });
+
+  it('posts a review with each comment on its file and line of the new code', async () => {
+    const { fake, writer } = writerAnswering(200, {
+      data: { addPullRequestReview: { pullRequestReview: { id: 'R_1' } } },
+    });
+
+    await writer.submitReview('gho', 'PR_303', {
+      summary: 'Two things to fix.',
+      event: 'COMMENT',
+      comments: [{ path: 'src/cache.ts', line: 12, body: 'Name this.' }],
+    });
+
+    expect(fake.requests[0].body).toMatchObject({
+      variables: {
+        id: 'PR_303',
+        event: 'COMMENT',
+        body: 'Two things to fix.',
+        threads: [
+          { path: 'src/cache.ts', line: 12, side: 'RIGHT', body: 'Name this.' },
+        ],
+      },
+    });
+  });
+
+  it('re-runs only the failed jobs of a workflow run', async () => {
+    const { fake, writer } = writerAnswering(201, null);
+
+    await writer.rerunFailedJobs('gho', 'acme/web', 9);
+
+    expect(fake.requests[0]).toMatchObject({
+      url: 'https://api/repos/acme/web/actions/runs/9/rerun-failed-jobs',
+      method: 'POST',
+    });
+  });
 });

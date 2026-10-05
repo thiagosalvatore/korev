@@ -1,4 +1,11 @@
-import type { QuestionAnswers } from '../shared/agent-tasks';
+import {
+  REVIEW_SEVERITIES,
+  type QuestionAnswers,
+  type ReviewComment,
+  type ReviewDraft,
+  type ReviewEvent,
+  type ReviewSubmission,
+} from '../shared/agent-tasks';
 import type {
   MergeMethod,
   MergeRequest,
@@ -59,4 +66,70 @@ export function parseAnswers(value: unknown): QuestionAnswers | null {
   const entries = Object.entries(value);
   if (!entries.every(([, answer]) => typeof answer === 'string')) return null;
   return Object.fromEntries(entries) as QuestionAnswers;
+}
+
+const REVIEW_EVENTS: readonly ReviewEvent[] = ['COMMENT', 'REQUEST_CHANGES'];
+const COMMENT_STATUSES: readonly ReviewComment['status'][] = [
+  'open',
+  'accepted',
+  'dismissed',
+];
+
+function isText(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+function isLine(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) > 0;
+}
+
+function parseEvent(value: unknown): ReviewEvent | null {
+  return REVIEW_EVENTS.find((event) => event === value) ?? null;
+}
+
+function parseSubmittedComment(
+  value: unknown,
+): ReviewSubmission['comments'][number] | null {
+  const { path, line, body } = asRecord(value);
+  if (!isText(path) || !path || !isLine(line) || !isText(body)) return null;
+  return { path, line, body };
+}
+
+export function parseReviewSubmission(value: unknown): ReviewSubmission | null {
+  const fields = asRecord(value);
+  const event = parseEvent(fields.event);
+  if (!event || !isText(fields.summary) || !Array.isArray(fields.comments)) {
+    return null;
+  }
+  const comments = fields.comments.map(parseSubmittedComment);
+  if (!comments.every((comment) => comment !== null)) return null;
+  return { summary: fields.summary, event, comments };
+}
+
+function parseDraftComment(value: unknown): ReviewComment | null {
+  const fields = asRecord(value);
+  const submitted = parseSubmittedComment(value);
+  const severity = REVIEW_SEVERITIES.find((level) => level === fields.severity);
+  const status = COMMENT_STATUSES.find((option) => option === fields.status);
+  const context = Array.isArray(fields.context) ? fields.context : null;
+  if (!submitted || !severity || !status || !isText(fields.id)) return null;
+  if (!isLine(fields.contextStart) || !context?.every(isText)) return null;
+  return {
+    ...submitted,
+    id: fields.id,
+    severity,
+    status,
+    contextStart: fields.contextStart,
+    context,
+  };
+}
+
+export function parseReviewDraft(value: unknown): ReviewDraft | null {
+  const fields = asRecord(value);
+  const event = parseEvent(fields.event);
+  if (!event || !isText(fields.summary) || !isText(fields.headOid)) return null;
+  if (!Array.isArray(fields.comments)) return null;
+  const comments = fields.comments.map(parseDraftComment);
+  if (!comments.every((comment) => comment !== null)) return null;
+  return { headOid: fields.headOid, summary: fields.summary, event, comments };
 }

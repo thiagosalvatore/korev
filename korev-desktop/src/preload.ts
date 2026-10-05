@@ -76,6 +76,10 @@ const bridge: KorevBridge = {
     cancel: (target) => invoke(IpcChannel.AiCancel, target),
     dismiss: (target) => invoke(IpcChannel.AiDismiss, target),
     rerunFailedJobs: (target) => invoke(IpcChannel.AiRerunFailedJobs, target),
+    saveReviewDraft: (target, draft) =>
+      invoke(IpcChannel.AiSaveReviewDraft, target, draft),
+    submitReview: (target, review) =>
+      invoke(IpcChannel.AiSubmitReview, target, review),
     checkoutsSize: () => invoke(IpcChannel.AiCheckoutsSize),
     removeCheckouts: () => invoke(IpcChannel.AiRemoveCheckouts),
   },

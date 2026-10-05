@@ -10,6 +10,7 @@ import type {
   AgentTaskState,
   AiTaskSettings,
   ExplanationView,
+  ReviewEvent,
 } from '../shared/agent-tasks';
 import {
   AGENT_INFO,
@@ -33,6 +34,8 @@ import { myPrsIn, pullRequestsIn } from '../inbox/stacks';
 import {
   parseAnswers,
   parseMergeRequest,
+  parseReviewDraft,
+  parseReviewSubmission,
   parseMergeTool,
   parseTarget,
   parseTargets,
@@ -40,6 +43,7 @@ import {
 import { createAgentTasks } from './agent-tasks/engine';
 import { createExplainTask } from './agent-tasks/explain';
 import { createAddressCommentsTask } from './agent-tasks/address-comments';
+import { createReviewFixTask, createReviewTask } from './agent-tasks/review';
 import { createFixCiTask, type CiFailure } from './agent-tasks/fix-ci';
 import { createFixConflictsTask } from './agent-tasks/fix-conflicts';
 import {
@@ -56,6 +60,7 @@ import { createAuthService } from './auth-service';
 import type { SecretCipher } from './encrypted-file';
 import type { FileSystem } from './file-system';
 import { DeviceFlowLogin } from './github/auth';
+import { describeError } from './github/errors';
 import { createGithubClient } from './github/client';
 import {
   createInboxPoller,
@@ -90,6 +95,10 @@ const EXPLANATIONS_FILE = 'explanations.bin';
 const EXPLANATION_COPIES_DIR = 'korev-explanations';
 const WORKFLOW_SCOPE = 'workflow';
 const CI_CHECKS_READ = 10;
+const SUBMITTED_REVIEW: Record<ReviewEvent, string> = {
+  COMMENT: 'Submitted your review as a comment',
+  REQUEST_CHANGES: 'Submitted your review requesting changes',
+};
 const CHECKOUTS_BUSY = 'Wait for Korev to finish its running tasks first.';
 const INVALID_ACTION: ActionResult = {
   ok: false,
@@ -235,7 +244,7 @@ export function createKorev(deps: KorevDeps): Korev {
       explain: createExplainTask({
         checkouts,
         runAgent: agents.run,
-        prBody: async (pr) => (await readPrText(pr))?.body ?? '',
+        prBody,
         format: () => settings.current().aiTasks.explainFormat,
         save: (ref, explanation) => explanations.save(ref, explanation),
         now: () => Date.now(),
@@ -250,6 +259,13 @@ export function createKorev(deps: KorevDeps): Korev {
         runAgent: agents.run,
         canPushWorkflows,
         readFailures: readCiFailures,
+      }),
+      review: createReviewTask({ checkouts, runAgent: agents.run, prBody }),
+      'review-fix': createReviewFixTask({
+        checkouts,
+        runAgent: agents.run,
+        prBody,
+        canPushWorkflows,
       }),
       'address-comments': createAddressCommentsTask({
         checkouts,
@@ -315,6 +331,7 @@ export function createKorev(deps: KorevDeps): Korev {
       ...snapshot,
       actions: prActions.state(),
       agentTasks: agentTasks.state(),
+      agentHistory: agentTasks.history(),
     };
   }
 
@@ -325,6 +342,13 @@ export function createKorev(deps: KorevDeps): Korev {
     if (state.status === 'needs-input') {
       deps.notify({
         title: `Korev needs your answer on ${number}`,
+        body: pr?.title ?? ref,
+        ref,
+      });
+    }
+    if (state.status === 'done' && state.review) {
+      deps.notify({
+        title: `Review draft ready for ${number}`,
         body: pr?.title ?? ref,
         ref,
       });
@@ -371,6 +395,10 @@ export function createKorev(deps: KorevDeps): Korev {
     );
   }
 
+  async function prBody(pr: PullRequest): Promise<string> {
+    return (await readPrText(pr))?.body ?? '';
+  }
+
   function readPrText(pr: { repo: string; number: number }) {
     const token = auth.token();
     return token ? taskReads.pullRequestText(token, pr) : Promise.resolve(null);
@@ -398,6 +426,32 @@ export function createKorev(deps: KorevDeps): Korev {
     );
   }
 
+  async function submitReview(
+    target: PrTarget,
+    value: unknown,
+  ): Promise<ActionResult> {
+    const review = parseReviewSubmission(value);
+    const token = auth.token();
+    if (!review || !token) return INVALID_ACTION;
+    try {
+      await writer.submitReview(token, target.id, review);
+    } catch (error) {
+      return { ok: false, message: describeError(error) };
+    }
+    agentTasks.updateReview(
+      prRef(target),
+      null,
+      SUBMITTED_REVIEW[review.event],
+    );
+    void inbox.trigger('manual');
+    return { ok: true };
+  }
+
+  function saveReviewDraft(target: PrTarget, value: unknown): void {
+    const draft = parseReviewDraft(value);
+    if (draft) agentTasks.updateReview(prRef(target), draft);
+  }
+
   async function rerunFailedJobs(target: PrTarget): Promise<ActionResult> {
     const state = agentTasks.state()[prRef(target)];
     const runIds = state?.status === 'done' ? (state.rerunRunIds ?? []) : [];
@@ -410,7 +464,7 @@ export function createKorev(deps: KorevDeps): Korev {
         ),
       );
     } catch (error) {
-      return { ok: false, message: String(error) };
+      return { ok: false, message: describeError(error) };
     }
     void inbox.trigger('manual');
     return { ok: true };
@@ -793,6 +847,11 @@ export function createKorev(deps: KorevDeps): Korev {
     ),
     [IpcChannel.AiRerunFailedJobs]: withTarget(
       rerunFailedJobs,
+      Promise.resolve(INVALID_ACTION),
+    ),
+    [IpcChannel.AiSaveReviewDraft]: withTarget(saveReviewDraft, undefined),
+    [IpcChannel.AiSubmitReview]: withTarget(
+      submitReview,
       Promise.resolve(INVALID_ACTION),
     ),
     [IpcChannel.AiCheckoutsSize]: () => checkouts.size(),

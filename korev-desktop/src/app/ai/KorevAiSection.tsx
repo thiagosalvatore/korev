@@ -1,10 +1,12 @@
 import { Button, Switch } from '../../design-system';
 import { AGENT_TASK_WORDS } from '../../shared/agent-tasks';
+import { pluralize } from '../format';
 import { PanelSection } from '../inbox/PanelSection';
 import { isRunning } from './agent-task-state';
 import {
   EXPLAIN_KEY,
   KEEP_MERGEABLE_KEY,
+  REVIEW_KEY,
   type FixAction,
   type PanelAi,
 } from './useKorevAi';
@@ -107,7 +109,27 @@ export function KorevAiSection({ ai }: { ai: PanelAi }) {
         >
           Explain
         </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          kbd={`⇧${REVIEW_KEY}`}
+          disabled={busy}
+          title={busy ? ALREADY_WORKING : undefined}
+          onClick={ai.onReview}
+        >
+          {AGENT_TASK_WORDS[ai.reviewKind].name}
+        </Button>
       </div>
+      {ai.draft ? (
+        <div className="mt-2 flex items-center gap-2">
+          <p className="m-0 min-w-0 flex-1 text-sm text-fg-2">
+            Review draft · {pluralize(ai.draft.comments.length, 'comment')}
+          </p>
+          <Button size="sm" variant="primary" onClick={ai.onOpenDraft}>
+            Open review draft
+          </Button>
+        </div>
+      ) : null}
     </PanelSection>
   );
 }

@@ -11,12 +11,10 @@ import {
 } from './contract';
 import { TaskError, type AgentTask } from './engine';
 import type { StoredExplanation } from './explanations';
+import { readPrChanges } from './pr-changes';
 import { MALFORMED_OUTPUT, runStructured, type RunAgent } from './run-agent';
 
 export const EXPLAIN_TIMEOUT_MS = RUN_TIMEOUT_MS;
-export const DIFF_LIMIT_CHARS = 150_000;
-const DIFF_CUT_NOTE =
-  '\n[Korev cut the diff here. Read the files for the rest.]';
 
 export const EXPLAIN_SCHEMA = outputSchema({ document: { type: 'string' } });
 
@@ -68,11 +66,6 @@ export function explainPrompt(input: ExplainInput): string {
   });
 }
 
-function limitDiff(diff: string): string {
-  if (diff.length <= DIFF_LIMIT_CHARS) return diff;
-  return `${diff.slice(0, DIFF_LIMIT_CHARS)}${DIFF_CUT_NOTE}`;
-}
-
 export interface ExplainTaskDeps {
   checkouts: Checkouts;
   runAgent: RunAgent;
@@ -90,11 +83,9 @@ export function createExplainTask(deps: ExplainTaskDeps): AgentTask {
         number: pr.number,
         baseRefName: pr.baseRefName,
       });
-      const range = `origin/${pr.baseRefName}...HEAD`;
-      const [body, diffStat, diff] = await Promise.all([
+      const [body, changes] = await Promise.all([
         deps.prBody(pr),
-        deps.checkouts.git(checkout.path, ['diff', '--stat', range]),
-        deps.checkouts.git(checkout.path, ['diff', range]),
+        readPrChanges(deps.checkouts, checkout.path, pr),
       ]);
       const format = deps.format();
       step('running');
@@ -102,8 +93,7 @@ export function createExplainTask(deps: ExplainTaskDeps): AgentTask {
         prompt: explainPrompt({
           pr,
           body,
-          diffStat,
-          diff: limitDiff(diff),
+          ...changes,
           format,
           instructions,
           answered,

@@ -27,6 +27,21 @@ if (prompt.includes("Korev's explain agent")) {
     document:
       '<h2>What changes</h2><p>Each tenant gets its own ingestion rate limit.</p>',
   });
+} else if (prompt.includes("Korev's review agent")) {
+  reply({
+    ...base,
+    summary: 'One change worth making before merge.',
+    event: 'COMMENT',
+    comments: [
+      {
+        path: 'ingest.ts',
+        line: 1,
+        body: 'Read the limit from config instead of hard-coding it.',
+        severity: 'medium',
+        confidence: 'high',
+      },
+    ],
+  });
 } else if (prompt.includes("Korev's merge-conflict agent")) {
   if (prompt.includes('The user already answered')) {
     require('node:fs').writeFileSync('ingest.ts', 'export const limit = 75;\n');

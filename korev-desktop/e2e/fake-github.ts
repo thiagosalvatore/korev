@@ -12,6 +12,8 @@ export const FAILING_PR_TITLE = 'Rate-limit per tenant on ingestion endpoints';
 export const NEW_PR_TITLE = 'Bump OpenTelemetry to 1.31';
 export const WEB_PR_TITLE = 'Settings: org access states';
 export const STALE_PR_TITLE = 'Old experiment with the exporter';
+export const REVIEW_PR_NUMBER = 512;
+export const REVIEW_PR_TITLE = 'Make the ingestion limit configurable';
 
 const GRANTED_SCOPES = 'repo, read:org';
 const POLL_INTERVAL_SECONDS = '1';
@@ -166,6 +168,32 @@ function prNode(
   };
 }
 
+const REVIEW_PR: PrSpec = {
+  repo: API_REPO,
+  number: REVIEW_PR_NUMBER,
+  title: REVIEW_PR_TITLE,
+  mergeStateStatus: 'BLOCKED',
+  rollup: 'SUCCESS',
+  conclusion: 'SUCCESS',
+};
+
+function reviewRequestNode(headOid: string) {
+  return {
+    ...prNode(REVIEW_PR, { inMergeQueue: false, comments: [] }, headOid, false),
+    author: { login: 'li', avatarUrl: null },
+    files: {
+      pageInfo: { hasNextPage: false },
+      nodes: [{ path: 'ingest.ts', additions: 1, deletions: 1 }],
+    },
+    reviewRequests: {
+      nodes: [
+        { requestedReviewer: { __typename: 'User', login: VIEWER_LOGIN } },
+      ],
+    },
+    timelineItems: { nodes: [] },
+  };
+}
+
 function connection(nodes: unknown[]) {
   return { pageInfo: { hasNextPage: false, endCursor: null }, nodes };
 }
@@ -236,6 +264,7 @@ export const PR_BODY =
 export interface FakeGithubOptions {
   headOids?: Record<number, string>;
   conflicting?: number[];
+  reviewRequest?: boolean;
   mergeQueueRepos?: string[];
   ownerAvatarUrl?: string;
   includeNewPr?: boolean;
@@ -248,6 +277,7 @@ export interface FakeGithub {
   publishNewPr(): void;
   holdInbox(): void;
   releaseInbox(): void;
+  submittedReviews(): unknown[];
   close(): Promise<void>;
 }
 
@@ -278,8 +308,14 @@ export async function startFakeGithub(
   const specById = (id: unknown) =>
     myPrs.find((spec) => `PR_${spec.number}` === id);
 
+  const submitted: unknown[] = [];
+
   function mutate(request: GraphqlRequest) {
     const { query, variables = {} } = request;
+    if (query.includes('mutation SubmitReview')) {
+      submitted.push(variables);
+      return { addPullRequestReview: { pullRequestReview: { id: 'R_1' } } };
+    }
     const spec = specById(variables.id);
     if (query.includes('mutation ClosePullRequest') && spec) {
       removePr(spec.number);
@@ -363,7 +399,15 @@ export async function startFakeGithub(
             ),
           ),
         ),
-        reviews: connection([]),
+        reviews: connection(
+          options.reviewRequest
+            ? [
+                reviewRequestNode(
+                  options.headOids?.[REVIEW_PR_NUMBER] ?? 'head512',
+                ),
+              ]
+            : [],
+        ),
       };
     }
     return { viewer: { login: VIEWER_LOGIN, avatarUrl: null } };
@@ -421,6 +465,7 @@ export async function startFakeGithub(
     releaseInbox() {
       openInboxGate();
     },
+    submittedReviews: () => submitted,
     close: () => {
       openInboxGate();
       server.closeAllConnections();

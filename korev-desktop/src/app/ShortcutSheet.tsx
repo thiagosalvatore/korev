@@ -21,6 +21,7 @@ const SHORTCUTS: Shortcut[] = [
   { keys: ['⇧X'], label: 'Close the selected PR (My PRs)' },
   { keys: ['⇧K'], label: 'Keep or stop keeping a stale PR (My PRs)' },
   { keys: ['⇧E'], label: 'Explain the selected PR' },
+  { keys: ['⇧R'], label: 'Review the selected PR (Review & fix on My PRs)' },
   { keys: ['⇧A'], label: 'Keep the selected PR mergeable (My PRs)' },
   { keys: ['.'], label: 'Show held updates' },
   { keys: ['⌘1'], label: 'Review requests' },

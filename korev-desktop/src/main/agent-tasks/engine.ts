@@ -1,9 +1,12 @@
-import type {
-  AgentQuestion,
-  AgentTaskKind,
-  AgentTaskState,
-  AgentTaskStep,
-  QuestionAnswers,
+import {
+  type AgentQuestion,
+  type AgentTaskKind,
+  type AgentTaskState,
+  type AgentTaskStep,
+  KOREV_RUNS_KEPT,
+  type QuestionAnswers,
+  type ReviewDraft,
+  type KorevRun,
 } from '../../shared/agent-tasks';
 import { myPrsIn, pullRequestsIn } from '../../inbox/stacks';
 import type { InboxSnapshot, MyPr } from '../../shared/inbox';
@@ -51,6 +54,7 @@ export type TaskOutcome =
       summary: string;
       commits: string[];
       rerunRunIds?: number[];
+      review?: ReviewDraft;
     }
   | { status: 'needs-input'; questions: AgentQuestion[] };
 
@@ -80,6 +84,8 @@ export interface AgentTasks {
   cancel(ref: string): void;
   dismiss(ref: string): Promise<void>;
   reconcile(snapshot: InboxSnapshot): void;
+  history(): Record<string, KorevRun[]>;
+  updateReview(ref: string, review: ReviewDraft | null, summary?: string): void;
   restore(login: string): Promise<void>;
   clear(): Promise<void>;
   keptRefs(): string[];
@@ -148,7 +154,24 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     });
   }
 
+  function withRun(record: TaskRecord, state: AgentTaskState): TaskRecord {
+    if (state.status !== 'done' && state.status !== 'failed') return record;
+    const run: KorevRun = {
+      kind: state.kind,
+      outcome: state.status,
+      summary: state.status === 'done' ? state.summary : state.message,
+      commits: state.status === 'done' ? state.commits : [],
+      finishedAt: new Date(deps.now()).toISOString(),
+    };
+    return {
+      ...record,
+      history: [run, ...(record.history ?? [])].slice(0, KOREV_RUNS_KEPT),
+    };
+  }
+
   function settle(ref: string, state: AgentTaskState): void {
+    const record = records.get(ref);
+    if (record) put(ref, withRun(record, state));
     setState(ref, state);
     if (state.status !== 'needs-input') release(ref);
     deps.onSettled(ref, state);
@@ -211,6 +234,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       ...(outcome.rerunRunIds?.length
         ? { rerunRunIds: outcome.rerunRunIds }
         : {}),
+      ...(outcome.review ? { review: outcome.review } : {}),
       finishedAt: finishedAt(),
     });
   }
@@ -268,6 +292,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       kind,
       answered,
       autopilot,
+      history: records.get(ref)?.history,
       state: {
         status: 'running',
         kind,
@@ -429,7 +454,32 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     await deps.store.clear();
   }
 
+  function updateReview(
+    ref: string,
+    review: ReviewDraft | null,
+    summary?: string,
+  ): void {
+    const record = records.get(ref);
+    if (record?.state.status !== 'done') return;
+    const { review: _previous, ...rest } = record.state;
+    put(ref, {
+      ...record,
+      state: {
+        ...rest,
+        ...(review ? { review } : {}),
+        summary: summary ?? rest.summary,
+      },
+    });
+  }
+
   return {
+    updateReview,
+    history: () =>
+      Object.fromEntries(
+        [...records].flatMap(([ref, record]) =>
+          record.history?.length ? [[ref, record.history]] : [],
+        ),
+      ),
     state: () =>
       Object.fromEntries(
         [...records].map(([ref, record]) => [ref, record.state]),

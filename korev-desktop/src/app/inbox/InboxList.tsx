@@ -200,6 +200,7 @@ export function InboxList({
 
   const ai = useKorevAi(
     held.displayed.agentTasks,
+    held.displayed.agentHistory,
     selection.subject,
     (ref) =>
       pullRequestsIn(held.displayed).find((pr) => prRef(pr) === ref) ?? null,

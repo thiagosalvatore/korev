@@ -428,6 +428,7 @@ export function makeSnapshot(
     repoAvatars: {},
     actions: {},
     agentTasks: {},
+    agentHistory: {},
     truncated: { mine: false, reviews: false },
     stacksUnavailable: false,
     error: null,

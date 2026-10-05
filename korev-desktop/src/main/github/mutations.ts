@@ -1,3 +1,4 @@
+import type { ReviewSubmission } from '../../shared/agent-tasks';
 import type { MergeMethod, PrTarget } from '../../shared/merge';
 import { GithubHttpError, GraphqlQueryError, redactToken } from './errors';
 import { graphql } from './graphql';
@@ -35,6 +36,11 @@ export interface GithubWriter {
   addComment(token: string, id: string, body: string): Promise<void>;
   rerunFailedJobs(token: string, repo: string, runId: number): Promise<void>;
   replyToThread(token: string, threadId: string, body: string): Promise<void>;
+  submitReview(
+    token: string,
+    pullRequestId: string,
+    review: ReviewSubmission,
+  ): Promise<void>;
 }
 
 const HTTP_BAD_REQUEST = 400;
@@ -72,6 +78,20 @@ mutation ReplyToThread($threadId: ID!, $body: String!) {
     input: { pullRequestReviewThreadId: $threadId, body: $body }
   ) { comment { id } }
 }`;
+
+const SUBMIT_REVIEW_MUTATION = `
+mutation SubmitReview(
+  $id: ID!
+  $event: PullRequestReviewEvent!
+  $body: String
+  $threads: [DraftPullRequestReviewThread]
+) {
+  addPullRequestReview(
+    input: { pullRequestId: $id, event: $event, body: $body, threads: $threads }
+  ) { pullRequestReview { id } }
+}`;
+
+const NEW_SIDE = 'RIGHT';
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -177,6 +197,18 @@ export function createGithubWriter(deps: {
     dequeuePullRequest: (token, id) => mutate(token, DEQUEUE_MUTATION, { id }),
     addComment: (token, id, body) =>
       mutate(token, ADD_COMMENT_MUTATION, { id, body }),
+    submitReview: (token, id, review) =>
+      mutate(token, SUBMIT_REVIEW_MUTATION, {
+        id,
+        event: review.event,
+        body: review.summary,
+        threads: review.comments.map((comment) => ({
+          path: comment.path,
+          line: comment.line,
+          side: NEW_SIDE,
+          body: comment.body,
+        })),
+      }),
     replyToThread: (token, threadId, body) =>
       mutate(token, THREAD_REPLY_MUTATION, { threadId, body }),
     rerunFailedJobs: async (token, repo, runId) => {

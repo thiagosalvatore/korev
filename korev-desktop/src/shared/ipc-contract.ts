@@ -10,6 +10,8 @@ import type {
   AiTaskSettings,
   ExplanationView,
   QuestionAnswers,
+  ReviewDraft,
+  ReviewSubmission,
 } from './agent-tasks';
 import type { AuthState, LoginState, TokenResult } from './auth';
 import type { InboxSnapshot } from './inbox';
@@ -69,6 +71,8 @@ export enum IpcChannel {
   AiCancel = 'ai:cancel',
   AiDismiss = 'ai:dismiss',
   AiRerunFailedJobs = 'ai:rerun-failed-jobs',
+  AiSaveReviewDraft = 'ai:save-review-draft',
+  AiSubmitReview = 'ai:submit-review',
   AiCheckoutsSize = 'ai:checkouts-size',
   AiRemoveCheckouts = 'ai:remove-checkouts',
 }
@@ -141,6 +145,11 @@ export interface KorevBridge {
     cancel(target: PrTarget): Promise<void>;
     dismiss(target: PrTarget): Promise<void>;
     rerunFailedJobs(target: PrTarget): Promise<ActionResult>;
+    saveReviewDraft(target: PrTarget, draft: ReviewDraft): Promise<void>;
+    submitReview(
+      target: PrTarget,
+      review: ReviewSubmission,
+    ): Promise<ActionResult>;
     checkoutsSize(): Promise<number>;
     removeCheckouts(): Promise<ActionResult>;
   };

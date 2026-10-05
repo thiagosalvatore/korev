@@ -1,4 +1,8 @@
-import type { AgentTaskKind, AgentTaskState } from '../../shared/agent-tasks';
+import type {
+  AgentTaskKind,
+  AgentTaskState,
+  KorevRun,
+} from '../../shared/agent-tasks';
 import {
   createEncryptedFile,
   hasSecureStorage,
@@ -13,6 +17,7 @@ export interface TaskRecord {
   state: AgentTaskState;
   answered: AnsweredQuestion[];
   autopilot?: boolean;
+  history?: KorevRun[];
 }
 
 export interface StoredTasks {

@@ -13,5 +13,5 @@
     "sourceMap": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "e2e/**/*", "*.ts", "*.mts"]
+  "include": ["src/**/*", "e2e/**/*", "eval/**/*", "*.ts", "*.mts"]
 }

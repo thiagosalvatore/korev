@@ -162,6 +162,43 @@ describe('Fix CI', () => {
   });
 });
 
+describe('Korev activity', () => {
+  it('lists what Korev did on the PR, with links to its commits', async () => {
+    installFakeBridge({ settings: WITH_AGENT });
+    render(
+      <MyPrs
+        snapshot={makeSnapshot({
+          mine: [
+            {
+              bucket: 'needs-you',
+              count: 1,
+              entries: [{ kind: 'pr', item: ITEM }],
+            },
+          ],
+          agentHistory: {
+            [REF]: [
+              {
+                kind: 'fix-conflicts',
+                outcome: 'done',
+                summary: 'Kept both timeouts',
+                commits: ['abc1234def'],
+                finishedAt: '2026-10-03T13:00:00.000Z',
+              },
+            ],
+          },
+        })}
+        onOpenSettings={vi.fn()}
+      />,
+    );
+    const panel = openPanel();
+
+    expect(await within(panel).findByText('Kept both timeouts')).toBeTruthy();
+    expect(
+      within(panel).getByRole('link', { name: 'abc1234' }).getAttribute('href'),
+    ).toBe('https://github.com/acme/api/commit/abc1234def');
+  });
+});
+
 describe('questions from Korev', () => {
   it('sends the answers only once every question has one', async () => {
     const { bridge } = renderMine(ITEM, { [REF]: WAITING });

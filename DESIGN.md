@@ -34,7 +34,7 @@ and open `#gallery`).
 | Approved | Priority column of an "Already approved" row when a person approved | success |
 | Bot approved | Priority column of an "Already approved" row when only bots approved | neutral |
 | Action chip | My PR row while Korev acts on it: "Merging…" / "Closing…" (with `loader`), "Still merging on GitHub", "Merge failed", "Close failed" | neutral, or danger for a failure |
-| Task chip | Row while Korev's agent works on the PR: "Explaining…", "Fixing conflicts…", "Fixing CI…", "Addressing comments…", or "Queued" while it waits for one of the two run slots (with `loader`); "<Task> failed" | neutral, or danger for a failure |
+| Task chip | Row while Korev's agent works on the PR: "Explaining…", "Fixing conflicts…", "Fixing CI…", "Addressing comments…", "Reviewing…", or "Queued" while it waits for one of the two run slots (with `loader`); "<Task> failed" | neutral, or danger for a failure |
 | Queue chip | "In Trunk queue" / "In merge queue" (In progress); "Removed from Trunk queue" (Needs you) | neutral / warning |
 | Section count | My PRs section header count | Needs you danger, Ready to merge success, In progress and Stale mono `fg-2` |
 | Stack | Header of a stack group | accent |
@@ -259,6 +259,16 @@ and open `#gallery`).
   app. Loading shows skeleton lines with "Explaining #301 · usually 1–3 min" and Stop.
   An explanation made for an older head shows the warning banner "This PR changed since
   this explanation (abc1234 → def5678)" with Regenerate.
+- Review (⇧R) runs on review requests; on My PRs it is "Review & fix", which reviews and
+  then pushes fixes for what it found. A review draft opens from "Open review draft" in
+  the same wide overlay: the summary in an editable field, then one `Finding` card per
+  comment with path:line, the code around the line in a `DiffHunk`, the comment text
+  (click to edit), and Accept / Dismiss. The footer counts "4 of 6 comments" and offers
+  "Request changes" and "Submit as comment" (primary). Approve is never offered. With
+  no findings the body starts with "Nothing to flag." Esc keeps the edited draft.
+  Findings the agent is unsure of arrive as questions instead of cards.
+- A collapsed "Korev activity" section lists the last five runs on the PR: when, which
+  task, the result, and links to the commits.
 - Wording says "Korev", never "magic" or "AI assistant". Done and failed tasks are
   announced: "Explanation ready for #301", "Explain failed on #301".
 
@@ -270,7 +280,8 @@ and open `#gallery`).
 - Enter opens the PR, ⌘Enter opens it on GitHub, Esc closes the side panel and returns
   focus to the row. In My PRs, ⇧M and ⇧X open the merge and close confirms for the
   selected PR, and ⇧K keeps or stops keeping a stale one, even with the panel closed.
-  In both views ⇧E explains the selected PR; in My PRs ⇧A toggles Keep mergeable.
+  In both views ⇧E explains and ⇧R reviews the selected PR; in My PRs ⇧A toggles Keep
+  mergeable.
 - ⌘1 / ⌘2 switch views, ⌘, opens Settings, ⌘R refreshes, `?` shows the shortcut sheet.
 - Single-letter shortcuts are ignored while a text field has focus.
 - Tab order: sidebar → list → panel. Every focusable element shows `--focus-ring` on

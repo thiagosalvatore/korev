@@ -10,7 +10,13 @@ import {
   panel,
   withSession,
 } from './app';
-import { API_REPO, FAILING_PR_NUMBER, FAILING_PR_TITLE } from './fake-github';
+import {
+  API_REPO,
+  FAILING_PR_NUMBER,
+  FAILING_PR_TITLE,
+  REVIEW_PR_NUMBER,
+  REVIEW_PR_TITLE,
+} from './fake-github';
 import { createGitRemote, type GitRemote } from '../src/main/test-git-remote';
 
 const STUBS = resolve('e2e/stubs');
@@ -35,6 +41,11 @@ async function withRemote(run: (remote: GitRemote) => Promise<void>) {
           number: FAILING_PR_NUMBER,
           headRefName: `feature-${FAILING_PR_NUMBER}`,
           files: { 'ingest.ts': 'export const limit = 100;\n' },
+        },
+        {
+          number: REVIEW_PR_NUMBER,
+          headRefName: `feature-${REVIEW_PR_NUMBER}`,
+          files: { 'ingest.ts': 'export const limit = 200;\n' },
         },
       ]),
     );
@@ -135,4 +146,60 @@ test('fixes a merge conflict after asking one question, and pushes the merge', a
       { headOids: remote.headOids, conflicting: [FAILING_PR_NUMBER] },
     );
   });
+});
+
+test('drafts a review of a teammate PR and submits it as a comment', async () => {
+  await withRemote((remote) =>
+    withSession(
+      async (github, userDataDir) => {
+        await chooseClaude(userDataDir);
+        const app = await launch(github, userDataDir, aiEnv(remote));
+        try {
+          const window = await appWindow(app);
+          await connectAndOpenMyPrs(window);
+          await window.getByRole('button', { name: /Review requests/ }).click();
+          await openRow(window, REVIEW_PR_TITLE);
+          await panel(window)
+            .getByRole('button', { name: /^Review/ })
+            .click();
+
+          await panel(window)
+            .getByRole('button', { name: 'Open review draft' })
+            .click({ timeout: 30_000 });
+          const draft = window.getByRole('dialog');
+          await expect(
+            draft.getByText(
+              'Read the limit from config instead of hard-coding it.',
+            ),
+          ).toBeVisible();
+          await expect(
+            draft.getByRole('button', { name: /Approve/ }),
+          ).toHaveCount(0);
+          await draft
+            .getByRole('button', { name: 'Submit as comment' })
+            .click();
+
+          await expect(draft).toBeHidden();
+          expect(github.submittedReviews()).toEqual([
+            {
+              id: `PR_${REVIEW_PR_NUMBER}`,
+              event: 'COMMENT',
+              body: 'One change worth making before merge.',
+              threads: [
+                {
+                  path: 'ingest.ts',
+                  line: 1,
+                  side: 'RIGHT',
+                  body: 'Read the limit from config instead of hard-coding it.',
+                },
+              ],
+            },
+          ]);
+        } finally {
+          await app.close();
+        }
+      },
+      { headOids: remote.headOids, reviewRequest: true },
+    ),
+  );
 });

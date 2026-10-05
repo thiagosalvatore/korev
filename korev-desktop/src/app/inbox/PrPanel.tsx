@@ -28,6 +28,7 @@ import { layerStateLabel } from './OtherLayerRow';
 import { authorHandle } from './PrRow';
 import { ActionFooter, ActionStatus, type PanelActions } from './PanelActions';
 import { AgentTaskStatus } from '../ai/agent-task-state';
+import { KorevActivity } from '../ai/KorevActivity';
 import { KorevAiSection } from '../ai/KorevAiSection';
 import { AnswersFooter, QuestionsSection } from '../ai/QuestionsSection';
 import type { PanelAi } from '../ai/useKorevAi';
@@ -327,7 +328,12 @@ function SubjectDetails({
 }) {
   if (subject.kind === 'layer') return <LayerDetails subject={subject} />;
   const { pr } = subject.item;
-  const aiSection = ai ? <KorevAiSection ai={ai} /> : null;
+  const aiSection = ai ? (
+    <>
+      <KorevAiSection ai={ai} />
+      <KorevActivity runs={ai.history} prUrl={ai.prUrl} />
+    </>
+  ) : null;
   if (subject.kind === 'review') {
     return (
       <PullRequestDetails

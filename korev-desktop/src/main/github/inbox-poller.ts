@@ -114,6 +114,7 @@ export function emptySnapshot(repoCount = 0): InboxSnapshot {
     repoAvatars: {},
     actions: {},
     agentTasks: {},
+    agentHistory: {},
     truncated: { mine: false, reviews: false },
     stacksUnavailable: false,
     error: null,

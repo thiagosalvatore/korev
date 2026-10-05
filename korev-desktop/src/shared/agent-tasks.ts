@@ -2,12 +2,16 @@ export type AgentTaskKind =
   | 'explain'
   | 'fix-conflicts'
   | 'fix-ci'
-  | 'address-comments';
+  | 'address-comments'
+  | 'review'
+  | 'review-fix';
 
 export const AGENT_TASK_KINDS: readonly AgentTaskKind[] = [
   'fix-conflicts',
   'fix-ci',
   'address-comments',
+  'review',
+  'review-fix',
   'explain',
 ];
 
@@ -43,6 +47,18 @@ export const AGENT_TASK_WORDS: Record<AgentTaskKind, AgentTaskWords> = {
     failed: 'Address comments failed',
     done: 'Addressed comments on',
   },
+  review: {
+    name: 'Review',
+    running: 'Reviewing',
+    failed: 'Review failed',
+    done: 'Review draft ready for',
+  },
+  'review-fix': {
+    name: 'Review & fix',
+    running: 'Reviewing',
+    failed: 'Review & fix failed',
+    done: 'Reviewed and fixed',
+  },
 };
 
 export type AgentTaskStep = 'queued' | 'preparing' | 'running' | 'pushing';
@@ -74,9 +90,57 @@ export type AgentTaskState =
       summary: string;
       commits: string[];
       rerunRunIds?: number[];
+      review?: ReviewDraft;
       finishedAt: string;
     }
   | { status: 'failed'; kind: AgentTaskKind; message: string };
+
+export type ReviewEvent = 'COMMENT' | 'REQUEST_CHANGES';
+
+export type ReviewSeverity = 'critical' | 'high' | 'medium' | 'low';
+
+export const REVIEW_SEVERITIES: readonly ReviewSeverity[] = [
+  'critical',
+  'high',
+  'medium',
+  'low',
+];
+
+export type ReviewCommentStatus = 'open' | 'accepted' | 'dismissed';
+
+export interface ReviewComment {
+  id: string;
+  path: string;
+  line: number;
+  body: string;
+  severity: ReviewSeverity;
+  contextStart: number;
+  context: string[];
+  status: ReviewCommentStatus;
+}
+
+export interface ReviewDraft {
+  headOid: string;
+  summary: string;
+  event: ReviewEvent;
+  comments: ReviewComment[];
+}
+
+export interface ReviewSubmission {
+  summary: string;
+  event: ReviewEvent;
+  comments: Pick<ReviewComment, 'path' | 'line' | 'body'>[];
+}
+
+export interface KorevRun {
+  kind: AgentTaskKind;
+  outcome: 'done' | 'failed';
+  summary: string;
+  commits: string[];
+  finishedAt: string;
+}
+
+export const KOREV_RUNS_KEPT = 5;
 
 export type ExplainFormat = 'html' | 'markdown';
 
@@ -118,6 +182,15 @@ export const DEFAULT_INSTRUCTIONS: Record<AgentTaskKind, string> = {
   'fix-ci': [
     'Fix the failing checks with the smallest change that makes them pass.',
     'Run the failing tests, linters or builds locally before you finish, and fix what they report.',
+  ].join(' '),
+  review: [
+    'Review this pull request the way a careful senior engineer on the team would.',
+    'Look for bugs, missing tests for changed behaviour, security problems, and code that does not do what the description says.',
+    'Skip style nits that a linter would catch. Every comment must point at a line in the diff and say what to change.',
+  ].join(' '),
+  'review-fix': [
+    'Review this pull request for bugs, missing tests and security problems, then fix what you found.',
+    'Skip style nits that a linter would catch.',
   ].join(' '),
   'address-comments': [
     'Address each review comment.',
