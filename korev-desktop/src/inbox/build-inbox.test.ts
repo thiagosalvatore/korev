@@ -21,6 +21,7 @@ function build(input: Partial<InboxInput>) {
     mergeWith: {},
     keptPrs: {},
     needsAnswer: [],
+    korevWorking: [],
     ...input,
   });
 }
@@ -59,7 +60,9 @@ describe('buildInbox', () => {
       ],
     });
 
-    expect(inbox.mine.map((section) => section.count)).toEqual([1, 1, 0, 0, 0]);
+    expect(inbox.mine.map((section) => section.count)).toEqual([
+      1, 0, 1, 0, 0, 0,
+    ]);
   });
 
   it('keeps stacks whole and counts only reviews still waiting on the viewer', () => {
@@ -110,5 +113,13 @@ describe('buildInbox', () => {
       code: 'needs-answer',
       label: 'Korev needs your answer',
     });
+  });
+
+  it('puts a PR Korev is working on in its own section', () => {
+    const pr = makePr({ number: 7, mergeStateStatus: 'DIRTY' });
+
+    const { mine } = build({ mine: [pr], korevWorking: ['acme/web#7'] });
+
+    expect(mine.map((section) => section.count)).toEqual([0, 1, 0, 0, 0, 0]);
   });
 });

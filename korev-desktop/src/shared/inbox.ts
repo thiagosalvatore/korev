@@ -2,7 +2,13 @@ import type { AgentTaskState, KorevRun } from './agent-tasks';
 import type { PrActionState, QueueStatus, RepoMergeInfo } from './merge';
 import type { PullRequest, StackLayer } from './pull-request';
 
-export type Bucket = 'needs-you' | 'in-progress' | 'ready' | 'stale' | 'kept';
+export type Bucket =
+  | 'needs-you'
+  | 'korev-working'
+  | 'in-progress'
+  | 'ready'
+  | 'stale'
+  | 'kept';
 
 export type ReasonSeverity = 'danger' | 'warning' | 'neutral' | 'success';
 

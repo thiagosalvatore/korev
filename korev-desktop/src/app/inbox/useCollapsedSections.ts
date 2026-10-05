@@ -3,6 +3,7 @@ import { announce } from '../LiveAnnouncer';
 import { saveCollapsedSection, useSettings } from '../useSettings';
 
 const COLLAPSED_BY_DEFAULT: Record<CollapsibleSection, boolean> = {
+  'korev-working': false,
   ready: false,
   'in-progress': false,
   stale: true,

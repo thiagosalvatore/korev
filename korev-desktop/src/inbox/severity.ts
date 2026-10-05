@@ -2,6 +2,7 @@ import type { Bucket, Reason, ReasonSeverity } from '../shared/inbox';
 
 export const BUCKET_ORDER: readonly Bucket[] = [
   'needs-you',
+  'korev-working',
   'in-progress',
   'ready',
   'stale',
@@ -10,6 +11,7 @@ export const BUCKET_ORDER: readonly Bucket[] = [
 
 export const SECTION_ORDER: readonly Bucket[] = [
   'needs-you',
+  'korev-working',
   'ready',
   'in-progress',
   'stale',

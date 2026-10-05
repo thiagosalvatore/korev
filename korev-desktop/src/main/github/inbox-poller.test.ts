@@ -101,6 +101,7 @@ function setup() {
     mergeWith: () => ({}),
     keptPrs: () => ({}),
     needsAnswer: () => [],
+    korevWorking: () => [],
     renameRepos: async (renames) => {
       session.repos = session.repos.map(
         (repo) => renames.find((rename) => rename.from === repo)?.to ?? repo,

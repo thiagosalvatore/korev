@@ -11,6 +11,7 @@ export interface ClassifyContext {
   now?: Date;
   keptAt?: string | null;
   needsAnswer?: boolean;
+  korevWorking?: boolean;
 }
 
 type ReasonRule = (pr: PullRequest, context: ClassifyContext) => Reason | null;
@@ -251,7 +252,11 @@ export function classifyMyPr(
   pr: PullRequest,
   context: ClassifyContext = FIRST_SIGHTING,
 ): MyPr {
-  return withStaleness(classifyByState(pr, context), context);
+  const item = classifyByState(pr, context);
+  if (context.korevWorking && !context.needsAnswer) {
+    return { ...item, bucket: 'korev-working' };
+  }
+  return withStaleness(item, context);
 }
 
 function classifyByState(pr: PullRequest, context: ClassifyContext): MyPr {

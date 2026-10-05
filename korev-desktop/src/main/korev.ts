@@ -204,6 +204,7 @@ export function createKorev(deps: KorevDeps): Korev {
     mergeWith: () => settings.current().mergeWith,
     keptPrs: () => settings.current().keptPrs,
     needsAnswer: () => agentTasks.keptRefs(),
+    korevWorking: () => agentTasks.workingRefs(),
     renameRepos: followRepoRenames,
     now: () => new Date(),
     scheduler: timers,
@@ -388,15 +389,21 @@ export function createKorev(deps: KorevDeps): Korev {
     }
   }
 
-  let waitingOnAnswers = '';
+  let classifiedTasks = '';
+
+  function taskClassKey(): string {
+    const waiting = agentTasks.keptRefs().sort().join(' ');
+    const working = agentTasks.workingRefs().sort().join(' ');
+    return `${waiting}|${working}`;
+  }
 
   function followTasks(): void {
-    const waiting = agentTasks.keptRefs().sort().join(' ');
-    if (waiting === waitingOnAnswers) {
+    const key = taskClassKey();
+    if (key === classifiedTasks) {
       broadcastInbox(inbox.snapshot());
       return;
     }
-    waitingOnAnswers = waiting;
+    classifiedTasks = key;
     inbox.rebuild();
   }
 

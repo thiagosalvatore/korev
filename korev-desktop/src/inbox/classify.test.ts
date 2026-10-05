@@ -262,3 +262,32 @@ describe('classifyMyPr stale', () => {
     expect(classifyQuiet(40, failing, daysAgo(31)).bucket).toBe('stale');
   });
 });
+
+describe('classifyMyPr Korev working', () => {
+  const conflicting = makePr({
+    mergeStateStatus: 'DIRTY',
+    mergeable: 'CONFLICTING',
+    lastActivityAt: daysAgo(40),
+  });
+
+  it('moves a PR Korev is fixing out of Needs you, keeping its reasons', () => {
+    const result = classifyMyPr(conflicting, {
+      unknownMergeStreak: 1,
+      now: NOW,
+      korevWorking: true,
+    });
+
+    expect(result.bucket).toBe('korev-working');
+    expect(codesOf(result)).toEqual(['conflicts']);
+  });
+
+  it('keeps a PR in Needs you while Korev waits for an answer', () => {
+    const result = classifyMyPr(conflicting, {
+      unknownMergeStreak: 1,
+      needsAnswer: true,
+      korevWorking: true,
+    });
+
+    expect(result.bucket).toBe('needs-you');
+  });
+});

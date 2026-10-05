@@ -14,6 +14,7 @@ export interface WindowBounds {
 }
 
 export const COLLAPSIBLE_SECTIONS = [
+  'korev-working',
   'ready',
   'in-progress',
   'stale',

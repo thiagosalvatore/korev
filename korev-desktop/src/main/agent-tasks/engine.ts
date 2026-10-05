@@ -107,11 +107,21 @@ export interface AgentTasks {
   restore(login: string): Promise<void>;
   clear(): Promise<void>;
   keptRefs(): string[];
+  workingRefs(): string[];
   isBusy(): boolean;
   stop(): void;
 }
 
 const OK: ActionResult = { ok: true };
+
+const READ_ONLY_KINDS: ReadonlySet<AgentTaskKind> = new Set([
+  'explain',
+  'review',
+]);
+
+function isFixing(state: AgentTaskState): boolean {
+  return state.status === 'running' && !READ_ONLY_KINDS.has(state.kind);
+}
 
 function failure(message: string): ActionResult {
   return { ok: false, message };
@@ -539,6 +549,10 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     keptRefs: () =>
       [...records]
         .filter(([, record]) => keepsCheckout(record.state))
+        .map(([ref]) => ref),
+    workingRefs: () =>
+      [...records]
+        .filter(([, record]) => isFixing(record.state))
         .map(([ref]) => ref),
     isBusy: () => running > 0 || waiting.length > 0,
     stop: () => {

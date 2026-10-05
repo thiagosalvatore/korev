@@ -26,6 +26,7 @@ export interface InboxInput {
   mergeWith: Record<string, MergeTool>;
   keptPrs: Record<string, string>;
   needsAnswer: string[];
+  korevWorking: string[];
 }
 
 export interface Inbox {
@@ -84,8 +85,10 @@ export function buildInbox({
   mergeWith,
   keptPrs,
   needsAnswer,
+  korevWorking,
 }: InboxInput): Inbox {
   const waiting = new Set(needsAnswer);
+  const working = new Set(korevWorking);
   const classified = mine.map((pr) =>
     classifyMyPr(pr, {
       unknownMergeStreak: unknownMergeStreaks[pr.id] ?? 0,
@@ -93,6 +96,7 @@ export function buildInbox({
       now,
       keptAt: keptPrs[prRef(pr)] ?? null,
       needsAnswer: waiting.has(prRef(pr)),
+      korevWorking: working.has(prRef(pr)),
     }),
   );
   const sorted = reviews.map((pr) =>

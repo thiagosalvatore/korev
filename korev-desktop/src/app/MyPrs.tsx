@@ -33,6 +33,7 @@ import { useRepoFilter } from './inbox/useRepoFilter';
 
 const BUCKET_LABELS: Record<Bucket, string> = {
   'needs-you': 'Needs you',
+  'korev-working': 'Korev working',
   'in-progress': 'In progress',
   ready: 'Ready to merge',
   stale: 'Stale',
@@ -80,6 +81,7 @@ function MyEntryView({ entry }: { entry: MyEntry }) {
 
 const COUNT_TONES: Record<Bucket, CountTone> = {
   'needs-you': 'danger',
+  'korev-working': 'neutral',
   ready: 'success',
   'in-progress': 'neutral',
   stale: 'neutral',

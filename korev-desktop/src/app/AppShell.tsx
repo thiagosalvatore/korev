@@ -94,6 +94,7 @@ function inboxItems(snapshot: InboxSnapshot | null): SidebarNavItem<View>[] {
 
 const SECTION_SUMMARY: Record<Bucket, string> = {
   'needs-you': 'need you',
+  'korev-working': 'with Korev',
   ready: 'ready to merge',
   'in-progress': 'in progress',
   stale: 'stale',

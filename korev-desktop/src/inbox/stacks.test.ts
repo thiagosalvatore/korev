@@ -17,6 +17,7 @@ const SEVERITY_BY_BUCKET = {
   'needs-you': 'danger',
   'in-progress': 'neutral',
   ready: 'success',
+  'korev-working': 'neutral',
   stale: 'warning',
   kept: 'neutral',
 } as const;
@@ -93,12 +94,13 @@ describe('groupMyPrs', () => {
 
     expect(sections.map((section) => section.bucket)).toEqual([
       'needs-you',
+      'korev-working',
       'ready',
       'in-progress',
       'stale',
       'kept',
     ]);
-    expect(sections[1]).toMatchObject({ count: 1, entries: [{ kind: 'pr' }] });
+    expect(sections[2]).toMatchObject({ count: 1, entries: [{ kind: 'pr' }] });
   });
 
   it('shows a merged bottom layer as other and does not count it open', () => {
@@ -149,7 +151,9 @@ describe('groupMyPrs', () => {
       NO_REPO_ORDER,
     );
 
-    expect(sections.map((section) => section.count)).toEqual([2, 1, 0, 0, 0]);
+    expect(sections.map((section) => section.count)).toEqual([
+      2, 0, 1, 0, 0, 0,
+    ]);
     expect(onlyStack(sections)).toMatchObject({
       bucket: 'needs-you',
       headline: 'Needs you: #304 Lint failing',
@@ -176,7 +180,7 @@ describe('groupMyPrs', () => {
       ],
     };
 
-    const [, , inProgress] = groupMyPrs(
+    const [, , , inProgress] = groupMyPrs(
       [
         myPr(1, 'in-progress', null, daysAgo(2)),
         myPr(2, 'in-progress', null, hoursAgo(0)),

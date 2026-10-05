@@ -46,6 +46,7 @@ interface PlacedReviewEntry {
 
 const BUCKET_LABEL: Record<Bucket, string> = {
   'needs-you': 'Needs you',
+  'korev-working': 'Korev working',
   'in-progress': 'In progress',
   ready: 'Ready to merge',
   stale: 'Stale',
