@@ -57,8 +57,13 @@ const OUTCOME_WORDS: Record<CheckOutcome, string> = {
   skipped: 'skipped',
 };
 
-const LISTED_OUTCOMES: CheckOutcome[] = ['failing', 'pending'];
-const SUMMARISED_OUTCOMES: CheckOutcome[] = ['passing', 'skipped'];
+const CHECK_ORDER: CheckOutcome[] = [
+  'pending',
+  'failing',
+  'passing',
+  'skipped',
+];
+const COLLAPSED_CHECK_LIMIT = 10;
 
 const REVIEW_WORDS: Record<ReviewState, string> = {
   APPROVED: 'approved',
@@ -150,39 +155,22 @@ function CheckLine({ check }: { check: Check }) {
   );
 }
 
-function OutcomeSummary({
-  outcome,
-  count,
-}: {
-  outcome: CheckOutcome;
-  count: number;
-}) {
-  if (count === 0) return null;
-  const words = `${count} ${OUTCOME_WORDS[outcome]}`;
-  return (
-    <Line>
-      <CiIcon state={OUTCOME_CI[outcome]} label={words} />
-      {words}
-    </Line>
-  );
-}
-
 function ChecksSection({ checks }: { checks: Check[] }) {
+  const [showsAll, setShowsAll] = useState(false);
+  const ordered = CHECK_ORDER.flatMap((outcome) => checksWith(checks, outcome));
+  const hidden = !showsAll && ordered.length > COLLAPSED_CHECK_LIMIT;
+  const visible = hidden ? ordered.slice(0, COLLAPSED_CHECK_LIMIT) : ordered;
   return (
     <PanelSection title="Checks">
       {checks.length === 0 ? <Line>No checks reported</Line> : null}
-      {LISTED_OUTCOMES.flatMap((outcome) =>
-        checksWith(checks, outcome).map((check) => (
-          <CheckLine key={`${outcome}:${check.name}`} check={check} />
-        )),
-      )}
-      {SUMMARISED_OUTCOMES.map((outcome) => (
-        <OutcomeSummary
-          key={outcome}
-          outcome={outcome}
-          count={checksWith(checks, outcome).length}
-        />
+      {visible.map((check) => (
+        <CheckLine key={`${check.outcome}:${check.name}`} check={check} />
       ))}
+      {hidden ? (
+        <Button variant="ghost" size="sm" onClick={() => setShowsAll(true)}>
+          Show all {ordered.length} checks
+        </Button>
+      ) : null}
     </PanelSection>
   );
 }
@@ -296,7 +284,7 @@ function PullRequestDetails({
   return (
     <>
       {why}
-      <ChecksSection checks={pr.checks} />
+      <ChecksSection key={pr.url} checks={pr.checks} />
       <ReviewersSection pr={pr} />
       <ChangesSection pr={pr} size={size} />
       <PrStack pr={pr} />

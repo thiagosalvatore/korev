@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApprovedReview, InboxSnapshot } from '../shared/inbox';
+import type { Check, CheckOutcome } from '../shared/pull-request';
 import { installFakeBridge, installMatchMedia } from './fake-bridge';
 import { ReviewInbox } from './ReviewInbox';
 import {
@@ -65,6 +66,29 @@ function withApproved(
   return makeSnapshot({
     reviews: { entries, approved: [APPROVED_REVIEW, API_APPROVED] },
   });
+}
+
+function checksNamed(outcome: CheckOutcome, count: number): Check[] {
+  return Array.from({ length: count }, (_, index) => ({
+    name: `${outcome} check ${index + 1}`,
+    outcome,
+  }));
+}
+
+function snapshotWithChecks(checks: Check[]): InboxSnapshot {
+  const invoice = {
+    ...INVOICE_REVIEW,
+    pr: { ...INVOICE_REVIEW.pr, checks },
+  };
+  return makeSnapshot({
+    reviews: { entries: [{ kind: 'pr', item: invoice }], approved: [] },
+  });
+}
+
+function listedCheckNames(): string[] {
+  return within(panel())
+    .getAllByText(/ check \d+$/)
+    .map((line) => line.textContent ?? '');
 }
 
 describe('ReviewInbox', () => {
@@ -168,5 +192,33 @@ describe('ReviewInbox', () => {
     const selected = screen.getByRole('option', { selected: true });
     expect(selected.textContent).toContain(INVOICE_REVIEW.pr.title);
     expect(within(panel()).getByText(INVOICE_REVIEW.pr.title)).toBeTruthy();
+  });
+
+  it('lists running checks, then failing, then passing, showing 10 until asked for all', () => {
+    installFakeBridge();
+    renderInbox(
+      snapshotWithChecks([
+        ...checksNamed('passing', 6),
+        ...checksNamed('failing', 3),
+        ...checksNamed('pending', 3),
+      ]),
+    );
+    fireEvent.click(rowTitled(INVOICE_REVIEW.pr.title));
+
+    expect(listedCheckNames()).toEqual(
+      [
+        ...checksNamed('pending', 3),
+        ...checksNamed('failing', 3),
+        ...checksNamed('passing', 4),
+      ].map((check) => check.name),
+    );
+
+    fireEvent.click(
+      within(panel()).getByRole('button', { name: 'Show all 12 checks' }),
+    );
+    expect(listedCheckNames()).toHaveLength(12);
+    expect(
+      within(panel()).queryByRole('button', { name: /Show all/ }),
+    ).toBeNull();
   });
 });
