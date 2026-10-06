@@ -86,6 +86,23 @@ and open `#gallery`).
   summary "You're asked on 2 of 4". Layers not requested from the viewer collapse into
   one expandable line.
 
+## Sidebar
+
+- Three groups, each under a `type-overline` heading: **Reviews** (Review requests),
+  **My PRs** (Open, Ready to merge, Stale) and **Korev**. Settings sits at the bottom.
+  Below 900px the sidebar is a 56px icon rail and each heading becomes a hairline.
+- **Korev** lists what Korev is doing or what needs you, one row per PR: `#num title` on
+  line 1 and the status on line 2. The group is hidden when it is empty.
+  - Running: `loader` (spins), "Fixing CI…" or "Queued", `fg-3`.
+  - Questions: `message-circle-question`, "Needs your answer", danger.
+  - Failed: `circle-x`, "Fix CI failed", danger.
+  - A finished review: `file-pen-line`, "Review draft ready", success.
+  - Finished fixes and every Explain are left out. A toast already said they are done,
+    and Explain has its reader.
+- Clicking a Korev row opens the view that holds the PR, selects its row and shows its
+  run page. The row is marked current while its run page is open; no view is.
+- The topbar ends with a ghost "Go to ⌘K" button that opens the palette.
+
 ## Status sections
 
 - My PRs are split across three sidebar views, each for every repo together:
@@ -223,8 +240,10 @@ and open `#gallery`).
 - The side panel only sums up a Korev task. The work itself happens on the **Korev run
   page**, which replaces the list and the panel in the main area. It opens when the user
   starts a fix or Review, from "Open" / "Answer questions" / "Open review
-  draft" in the panel, and from a question notification. "Back" (Esc) returns to the
-  list with the row focused. Explain keeps its reader.
+  draft" in the panel, from the sidebar's Korev group, and from a question notification.
+  "Back" (Esc) returns to the list with the row focused. Explain keeps its reader.
+- Choosing a view in the sidebar closes the run page. Typed answers and the terminal
+  stay, so the run picks up where the user left it when they open it again.
 - The run page header shows the PR, the task line (with Stop and Open terminal) and a
   failure with Retry. Below it, the "Activity" feed lists what the agent does as it
   happens: steps ("Read src/a.ts", "Ran npm test") in mono `fg-2`, the agent's own text

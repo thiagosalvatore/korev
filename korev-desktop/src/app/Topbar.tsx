@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Button, Icon, IconButton, Kbd, cn } from '../design-system';
+import { Button, Icon, IconButton, cn } from '../design-system';
 import type { InboxSnapshot } from '../shared/inbox';
 import { formatClock, formatDataTime, formatSynced } from './format';
 import { DRAG_REGION, NO_DRAG } from './layout';
@@ -35,8 +35,6 @@ function StatusText({
     </span>
   );
 }
-
-const HINT_KEYS = ['J', 'K', '↵', '?'];
 
 function withTime(label: string, iso: string | null, prefix: string): string {
   if (!iso) return label;
@@ -116,22 +114,18 @@ function SyncStatus({ snapshot, onReconnect }: SyncStatusProps) {
   }
 }
 
-function KeyHints({ onShowShortcuts }: { onShowShortcuts: () => void }) {
+function GoToButton({ onOpenPalette }: { onOpenPalette: () => void }) {
   return (
-    <button
-      type="button"
-      aria-label="Keyboard shortcuts"
-      title="Keyboard shortcuts"
-      onClick={onShowShortcuts}
-      className={cn(
-        'hidden cursor-pointer items-center gap-1 rounded-sm border-0 bg-transparent p-1 hover:bg-hover focus-visible:shadow-focus min-[900px]:inline-flex',
-        NO_DRAG,
-      )}
+    <Button
+      size="sm"
+      variant="ghost"
+      icon="search"
+      kbd="⌘K"
+      onClick={onOpenPalette}
+      className={NO_DRAG}
     >
-      {HINT_KEYS.map((key) => (
-        <Kbd key={key}>{key}</Kbd>
-      ))}
-    </button>
+      Go to
+    </Button>
   );
 }
 
@@ -141,7 +135,7 @@ export interface TopbarProps {
   filter?: ReactNode;
   snapshot: InboxSnapshot | null;
   onReconnect: () => void;
-  onShowShortcuts?: () => void;
+  onOpenPalette: () => void;
 }
 
 export function Topbar({
@@ -150,7 +144,7 @@ export function Topbar({
   filter,
   snapshot,
   onReconnect,
-  onShowShortcuts,
+  onOpenPalette,
 }: TopbarProps) {
   return (
     <header
@@ -178,7 +172,7 @@ export function Topbar({
         onClick={() => void refreshInbox()}
         className={NO_DRAG}
       />
-      {onShowShortcuts ? <KeyHints onShowShortcuts={onShowShortcuts} /> : null}
+      <GoToButton onOpenPalette={onOpenPalette} />
     </header>
   );
 }

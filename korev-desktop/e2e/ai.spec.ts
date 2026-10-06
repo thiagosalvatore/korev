@@ -9,6 +9,7 @@ import {
   openRow,
   panel,
   runPage,
+  showView,
   withSession,
 } from './app';
 import {
@@ -144,6 +145,47 @@ test('fixes a merge conflict after asking one question, and pushes the merge', a
               `feature-${FAILING_PR_NUMBER}`,
             ),
           ).toBe(`Merge main into feature-${FAILING_PR_NUMBER}`);
+        } finally {
+          await app.close();
+        }
+      },
+      { headOids: remote.headOids, conflicting: [FAILING_PR_NUMBER] },
+    );
+  });
+});
+
+test('keeps a conflict fix waiting for an answer in the sidebar after switching views', async () => {
+  await withRemote(async (remote) => {
+    remote.commit(
+      'main',
+      { 'ingest.ts': 'export const limit = 50;\n' },
+      'Lower the limit',
+    );
+    await withSession(
+      async (github, userDataDir) => {
+        await chooseClaude(userDataDir);
+        const app = await launch(github, userDataDir, aiEnv(remote));
+        try {
+          const window = await appWindow(app);
+          await connectAndOpenMyPrs(window);
+          await openRow(window, FAILING_PR_TITLE);
+          await panel(window)
+            .getByRole('button', { name: 'Fix conflicts' })
+            .click();
+          const answer = runPage(window, FAILING_PR_NUMBER).getByRole(
+            'textbox',
+            { name: 'Your answer' },
+          );
+          await answer.fill('Use 75', { timeout: 30_000 });
+
+          await showView(window, 'Ready to merge');
+          await expect(runPage(window, FAILING_PR_NUMBER)).toBeHidden();
+          await window
+            .getByRole('navigation', { name: 'Korev' })
+            .getByRole('button', { name: /#491.*Needs your answer/ })
+            .click();
+
+          await expect(answer).toHaveValue('Use 75');
         } finally {
           await app.close();
         }

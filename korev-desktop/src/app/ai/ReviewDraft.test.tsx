@@ -1,7 +1,6 @@
 import {
   cleanup,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
@@ -18,6 +17,7 @@ import {
   WATCHING_SETTINGS,
   makeSnapshot,
 } from '../test-fixtures';
+import { renderList } from '../test-render';
 
 beforeEach(() => installMatchMedia());
 afterEach(cleanup);
@@ -66,7 +66,7 @@ function doneWith(review: ReviewDraft): AgentTaskState {
 
 async function openDraft(review: ReviewDraft) {
   const { bridge } = installFakeBridge({ settings: WITH_AGENT });
-  const { rerender } = render(
+  const { rerender } = renderList(
     <ReviewInbox
       snapshot={makeSnapshot({ agentTasks: { [REF]: doneWith(review) } })}
       onOpenSettings={vi.fn()}
@@ -184,7 +184,7 @@ describe('review draft', () => {
     const { bridge } = installFakeBridge({ settings: WITH_AGENT });
     const mine = LINT_PR.pr;
     const target = { id: mine.id, repo: mine.repo, number: mine.number };
-    render(
+    renderList(
       <MyPrs
         view="open"
         snapshot={makeSnapshot({
@@ -202,9 +202,6 @@ describe('review draft', () => {
 
     fireEvent.click(
       await within(panel).findByRole('button', { name: /^Review/ }),
-    );
-    fireEvent.click(
-      within(panel).getByRole('button', { name: 'Open review draft' }),
     );
     const page = screen.getByRole('region', {
       name: `Korev on #${mine.number}`,

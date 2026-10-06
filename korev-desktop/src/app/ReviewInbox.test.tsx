@@ -1,7 +1,6 @@
 import {
   cleanup,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
@@ -17,12 +16,13 @@ import {
   makePr,
   makeSnapshot,
 } from './test-fixtures';
+import { renderList } from './test-render';
 
 beforeEach(() => installMatchMedia());
 afterEach(cleanup);
 
 function renderInbox(snapshot: InboxSnapshot = makeSnapshot()) {
-  const utils = render(
+  const utils = renderList(
     <ReviewInbox snapshot={snapshot} onOpenSettings={vi.fn()} />,
   );
   const rerenderWith = (next: InboxSnapshot) =>

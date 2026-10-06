@@ -17,6 +17,7 @@ import {
   WATCHING_SETTINGS,
   makeSnapshot,
 } from '../test-fixtures';
+import { renderList } from '../test-render';
 
 beforeEach(() => installMatchMedia());
 afterEach(cleanup);
@@ -49,7 +50,7 @@ function renderMine(
   agentTasks: Record<string, AgentTaskState> = {},
 ) {
   const fake = installFakeBridge({ settings: WITH_AGENT, ...options });
-  render(
+  renderList(
     <MyPrs
       view="open"
       snapshot={makeSnapshot({ agentTasks })}

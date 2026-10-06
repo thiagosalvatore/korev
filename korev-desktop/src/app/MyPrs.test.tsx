@@ -2,7 +2,6 @@ import {
   act,
   cleanup,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
@@ -20,6 +19,7 @@ import {
   withKeptPr,
   withStaleStack,
 } from './test-fixtures';
+import { renderList } from './test-render';
 
 let bridge: ReturnType<typeof installFakeBridge>['bridge'];
 
@@ -33,7 +33,7 @@ function renderMyPrs(
   snapshot: InboxSnapshot = makeSnapshot(),
   view: MyPrsView = 'open',
 ) {
-  return render(
+  return renderList(
     <MyPrs view={view} snapshot={snapshot} onOpenSettings={vi.fn()} />,
   );
 }

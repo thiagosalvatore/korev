@@ -56,7 +56,7 @@ export async function connectAndOpenMyPrs(window: Page) {
 
 export async function showView(window: Page, label: string) {
   await window
-    .getByRole('navigation', { name: 'Inbox' })
+    .getByRole('navigation', { name: /^(Reviews|My PRs)$/ })
     .getByRole('button', { name: new RegExp(`^${label}`) })
     .click();
 }

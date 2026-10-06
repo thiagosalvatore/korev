@@ -19,6 +19,7 @@ import {
   makePr,
   makeSnapshot,
 } from '../test-fixtures';
+import { renderList } from '../test-render';
 
 beforeEach(() => installMatchMedia());
 afterEach(cleanup);
@@ -84,7 +85,7 @@ function renderMine(
   agentTasks: Record<string, AgentTaskState> = {},
 ) {
   const fake = installFakeBridge({ settings: WITH_AGENT });
-  const { rerender } = render(myPrsWith(item, agentTasks));
+  const { rerender } = renderList(myPrsWith(item, agentTasks));
   return {
     ...fake,
     settle: (settled: Record<string, AgentTaskState>) =>
@@ -225,7 +226,7 @@ describe('Fix CI', () => {
 describe('Korev activity', () => {
   it('lists what Korev did on the PR, with links to its commits', async () => {
     installFakeBridge({ settings: WITH_AGENT });
-    render(
+    renderList(
       <MyPrs
         view="open"
         snapshot={makeSnapshot({

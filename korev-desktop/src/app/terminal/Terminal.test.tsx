@@ -2,7 +2,6 @@ import {
   act,
   cleanup,
   fireEvent,
-  render,
   screen,
   within,
 } from '@testing-library/react';
@@ -13,6 +12,7 @@ import type { Settings } from '../../shared/settings';
 import { installFakeBridge, installMatchMedia } from '../fake-bridge';
 import { MyPrs } from '../MyPrs';
 import { WATCHING_SETTINGS, makePr, makeSnapshot } from '../test-fixtures';
+import { renderList } from '../test-render';
 
 const written = vi.hoisted(() => [] as string[]);
 
@@ -72,7 +72,7 @@ const UNPUSHED: AgentTaskState = {
 
 function renderMine(state: AgentTaskState) {
   const fake = installFakeBridge({ settings: WITH_AGENT });
-  render(
+  renderList(
     <MyPrs
       view="open"
       snapshot={makeSnapshot({

@@ -179,6 +179,21 @@ export const REVIEW_MODEL: ListModel = {
     approvedReviews(snapshot).length === 0,
 };
 
+export function subjectOf(
+  snapshot: InboxSnapshot,
+  ref: string,
+): PanelSubject | null {
+  const subjects = [
+    ...MINE_MODEL.subjects(snapshot).values(),
+    ...REVIEW_MODEL.subjects(snapshot).values(),
+  ];
+  return (
+    subjects.find(
+      (subject) => subject.kind !== 'layer' && prRef(subject.item.pr) === ref,
+    ) ?? null
+  );
+}
+
 export interface SubjectSummary {
   title: string;
   url: string;

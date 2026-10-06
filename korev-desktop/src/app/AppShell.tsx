@@ -31,6 +31,9 @@ import {
 } from './inbox/selectors';
 import { useKeyShortcuts } from './keyboard';
 import { DRAG_REGION, NARROW_QUERY } from './layout';
+import { KorevStage } from './ai/KorevStage';
+import { KorevTasksNav, korevTasks } from './ai/KorevTasksNav';
+import { KorevAiProvider, useKorevAi } from './ai/useKorevAi';
 import { CommandPalette, type PaletteItem } from './CommandPalette';
 import { LiveAnnouncer } from './LiveAnnouncer';
 import { MyPrs } from './MyPrs';
@@ -97,15 +100,20 @@ function isSynced(snapshot: InboxSnapshot | null): snapshot is InboxSnapshot {
   return Boolean(snapshot?.syncedAt);
 }
 
-function inboxItems(snapshot: InboxSnapshot | null): SidebarNavItem<View>[] {
-  const synced = isSynced(snapshot);
+function reviewItems(snapshot: InboxSnapshot | null): SidebarNavItem<View>[] {
   return [
     {
       id: 'review',
       label: VIEW_TITLES.review,
       icon: 'inbox',
-      badge: synced ? reviewBadge(snapshot) : undefined,
+      badge: isSynced(snapshot) ? reviewBadge(snapshot) : undefined,
     },
+  ];
+}
+
+function myPrItems(snapshot: InboxSnapshot | null): SidebarNavItem<View>[] {
+  const synced = isSynced(snapshot);
+  return [
     {
       id: 'open',
       label: VIEW_TITLES.open,
@@ -207,14 +215,25 @@ function paletteItems(
   return [...commandItems, ...prItems];
 }
 
+const NO_VIEW = '';
+
 interface SidebarProps {
   view: View;
   snapshot: InboxSnapshot | null;
+  runRef: string | null;
   onSelect: (view: View) => void;
+  onOpenRun: (ref: string) => void;
 }
 
-function Sidebar({ view, snapshot, onSelect }: SidebarProps) {
+function Sidebar({
+  view,
+  snapshot,
+  runRef,
+  onSelect,
+  onOpenRun,
+}: SidebarProps) {
   const compact = useMediaQuery(NARROW_QUERY);
+  const current = runRef ? NO_VIEW : view;
   return (
     <aside
       className={cn(
@@ -231,18 +250,34 @@ function Sidebar({ view, snapshot, onSelect }: SidebarProps) {
       >
         <Logo size={18} variant={compact ? 'mark' : 'full'} />
       </div>
-      <SidebarNav
-        label="Inbox"
-        items={inboxItems(snapshot)}
-        value={view}
-        onChange={onSelect}
-        compact={compact}
-      />
-      <span className="flex-1" />
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+        <SidebarNav
+          label="Reviews"
+          heading
+          items={reviewItems(snapshot)}
+          value={current}
+          onChange={onSelect}
+          compact={compact}
+        />
+        <SidebarNav
+          label="My PRs"
+          heading
+          items={myPrItems(snapshot)}
+          value={current}
+          onChange={onSelect}
+          compact={compact}
+        />
+        <KorevTasksNav
+          tasks={korevTasks(snapshot)}
+          activeRef={runRef}
+          compact={compact}
+          onOpen={onOpenRun}
+        />
+      </div>
       <SidebarNav
         label="App"
         items={SETTINGS_ITEMS}
-        value={view}
+        value={current}
         onChange={onSelect}
         compact={compact}
       />
@@ -291,8 +326,10 @@ export function AppShell({ auth, settings }: AppShellProps) {
   const repoFilter = useSettings()?.repoFilter ?? DEFAULT_SETTINGS.repoFilter;
   const openSettings = () => selectView(SETTINGS_VIEW);
   const showShortcuts = () => setShortcutsOpen(true);
+  const ai = useKorevAi(snapshot, openSettings);
 
   function selectView(next: View) {
+    ai.closeRun();
     setView(next);
     if (next !== SETTINGS_VIEW) void saveLastView(next);
   }
@@ -301,6 +338,11 @@ export function AppShell({ auth, settings }: AppShellProps) {
   const focusPr = (ref: string) => {
     selectView((snapshot && myPrsViewOf(snapshot, ref)) ?? 'review');
     setFocusRequest({ ref, at: Date.now() });
+    if (snapshot?.agentTasks[ref]?.status === 'needs-input') ai.showRun(ref);
+  };
+  const openRun = (ref: string) => {
+    focusPr(ref);
+    ai.showRun(ref);
   };
   useFocusPrRequests(focusPr);
 
@@ -318,47 +360,57 @@ export function AppShell({ auth, settings }: AppShellProps) {
   useAppCommands(commands);
 
   return (
-    <div className="flex h-screen bg-app text-fg-1">
-      <Sidebar view={view} snapshot={snapshot} onSelect={selectView} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar
-          title={VIEW_TITLES[view]}
-          subtitle={viewSubtitle(view, snapshot, repoFilter)}
-          filter={
-            view === SETTINGS_VIEW ? undefined : (
-              <RepoFilterMenu
-                view={inboxViewOf(view)}
-                repoAvatars={snapshot?.repoAvatars ?? {}}
-              />
-            )
-          }
+    <KorevAiProvider value={ai}>
+      <div className="flex h-screen bg-app text-fg-1">
+        <Sidebar
+          view={view}
           snapshot={snapshot}
-          onReconnect={openSettings}
-          onShowShortcuts={view === SETTINGS_VIEW ? undefined : showShortcuts}
+          runRef={ai.runRef}
+          onSelect={selectView}
+          onOpenRun={openRun}
         />
-        <main className="min-h-0 flex-1 overflow-hidden">
-          <FocusRequestProvider value={focusRequest}>
-            <ViewContent
-              key={view}
-              view={view}
-              auth={auth}
-              settings={settings}
-              snapshot={snapshot}
-              onOpenSettings={openSettings}
-            />
-          </FocusRequestProvider>
-        </main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Topbar
+            title={VIEW_TITLES[view]}
+            subtitle={viewSubtitle(view, snapshot, repoFilter)}
+            filter={
+              view === SETTINGS_VIEW ? undefined : (
+                <RepoFilterMenu
+                  view={inboxViewOf(view)}
+                  repoAvatars={snapshot?.repoAvatars ?? {}}
+                />
+              )
+            }
+            snapshot={snapshot}
+            onReconnect={openSettings}
+            onOpenPalette={() => setPaletteOpen(true)}
+          />
+          <main className="min-h-0 flex-1 overflow-hidden">
+            <FocusRequestProvider value={focusRequest}>
+              <KorevStage>
+                <ViewContent
+                  key={view}
+                  view={view}
+                  auth={auth}
+                  settings={settings}
+                  snapshot={snapshot}
+                  onOpenSettings={openSettings}
+                />
+              </KorevStage>
+            </FocusRequestProvider>
+          </main>
+        </div>
+        <LiveAnnouncer snapshot={snapshot} />
+        <ShortcutSheet
+          open={shortcutsOpen}
+          onClose={() => setShortcutsOpen(false)}
+        />
+        <CommandPalette
+          open={paletteOpen}
+          items={paletteItems(snapshot, commands, focusPr)}
+          onClose={() => setPaletteOpen(false)}
+        />
       </div>
-      <LiveAnnouncer snapshot={snapshot} />
-      <ShortcutSheet
-        open={shortcutsOpen}
-        onClose={() => setShortcutsOpen(false)}
-      />
-      <CommandPalette
-        open={paletteOpen}
-        items={paletteItems(snapshot, commands, focusPr)}
-        onClose={() => setPaletteOpen(false)}
-      />
-    </div>
+    </KorevAiProvider>
   );
 }

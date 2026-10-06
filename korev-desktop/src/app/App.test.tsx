@@ -54,7 +54,7 @@ describe('App', () => {
     installFakeBridge({ auth: CONNECTED_AUTH, settings: WATCHING_SETTINGS });
     render(<App />);
     expect(
-      await screen.findByRole('navigation', { name: 'Inbox' }),
+      await screen.findByRole('navigation', { name: 'My PRs' }),
     ).toBeTruthy();
     expect(
       screen.getByRole('heading', { level: 1, name: 'Review requests' }),

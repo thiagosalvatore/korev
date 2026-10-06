@@ -11,9 +11,12 @@ import { AppShell } from './AppShell';
 import { installFakeBridge, installMatchMedia } from './fake-bridge';
 import type { InboxSnapshot } from '../shared/inbox';
 import { prRef } from '../shared/pr-ref';
+import type { AgentTaskState } from '../shared/agent-tasks';
 import {
   CONNECTED_AUTH,
+  INVOICE_REVIEW,
   OTEL_PR,
+  SYNCED_AT,
   WATCHING_SETTINGS,
   makeSnapshot,
   withKeptPr,
@@ -27,6 +30,34 @@ function renderShell(snapshot?: InboxSnapshot, settings = WATCHING_SETTINGS) {
   const fake = installFakeBridge({ snapshot, settings });
   render(<AppShell auth={CONNECTED_AUTH} settings={WATCHING_SETTINGS} />);
   return fake;
+}
+
+const OTEL_REF = prRef(OTEL_PR.pr);
+
+const FIXING_CI: AgentTaskState = {
+  status: 'running',
+  kind: 'fix-ci',
+  step: 'running',
+  startedAt: SYNCED_AT,
+};
+
+const ASKING: AgentTaskState = {
+  status: 'needs-input',
+  kind: 'fix-ci',
+  questions: [{ id: 'q1', question: 'Pin the version?', context: '' }],
+};
+
+const FIXED: AgentTaskState = {
+  status: 'done',
+  kind: 'fix-ci',
+  summary: 'Fixed the lint step',
+  commits: ['abc1234'],
+  finishedAt: SYNCED_AT,
+};
+
+async function openKorevTask(name: RegExp) {
+  const nav = await screen.findByRole('navigation', { name: 'Korev' });
+  fireEvent.click(within(nav).getByRole('button', { name }));
 }
 
 function viewTitle(): string {
@@ -122,6 +153,57 @@ describe('AppShell', () => {
 
     expect(highlighted.textContent).toContain(viewTitle());
     expect(viewTitle()).not.toBe('Review requests');
+  });
+
+  it('lists what Korev is working on in the sidebar and opens the run from it', async () => {
+    renderShell(
+      makeSnapshot({
+        agentTasks: {
+          [OTEL_REF]: FIXING_CI,
+          [prRef(INVOICE_REVIEW.pr)]: FIXED,
+        },
+      }),
+    );
+
+    await openKorevTask(/#480 Bump OpenTelemetry to 1\.31.*Fixing CI/);
+
+    expect(screen.getByRole('region', { name: 'Korev on #480' })).toBeTruthy();
+    expect(viewTitle()).toBe('Ready to merge');
+    expect(
+      within(screen.getByRole('navigation', { name: 'Korev' })).queryByText(
+        /#91/,
+      ),
+    ).toBeNull();
+  });
+
+  it('comes back to the open panel when Esc leaves the run page', async () => {
+    renderShell(makeSnapshot({ agentTasks: { [OTEL_REF]: FIXING_CI } }));
+    await openKorevTask(/#480/);
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    expect(screen.queryByRole('region', { name: 'Korev on #480' })).toBeNull();
+    expect(
+      screen.getByRole('complementary', { name: 'Pull request details' }),
+    ).toBeTruthy();
+  });
+
+  it('keeps typed answers when the user leaves the run page for another view', async () => {
+    const { emitCommand } = renderShell(
+      makeSnapshot({ agentTasks: { [OTEL_REF]: ASKING } }),
+    );
+    await openKorevTask(/#480.*Needs your answer/);
+    fireEvent.change(screen.getByLabelText('Your answer'), {
+      target: { value: 'Yes, pin 1.31' },
+    });
+
+    act(() => emitCommand('show-review'));
+    expect(screen.queryByRole('region', { name: 'Korev on #480' })).toBeNull();
+    await openKorevTask(/#480/);
+
+    expect(
+      (screen.getByLabelText('Your answer') as HTMLTextAreaElement).value,
+    ).toBe('Yes, pin 1.31');
   });
 
   it('filters the list and the topbar to the chosen repos while the sidebar counts every repo', async () => {

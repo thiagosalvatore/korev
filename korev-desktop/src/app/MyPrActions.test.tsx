@@ -1,10 +1,4 @@
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from '@testing-library/react';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InboxSnapshot } from '../shared/inbox';
 import type { MyPrsView, Settings } from '../shared/settings';
@@ -20,6 +14,7 @@ import {
   makeSnapshot,
   withStaleStack,
 } from './test-fixtures';
+import { renderList } from './test-render';
 
 beforeEach(() => installMatchMedia());
 afterEach(cleanup);
@@ -30,7 +25,9 @@ function setup(
   view: MyPrsView = 'open',
 ) {
   const { bridge } = installFakeBridge({ settings });
-  render(<MyPrs view={view} snapshot={snapshot} onOpenSettings={vi.fn()} />);
+  renderList(
+    <MyPrs view={view} snapshot={snapshot} onOpenSettings={vi.fn()} />,
+  );
   return bridge;
 }
 
@@ -222,7 +219,7 @@ describe('My PR actions', () => {
   it('names only the closed PRs after a partial failure and reopens only those', async () => {
     const { bridge } = installFakeBridge({ settings: WATCHING_SETTINGS });
     const snapshot = withStaleStack();
-    const view = render(
+    const view = renderList(
       <MyPrs view="stale" snapshot={snapshot} onOpenSettings={vi.fn()} />,
     );
     await selectStale(OLD_SPLIT_PR.pr.title);

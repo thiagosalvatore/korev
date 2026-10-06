@@ -16,6 +16,7 @@ import {
   WATCHING_SETTINGS,
   makeSnapshot,
 } from '../test-fixtures';
+import { renderList } from '../test-render';
 
 beforeEach(() => installMatchMedia());
 afterEach(cleanup);
@@ -32,7 +33,7 @@ function withAi(aiTasks: Partial<Settings['aiTasks']> = {}): Settings {
 
 function renderMine(settings: Settings) {
   const { bridge } = installFakeBridge({ settings });
-  render(
+  renderList(
     <MyPrs view="open" snapshot={makeSnapshot()} onOpenSettings={vi.fn()} />,
   );
   return bridge;

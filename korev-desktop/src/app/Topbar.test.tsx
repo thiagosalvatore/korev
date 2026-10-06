@@ -18,6 +18,7 @@ describe('Topbar', () => {
         title="Open"
         snapshot={makeSnapshot({ status: 'auth_lost' })}
         onReconnect={onReconnect}
+        onOpenPalette={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Reconnect GitHub' }));
@@ -31,6 +32,7 @@ describe('Topbar', () => {
         title="Open"
         snapshot={makeSnapshot({ status: 'offline' })}
         onReconnect={vi.fn()}
+        onOpenPalette={vi.fn()}
       />,
     );
     expect(
@@ -45,6 +47,7 @@ describe('Topbar', () => {
         title="Open"
         snapshot={makeSnapshot({ status: 'syncing', fromCache: true })}
         onReconnect={vi.fn()}
+        onOpenPalette={vi.fn()}
       />,
     );
     expect(
@@ -63,6 +66,7 @@ describe('Topbar', () => {
           error: 'GitHub answered with HTTP 504',
         })}
         onReconnect={vi.fn()}
+        onOpenPalette={vi.fn()}
       />,
     );
     expect(

@@ -1,5 +1,7 @@
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -19,7 +21,8 @@ import {
   type KorevRun,
   type ReviewDraft,
 } from '../../shared/agent-tasks';
-import type { ReasonCode } from '../../shared/inbox';
+import type { InboxSnapshot, ReasonCode } from '../../shared/inbox';
+import { pullRequestsIn } from '../../inbox/stacks';
 import type { PrTarget } from '../../shared/merge';
 import { prRef } from '../../shared/pr-ref';
 import type { PullRequest } from '../../shared/pull-request';
@@ -28,7 +31,7 @@ import type { ShortcutMap } from '../keyboard';
 import { announce } from '../LiveAnnouncer';
 import { useSettings } from '../useSettings';
 import { useTimedToast } from '../useTimedToast';
-import type { PanelSubject } from '../inbox/list-model';
+import { subjectOf, type PanelSubject } from '../inbox/list-model';
 import { TerminalDrawer } from '../terminal/TerminalDrawer';
 import { hasWorktree } from './agent-task-state';
 import { ExplainReader } from './ExplainReader';
@@ -41,6 +44,8 @@ export const EXPLAIN_KEY = 'E';
 export const KEEP_MERGEABLE_KEY = 'A';
 export const REVIEW_KEY = 'R';
 const TOAST_MS = 8000;
+const NO_TASKS: Record<string, AgentTaskState> = {};
+const NO_HISTORY: Record<string, KorevRun[]> = {};
 const SHORT_SHA = 7;
 
 const FIX_FOR_REASON: Partial<Record<ReasonCode, AgentTaskKind>> = {
@@ -164,19 +169,33 @@ export interface KorevAi {
   panelAi(subject: PanelSubject | null): PanelAi | undefined;
   runRef: string | null;
   showRun(ref: string): void;
-  runPage(subject: PanelSubject): ReactNode;
-  shortcuts: ShortcutMap;
+  closeRun(): void;
+  runPage(): ReactNode;
+  shortcutsFor(selected: PanelSubject | null): ShortcutMap;
   overlays: ReactNode;
   terminal: ReactNode;
 }
 
+const KorevAiContext = createContext<KorevAi | null>(null);
+
+export const KorevAiProvider = KorevAiContext.Provider;
+
+export function useKorevAiContext(): KorevAi {
+  const ai = useContext(KorevAiContext);
+  if (!ai) throw new Error('useKorevAiContext needs a KorevAiProvider');
+  return ai;
+}
+
 export function useKorevAi(
-  tasks: Record<string, AgentTaskState>,
-  history: Record<string, KorevRun[]>,
-  selected: PanelSubject | null,
-  pullRequests: (ref: string) => PullRequest | null,
+  snapshot: InboxSnapshot | null,
   onOpenSettings: () => void,
 ): KorevAi {
+  const tasks = snapshot?.agentTasks ?? NO_TASKS;
+  const history = snapshot?.agentHistory ?? NO_HISTORY;
+  const pullRequests = (ref: string) =>
+    (snapshot ? pullRequestsIn(snapshot) : []).find(
+      (pr) => prRef(pr) === ref,
+    ) ?? null;
   const settings = useSettings();
   const [reader, setReader] = useState<PullRequest | null>(null);
   const [runRef, setRunRef] = useState<string | null>(null);
@@ -336,7 +355,8 @@ export function useKorevAi(
     };
   }
 
-  function runPage(subject: PanelSubject): ReactNode {
+  function runPage(): ReactNode {
+    const subject = snapshot && runRef ? subjectOf(snapshot, runRef) : null;
     const pr = subjectPr(subject);
     const ai = panelAi(subject);
     if (!pr || !ai) return null;
@@ -397,14 +417,15 @@ export function useKorevAi(
     panelAi,
     runRef,
     showRun,
+    closeRun,
     runPage,
-    shortcuts: {
+    shortcutsFor: (selected) => ({
       [EXPLAIN_KEY]: () => explain(subjectPr(selected)),
       [REVIEW_KEY]: () => review(selected),
       [KEEP_MERGEABLE_KEY]: () => {
         if (selected?.kind === 'mine') toggleKeepMergeable(selected.item.pr);
       },
-    },
+    }),
     overlays,
     terminal: terminalFor ? (
       <TerminalDrawer
