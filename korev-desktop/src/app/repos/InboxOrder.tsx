@@ -15,6 +15,10 @@ export function moveRepo(repos: string[], repo: string, to: number): string[] {
 }
 
 const DETECTED_QUEUE = 'detected-queue';
+const ORDER_HEADING = 'Inbox order';
+const MERGE_WITH_HEADING = 'Merge with';
+const MERGE_WITH_HELP =
+  "Merge with is the tool that merges each repo's PRs. Korev shows its queue and sends PRs to it.";
 
 const MERGE_TOOL_OPTIONS: SelectOption[] = [
   { value: 'github', label: 'GitHub' },
@@ -142,7 +146,13 @@ export function InboxOrder({ repos, mergeWith, repoMerge }: InboxOrderProps) {
 
   return (
     <div className="mt-5">
-      <h3 className="m-0 mb-1.5 type-overline text-fg-3">Inbox order</h3>
+      <div className="flex items-baseline gap-2 px-1">
+        <h3 className="m-0 flex-1 type-overline text-fg-3">{ORDER_HEADING}</h3>
+        <span className="w-56 type-overline text-fg-3">
+          {MERGE_WITH_HEADING}
+        </span>
+      </div>
+      <p className="mt-1 mb-1.5 px-1 text-xs text-fg-3">{MERGE_WITH_HELP}</p>
       <ol className="m-0 flex list-none flex-col p-0">
         {repos.map((repo, index) => (
           <OrderRow
