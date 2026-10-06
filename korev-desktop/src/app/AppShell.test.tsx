@@ -258,6 +258,25 @@ describe('AppShell', () => {
     ).toBe('Yes, pin 1.31');
   });
 
+  it('puts the Settings sections in the sidebar and goes back to the last view', () => {
+    const { emitCommand } = renderShell();
+    act(() => emitCommand('show-ready'));
+    act(() => emitCommand('show-settings'));
+
+    expect(screen.queryByRole('navigation', { name: 'My PRs' })).toBeNull();
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Settings' })).getByRole(
+        'button',
+        { name: 'AI agents' },
+      ),
+    );
+    expect(screen.getByText(/Korev runs AI tasks/)).toBeTruthy();
+    expect(screen.queryByLabelText('acme/api')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to inbox' }));
+    expect(viewTitle()).toBe('Ready to merge');
+  });
+
   it('filters the list and the topbar to the chosen repos while the sidebar counts every repo', async () => {
     const { emitCommand } = renderShell(undefined, {
       ...WATCHING_SETTINGS,

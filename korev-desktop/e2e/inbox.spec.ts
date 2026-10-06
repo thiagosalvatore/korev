@@ -85,6 +85,7 @@ test('sorts ready PRs by repo in the order chosen in Settings, and moves through
         await window
           .getByRole('button', { name: `Reorder ${API_REPO}, 1 of 2` })
           .press('Alt+ArrowDown');
+        await window.getByRole('button', { name: 'Back to inbox' }).click();
         await showView(window, 'Ready to merge');
 
         const readyRows = listRows(window);
@@ -227,6 +228,7 @@ test("sends PRs to GitHub's merge queue and to Trunk", async () => {
           .click();
         await window.getByRole('button', { name: 'Repositories' }).click();
         await window.getByLabel(`Merge ${WEB_REPO} with`).selectOption('trunk');
+        await window.getByRole('button', { name: 'Back to inbox' }).click();
         await showView(window, 'Ready to merge');
         await openRow(window, WEB_PR_TITLE);
         await panel(window)

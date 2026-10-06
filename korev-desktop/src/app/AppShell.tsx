@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Logo,
   SidebarNav,
@@ -6,7 +6,7 @@ import {
   type SidebarNavBadge,
   type SidebarNavItem,
 } from '../design-system';
-import type { AuthState } from '../shared/auth';
+import type { AuthState, Connection } from '../shared/auth';
 import type { InboxSnapshot } from '../shared/inbox';
 import type { AppCommand } from '../shared/ipc-contract';
 import { prRef } from '../shared/pr-ref';
@@ -38,7 +38,12 @@ import { CommandPalette, type PaletteItem } from './CommandPalette';
 import { LiveAnnouncer } from './LiveAnnouncer';
 import { MyPrs } from './MyPrs';
 import { ReviewInbox } from './ReviewInbox';
-import { SettingsPage } from './Settings';
+import {
+  SettingsPage,
+  settingsSections,
+  shownSection,
+  type SettingsSection,
+} from './Settings';
 import { SHORTCUT_SHEET_KEY, ShortcutSheet } from './ShortcutSheet';
 import { Topbar } from './Topbar';
 import {
@@ -217,23 +222,14 @@ function paletteItems(
 
 const NO_VIEW = '';
 
-interface SidebarProps {
-  view: View;
-  snapshot: InboxSnapshot | null;
-  runRef: string | null;
-  onSelect: (view: View) => void;
-  onOpenRun: (ref: string) => void;
-}
+const BACK_TO_INBOX = 'back';
 
-function Sidebar({
-  view,
-  snapshot,
-  runRef,
-  onSelect,
-  onOpenRun,
-}: SidebarProps) {
+const BACK_ITEMS: SidebarNavItem<typeof BACK_TO_INBOX>[] = [
+  { id: BACK_TO_INBOX, label: 'Back to inbox', icon: 'arrow-left' },
+];
+
+function Sidebar({ children }: { children: ReactNode }) {
   const compact = useMediaQuery(NARROW_QUERY);
-  const current = runRef ? NO_VIEW : view;
   return (
     <aside
       className={cn(
@@ -250,6 +246,65 @@ function Sidebar({
       >
         <Logo size={18} variant={compact ? 'mark' : 'full'} />
       </div>
+      {children}
+    </aside>
+  );
+}
+
+interface SettingsNavProps {
+  connection: Connection | null;
+  section: SettingsSection;
+  onSelect: (section: SettingsSection) => void;
+  onBack: () => void;
+}
+
+function SettingsNav({
+  connection,
+  section,
+  onSelect,
+  onBack,
+}: SettingsNavProps) {
+  const compact = useMediaQuery(NARROW_QUERY);
+  return (
+    <>
+      <SidebarNav
+        label="Back"
+        items={BACK_ITEMS}
+        value={NO_VIEW}
+        onChange={onBack}
+        compact={compact}
+      />
+      <SidebarNav
+        label="Settings"
+        heading
+        items={settingsSections(connection)}
+        value={section}
+        onChange={onSelect}
+        compact={compact}
+      />
+    </>
+  );
+}
+
+interface InboxNavProps {
+  view: View;
+  snapshot: InboxSnapshot | null;
+  runRef: string | null;
+  onSelect: (view: View) => void;
+  onOpenRun: (ref: string) => void;
+}
+
+function InboxNav({
+  view,
+  snapshot,
+  runRef,
+  onSelect,
+  onOpenRun,
+}: InboxNavProps) {
+  const compact = useMediaQuery(NARROW_QUERY);
+  const current = runRef ? NO_VIEW : view;
+  return (
+    <>
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">
         <SidebarNav
           label="Reviews"
@@ -281,13 +336,14 @@ function Sidebar({
         onChange={onSelect}
         compact={compact}
       />
-    </aside>
+    </>
   );
 }
 
 interface ViewContentProps extends AppShellProps {
   view: View;
   snapshot: InboxSnapshot | null;
+  section: SettingsSection;
   onOpenSettings: () => void;
 }
 
@@ -296,6 +352,7 @@ function ViewContent({
   auth,
   settings,
   snapshot,
+  section,
   onOpenSettings,
 }: ViewContentProps) {
   if (view === 'review') {
@@ -308,7 +365,12 @@ function ViewContent({
   }
   return (
     <div className="h-full overflow-auto">
-      <SettingsPage auth={auth} settings={settings} snapshot={snapshot} />
+      <SettingsPage
+        auth={auth}
+        settings={settings}
+        snapshot={snapshot}
+        section={section}
+      />
     </div>
   );
 }
@@ -320,6 +382,9 @@ export interface AppShellProps {
 
 export function AppShell({ auth, settings }: AppShellProps) {
   const [view, setView] = useState<View>(settings.lastView);
+  const [listView, setListView] = useState<ListView>(settings.lastView);
+  const [section, setSection] = useState<SettingsSection | null>(null);
+  const shownSettings = shownSection(section, auth.connection);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const snapshot = useInboxSnapshot();
@@ -331,7 +396,9 @@ export function AppShell({ auth, settings }: AppShellProps) {
   function selectView(next: View) {
     ai.closeRun();
     setView(next);
-    if (next !== SETTINGS_VIEW) void saveLastView(next);
+    if (next === SETTINGS_VIEW) return;
+    setListView(next);
+    void saveLastView(next);
   }
 
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
@@ -362,13 +429,24 @@ export function AppShell({ auth, settings }: AppShellProps) {
   return (
     <KorevAiProvider value={ai}>
       <div className="flex h-screen bg-app text-fg-1">
-        <Sidebar
-          view={view}
-          snapshot={snapshot}
-          runRef={ai.runRef}
-          onSelect={selectView}
-          onOpenRun={openRun}
-        />
+        <Sidebar>
+          {view === SETTINGS_VIEW ? (
+            <SettingsNav
+              connection={auth.connection}
+              section={shownSettings}
+              onSelect={setSection}
+              onBack={() => selectView(listView)}
+            />
+          ) : (
+            <InboxNav
+              view={view}
+              snapshot={snapshot}
+              runRef={ai.runRef}
+              onSelect={selectView}
+              onOpenRun={openRun}
+            />
+          )}
+        </Sidebar>
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar
             title={VIEW_TITLES[view]}
@@ -394,6 +472,7 @@ export function AppShell({ auth, settings }: AppShellProps) {
                   auth={auth}
                   settings={settings}
                   snapshot={snapshot}
+                  section={shownSettings}
                   onOpenSettings={openSettings}
                 />
               </KorevStage>

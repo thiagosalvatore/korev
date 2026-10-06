@@ -92,15 +92,10 @@ describe('Keep mergeable', () => {
     render(
       <SettingsPage
         auth={CONNECTED_AUTH}
+        section="ai-tasks"
         settings={settings}
         snapshot={makeSnapshot()}
       />,
-    );
-    fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'Settings' })).getByRole(
-        'button',
-        { name: 'AI tasks' },
-      ),
     );
 
     fireEvent.click(

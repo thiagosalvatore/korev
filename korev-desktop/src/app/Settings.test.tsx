@@ -1,10 +1,4 @@
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { installFakeBridge } from './fake-bridge';
 import { SettingsPage } from './Settings';
@@ -16,44 +10,17 @@ import {
 
 afterEach(cleanup);
 
-function openSection(name: string) {
-  fireEvent.click(
-    within(screen.getByRole('navigation', { name: 'Settings' })).getByRole(
-      'button',
-      { name },
-    ),
-  );
-}
-
-describe('Settings sections', () => {
-  it('shows only the section picked in the Settings nav', () => {
-    installFakeBridge();
-    render(
-      <SettingsPage
-        auth={CONNECTED_AUTH}
-        settings={WATCHING_SETTINGS}
-        snapshot={makeSnapshot()}
-      />,
-    );
-
-    openSection('AI agents');
-
-    expect(screen.getByText(/Korev runs AI tasks/)).toBeTruthy();
-    expect(screen.queryByLabelText('acme/api')).toBeNull();
-  });
-});
-
 describe('SettingsPage', () => {
   it('stops watching an unchecked repo and restores it on Undo', async () => {
     const { bridge } = installFakeBridge();
     render(
       <SettingsPage
         auth={CONNECTED_AUTH}
+        section="repositories"
         settings={WATCHING_SETTINGS}
         snapshot={makeSnapshot()}
       />,
     );
-    openSection('Repositories');
 
     fireEvent.click(screen.getByLabelText('acme/api'));
 
@@ -75,11 +42,11 @@ describe('Inbox order', () => {
     render(
       <SettingsPage
         auth={CONNECTED_AUTH}
+        section="repositories"
         settings={WATCHING_SETTINGS}
         snapshot={makeSnapshot()}
       />,
     );
-    openSection('Repositories');
 
     const handle = screen.getByRole('button', {
       name: 'Reorder acme/web, 2 of 2',
@@ -100,6 +67,7 @@ describe('Merge with', () => {
     render(
       <SettingsPage
         auth={CONNECTED_AUTH}
+        section="repositories"
         settings={WATCHING_SETTINGS}
         snapshot={makeSnapshot({
           repoMerge: {
@@ -112,7 +80,6 @@ describe('Merge with', () => {
         })}
       />,
     );
-    openSection('Repositories');
 
     fireEvent.change(screen.getByLabelText('Merge acme/api with'), {
       target: { value: 'trunk' },

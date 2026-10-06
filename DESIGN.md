@@ -102,6 +102,10 @@ and open `#gallery`).
 - Clicking a Korev row opens the view that holds the PR, selects its row and shows its
   run page. The row is marked current while its run page is open; no view is.
 - The topbar ends with a ghost "Go to ⌘K" button that opens the palette.
+- In Settings the sidebar swaps its groups for a "Back to inbox" item (`arrow-left`) and
+  a **Settings** group with the sections (GitHub, Repositories, AI agents, AI tasks,
+  General). Back returns to the last inbox view. The settings page itself has no second
+  nav.
 
 ## Status sections
 

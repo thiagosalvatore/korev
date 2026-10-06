@@ -4,7 +4,6 @@ import {
   Avatar,
   Button,
   Card,
-  SidebarNav,
   Tabs,
   Toast,
   type SidebarNavItem,
@@ -44,7 +43,7 @@ const THEME_TABS: { id: ThemePreference; label: string }[] = [
   { id: 'dark', label: 'Dark' },
 ];
 
-type SettingsSection =
+export type SettingsSection =
   | 'github'
   | 'repositories'
   | 'agents'
@@ -64,10 +63,18 @@ const APP_SECTIONS: SidebarNavItem<SettingsSection>[] = [
   { id: 'general', label: 'General', icon: 'sliders-horizontal' },
 ];
 
-function sectionsFor(
+export function settingsSections(
   connection: Connection | null,
 ): SidebarNavItem<SettingsSection>[] {
   return connection ? [GITHUB_SECTION, ...APP_SECTIONS] : APP_SECTIONS;
+}
+
+export function shownSection(
+  section: SettingsSection | null,
+  connection: Connection | null,
+): SettingsSection {
+  const sections = settingsSections(connection);
+  return sections.find(({ id }) => id === section)?.id ?? sections[0].id;
 }
 
 function themeById(id: string): ThemePreference | undefined {
@@ -226,9 +233,6 @@ export interface SettingsPageProps {
   auth: AuthState;
   settings: Settings;
   snapshot: InboxSnapshot | null;
-}
-
-interface SectionContentProps extends SettingsPageProps {
   section: SettingsSection;
 }
 
@@ -237,7 +241,7 @@ function SectionContent({
   auth,
   settings,
   snapshot,
-}: SectionContentProps) {
+}: SettingsPageProps) {
   if (section === 'github' && auth.connection) {
     return (
       <AccountCard
@@ -274,23 +278,9 @@ function SectionContent({
 }
 
 export function SettingsPage(props: SettingsPageProps) {
-  const sections = sectionsFor(props.auth.connection);
-  const [section, setSection] = useState(sections[0].id);
-  const current = sections.some(({ id }) => id === section)
-    ? section
-    : sections[0].id;
   return (
-    <div className="flex max-w-210 gap-6 px-6 py-6">
-      <SidebarNav
-        label="Settings"
-        items={sections}
-        value={current}
-        onChange={setSection}
-        className="sticky top-6 w-44 shrink-0 self-start"
-      />
-      <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <SectionContent section={current} {...props} />
-      </div>
+    <div className="flex max-w-160 flex-col gap-4 px-6 py-6">
+      <SectionContent {...props} />
     </div>
   );
 }
