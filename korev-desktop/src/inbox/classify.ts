@@ -22,6 +22,7 @@ const FIRST_SIGHTING: ClassifyContext = { unknownMergeStreak: 1 };
 const READY_MERGE_STATES: ReadonlySet<MergeStateStatus> = new Set([
   'CLEAN',
   'HAS_HOOKS',
+  'UNSTABLE',
 ]);
 
 const QUEUE_NAMES: Record<MergeTool, string> = {
@@ -179,6 +180,10 @@ function mergeabilityReason(
   return reason('checking-mergeability', 'Checking mergeability…');
 }
 
+function readyToMergeReason(): Reason {
+  return reason('ready-to-merge', 'Ready to merge');
+}
+
 function needsAnswerReason(
   _pr: PullRequest,
   { needsAnswer }: ClassifyContext,
@@ -193,8 +198,12 @@ const NEEDS_YOU_RULES: readonly ReasonRule[] = [
   conflictsReason,
   unresolvedThreadsReason,
   behindReason,
-  optionalChecksReason,
   removedFromQueueReason,
+];
+
+const READY_RULES: readonly ReasonRule[] = [
+  optionalChecksReason,
+  readyToMergeReason,
 ];
 
 const IN_PROGRESS_RULES: readonly ReasonRule[] = [
@@ -270,7 +279,7 @@ function classifyByState(pr: PullRequest, context: ClassifyContext): MyPr {
     return {
       pr,
       bucket: 'ready',
-      reasons: [reason('ready-to-merge', 'Ready to merge')],
+      reasons: collectReasons(pr, context, READY_RULES),
       queue,
     };
   }

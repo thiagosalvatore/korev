@@ -20,7 +20,6 @@ describe('classifyMyPr merge states', () => {
     ['HAS_HOOKS', 'ready', 'ready-to-merge'],
     ['BEHIND', 'needs-you', 'behind'],
     ['DIRTY', 'needs-you', 'conflicts'],
-    ['UNSTABLE', 'needs-you', 'optional-checks-failing'],
     ['UNKNOWN', 'in-progress', 'checking-mergeability'],
     ['BLOCKED', 'in-progress', 'blocked-by-rules'],
   ] as const)('%s puts the PR in %s with %s', (state, bucket, code) => {
@@ -39,6 +38,27 @@ describe('classifyMyPr merge states', () => {
     );
 
     expect(codesOf(result)).toEqual(['waiting-on-review']);
+  });
+
+  it('puts an UNSTABLE PR in ready with the optional checks warning first', () => {
+    const result = classifyMyPr(makePr({ mergeStateStatus: 'UNSTABLE' }));
+
+    expect(result.bucket).toBe('ready');
+    expect(codesOf(result)).toEqual([
+      'optional-checks-failing',
+      'ready-to-merge',
+    ]);
+  });
+
+  it('keeps an UNSTABLE PR in progress while checks are still running', () => {
+    const result = classifyMyPr(
+      makePr({
+        mergeStateStatus: 'UNSTABLE',
+        checks: checks(['failing', 'pending']),
+      }),
+    );
+
+    expect(result.bucket).toBe('in-progress');
   });
 
   it('lists the failing optional checks by name when UNSTABLE', () => {
