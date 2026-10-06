@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppShell } from './AppShell';
@@ -89,6 +90,38 @@ describe('AppShell', () => {
     act(() => emitCommand('show-stale'));
 
     expect(await screen.findByText('2 stale')).toBeTruthy();
+  });
+
+  it('jumps to a PR found by number in the command palette and opens its details', async () => {
+    const { emitCommand } = renderShell();
+    await screen.findByLabelText('1 ready to merge');
+    act(() => emitCommand('show-palette'));
+
+    const search = screen.getByRole('combobox', { name: 'Go to' });
+    fireEvent.change(search, { target: { value: '#480' } });
+    fireEvent.keyDown(search, { key: 'Enter' });
+
+    expect(viewTitle()).toBe('Ready to merge');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(
+      within(
+        screen.getByRole('complementary', { name: 'Pull request details' }),
+      ).getByText('Bump OpenTelemetry to 1.31'),
+    ).toBeTruthy();
+  });
+
+  it('runs the highlighted command when arrows move through the palette matches', () => {
+    const { emitCommand } = renderShell();
+    act(() => emitCommand('show-palette'));
+
+    const search = screen.getByRole('combobox', { name: 'Go to' });
+    fireEvent.change(search, { target: { value: 're' } });
+    fireEvent.keyDown(search, { key: 'ArrowDown' });
+    const highlighted = screen.getByRole('option', { selected: true });
+    fireEvent.keyDown(search, { key: 'Enter' });
+
+    expect(highlighted.textContent).toContain(viewTitle());
+    expect(viewTitle()).not.toBe('Review requests');
   });
 
   it('filters the list and the topbar to the chosen repos while the sidebar counts every repo', async () => {

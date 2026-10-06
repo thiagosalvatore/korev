@@ -304,6 +304,10 @@ and open `#gallery`).
   In both views ⇧E explains and ⇧R reviews the selected PR; in My PRs ⇧A toggles Keep
   mergeable.
 - ⌘1 / ⌘2 switch views, ⌘, opens Settings, ⌘R refreshes, `?` shows the shortcut sheet.
+- ⌘K opens "Go to", a search over every listed PR (by `#num`, title or repo) and the
+  view commands. Every word typed must match. ↑/↓ move, Enter runs the highlighted match,
+  Esc closes. Picking a PR opens the view that holds it with its side panel open, the
+  same way a notification does.
 - Single-letter shortcuts are ignored while a text field has focus.
 - Tab order: sidebar → list → panel. Every focusable element shows `--focus-ring` on
   `:focus-visible`.

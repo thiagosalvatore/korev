@@ -101,7 +101,8 @@ export type AppCommand =
   | 'show-stale'
   | 'show-settings'
   | 'refresh'
-  | 'show-shortcuts';
+  | 'show-shortcuts'
+  | 'show-palette';
 
 export type Unsubscribe = () => void;
 

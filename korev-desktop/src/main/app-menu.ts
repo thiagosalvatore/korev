@@ -44,6 +44,8 @@ function developmentItems(
 function viewSubmenu(options: AppMenuOptions): MenuItemConstructorOptions[] {
   const { send } = options;
   return [
+    commandItem('Go to…', 'CmdOrCtrl+K', 'show-palette', send),
+    SEPARATOR,
     commandItem('Review Requests', 'CmdOrCtrl+1', 'show-review', send),
     commandItem('Open', 'CmdOrCtrl+2', 'show-open', send),
     commandItem('Ready to Merge', 'CmdOrCtrl+3', 'show-ready', send),

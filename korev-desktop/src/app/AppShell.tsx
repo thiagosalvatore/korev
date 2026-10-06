@@ -8,6 +8,8 @@ import {
 } from '../design-system';
 import type { AuthState } from '../shared/auth';
 import type { InboxSnapshot } from '../shared/inbox';
+import type { AppCommand } from '../shared/ipc-contract';
+import { prRef } from '../shared/pr-ref';
 import {
   DEFAULT_SETTINGS,
   type InboxView,
@@ -22,19 +24,25 @@ import type { Bucket } from '../shared/inbox';
 import {
   bucketCount,
   hasTopPriority,
+  listedPullRequests,
   myPrsViewOf,
   myPrsViewSnapshot,
   sectionCounts,
 } from './inbox/selectors';
 import { useKeyShortcuts } from './keyboard';
 import { DRAG_REGION, NARROW_QUERY } from './layout';
+import { CommandPalette, type PaletteItem } from './CommandPalette';
 import { LiveAnnouncer } from './LiveAnnouncer';
 import { MyPrs } from './MyPrs';
 import { ReviewInbox } from './ReviewInbox';
 import { SettingsPage } from './Settings';
 import { SHORTCUT_SHEET_KEY, ShortcutSheet } from './ShortcutSheet';
 import { Topbar } from './Topbar';
-import { useAppCommands, useFocusPrRequests } from './useAppCommands';
+import {
+  useAppCommands,
+  useFocusPrRequests,
+  type AppCommandHandlers,
+} from './useAppCommands';
 import { FocusRequestProvider, type FocusRequest } from './inbox/focus-request';
 import { refreshInbox, useInboxSnapshot } from './useInboxSnapshot';
 import { useMediaQuery } from './useMediaQuery';
@@ -163,6 +171,42 @@ function viewSubtitle(
   return repos.length > 0 ? `${summary}${FILTERED_NOTE}` : summary;
 }
 
+interface PaletteCommand {
+  command: AppCommand;
+  label: string;
+  hint: string;
+}
+
+const PALETTE_COMMANDS: PaletteCommand[] = [
+  { command: 'show-review', label: VIEW_TITLES.review, hint: '⌘1' },
+  { command: 'show-open', label: VIEW_TITLES.open, hint: '⌘2' },
+  { command: 'show-ready', label: VIEW_TITLES.ready, hint: '⌘3' },
+  { command: 'show-stale', label: VIEW_TITLES.stale, hint: '⌘4' },
+  { command: 'show-settings', label: VIEW_TITLES.settings, hint: '⌘,' },
+  { command: 'refresh', label: 'Refresh', hint: '⌘R' },
+  { command: 'show-shortcuts', label: 'Keyboard shortcuts', hint: '?' },
+];
+
+function paletteItems(
+  snapshot: InboxSnapshot | null,
+  commands: AppCommandHandlers,
+  focusPr: (ref: string) => void,
+): PaletteItem[] {
+  const commandItems = PALETTE_COMMANDS.map(({ command, label, hint }) => ({
+    id: command,
+    label,
+    hint,
+    run: commands[command],
+  }));
+  const prItems = (snapshot ? listedPullRequests(snapshot) : []).map((pr) => ({
+    id: prRef(pr),
+    label: `#${pr.number} ${pr.title}`,
+    detail: pr.repo,
+    run: () => focusPr(prRef(pr)),
+  }));
+  return [...commandItems, ...prItems];
+}
+
 interface SidebarProps {
   view: View;
   snapshot: InboxSnapshot | null;
@@ -242,6 +286,7 @@ export interface AppShellProps {
 export function AppShell({ auth, settings }: AppShellProps) {
   const [view, setView] = useState<View>(settings.lastView);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const snapshot = useInboxSnapshot();
   const repoFilter = useSettings()?.repoFilter ?? DEFAULT_SETTINGS.repoFilter;
   const openSettings = () => selectView(SETTINGS_VIEW);
@@ -253,13 +298,13 @@ export function AppShell({ auth, settings }: AppShellProps) {
   }
 
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
-  useFocusPrRequests((ref) => {
+  const focusPr = (ref: string) => {
     selectView((snapshot && myPrsViewOf(snapshot, ref)) ?? 'review');
     setFocusRequest({ ref, at: Date.now() });
-  });
+  };
+  useFocusPrRequests(focusPr);
 
-  useKeyShortcuts({ [SHORTCUT_SHEET_KEY]: showShortcuts });
-  useAppCommands({
+  const commands: AppCommandHandlers = {
     'show-review': () => selectView('review'),
     'show-open': () => selectView('open'),
     'show-ready': () => selectView('ready'),
@@ -267,7 +312,10 @@ export function AppShell({ auth, settings }: AppShellProps) {
     'show-settings': openSettings,
     refresh: () => void refreshInbox(),
     'show-shortcuts': showShortcuts,
-  });
+    'show-palette': () => setPaletteOpen(true),
+  };
+  useKeyShortcuts({ [SHORTCUT_SHEET_KEY]: showShortcuts });
+  useAppCommands(commands);
 
   return (
     <div className="flex h-screen bg-app text-fg-1">
@@ -305,6 +353,11 @@ export function AppShell({ auth, settings }: AppShellProps) {
       <ShortcutSheet
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
+      />
+      <CommandPalette
+        open={paletteOpen}
+        items={paletteItems(snapshot, commands, focusPr)}
+        onClose={() => setPaletteOpen(false)}
       />
     </div>
   );

@@ -8,6 +8,7 @@ interface Shortcut {
 export const SHORTCUT_SHEET_KEY = '?';
 
 const SHORTCUTS: Shortcut[] = [
+  { keys: ['⌘K'], label: 'Go to a PR or command' },
   { keys: ['J', '↓'], label: 'Next pull request' },
   { keys: ['K', '↑'], label: 'Previous pull request' },
   {

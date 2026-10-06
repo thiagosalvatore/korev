@@ -5,6 +5,7 @@ import type {
   ReviewItem,
 } from '../../shared/inbox';
 import { prRef } from '../../shared/pr-ref';
+import type { PullRequest } from '../../shared/pull-request';
 import type { MyPrsView } from '../../shared/settings';
 import { myPrsIn } from '../../inbox/stacks';
 
@@ -22,6 +23,12 @@ function requestedInEntry(entry: ReviewEntry): ReviewItem[] {
 
 export function requestedItems(snapshot: InboxSnapshot): ReviewItem[] {
   return snapshot.reviews.entries.flatMap(requestedInEntry);
+}
+
+export function listedPullRequests(snapshot: InboxSnapshot): PullRequest[] {
+  return [...myPrsIn(snapshot.mine), ...requestedItems(snapshot)].map(
+    (item) => item.pr,
+  );
 }
 
 export function sectionCounts(snapshot: InboxSnapshot): SectionCount[] {
