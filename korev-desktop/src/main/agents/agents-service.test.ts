@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '../../shared/settings';
 import type { AgentPreference } from '../../shared/agents';
@@ -212,6 +213,21 @@ describe('agents service', () => {
     const schemaPath = args?.[args.indexOf('--output-schema') + 1] ?? '';
     expect(fs.files.get(schemaPath)?.toString()).toBe('{"type":"object"}');
     expect(options?.timeoutMs).toBe(30 * 60_000);
+  });
+
+  it("gives Claude Code the user's skills through a plugin folder in the scratch dir", async () => {
+    const { agents, callTo, fs } = setup(
+      { claude: ok('{"type":"result","result":"{}"}') },
+      { provider: 'claude', models: {} },
+    );
+
+    await agents.run({ prompt: 'Review', cwd: '/repo', access: 'read-only' });
+
+    const [, args] = callTo('claude') ?? [];
+    const pluginDir = args?.[args.indexOf('--plugin-dir') + 1] ?? '';
+    expect(fs.links.get(join(pluginDir, 'skills'))).toBe(
+      '/Users/maria/.claude/skills',
+    );
   });
 
   it('reports a run that hit its time limit in minutes', async () => {

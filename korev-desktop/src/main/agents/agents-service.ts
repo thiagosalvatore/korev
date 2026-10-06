@@ -21,6 +21,7 @@ import { join } from 'node:path';
 import type { FileSystem } from '../file-system';
 import { childEnv, resolveLoginPath } from './login-path';
 import { extractVersion, PROVIDERS, type OutputSchema } from './providers';
+import { linkSkillPlugins } from './skill-plugins';
 
 const STATUS_TIMEOUT_MS = 15_000;
 const SIGN_IN_TIMEOUT_MS = 5 * 60_000;
@@ -209,6 +210,12 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
     return { json, path };
   }
 
+  async function skillPlugins(): Promise<string[]> {
+    const home = deps.env.HOME;
+    if (!home) return [];
+    return linkSkillPlugins({ fs: deps.fs, home, scratchDir: deps.scratchDir });
+  }
+
   async function run(request: AgentRunRequest): Promise<AgentRunResult> {
     const preference = deps.preference();
     const provider = request.provider ?? preference.provider;
@@ -221,6 +228,7 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
     const timeoutMs = request.timeoutMs ?? RUN_TIMEOUT_MS;
     try {
       const schema = request.schema ? await outputSchema(request.schema) : null;
+      const plugins = await skillPlugins();
       const result = await exec(
         provider,
         definition.runArgs({
@@ -228,6 +236,7 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
           access: request.access,
           schema,
           network: request.network ?? false,
+          skillPlugins: plugins,
         }),
         {
           cwd: request.cwd,

@@ -1,17 +1,30 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 export interface FileSystem {
   read(path: string): Promise<Buffer | null>;
   writeAtomic(path: string, contents: Buffer | string): Promise<void>;
   remove(path: string): Promise<void>;
+  link(target: string, path: string): Promise<void>;
 }
 
 const MISSING_FILE_CODE = 'ENOENT';
+const EXISTING_FILE_CODE = 'EEXIST';
 const TEMP_SUFFIX = '.tmp';
 
 function isMissingFile(error: unknown): boolean {
   return (error as NodeJS.ErrnoException)?.code === MISSING_FILE_CODE;
+}
+
+function isExistingFile(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException)?.code === EXISTING_FILE_CODE;
 }
 
 export const nodeFileSystem: FileSystem = {
@@ -32,19 +45,30 @@ export const nodeFileSystem: FileSystem = {
   async remove(path) {
     await rm(path, { force: true });
   },
+  async link(target, path) {
+    await mkdir(dirname(path), { recursive: true });
+    await rm(path, { force: true });
+    try {
+      await symlink(target, path);
+    } catch (error) {
+      if (!isExistingFile(error)) throw error;
+    }
+  },
 };
 
 export function createMemoryFileSystem(
   initial: Record<string, Buffer | string> = {},
-): FileSystem & { files: Map<string, Buffer> } {
+): FileSystem & { files: Map<string, Buffer>; links: Map<string, string> } {
   const files = new Map<string, Buffer>(
     Object.entries(initial).map(([path, contents]) => [
       path,
       Buffer.from(contents),
     ]),
   );
+  const links = new Map<string, string>();
   return {
     files,
+    links,
     async read(path) {
       return files.get(path) ?? null;
     },
@@ -53,6 +77,9 @@ export function createMemoryFileSystem(
     },
     async remove(path) {
       files.delete(path);
+    },
+    async link(target, path) {
+      links.set(path, target);
     },
   };
 }

@@ -24,6 +24,7 @@ export interface RunOptions {
   access: AgentAccess;
   schema: OutputSchema | null;
   network: boolean;
+  skillPlugins: string[];
 }
 
 export interface ProviderDefinition {
@@ -43,7 +44,7 @@ const STDIN_PROMPT = '-';
 const LISTED_MODEL_VISIBILITY = 'list';
 const CODEX_PLANS = ['ChatGPT', 'API key'];
 
-const CLAUDE_READ_TOOLS = ['Read', 'Grep', 'Glob'];
+const CLAUDE_READ_TOOLS = ['Read', 'Grep', 'Glob', 'Skill'];
 const CLAUDE_EDIT_TOOLS = [...CLAUDE_READ_TOOLS, 'Edit', 'Write', 'Bash'];
 export const PACKAGE_REGISTRY_DOMAINS: readonly string[] = [
   'registry.npmjs.org',
@@ -319,13 +320,14 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
     parseStatus: parseClaudeStatus,
     loginArgs: null,
     listModels: async () => CLAUDE_MODELS,
-    runArgs: ({ model, access, schema, network }) => [
+    runArgs: ({ model, access, schema, network, skillPlugins }) => [
       '-p',
       '--output-format',
       'stream-json',
       '--verbose',
       '--no-session-persistence',
       ...claudeAccessArgs(access, network),
+      ...skillPlugins.flatMap((pluginDir) => ['--plugin-dir', pluginDir]),
       ...optionArgs('--model', model),
       ...optionArgs('--json-schema', schema?.json),
     ],

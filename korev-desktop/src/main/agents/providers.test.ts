@@ -200,7 +200,12 @@ function flagValue(args: string[], flag: string): string | undefined {
   return args[args.indexOf(flag) + 1];
 }
 
-const NO_EXTRAS = { model: null, schema: null, network: false };
+const NO_EXTRAS = {
+  model: null,
+  schema: null,
+  network: false,
+  skillPlugins: [],
+};
 const SCHEMA = { json: '{"type":"object"}', path: '/tmp/schema.json' };
 const SANDBOX = {
   enabled: true,
@@ -220,7 +225,7 @@ describe('run access', () => {
     });
 
     expect(args).toContain('--restricted');
-    expect(flagValue(args, '--tools')).toBe('Read,Grep,Glob');
+    expect(flagValue(args, '--tools')).toBe('Read,Grep,Glob,Skill');
     expect(flagValue(args, '--permission-prompts')).toBe('none');
   });
 
@@ -233,6 +238,19 @@ describe('run access', () => {
     );
     expect(flagValue(args, '--permission-mode')).toBe('acceptEdits');
     expect(claudeSandbox(args)).toEqual(SANDBOX);
+  });
+
+  it("loads the user's skills into Claude Code from each plugin folder", () => {
+    const args = PROVIDERS.claude.runArgs({
+      ...NO_EXTRAS,
+      access: 'read-only',
+      skillPlugins: ['/tmp/korev/user-skills', '/tmp/korev/ponytail'],
+    });
+
+    expect(args).toContain('--restricted');
+    expect(args.join(' ')).toContain(
+      '--plugin-dir /tmp/korev/user-skills --plugin-dir /tmp/korev/ponytail',
+    );
   });
 
   it.each([
@@ -275,7 +293,7 @@ describe('run access', () => {
     'never lets %s leave its sandbox on a %s run (network %s, schema %o)',
     (provider, access, network, schema) => {
       const args = PROVIDERS[provider].runArgs({
-        model: null,
+        ...NO_EXTRAS,
         access,
         schema,
         network,
