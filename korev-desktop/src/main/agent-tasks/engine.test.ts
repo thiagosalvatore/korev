@@ -473,6 +473,35 @@ describe('keep mergeable', () => {
     });
   });
 
+  it('counts re-runs of the same failing checks toward the two attempts', async () => {
+    const { engine, pending, settle } = setup(undefined, WATCH_ALL);
+    const failing = mineSnapshot(watchedPr(FAILING_CI));
+    const rerunning = mineSnapshot(
+      watchedPr({
+        ci: 'running',
+        checks: [{ name: 'lint', outcome: 'pending' }],
+      }),
+    );
+
+    for (const attempt of [0, 1]) {
+      engine.reconcile(failing);
+      pending[attempt].resolve({
+        status: 'done',
+        summary: 'Re-ran',
+        commits: [],
+      });
+      await settle();
+      engine.reconcile(rerunning);
+    }
+    engine.reconcile(failing);
+
+    expect(pending).toHaveLength(2);
+    expect(stateOf(engine, 1)).toMatchObject({
+      status: 'needs-input',
+      questions: [{ id: 'gave-up:fix-ci' }],
+    });
+  });
+
   it('watches every PR of mine when "all" is on, except one turned off', () => {
     const settings = { allMine: true, prs: { [refOf(2)]: false } };
     const { engine } = setup(undefined, (ref) =>

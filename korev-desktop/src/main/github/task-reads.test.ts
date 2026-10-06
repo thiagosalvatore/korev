@@ -6,7 +6,7 @@ const API = 'https://api.github.com';
 const PR = { repo: 'acme/api', number: 77 };
 
 describe('task reads', () => {
-  it('reads only the failing checks of one PR, and which are Actions jobs', async () => {
+  it('reads only the failing checks of one PR, which are Actions jobs and which were cancelled', async () => {
     const fake = createFakeFetch({
       body: {
         data: {
@@ -38,6 +38,17 @@ describe('task reads', () => {
                       conclusion: 'SUCCESS',
                     },
                     {
+                      __typename: 'CheckRun',
+                      databaseId: 33,
+                      name: 'e2e',
+                      status: 'COMPLETED',
+                      conclusion: 'CANCELLED',
+                      checkSuite: {
+                        app: { slug: 'github-actions' },
+                        workflowRun: { databaseId: 9 },
+                      },
+                    },
+                    {
                       __typename: 'StatusContext',
                       context: 'ci/circleci',
                       state: 'FAILURE',
@@ -66,6 +77,16 @@ describe('task reads', () => {
         checkRunId: 31,
         workflowRunId: 9,
         isActionsJob: true,
+        cancelled: false,
+      },
+      {
+        name: 'e2e',
+        summary: '',
+        url: null,
+        checkRunId: 33,
+        workflowRunId: 9,
+        isActionsJob: true,
+        cancelled: true,
       },
       {
         name: 'ci/circleci',
@@ -74,6 +95,7 @@ describe('task reads', () => {
         checkRunId: null,
         workflowRunId: null,
         isActionsJob: false,
+        cancelled: false,
       },
     ]);
     expect(fake.requests[0].body).toMatchObject({

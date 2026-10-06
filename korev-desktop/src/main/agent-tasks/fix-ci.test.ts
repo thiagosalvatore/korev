@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { makePr } from '../../inbox/test-fixtures';
 import type { Checkouts } from '../checkouts';
 import {
+  CANCELLED_RERUN_SUMMARY,
   FIX_CI_TIMEOUT_MS,
   NO_FAILING_CHECKS,
   createFixCiTask,
@@ -26,6 +27,7 @@ const LINT_FAILURE: CiFailure = {
     checkRunId: 31,
     workflowRunId: 9,
     isActionsJob: true,
+    cancelled: false,
   },
   annotations: [
     {
@@ -68,11 +70,13 @@ function agentSays(fields: object): RunAgent {
 
 function runTask(runAgent: RunAgent, failures: CiFailure[] = [LINT_FAILURE]) {
   const checkouts = fakeCheckouts();
+  const rerunFailedJobs = vi.fn(async () => undefined);
   const task = createFixCiTask({
     checkouts,
     runAgent,
     canPushWorkflows: async () => false,
     readFailures: async () => failures,
+    rerunFailedJobs,
   });
   const outcome = task.run({
     ref: 'acme/api#77',
@@ -83,7 +87,7 @@ function runTask(runAgent: RunAgent, failures: CiFailure[] = [LINT_FAILURE]) {
     step: () => undefined,
     activity: () => undefined,
   });
-  return { outcome, checkouts };
+  return { outcome, checkouts, rerunFailedJobs };
 }
 
 describe('fix CI task', () => {
@@ -136,8 +140,8 @@ describe('fix CI task', () => {
     );
   });
 
-  it('offers to re-run the failed jobs instead of committing when nothing needed changing', async () => {
-    const { outcome, checkouts } = runTask(
+  it('re-runs the failed jobs instead of committing when nothing needed changing', async () => {
+    const { outcome, checkouts, rerunFailedJobs } = runTask(
       agentSays({
         changed: false,
         commitMessage: null,
@@ -147,11 +151,34 @@ describe('fix CI task', () => {
 
     expect(await outcome).toEqual({
       status: 'done',
-      summary: 'Runner timed out',
+      summary: 'Re-ran the failed jobs · Runner timed out',
       commits: [],
-      rerunRunIds: [9],
     });
+    expect(rerunFailedJobs).toHaveBeenCalledWith(PR, [9]);
     expect(checkouts.push).not.toHaveBeenCalled();
+  });
+
+  it('re-runs cancelled checks without starting the agent', async () => {
+    const runAgent = agentSays({});
+    const cancelled = (workflowRunId: number): CiFailure => ({
+      check: { ...LINT_FAILURE.check, workflowRunId, cancelled: true },
+      annotations: [],
+      logTail: null,
+    });
+    const { outcome, checkouts, rerunFailedJobs } = runTask(runAgent, [
+      cancelled(9),
+      cancelled(9),
+      cancelled(12),
+    ]);
+
+    expect(await outcome).toEqual({
+      status: 'done',
+      summary: CANCELLED_RERUN_SUMMARY,
+      commits: [],
+    });
+    expect(rerunFailedJobs).toHaveBeenCalledWith(PR, [9, 12]);
+    expect(runAgent).not.toHaveBeenCalled();
+    expect(checkouts.open).not.toHaveBeenCalled();
   });
 
   it('finishes with nothing to do and no agent when no check is failing', async () => {

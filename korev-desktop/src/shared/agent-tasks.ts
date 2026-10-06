@@ -97,7 +97,6 @@ export type AgentTaskState =
       kind: AgentTaskKind;
       summary: string;
       commits: string[];
-      rerunRunIds?: number[];
       review?: ReviewDraft;
       nothingToDo?: boolean;
       finishedAt: string;

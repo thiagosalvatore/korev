@@ -85,11 +85,6 @@ export function KorevAiSection({ ai }: { ai: PanelAi }) {
               Open
             </Button>
           )}
-          {ai.state.rerunRunIds?.length ? (
-            <Button size="sm" onClick={ai.onRerunFailedJobs}>
-              Re-run failed jobs
-            </Button>
-          ) : null}
         </div>
       ) : null}
       {ai.fixes.map((fix) => (

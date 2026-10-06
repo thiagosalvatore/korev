@@ -289,6 +289,7 @@ export function createKorev(deps: KorevDeps): Korev {
         runAgent: agents.run,
         canPushWorkflows,
         readFailures: readCiFailures,
+        rerunFailedJobs,
       }),
       review: createReviewTask({ checkouts, runAgent: agents.run, prBody }),
       'address-comments': createAddressCommentsTask({
@@ -487,22 +488,16 @@ export function createKorev(deps: KorevDeps): Korev {
     if (draft) agentTasks.updateReview(prRef(target), draft);
   }
 
-  async function rerunFailedJobs(target: PrTarget): Promise<ActionResult> {
-    const state = agentTasks.state()[prRef(target)];
-    const runIds = state?.status === 'done' ? (state.rerunRunIds ?? []) : [];
+  async function rerunFailedJobs(
+    pr: PullRequest,
+    runIds: number[],
+  ): Promise<void> {
     const token = auth.token();
-    if (!token || runIds.length === 0) return INVALID_ACTION;
-    try {
-      await Promise.all(
-        runIds.map((runId) =>
-          writer.rerunFailedJobs(token, target.repo, runId),
-        ),
-      );
-    } catch (error) {
-      return { ok: false, message: describeError(error) };
-    }
+    if (!token) return;
+    await Promise.all(
+      runIds.map((runId) => writer.rerunFailedJobs(token, pr.repo, runId)),
+    );
     void inbox.trigger('manual');
-    return { ok: true };
   }
 
   function taskInstructions(kind: AgentTaskKind): string {
@@ -902,10 +897,6 @@ export function createKorev(deps: KorevDeps): Korev {
     [IpcChannel.AiDismiss]: withTarget(
       (target) => agentTasks.dismiss(prRef(target)),
       Promise.resolve(),
-    ),
-    [IpcChannel.AiRerunFailedJobs]: withTarget(
-      rerunFailedJobs,
-      Promise.resolve(INVALID_ACTION),
     ),
     [IpcChannel.AiSaveReviewDraft]: withTarget(saveReviewDraft, undefined),
     [IpcChannel.AiSubmitReview]: withTarget(

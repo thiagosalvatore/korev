@@ -117,6 +117,7 @@ function lintFailure(logTail: string): CiFailure {
       checkRunId: 1,
       workflowRunId: 1,
       isActionsJob: true,
+      cancelled: false,
     },
     annotations: [],
     logTail,
@@ -176,6 +177,7 @@ describe(`agent tasks with ${provider}`, () => {
     );
     const task = createFixCiTask({
       ...deps(remote),
+      rerunFailedJobs: async () => undefined,
       readFailures: async () => [
         lintFailure(
           '$ node lint.js\nsrc/app.js:1 no-var: use const or let\nexit 1',
@@ -239,6 +241,7 @@ describe(`agent tasks with ${provider}`, () => {
     ].join('\n');
     const task = createFixCiTask({
       ...deps(remote),
+      rerunFailedJobs: async () => undefined,
       readFailures: async () => [lintFailure(injected)],
     });
 

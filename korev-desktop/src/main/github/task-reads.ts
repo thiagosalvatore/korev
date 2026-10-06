@@ -28,6 +28,7 @@ export interface FailingCheck {
   checkRunId: number | null;
   workflowRunId: number | null;
   isActionsJob: boolean;
+  cancelled: boolean;
 }
 
 export interface CheckAnnotation {
@@ -113,6 +114,7 @@ query UnresolvedThreads($owner: String!, $name: String!, $number: Int!) {
 
 const PR_STATES: readonly PrState[] = ['OPEN', 'CLOSED', 'MERGED'];
 const ACTIONS_APP_SLUG = 'github-actions';
+const CANCELLED_CONCLUSION = 'CANCELLED';
 const ANNOTATIONS_PAGE_SIZE = 50;
 const LOGS_ACCEPT = 'application/vnd.github+json';
 
@@ -194,6 +196,7 @@ function toFailingCheck(node: CheckNode): FailingCheck {
     checkRunId: node.databaseId ?? null,
     workflowRunId: node.checkSuite?.workflowRun?.databaseId ?? null,
     isActionsJob,
+    cancelled: node.conclusion === CANCELLED_CONCLUSION,
   };
 }
 

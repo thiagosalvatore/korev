@@ -69,7 +69,6 @@ export type TaskOutcome =
       status: 'done';
       summary: string;
       commits: string[];
-      rerunRunIds?: number[];
       review?: ReviewDraft;
       nothingToDo?: boolean;
     }
@@ -272,9 +271,6 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       kind,
       summary: outcome.summary,
       commits: outcome.commits,
-      ...(outcome.rerunRunIds?.length
-        ? { rerunRunIds: outcome.rerunRunIds }
-        : {}),
       ...(outcome.review ? { review: outcome.review } : {}),
       ...(outcome.nothingToDo ? { nothingToDo: true } : {}),
       finishedAt: finishedAt(),

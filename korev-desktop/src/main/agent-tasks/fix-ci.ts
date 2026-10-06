@@ -26,6 +26,8 @@ import { MALFORMED_OUTPUT, runStructured, type RunAgent } from './run-agent';
 export const FIX_CI_TIMEOUT_MS = FIX_TIMEOUT_MS;
 export const FIX_CI_SCHEMA = outputSchema();
 export const NO_FAILING_CHECKS = 'No checks are failing on this PR right now.';
+export const CANCELLED_RERUN_SUMMARY = 'Re-ran the cancelled checks';
+const RERUN_PREFIX = 'Re-ran the failed jobs · ';
 
 export interface CiFailure {
   check: FailingCheck;
@@ -82,6 +84,7 @@ export function fixCiPrompt(input: FixCiInput): string {
 export interface FixCiDeps extends FixDeps {
   runAgent: RunAgent;
   readFailures(pr: PullRequest): Promise<CiFailure[]>;
+  rerunFailedJobs(pr: PullRequest, runIds: number[]): Promise<void>;
 }
 
 function workflowRunIds(failures: CiFailure[]): number[] {
@@ -91,11 +94,26 @@ function workflowRunIds(failures: CiFailure[]): number[] {
   return [...new Set(ids)];
 }
 
+function rerunnableWithoutAgent(failures: CiFailure[]): boolean {
+  return failures.every(
+    ({ check }) => check.cancelled && check.isActionsJob && check.workflowRunId,
+  );
+}
+
 function defaultCommitMessage(failures: CiFailure[]): string {
   return `Fix ${failures.map(({ check }) => check.name).join(', ')}`;
 }
 
 export function createFixCiTask(deps: FixCiDeps): AgentTask {
+  async function rerun(
+    pr: PullRequest,
+    failures: CiFailure[],
+    summary: string,
+  ): Promise<TaskOutcome> {
+    await deps.rerunFailedJobs(pr, workflowRunIds(failures));
+    return { status: 'done', summary, commits: [] };
+  }
+
   async function attempt({
     pr,
     instructions,
@@ -106,6 +124,9 @@ export function createFixCiTask(deps: FixCiDeps): AgentTask {
   }: TaskRun): Promise<TaskOutcome> {
     const failures = await deps.readFailures(pr);
     if (failures.length === 0) return nothingToDo(NO_FAILING_CHECKS);
+    if (rerunnableWithoutAgent(failures)) {
+      return rerun(pr, failures, CANCELLED_RERUN_SUMMARY);
+    }
     const checkout = await openForFix(deps.checkouts, pr);
     step('running');
     const fields = await runStructured(deps.runAgent, {
@@ -123,13 +144,11 @@ export function createFixCiTask(deps: FixCiDeps): AgentTask {
     if (output.questions.length > 0) {
       return { status: 'needs-input', questions: output.questions };
     }
+    if (!output.changed && workflowRunIds(failures).length > 0) {
+      return rerun(pr, failures, `${RERUN_PREFIX}${output.summary}`);
+    }
     if (!output.changed) {
-      return {
-        status: 'done',
-        summary: output.summary,
-        commits: [],
-        rerunRunIds: workflowRunIds(failures),
-      };
+      return { status: 'done', summary: output.summary, commits: [] };
     }
     step('pushing');
     const message = output.commitMessage ?? defaultCommitMessage(failures);

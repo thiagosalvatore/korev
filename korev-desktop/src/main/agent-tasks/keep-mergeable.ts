@@ -119,7 +119,9 @@ export function decide(
     ...previous,
     signature,
     triedOnSignature: tried,
-    attempts: attemptsStillNeeded(previous.attempts, steps),
+    attempts: checksRunning(pr)
+      ? previous.attempts
+      : attemptsStillNeeded(previous.attempts, steps),
   };
   for (const step of steps.filter((candidate) => !tried.includes(candidate))) {
     const attempts = memory.attempts[step] ?? 0;

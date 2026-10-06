@@ -88,7 +88,6 @@ export interface PanelAi {
   onOpenRun: () => void;
   onStop: () => void;
   onRetry: () => void;
-  onRerunFailedJobs: () => void;
   onOpenSettings: () => void;
   onOpenTerminal?: () => void;
 }
@@ -294,19 +293,6 @@ export function useKorevAi(
     else announce(result.message);
   }
 
-  async function rerunFailedJobs(target: PrTarget) {
-    const result = await korev().ai.rerunFailedJobs(target);
-    const message = result.ok
-      ? `Re-running failed jobs on #${target.number}`
-      : result.message;
-    announce(message);
-    toast.show({
-      message,
-      tone: result.ok ? 'success' : 'danger',
-      commitUrl: null,
-    });
-  }
-
   function panelAi(subject: PanelSubject | null): PanelAi | undefined {
     const pr = subjectPr(subject);
     if (!pr) return undefined;
@@ -348,7 +334,6 @@ export function useKorevAi(
       onRetry: () => {
         if (state) retry(pr, state);
       },
-      onRerunFailedJobs: () => void rerunFailedJobs(target),
       onOpenSettings,
       onOpenTerminal: hasWorktree(state)
         ? () => setTerminalFor(target)
