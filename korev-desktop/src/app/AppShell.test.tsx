@@ -11,7 +11,7 @@ import { AppShell } from './AppShell';
 import { installFakeBridge, installMatchMedia } from './fake-bridge';
 import type { InboxSnapshot } from '../shared/inbox';
 import { prRef } from '../shared/pr-ref';
-import type { AgentTaskState } from '../shared/agent-tasks';
+import type { AgentTaskState, ExplanationView } from '../shared/agent-tasks';
 import {
   CONNECTED_AUTH,
   INVOICE_REVIEW,
@@ -58,6 +58,25 @@ const FIXED: AgentTaskState = {
 async function openKorevTask(name: RegExp) {
   const nav = await screen.findByRole('navigation', { name: 'Korev' });
   fireEvent.click(within(nav).getByRole('button', { name }));
+}
+
+const WITH_AGENT = {
+  ...WATCHING_SETTINGS,
+  agent: { provider: 'claude' as const, models: {} },
+};
+
+const OTEL_TARGET = { id: OTEL_PR.pr.id, repo: 'acme/api', number: 480 };
+
+async function openOtelPage(explanation: ExplanationView | null = null) {
+  const fake = installFakeBridge({ settings: WITH_AGENT, explanation });
+  render(<AppShell auth={CONNECTED_AUTH} settings={WITH_AGENT} />);
+  await screen.findByLabelText('1 ready to merge');
+  act(() => fake.emitCommand('show-ready'));
+  fireEvent.click(
+    screen.getByRole('option', { name: /Bump OpenTelemetry to 1\.31/ }),
+  );
+  fireEvent.keyDown(document.body, { key: 'o' });
+  return fake.bridge;
 }
 
 function viewTitle(): string {
@@ -186,6 +205,39 @@ describe('AppShell', () => {
     expect(
       screen.getByRole('complementary', { name: 'Pull request details' }),
     ).toBeTruthy();
+  });
+
+  it('opens the PR page with o and keeps the PR details beside it', async () => {
+    await openOtelPage();
+
+    expect(screen.getByRole('region', { name: 'Korev on #480' })).toBeTruthy();
+    expect(
+      screen.getByRole('complementary', { name: 'Pull request details' }),
+    ).toBeTruthy();
+  });
+
+  it('shows a saved explanation in the Explain tab without starting a new one', async () => {
+    const bridge = await openOtelPage({
+      headOid: 'abc1234def5678',
+      body: '<h2>What changes</h2>',
+      stale: false,
+    });
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Explain' }));
+
+    expect(await screen.findByTitle('Explanation of #480')).toBeTruthy();
+    expect(bridge.ai.explain).not.toHaveBeenCalled();
+  });
+
+  it('starts an explanation from the Explain tab when none is saved', async () => {
+    const bridge = await openOtelPage();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Explain' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Explain this PR' }),
+    );
+
+    expect(bridge.ai.explain).toHaveBeenCalledWith(OTEL_TARGET, false);
   });
 
   it('keeps typed answers when the user leaves the run page for another view', async () => {

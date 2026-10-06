@@ -31,7 +31,7 @@ import type { ShortcutMap } from '../keyboard';
 import { announce } from '../LiveAnnouncer';
 import { useSettings } from '../useSettings';
 import { useTimedToast } from '../useTimedToast';
-import { subjectOf, type PanelSubject } from '../inbox/list-model';
+import type { PanelSubject } from '../inbox/list-model';
 import { TerminalDrawer } from '../terminal/TerminalDrawer';
 import { hasWorktree } from './agent-task-state';
 import { ExplainReader } from './ExplainReader';
@@ -43,6 +43,7 @@ import { needsIntro, saveKeepMergeable } from './keep-mergeable';
 export const EXPLAIN_KEY = 'E';
 export const KEEP_MERGEABLE_KEY = 'A';
 export const REVIEW_KEY = 'R';
+export const OPEN_PAGE_KEY = 'o';
 const TOAST_MS = 8000;
 const NO_TASKS: Record<string, AgentTaskState> = {};
 const NO_HISTORY: Record<string, KorevRun[]> = {};
@@ -170,7 +171,7 @@ export interface KorevAi {
   runRef: string | null;
   showRun(ref: string): void;
   closeRun(): void;
-  runPage(): ReactNode;
+  runPage(subject: PanelSubject | null): ReactNode;
   shortcutsFor(selected: PanelSubject | null): ShortcutMap;
   overlays: ReactNode;
   terminal: ReactNode;
@@ -355,8 +356,7 @@ export function useKorevAi(
     };
   }
 
-  function runPage(): ReactNode {
-    const subject = snapshot && runRef ? subjectOf(snapshot, runRef) : null;
+  function runPage(subject: PanelSubject | null): ReactNode {
     const pr = subjectPr(subject);
     const ai = panelAi(subject);
     if (!pr || !ai) return null;

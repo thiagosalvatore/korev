@@ -1,8 +1,9 @@
-import { useEffect, type ReactNode } from 'react';
-import { Button } from '../../design-system';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Button, Tabs } from '../../design-system';
 import type { PrTarget } from '../../shared/merge';
 import type { PullRequest } from '../../shared/pull-request';
 import { ActivityFeed } from './ActivityFeed';
+import { ExplainTab } from './ExplainReader';
 import { AgentTaskStatus, isRunning } from './agent-task-state';
 import { KorevActivity } from './KorevActivity';
 import { QuestionsStepper } from './QuestionsStepper';
@@ -10,6 +11,12 @@ import { ReviewDraftEditor } from './ReviewDraftEditor';
 import type { PanelAi } from './useKorevAi';
 
 const NOT_WORKING = "Korev isn't working on this PR.";
+const KOREV_TAB = 'korev';
+const EXPLAIN_TAB = 'explain';
+const PAGE_TABS = [
+  { id: KOREV_TAB, label: 'Korev' },
+  { id: EXPLAIN_TAB, label: 'Explain' },
+];
 
 function useCloseOnEscape(onClose: () => void) {
   useEffect(() => {
@@ -99,8 +106,7 @@ export interface KorevRunPageProps {
   onClose: () => void;
 }
 
-export function KorevRunPage({ pr, ai, onClose }: KorevRunPageProps) {
-  useCloseOnEscape(onClose);
+function KorevRun({ pr, ai }: { pr: PullRequest; ai: PanelAi }) {
   const running = isRunning(ai.state);
   const result = running ? null : runResult(pr, ai);
   const feed = (
@@ -110,25 +116,49 @@ export function KorevRunPage({ pr, ai, onClose }: KorevRunPageProps) {
       className="px-5 py-4"
     />
   );
+  return result ? (
+    <div className="flex min-h-0 flex-1 max-[900px]:flex-col">
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto px-5 py-4">
+        {result}
+      </div>
+      <div className="flex min-h-0 w-[min(380px,40%)] flex-col border-l border-border-1 max-[900px]:w-full max-[900px]:border-t max-[900px]:border-l-0">
+        {feed}
+      </div>
+    </div>
+  ) : (
+    <div className="flex min-h-0 w-full max-w-[80ch] flex-1 flex-col">
+      {feed}
+    </div>
+  );
+}
+
+function explainState(ai: PanelAi) {
+  return ai.state?.kind === 'explain' ? ai.state : null;
+}
+
+export function KorevRunPage({ pr, ai, onClose }: KorevRunPageProps) {
+  useCloseOnEscape(onClose);
+  const [tab, setTab] = useState(KOREV_TAB);
+  const explaining = ai.available && tab === EXPLAIN_TAB;
   return (
     <section
       aria-label={`Korev on #${pr.number}`}
-      className="flex h-full min-h-0 flex-1 flex-col bg-app"
+      className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-app"
     >
       <RunHeader pr={pr} ai={ai} onClose={onClose} />
-      {result ? (
-        <div className="flex min-h-0 flex-1 max-[900px]:flex-col">
-          <div className="min-h-0 min-w-0 flex-1 overflow-auto px-5 py-4">
-            {result}
-          </div>
-          <div className="flex min-h-0 w-[min(380px,40%)] flex-col border-l border-border-1 max-[900px]:w-full max-[900px]:border-t max-[900px]:border-l-0">
-            {feed}
-          </div>
+      {ai.available ? (
+        <Tabs className="px-3" tabs={PAGE_TABS} value={tab} onChange={setTab} />
+      ) : null}
+      {explaining ? (
+        <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
+          <ExplainTab
+            target={targetOf(pr)}
+            headOid={pr.headRefOid}
+            state={explainState(ai)}
+          />
         </div>
       ) : (
-        <div className="flex min-h-0 w-full max-w-[80ch] flex-1 flex-col">
-          {feed}
-        </div>
+        <KorevRun pr={pr} ai={ai} />
       )}
     </section>
   );

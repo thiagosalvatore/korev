@@ -98,6 +98,39 @@ test('explains a PR in the reader with the agent running in a Korev checkout', a
   );
 });
 
+test('explains a PR from the Explain tab of its PR page', async () => {
+  await withRemote((remote) =>
+    withSession(
+      async (github, userDataDir) => {
+        await chooseClaude(userDataDir);
+        const app = await launch(github, userDataDir, aiEnv(remote));
+        try {
+          const window = await appWindow(app);
+          await connectAndOpenMyPrs(window);
+          await openRow(window, FAILING_PR_TITLE);
+          await window.keyboard.press('o');
+
+          const page = runPage(window, FAILING_PR_NUMBER);
+          await page.getByRole('tab', { name: 'Explain' }).click();
+          await page.getByRole('button', { name: 'Explain this PR' }).click();
+
+          await expect(
+            page
+              .frameLocator(
+                `iframe[title="Explanation of #${FAILING_PR_NUMBER}"]`,
+              )
+              .getByRole('heading', { name: 'What changes' }),
+          ).toBeVisible({ timeout: 30_000 });
+          await expect(panel(window)).toBeVisible();
+        } finally {
+          await app.close();
+        }
+      },
+      { headOids: remote.headOids },
+    ),
+  );
+});
+
 test('fixes a merge conflict after asking one question, and pushes the merge', async () => {
   await withRemote(async (remote) => {
     remote.commit(

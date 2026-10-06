@@ -237,11 +237,18 @@ and open `#gallery`).
   secondary `sm` button ("Merge conflicts · Fix conflicts"). Fixes that don't apply
   are hidden, not disabled. On a fork whose author didn't allow maintainer edits the
   buttons are disabled and one line says why.
-- The side panel only sums up a Korev task. The work itself happens on the **Korev run
-  page**, which replaces the list and the panel in the main area. It opens when the user
-  starts a fix or Review, from "Open" / "Answer questions" / "Open review
-  draft" in the panel, from the sidebar's Korev group, and from a question notification.
-  "Back" (Esc) returns to the list with the row focused. Explain keeps its reader.
+- The side panel only sums up a Korev task. The work itself happens on the **PR page**.
+  The page replaces the list, and the side panel stays docked on its right at every
+  width, so checks, reviewers, Merge and Close stay in reach. The page opens when the
+  user starts a fix or Review, from "Open" / "Answer questions" / "Open review draft" in
+  the panel, from the panel header's `maximize-2` button or `O`, from the sidebar's Korev
+  group, and from a question notification. "Back" (Esc, or the panel's close button)
+  returns to the list with the row focused and the panel open.
+- The page has two tabs when an agent is set up: **Korev** (the run) and **Explain**.
+  Explain shows the saved explanation inline with Regenerate and Open in browser. When
+  there is none it says "Korev hasn't explained this PR yet." with an "Explain this PR"
+  button; opening the tab never starts a run on its own. ⇧E and the panel's Explain
+  still open the reader.
 - Choosing a view in the sidebar closes the run page. Typed answers and the terminal
   stay, so the run picks up where the user left it when they open it again.
 - The run page header shows the PR, the task line (with Stop and Open terminal) and a
@@ -322,6 +329,7 @@ and open `#gallery`).
   selected PR, and ⇧K keeps or stops keeping a stale one, even with the panel closed.
   In both views ⇧E explains and ⇧R reviews the selected PR; in My PRs ⇧A toggles Keep
   mergeable.
+- `O` opens the PR page for the selected PR.
 - ⌘1 / ⌘2 switch views, ⌘, opens Settings, ⌘R refreshes, `?` shows the shortcut sheet.
 - ⌘K opens "Go to", a search over every listed PR (by `#num`, title or repo) and the
   view commands. Every word typed must match. ↑/↓ move, Enter runs the highlighted match,

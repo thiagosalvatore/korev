@@ -3,6 +3,7 @@ import {
   Badge,
   Button,
   DiffStat,
+  IconButton,
   SidePanel,
   SizeBadge,
   Tabs,
@@ -371,6 +372,7 @@ export interface PrPanelProps {
   mode: SidePanelMode;
   onClose: () => void;
   onOpenGithub: (url: string) => void;
+  onOpenPage?: () => void;
 }
 
 export function PrPanel({
@@ -381,6 +383,7 @@ export function PrPanel({
   mode,
   onClose,
   onOpenGithub,
+  onOpenPage,
 }: PrPanelProps) {
   const { url } = subjectSummary(subject);
   const [tab, setTab] = useState(DETAILS_TAB);
@@ -391,7 +394,20 @@ export function PrPanel({
       label={PANEL_LABEL}
       mode={mode}
       onClose={onClose}
-      header={<PanelHeader subject={subject} />}
+      header={
+        <div className="flex items-start gap-1">
+          <PanelHeader subject={subject} />
+          <span className="flex-1" />
+          {onOpenPage ? (
+            <IconButton
+              icon="maximize-2"
+              label="Open PR page (O)"
+              size="sm"
+              onClick={onOpenPage}
+            />
+          ) : null}
+        </div>
+      }
       footer={
         actions && !goneLabel ? (
           <ActionFooter actions={actions} demoted={Boolean(ai?.questions)} />

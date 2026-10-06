@@ -16,6 +16,7 @@ const SHORTCUTS: Shortcut[] = [
     label: 'Expand or collapse a section, approved PRs or stack layers',
   },
   { keys: ['↵'], label: 'Open details' },
+  { keys: ['O'], label: 'Open the PR page' },
   { keys: ['⌘↵'], label: 'Open on GitHub' },
   { keys: ['Esc'], label: 'Close details' },
   { keys: ['⇧M'], label: 'Merge the selected PR (your PRs)' },

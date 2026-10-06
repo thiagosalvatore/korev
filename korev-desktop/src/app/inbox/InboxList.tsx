@@ -17,7 +17,7 @@ import { useMediaQuery } from '../useMediaQuery';
 import { BannerSlot } from './BannerSlot';
 import { filterSnapshot } from './filter';
 import { GoneRow } from './GoneRow';
-import type { ListModel } from './list-model';
+import { subjectRef, type ListModel } from './list-model';
 import {
   ListboxProvider,
   findOption,
@@ -28,7 +28,7 @@ import {
   type ListboxApi,
 } from './listbox';
 import { AgentTasksProvider } from '../ai/agent-task-state';
-import { useKorevAiContext } from '../ai/useKorevAi';
+import { OPEN_PAGE_KEY, useKorevAiContext } from '../ai/useKorevAi';
 import { ActionsProvider } from './action-state';
 import { RepoAvatarsProvider } from './OwnerAvatar';
 import { PrPanel } from './PrPanel';
@@ -212,10 +212,19 @@ export function InboxList({
     }
   }
 
-  useFocusRowAfterRun(ai.runRef !== null, listbox, selectedKey);
+  const selectedRef = subjectRef(selection.subject);
+  const showingPage = ai.runRef !== null && ai.runRef === selectedRef;
+  useFocusRowAfterRun(showingPage, listbox, selectedKey);
+
+  function openPage() {
+    if (!selectedRef) return;
+    setPanelOpen(true);
+    ai.showRun(selectedRef);
+  }
 
   useKeyShortcuts({
     [APPLY_UPDATES_KEY]: applyHeld,
+    [OPEN_PAGE_KEY]: openPage,
     j: () => focusRovingStop(listbox.current),
     k: () => focusRovingStop(listbox.current),
     ...actions.shortcuts,
@@ -241,8 +250,10 @@ export function InboxList({
           <RepoAvatarsProvider value={held.displayed.repoAvatars}>
             <div className="flex h-full min-h-0 flex-col">
               <div className="relative flex min-h-0 flex-1">
+                {showingPage ? ai.runPage(selection.subject) : null}
                 <div
                   ref={scroller}
+                  hidden={showingPage}
                   className="min-w-0 flex-1 overflow-auto pb-6"
                   onMouseEnter={() => setPointerInside(true)}
                   onMouseLeave={() => setPointerInside(false)}
@@ -284,7 +295,7 @@ export function InboxList({
                     filteredOut
                   )}
                 </div>
-                {panelOpen && selection.subject && ai.runRef === null ? (
+                {panelOpen && selection.subject ? (
                   <PrPanel
                     subject={selection.subject}
                     goneLabel={
@@ -294,8 +305,11 @@ export function InboxList({
                     }
                     actions={actions.panelActions(selection.subject)}
                     ai={ai.panelAi(selection.subject)}
-                    mode={docked ? 'docked' : 'overlay'}
-                    onClose={closePanel}
+                    mode={docked || showingPage ? 'docked' : 'overlay'}
+                    onClose={showingPage ? ai.closeRun : closePanel}
+                    onOpenPage={
+                      showingPage || !selectedRef ? undefined : openPage
+                    }
                     onOpenGithub={openExternal}
                   />
                 ) : null}
