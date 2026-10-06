@@ -89,16 +89,18 @@ export function buildInbox({
 }: InboxInput): Inbox {
   const waiting = new Set(needsAnswer);
   const working = new Set(korevWorking);
-  const classified = mine.map((pr) =>
-    classifyMyPr(pr, {
+  const classified = mine.map((pr) => {
+    const mergeTool = mergeWith[pr.repo] ?? 'github';
+    return classifyMyPr(pr, {
       unknownMergeStreak: unknownMergeStreaks[pr.id] ?? 0,
-      queue: queueStatusFor(pr, mergeWith[pr.repo] ?? 'github'),
+      queue: queueStatusFor(pr, mergeTool),
+      mergeTool,
       now,
       keptAt: keptPrs[prRef(pr)] ?? null,
       needsAnswer: waiting.has(prRef(pr)),
       korevWorking: working.has(prRef(pr)),
-    }),
-  );
+    });
+  });
   const sorted = reviews.map((pr) =>
     sortReview(toReviewItem(pr, viewer, now), viewer),
   );

@@ -8,6 +8,7 @@ import { severityRank } from './severity';
 export interface ClassifyContext {
   unknownMergeStreak: number;
   queue?: QueueStatus | null;
+  mergeTool?: MergeTool;
   now?: Date;
   keptAt?: string | null;
   needsAnswer?: boolean;
@@ -161,10 +162,20 @@ function draftReason(pr: PullRequest): Reason | null {
   return reason('draft', 'Draft');
 }
 
-function blockedReason(pr: PullRequest): Reason | null {
+function mergesThroughQueueBot({ mergeTool }: ClassifyContext): boolean {
+  return mergeTool !== undefined && mergeTool !== 'github';
+}
+
+function blockedReason(
+  pr: PullRequest,
+  context: ClassifyContext,
+): Reason | null {
   if (pr.mergeStateStatus !== 'BLOCKED') return null;
   if (pr.reviewDecision === 'REVIEW_REQUIRED') {
     return reason('waiting-on-review', 'Waiting on required review');
+  }
+  if (context.queue?.kind === 'queued' || mergesThroughQueueBot(context)) {
+    return null;
   }
   return reason('blocked-by-rules', 'Blocked by branch rules');
 }
@@ -229,11 +240,17 @@ function collectReasons(
     .sort((a, b) => severityRank(a.severity) - severityRank(b.severity));
 }
 
-function isReadyToMerge(pr: PullRequest): boolean {
+function hasReadyMergeState(
+  pr: PullRequest,
+  context: ClassifyContext,
+): boolean {
+  if (READY_MERGE_STATES.has(pr.mergeStateStatus)) return true;
+  return pr.mergeStateStatus === 'BLOCKED' && mergesThroughQueueBot(context);
+}
+
+function isReadyToMerge(pr: PullRequest, context: ClassifyContext): boolean {
   return (
-    READY_MERGE_STATES.has(pr.mergeStateStatus) &&
-    !pr.isDraft &&
-    pr.unresolvedThreads === 0
+    hasReadyMergeState(pr, context) && !pr.isDraft && pr.unresolvedThreads === 0
   );
 }
 
@@ -275,7 +292,7 @@ function classifyByState(pr: PullRequest, context: ClassifyContext): MyPr {
     return { pr, bucket: 'needs-you', reasons: needsYou, queue };
   }
   const inProgress = collectReasons(pr, context, IN_PROGRESS_RULES);
-  if (inProgress.length === 0 && isReadyToMerge(pr)) {
+  if (inProgress.length === 0 && isReadyToMerge(pr, context)) {
     return {
       pr,
       bucket: 'ready',

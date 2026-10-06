@@ -211,6 +211,29 @@ describe('classifyMyPr queue status', () => {
     ]);
   });
 
+  it('shows only the queue on a queued PR that GitHub reports as blocked', () => {
+    const result = classifyMyPr(
+      makePr({ mergeStateStatus: 'BLOCKED', reviewDecision: 'APPROVED' }),
+      {
+        unknownMergeStreak: 0,
+        queue: { kind: 'queued', tool: 'trunk', by: null, at: null, url: null },
+      },
+    );
+
+    expect(result.bucket).toBe('in-progress');
+    expect(codesOf(result)).toEqual(['in-queue']);
+  });
+
+  it('puts an approved, blocked PR in ready when a queue bot merges the repo', () => {
+    const result = classifyMyPr(
+      makePr({ mergeStateStatus: 'BLOCKED', reviewDecision: 'APPROVED' }),
+      { unknownMergeStreak: 0, mergeTool: 'trunk' },
+    );
+
+    expect(result.bucket).toBe('ready');
+    expect(codesOf(result)).toEqual(['ready-to-merge']);
+  });
+
   it('puts a PR the queue removed back in Needs you', () => {
     const result = classifyMyPr(makePr(), {
       unknownMergeStreak: 1,
