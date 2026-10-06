@@ -22,6 +22,14 @@ export interface CheckContextNode {
   conclusion?: string | null;
   context?: string;
   state?: string;
+  checkSuite?: {
+    app?: { slug?: string } | null;
+    workflowRun?: {
+      databaseId?: number;
+      event?: string;
+      workflow?: { name?: string } | null;
+    } | null;
+  } | null;
 }
 
 export interface StackLayerNode {

@@ -129,7 +129,9 @@ export function toPullRequest(
       'UNKNOWN',
     ),
     ci: toCiState(node.statusCheckRollup?.state),
-    checks: presentNodes(node.statusCheckRollup?.contexts).map(toCheck),
+    checks: latestWorkflowRuns(
+      presentNodes(node.statusCheckRollup?.contexts),
+    ).map(toCheck),
     unresolvedThreads: countUnresolved(node),
     additions: node.additions,
     deletions: node.deletions,
@@ -191,7 +193,40 @@ export function toCheck(context: CheckContextNode): Check {
       outcome: STATUS_CONTEXT_OUTCOMES[context.state ?? ''] ?? 'pending',
     };
   }
-  return { name: context.name ?? '', outcome: checkRunOutcome(context) };
+  return { name: checkRunName(context), outcome: checkRunOutcome(context) };
+}
+
+function checkRunName(context: CheckContextNode): string {
+  const jobName = context.name ?? '';
+  const workflowName = context.checkSuite?.workflowRun?.workflow?.name;
+  return workflowName ? `${workflowName} / ${jobName}` : jobName;
+}
+
+export function latestWorkflowRuns<TContext extends CheckContextNode>(
+  contexts: TContext[],
+): TContext[] {
+  const newestRunIdByJob = new Map<string, number>();
+  for (const context of contexts) {
+    const job = workflowJob(context);
+    if (!job) continue;
+    const newest = newestRunIdByJob.get(job.key) ?? job.runId;
+    newestRunIdByJob.set(job.key, Math.max(newest, job.runId));
+  }
+  return contexts.filter((context) => {
+    const job = workflowJob(context);
+    return !job || newestRunIdByJob.get(job.key) === job.runId;
+  });
+}
+
+function workflowJob(
+  context: CheckContextNode,
+): { key: string; runId: number } | null {
+  const run = context.checkSuite?.workflowRun;
+  if (!run?.workflow?.name || typeof run.databaseId !== 'number') return null;
+  return {
+    key: JSON.stringify([run.workflow.name, run.event, context.name]),
+    runId: run.databaseId,
+  };
 }
 
 function checkRunOutcome(context: CheckContextNode): CheckOutcome {

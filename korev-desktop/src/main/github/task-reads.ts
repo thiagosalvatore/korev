@@ -7,7 +7,7 @@ import {
 } from './config';
 import { graphql } from './graphql';
 import { tailLines } from './log-tail';
-import { toCheck } from './map-pull-request';
+import { latestWorkflowRuns, toCheck } from './map-pull-request';
 import { type Connection, type CheckContextNode, presentNodes } from './nodes';
 import { buildHeaders, githubRequest, type FetchLike } from './request';
 
@@ -86,7 +86,7 @@ query FailingChecks($owner: String!, $name: String!, $number: Int!, $after: Stri
             __typename
             ... on CheckRun {
               databaseId name status conclusion detailsUrl title summary
-              checkSuite { app { slug } workflowRun { databaseId } }
+              checkSuite { app { slug } workflowRun { databaseId event workflow { name } } }
             }
             ... on StatusContext { context state description targetUrl }
           }
@@ -125,10 +125,6 @@ interface CheckNode extends CheckContextNode {
   summary?: string | null;
   description?: string | null;
   targetUrl?: string | null;
-  checkSuite?: {
-    app?: { slug?: string } | null;
-    workflowRun?: { databaseId?: number } | null;
-  } | null;
 }
 
 interface FailingChecksData {
@@ -188,7 +184,7 @@ interface AnnotationNode {
 function toFailingCheck(node: CheckNode): FailingCheck {
   const isActionsJob = node.checkSuite?.app?.slug === ACTIONS_APP_SLUG;
   return {
-    name: node.name ?? node.context ?? '',
+    name: toCheck(node).name,
     summary: [node.title, node.summary, node.description]
       .filter(Boolean)
       .join('\n'),
@@ -269,7 +265,7 @@ export function createTaskReads(deps: {
         ? (page.pageInfo.endCursor ?? null)
         : null;
     } while (after);
-    return contexts
+    return latestWorkflowRuns(contexts)
       .filter((node) => toCheck(node).outcome === 'failing')
       .map(toFailingCheck);
   }

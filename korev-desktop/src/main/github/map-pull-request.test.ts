@@ -176,6 +176,35 @@ describe('toPullRequest', () => {
     ]);
   });
 
+  it('keeps only the newest run of each workflow job, named as GitHub shows it', () => {
+    const run = (databaseId: number, event: string, conclusion: string) => ({
+      __typename: 'CheckRun',
+      name: 'Trunk',
+      status: 'COMPLETED',
+      conclusion,
+      checkSuite: {
+        workflowRun: { databaseId, event, workflow: { name: 'Backend CI' } },
+      },
+    });
+    const pr = toPullRequest(
+      withRollup({
+        state: 'SUCCESS',
+        contexts: {
+          nodes: [
+            run(1, 'pull_request', 'CANCELLED'),
+            run(2, 'pull_request', 'SUCCESS'),
+            run(3, 'push', 'FAILURE'),
+          ],
+        },
+      }),
+    );
+
+    expect(pr.checks).toEqual([
+      { name: 'Backend CI / Trunk', outcome: 'passing' },
+      { name: 'Backend CI / Trunk', outcome: 'failing' },
+    ]);
+  });
+
   it('takes the last activity from creation, the last commit and the newest human comment, ignoring bots', () => {
     const comment = (createdAt: string, typename: string) => ({
       author: { __typename: typename, login: 'someone' },

@@ -103,6 +103,44 @@ describe('task reads', () => {
     });
   });
 
+  it('skips a cancelled run that a newer run of the same workflow replaced', async () => {
+    const run = (databaseId: number, conclusion: string) => ({
+      __typename: 'CheckRun',
+      databaseId,
+      name: 'Trunk',
+      status: 'COMPLETED',
+      conclusion,
+      checkSuite: {
+        app: { slug: 'github-actions' },
+        workflowRun: {
+          databaseId,
+          event: 'pull_request',
+          workflow: { name: 'Backend CI' },
+        },
+      },
+    });
+    const fake = createFakeFetch({
+      body: {
+        data: {
+          repository: {
+            pullRequest: {
+              statusCheckRollup: {
+                contexts: { nodes: [run(1, 'CANCELLED'), run(2, 'SUCCESS')] },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const checks = await createTaskReads({
+      fetch: fake.fetch,
+      apiUrl: API,
+    }).failingChecks('tok', PR);
+
+    expect(checks).toEqual([]);
+  });
+
   it('reads failing checks past the first page of check contexts', async () => {
     const page = (
       nodes: object[],

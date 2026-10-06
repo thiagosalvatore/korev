@@ -167,7 +167,10 @@ fragment PrCore on PullRequest {
     contexts(first: ${CHECK_CONTEXTS_LIMIT}) {
       nodes {
         __typename
-        ... on CheckRun { name status conclusion }
+        ... on CheckRun {
+          name status conclusion
+          checkSuite { workflowRun { databaseId event workflow { name } } }
+        }
         ... on StatusContext { context state }
       }
     }
