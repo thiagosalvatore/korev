@@ -220,6 +220,7 @@ describe('agent tasks engine', () => {
       status: 'failed',
       kind: 'explain',
       message: 'Stopped after 10 minutes',
+      headRefOid: makePr().headRefOid,
     });
     expect(releaseCheckout).toHaveBeenCalled();
   });
@@ -382,6 +383,21 @@ describe('keep mergeable', () => {
 
     expect(stateOf(engine, 1)).toBeUndefined();
     expect(releaseCheckout).toHaveBeenCalledWith(refOf(1));
+  });
+
+  it('clears a failed run once the PR gets a new commit', async () => {
+    const { engine, pending, settle } = setup();
+    engine.start(refOf(1), 'fix-ci');
+    pending[0].reject(new Error('The agent stopped.'));
+    await settle();
+
+    engine.reconcile(mineSnapshot(makePr({ number: 1 })));
+    await settle();
+    expect(stateOf(engine, 1)).toMatchObject({ status: 'failed' });
+
+    engine.reconcile(mineSnapshot(makePr({ number: 1, headRefOid: 'h2' })));
+    await settle();
+    expect(stateOf(engine, 1)).toBeUndefined();
   });
 
   it('fixes the conflict first, then failing CI on a later snapshot', async () => {

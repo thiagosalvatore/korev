@@ -106,6 +106,7 @@ export type AgentTaskState =
       kind: AgentTaskKind;
       message: string;
       unpushed?: string;
+      headRefOid?: string;
     };
 
 export function keepsCheckout(state: AgentTaskState): boolean {

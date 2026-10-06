@@ -135,11 +135,24 @@ function isActive(record: TaskRecord | undefined): boolean {
   return record?.state.status === 'running';
 }
 
-function failedState(kind: AgentTaskKind, error: unknown): AgentTaskState {
+function failedState(
+  kind: AgentTaskKind,
+  error: unknown,
+  headRefOid: string | undefined,
+): AgentTaskState {
   const message = describeError(error);
   return error instanceof UnpushedChangesError
     ? { status: 'failed', kind, message, unpushed: error.sha }
-    : { status: 'failed', kind, message };
+    : { status: 'failed', kind, message, headRefOid };
+}
+
+function isOutdatedFailure(
+  state: AgentTaskState | undefined,
+  pr: PullRequest,
+): boolean {
+  if (state?.status !== 'failed') return false;
+  if (state.unpushed !== undefined) return state.unpushed === pr.headRefOid;
+  return state.headRefOid !== undefined && state.headRefOid !== pr.headRefOid;
 }
 
 function restored(record: TaskRecord): TaskRecord {
@@ -313,7 +326,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     } catch (error) {
       if (stopped) return;
       if (controller.signal.aborted) return;
-      settle(ref, failedState(kind, error));
+      settle(ref, failedState(kind, error, deps.findPr(ref)?.headRefOid));
     } finally {
       running -= 1;
       controllers.delete(ref);
@@ -455,12 +468,9 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
     }
   }
 
-  function dismissIfPushed(pr: PullRequest): void {
+  function dismissIfOutdated(pr: PullRequest): void {
     const ref = prRef(pr);
-    const state = records.get(ref)?.state;
-    if (state?.status === 'failed' && state.unpushed === pr.headRefOid) {
-      void dismiss(ref);
-    }
+    if (isOutdatedFailure(records.get(ref)?.state, pr)) void dismiss(ref);
   }
 
   function forgetGoneMemories(snapshot: InboxSnapshot, present: Set<string>) {
@@ -478,7 +488,7 @@ export function createAgentTasks(deps: AgentTasksDeps): AgentTasks {
       else put(ref, null);
     }
     forgetGoneMemories(snapshot, present);
-    pullRequestsIn(snapshot).forEach(dismissIfPushed);
+    pullRequestsIn(snapshot).forEach(dismissIfOutdated);
     myPrsIn(snapshot.mine).forEach(keepMergeable);
     persist();
   }
