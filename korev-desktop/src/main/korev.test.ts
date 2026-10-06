@@ -392,6 +392,73 @@ describe('korev', () => {
     );
   });
 
+  it('re-runs every cancelled workflow run when more checks fail than Fix CI reads details for', async () => {
+    const runIds = Array.from({ length: 12 }, (_, index) => 100 + index);
+    const cancelledChecks: CannedResponse = {
+      body: {
+        data: {
+          repository: {
+            pullRequest: {
+              statusCheckRollup: {
+                contexts: {
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                  nodes: runIds.map((runId) => ({
+                    __typename: 'CheckRun',
+                    databaseId: runId * 10,
+                    name: `job ${runId}`,
+                    status: 'COMPLETED',
+                    conclusion: 'CANCELLED',
+                    checkSuite: {
+                      app: { slug: 'github-actions' },
+                      workflowRun: { databaseId: runId },
+                    },
+                  })),
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const [inboxAfterRerun] = inboxWithOpenPr();
+    const routeByUrl: CannedReply = async (request) => {
+      if (request.url.includes('/annotations')) return { body: [] };
+      if (request.url.includes('/logs')) return { status: 404 };
+      if (request.url.includes('/rerun-failed-jobs')) return { status: 201 };
+      return inboxAfterRerun;
+    };
+    const { korev, fake, invoke } = setup(
+      [...inboxWithOpenPr(), teamsResponse],
+      previousSession(),
+    );
+    await korev.start();
+    await vi.waitFor(() =>
+      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
+        status: 'live',
+        fromCache: false,
+      }),
+    );
+    fake.enqueue(cancelledChecks, ...Array(40).fill(routeByUrl));
+
+    await invoke(IpcChannel.AiStart, OPEN_PR_TARGET, 'fix-ci');
+
+    await vi.waitFor(() =>
+      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
+        agentTasks: { [OPEN_PR_REF]: { status: 'done' } },
+      }),
+    );
+    const urls = fake.requests.map((request) => request.url);
+    expect(
+      urls.filter((url) => url.includes('/rerun-failed-jobs')).sort(),
+    ).toEqual(
+      runIds.map(
+        (runId) =>
+          `https://api.github.com/repos/acme/api/actions/runs/${runId}/rerun-failed-jobs`,
+      ),
+    );
+    expect(urls.filter((url) => url.includes('/annotations'))).toHaveLength(10);
+  });
+
   it("deletes saved explanations and Korev's task records on disconnect", async () => {
     const { korev, fs, invoke } = setup([neverAnswers], {
       ...previousSession(),

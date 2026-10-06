@@ -88,7 +88,7 @@ import {
   type GithubEndpoints,
 } from './github/config';
 import { applyRenames, type RepoRename } from './github/repo-access';
-import { createTaskReads } from './github/task-reads';
+import { createTaskReads, type FailingCheck } from './github/task-reads';
 import { emptyRepoPage } from './github/repo-picker';
 import type { FetchLike } from './github/request';
 import { createInboxCache } from './inbox-cache';
@@ -445,21 +445,33 @@ export function createKorev(deps: KorevDeps): Korev {
     if (!token) return [];
     const checks = await taskReads.failingChecks(token, pr);
     return Promise.all(
-      checks.slice(0, CI_CHECKS_READ).map(async (check) => ({
-        check,
-        annotations: check.checkRunId
-          ? await taskReads
-              .annotations(token, pr.repo, check.checkRunId)
-              .catch(() => [])
-          : [],
-        logTail:
-          check.isActionsJob && check.checkRunId
-            ? await taskReads
-                .jobLogTail(token, pr.repo, check.checkRunId)
-                .catch(() => null)
-            : null,
-      })),
+      checks.map((check, index) =>
+        index < CI_CHECKS_READ
+          ? readCiFailureDetails(token, pr, check)
+          : { check, annotations: [], logTail: null },
+      ),
     );
+  }
+
+  async function readCiFailureDetails(
+    token: string,
+    pr: PullRequest,
+    check: FailingCheck,
+  ): Promise<CiFailure> {
+    return {
+      check,
+      annotations: check.checkRunId
+        ? await taskReads
+            .annotations(token, pr.repo, check.checkRunId)
+            .catch(() => [])
+        : [],
+      logTail:
+        check.isActionsJob && check.checkRunId
+          ? await taskReads
+              .jobLogTail(token, pr.repo, check.checkRunId)
+              .catch(() => null)
+          : null,
+    };
   }
 
   async function submitReview(
