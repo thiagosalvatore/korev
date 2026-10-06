@@ -154,6 +154,28 @@ describe('Korev AI in the panel', () => {
     expect(within(panel).getByText(AGENT_CRASHED)).toBeTruthy();
   });
 
+  it('links to the last finished run without repeating its summary', async () => {
+    const summary = 'I resolved both conflicts by keeping each side.';
+    renderMine(
+      {},
+      {
+        [LINT_REF]: {
+          status: 'done',
+          kind: 'fix-conflicts',
+          summary,
+          commits: ['abc1234def'],
+          finishedAt: '2026-10-03T13:00:00.000Z',
+        },
+      },
+    );
+
+    const panel = openLintPr();
+
+    expect(await within(panel).findByText('Last Korev run')).toBeTruthy();
+    expect(within(panel).getByRole('button', { name: 'Open' })).toBeTruthy();
+    expect(within(panel).queryByText(new RegExp(summary))).toBeNull();
+  });
+
   it('keeps the failed chip on the row while a fix waits to be pushed', () => {
     renderMine({}, { [LINT_REF]: { ...CI_FIX_FAILED, unpushed: 'abc1234' } });
 

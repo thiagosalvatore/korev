@@ -75,16 +75,12 @@ export function KorevAiSection({ ai }: { ai: PanelAi }) {
           </span>
         </div>
       ) : null}
-      {ai.state?.status === 'done' ? (
+      {ai.state?.status === 'done' && !ai.draft ? (
         <div className="mb-1.5 flex flex-wrap items-center gap-2">
-          <p className="m-0 min-w-0 flex-1 text-sm text-fg-2">
-            Last Korev run · {ai.state.summary}
-          </p>
-          {ai.draft ? null : (
-            <Button size="sm" variant="ghost" onClick={ai.onOpenRun}>
-              Open
-            </Button>
-          )}
+          <p className="m-0 min-w-0 flex-1 text-sm text-fg-2">Last Korev run</p>
+          <Button size="sm" variant="ghost" onClick={ai.onOpenRun}>
+            Open
+          </Button>
         </div>
       ) : null}
       {ai.fixes.map((fix) => (

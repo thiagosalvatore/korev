@@ -300,7 +300,8 @@ and open `#gallery`).
   and the elapsed time ("Fix CI · Ran npm test · 4m") with "Open" and a ghost Stop
   that needs no confirm. The section's other buttons are disabled with "Korev is already working on
   this PR". A failure shows the danger chip, the plain message and Retry. The last
-  finished run stays as "Last Korev run · <summary>".
+  finished run stays as a "Last Korev run" line with "Open"; its summary is on the run
+  page, not in the panel.
 - Explanations open in a wide reader `Dialog` (`min(960px, 100vw − 32px)`): title
   "Explain #301 · <title>", the head commit as a short mono sha, "Regenerate" and "Open
   in browser". The body is a sandboxed `iframe` without scripts, styled with Korev's
