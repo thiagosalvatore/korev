@@ -1,4 +1,4 @@
-import { Badge, Button, IconButton } from '../../design-system';
+import { Badge, Button } from '../../design-system';
 import type { PrActionState, QueueStatus } from '../../shared/merge';
 import { KEEP_DAYS } from '../../inbox/keep';
 import { formatAge, joinMeta } from '../format';
@@ -37,15 +37,15 @@ function lockedTitle(locked: boolean): string | undefined {
   return locked ? LOCKED_HINT : undefined;
 }
 
-function KeepButton({ keep }: { keep: KeepAction }) {
+export function KeepButton({ keep }: { keep: KeepAction }) {
   return (
-    <Button kbd={`⇧${KEEP_KEY}`} onClick={keep.onToggle}>
+    <Button size="sm" kbd={`⇧${KEEP_KEY}`} onClick={keep.onToggle}>
       {keep.kept ? 'Stop keeping' : `Keep for ${KEEP_DAYS} days`}
     </Button>
   );
 }
 
-function KeepFailure({ keep }: { keep: KeepAction }) {
+export function KeepFailure({ keep }: { keep: KeepAction }) {
   return (
     <p className="m-0 text-xs text-danger-text">
       Couldn't save ·{' '}
@@ -54,6 +54,14 @@ function KeepFailure({ keep }: { keep: KeepAction }) {
       </button>
     </p>
   );
+}
+
+function isQueued(actions: PanelActions): boolean {
+  return actions.queue?.kind === 'queued';
+}
+
+export function footerOpensGithub(actions: PanelActions): boolean {
+  return !isQueued(actions) && !actions.ready;
 }
 
 export function ActionFooter({
@@ -65,62 +73,47 @@ export function ActionFooter({
 }) {
   const primary = demoted ? 'secondary' : 'primary';
   const disabled = actions.locked || isBusy(actions.state);
-  const queued = actions.queue?.kind === 'queued';
-  const githubIsSecondary = queued || actions.ready;
-  const { keep } = actions;
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2">
-        {queued ? (
-          <Button
-            className="flex-1"
-            disabled={disabled}
-            title={lockedTitle(actions.locked)}
-            onClick={actions.onCancelQueue}
-          >
-            Cancel
-          </Button>
-        ) : actions.ready ? (
-          <Button
-            variant={primary}
-            className="flex-1"
-            kbd={`⇧${MERGE_KEY}`}
-            disabled={disabled}
-            title={lockedTitle(actions.locked)}
-            onClick={actions.onMerge}
-          >
-            {actions.mergeLabel}
-          </Button>
-        ) : (
-          <Button
-            variant={primary}
-            className="flex-1"
-            kbd={demoted ? undefined : '⌘↵'}
-            onClick={actions.onOpenGithub}
-          >
-            {OPEN_ON_GITHUB}
-          </Button>
-        )}
+    <div className="flex flex-wrap gap-2">
+      {isQueued(actions) ? (
         <Button
-          variant="danger"
-          kbd={`⇧${CLOSE_KEY}`}
+          className="flex-1"
           disabled={disabled}
           title={lockedTitle(actions.locked)}
-          onClick={actions.onClose}
+          onClick={actions.onCancelQueue}
         >
-          Close
+          Cancel
         </Button>
-        {githubIsSecondary ? (
-          <IconButton
-            icon="external-link"
-            label={OPEN_ON_GITHUB}
-            variant="secondary"
-            onClick={actions.onOpenGithub}
-          />
-        ) : null}
-        {keep ? <KeepButton keep={keep} /> : null}
-      </div>
-      {keep?.failed ? <KeepFailure keep={keep} /> : null}
+      ) : actions.ready ? (
+        <Button
+          variant={primary}
+          className="flex-1"
+          kbd={`⇧${MERGE_KEY}`}
+          disabled={disabled}
+          title={lockedTitle(actions.locked)}
+          onClick={actions.onMerge}
+        >
+          {actions.mergeLabel}
+        </Button>
+      ) : (
+        <Button
+          variant={primary}
+          className="flex-1"
+          kbd={demoted ? undefined : '⌘↵'}
+          onClick={actions.onOpenGithub}
+        >
+          {OPEN_ON_GITHUB}
+        </Button>
+      )}
+      <Button
+        variant="danger"
+        kbd={`⇧${CLOSE_KEY}`}
+        disabled={disabled}
+        title={lockedTitle(actions.locked)}
+        onClick={actions.onClose}
+      >
+        Close
+      </Button>
     </div>
   );
 }

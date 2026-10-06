@@ -45,7 +45,7 @@ function RowStatus({
 const MS_PER_DAY = 86_400_000;
 const KEEP_MERGEABLE_NOTE = 'Keep mergeable';
 
-function daysLeft(until: string, now: number): number {
+export function daysLeft(until: string, now: number): number {
   return Math.max(0, Math.round((Date.parse(until) - now) / MS_PER_DAY));
 }
 

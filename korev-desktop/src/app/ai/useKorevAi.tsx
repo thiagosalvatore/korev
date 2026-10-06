@@ -57,7 +57,7 @@ const FIX_FOR_REASON: Partial<Record<ReasonCode, AgentTaskKind>> = {
 
 export interface FixAction {
   kind: AgentTaskKind;
-  reason: string;
+  code: ReasonCode;
   disabledReason: string | null;
 }
 
@@ -113,7 +113,7 @@ function fixesFor(subject: PanelSubject | null): FixAction[] {
   const disabledReason = canPushFixes(pr) ? null : FORK_WITHOUT_EDITS;
   return reasons.flatMap((reason) => {
     const kind = FIX_FOR_REASON[reason.code];
-    return kind ? [{ kind, reason: reason.label, disabledReason }] : [];
+    return kind ? [{ kind, code: reason.code, disabledReason }] : [];
   });
 }
 

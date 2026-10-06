@@ -100,15 +100,16 @@ function openPanel() {
   return screen.getByRole('complementary', { name: 'Pull request details' });
 }
 
-describe('fixes in the Korev AI section', () => {
-  it('offers the fix that matches each reason', async () => {
+describe('fixes next to their reason', () => {
+  it('offers the fix on the row of the reason it fixes', async () => {
     const { bridge } = renderMine();
     const panel = openPanel();
 
-    const fix = await within(panel).findByRole('button', {
+    await within(panel).findByRole('button', { name: 'Fix conflicts' });
+    const row = within(panel).getByText('Merge conflicts').closest('li');
+    const fix = within(row as HTMLElement).getByRole('button', {
       name: 'Fix conflicts',
     });
-    expect(within(panel).getAllByText('Merge conflicts')).toHaveLength(2);
     fireEvent.click(fix);
 
     expect(bridge.ai.start).toHaveBeenCalledWith(TARGET, 'fix-conflicts');

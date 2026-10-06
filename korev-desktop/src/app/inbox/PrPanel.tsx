@@ -11,7 +11,13 @@ import {
   type SidePanelMode,
 } from '../../design-system';
 import { prSize } from '../../inbox/size';
-import type { Approval, MyPr, ReviewItem, SizeInfo } from '../../shared/inbox';
+import type {
+  Approval,
+  MyPr,
+  Reason,
+  ReviewItem,
+  SizeInfo,
+} from '../../shared/inbox';
 import type {
   Check,
   CheckOutcome,
@@ -28,10 +34,23 @@ import { CiIcon } from './CiIcon';
 import { subjectSummary, type PanelSubject } from './list-model';
 import { layerStateLabel } from './OtherLayerRow';
 import { authorHandle } from './PrRow';
-import { ActionFooter, ActionStatus, type PanelActions } from './PanelActions';
-import { AgentTaskStatus } from '../ai/agent-task-state';
+import { daysLeft } from './MyPrRow';
+import {
+  ActionFooter,
+  ActionStatus,
+  KeepButton,
+  KeepFailure,
+  footerOpensGithub,
+  type KeepAction,
+  type PanelActions,
+} from './PanelActions';
+import { AgentTaskStatus, isRunning } from '../ai/agent-task-state';
 import { KorevActivity } from '../ai/KorevActivity';
-import { KorevAiSection } from '../ai/KorevAiSection';
+import {
+  FixButton,
+  KorevAiSection,
+  KorevRunResult,
+} from '../ai/KorevAiSection';
 import type { PanelAi } from '../ai/useKorevAi';
 import { PanelSection } from './PanelSection';
 import { PriorityBadge } from './PriorityBadge';
@@ -74,6 +93,7 @@ const REVIEW_WORDS: Record<ReviewState, string> = {
 };
 
 const LINE = 'flex min-w-0 items-center gap-2 py-1 text-sm text-fg-2';
+const REASON_ROW = 'flex flex-wrap items-center gap-x-2 gap-y-1 py-1';
 
 function Line({ children }: { children: ReactNode }) {
   return <div className={LINE}>{children}</div>;
@@ -97,17 +117,72 @@ function PanelHeader({ subject }: { subject: PanelSubject }) {
   );
 }
 
-function ReasonsSection({ item }: { item: MyPr }) {
+function ReasonAction({
+  reason,
+  ai,
+  keep,
+}: {
+  reason: Reason;
+  ai: PanelAi | undefined;
+  keep: KeepAction | null;
+}) {
+  if (reason.code === 'stale' && keep) return <KeepButton keep={keep} />;
+  if (!ai?.available) return null;
+  const fix = ai.fixes.find((candidate) => candidate.code === reason.code);
+  if (!fix) return null;
+  return (
+    <FixButton
+      fix={fix}
+      busy={isRunning(ai.state)}
+      onFix={() => ai.onFix(fix.kind)}
+    />
+  );
+}
+
+function KeptRow({ keptUntil, keep }: { keptUntil: string; keep: KeepAction }) {
+  const now = useNow(MINUTE_MS);
+  return (
+    <li className={REASON_ROW}>
+      <span className="min-w-0 flex-1 text-sm text-fg-2">
+        Kept · {daysLeft(keptUntil, now)}d left
+      </span>
+      <KeepButton keep={keep} />
+    </li>
+  );
+}
+
+function ReasonsSection({
+  item,
+  ai,
+  keep,
+}: {
+  item: MyPr;
+  ai: PanelAi | undefined;
+  keep: KeepAction | null;
+}) {
   const title = item.bucket === 'needs-you' ? 'Why it needs you' : 'Status';
+  const forkReason = ai?.available
+    ? ai.fixes.find((fix) => fix.disabledReason)?.disabledReason
+    : null;
   return (
     <PanelSection title={title}>
-      <div className="flex flex-wrap gap-1.5">
+      <ul className="m-0 list-none p-0">
         {item.reasons.map((reason) => (
-          <Badge key={reason.code} tone={reason.severity}>
-            {reason.label}
-          </Badge>
+          <li key={reason.code} className={REASON_ROW}>
+            <span className="min-w-0 flex-1">
+              <Badge tone={reason.severity}>{reason.label}</Badge>
+            </span>
+            <ReasonAction reason={reason} ai={ai} keep={keep} />
+          </li>
         ))}
-      </div>
+        {item.keptUntil && keep ? (
+          <KeptRow keptUntil={item.keptUntil} keep={keep} />
+        ) : null}
+      </ul>
+      {forkReason ? (
+        <p className="m-0 mt-1 text-xs text-fg-3">{forkReason}</p>
+      ) : null}
+      {keep?.failed ? <KeepFailure keep={keep} /> : null}
     </PanelSection>
   );
 }
@@ -313,9 +388,11 @@ function LayerDetails({
 function SubjectDetails({
   subject,
   ai,
+  keep,
 }: {
   subject: PanelSubject;
   ai: PanelAi | undefined;
+  keep: KeepAction | null;
 }) {
   if (subject.kind === 'layer') return <LayerDetails subject={subject} />;
   const { pr } = subject.item;
@@ -344,7 +421,7 @@ function SubjectDetails({
       size={prSize(pr)}
       why={
         <>
-          <ReasonsSection item={subject.item} />
+          <ReasonsSection item={subject.item} ai={ai} keep={keep} />
           {aiSection}
         </>
       }
@@ -377,6 +454,9 @@ export function PrPanel({
   const [tab, setTab] = useState(DETAILS_TAB);
   const runs = ai?.history ?? [];
   const showsActivity = ai && runs.length > 0 && tab === ACTIVITY_TAB;
+  const footerActions = goneLabel ? null : (actions ?? null);
+  const headerOpensGithub =
+    footerActions !== null && !footerOpensGithub(footerActions);
   return (
     <SidePanel
       label={PANEL_LABEL}
@@ -394,11 +474,22 @@ export function PrPanel({
               onClick={onOpenPage}
             />
           ) : null}
+          {headerOpensGithub ? (
+            <IconButton
+              icon="external-link"
+              label={OPEN_ON_GITHUB}
+              size="sm"
+              onClick={() => onOpenGithub(url)}
+            />
+          ) : null}
         </div>
       }
       footer={
-        actions && !goneLabel ? (
-          <ActionFooter actions={actions} demoted={Boolean(ai?.questions)} />
+        footerActions ? (
+          <ActionFooter
+            actions={footerActions}
+            demoted={Boolean(ai?.questions)}
+          />
         ) : (
           <Button
             variant="primary"
@@ -424,6 +515,7 @@ export function PrPanel({
           onOpenRun={ai.onOpenRun}
         />
       ) : null}
+      {ai ? <KorevRunResult ai={ai} /> : null}
       {runs.length > 0 ? (
         <Tabs
           className="mt-4.5"
@@ -438,7 +530,11 @@ export function PrPanel({
       {showsActivity ? (
         <KorevActivity runs={runs} prUrl={ai.prUrl} />
       ) : (
-        <SubjectDetails subject={subject} ai={ai} />
+        <SubjectDetails
+          subject={subject}
+          ai={ai}
+          keep={actions?.keep ?? null}
+        />
       )}
     </SidePanel>
   );

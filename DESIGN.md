@@ -134,12 +134,13 @@ and open `#gallery`).
 - A PR is stale when nobody has acted on it for 14 days and it is not ready to merge
   or queued. Activity is the PR being opened, a commit being pushed, or a person
   commenting. Bot comments don't count.
-- "Keep for 30 days" (panel footer, or ⇧K) moves a stale PR into a collapsed "Kept"
+- "Keep for 30 days" (on the "No activity" row of the panel's Status section, or ⇧K) moves a stale PR into a collapsed "Kept"
   toggle at the bottom of the Stale view, with a toast "Kept #302 for 30 days" and Undo. A keep
   ends after 30 days or when someone acts on the PR again. Keeping a stale stack keeps
   all of the viewer's layers. Kept PRs are left out of the Stale count and the topbar.
-  The panel shows "Stop keeping" for a kept PR, and ⇧K toggles.
-- If the keep can't be saved, the panel footer says "Couldn't save · Retry", it is
+  The panel's Status section shows "Kept · 26d left" with "Stop keeping" for a kept
+  PR, and ⇧K toggles.
+- If the keep can't be saved, the Status section says "Couldn't save · Retry", it is
   announced, and no toast shows.
 - Review requests is one list in suggested-priority order, then a collapsed "Already
   approved" toggle with a mono count. A team request moves there when you, a member of
@@ -207,7 +208,14 @@ and open `#gallery`).
 - Only My PRs can merge or close. The side panel footer has one primary button:
   Merge (labelled for the repo's path) when the PR is ready to merge, Cancel when it
   is in a queue, otherwise Open on GitHub. Close sits next to it in the danger
-  variant. Rows never carry buttons.
+  variant, and nothing else goes in the footer. When the primary button is not Open
+  on GitHub, an `external-link` icon in the panel header opens the PR on GitHub. Rows
+  never carry buttons.
+- The side panel gives each kind of control one place. The header leaves the panel
+  (PR page, GitHub). The top of the body says what is happening now (merge, queue and
+  Korev run status). Each reason in "Why it needs you" or "Status" carries the action
+  that resolves it. The "Korev AI" section asks Korev about the PR. The footer
+  finishes the PR.
 - Every action asks first. Confirms name PRs by number, never "above" or "below":
   "Merges #301, #302 and #303", "Includes @alex's #301", "#303 and #304 are built on
   this and will lose their base." A layer that isn't ready disables Merge and says why
@@ -233,13 +241,15 @@ and open `#gallery`).
 
 ## Korev AI
 
-- AI actions live in a "Korev AI" panel section, right under "Why it needs you" in My
+- Explain, Review and Keep mergeable live in a "Korev AI" panel section, right under "Why it needs you" in My
   PRs and under the priority or approval section in Review requests. The panel footer
   never changes for AI. Buttons are plain verbs with no icons; no sparkles, purple,
   gradients or glow. The heading is `type-overline` like every other section.
-- In My PRs, each reason Korev can fix gets one row: the reason text in `fg-2` and a
-  secondary `sm` button ("Merge conflicts · Fix conflicts"). Fixes that don't apply
-  are hidden, not disabled. On a fork whose author didn't allow maintainer edits the
+- In My PRs, each reason Korev can fix carries its fix on its own row in "Why it needs
+  you": the reason badge and a secondary `sm` button ("Merge conflicts · Fix
+  conflicts"). The reason is never listed a second time. Fixes that don't apply are
+  hidden, not disabled. The "Korev AI" section holds Explain and Review, then the Keep
+  mergeable switch. On a fork whose author didn't allow maintainer edits the
   buttons are disabled and one line says why.
 - The side panel only sums up a Korev task. The work itself happens on the **PR page**.
   The page replaces the list, and the side panel stays docked on its right at every
@@ -283,7 +293,8 @@ and open `#gallery`).
   Korev, switches to the PR's view and opens its panel, or the run page when Korev has
   questions. Settings → AI tasks has "Notify
   me when Korev needs me", on by default.
-- Keep mergeable is a `Switch` at the top of the section (⇧A in My PRs). A watched PR's
+- Keep mergeable is a `Switch` at the bottom of the section (⇧A in My PRs), with one
+  `fg-3` line under it saying what Korev will do. A watched PR's
   row line 2 ends with "· Keep mergeable", like "· Kept · 26d left"; there is no badge.
   The first time it is turned on, per PR or for all PRs, a `Dialog` ("Keep #301
   mergeable?") lists what Korev will do and offers "Turn on" or "Cancel". Settings → AI
@@ -301,7 +312,8 @@ and open `#gallery`).
   that needs no confirm. The section's other buttons are disabled with "Korev is already working on
   this PR". A failure shows the danger chip, the plain message and Retry. The last
   finished run stays as a "Last Korev run" line with "Open"; its summary is on the run
-  page, not in the panel.
+  page, not in the panel. Every run state (running, questions, failed, last run and
+  the review draft) shows in one place at the top of the panel body.
 - Explanations open in a wide reader `Dialog` (`min(960px, 100vw − 32px)`): title
   "Explain #301 · <title>", the head commit as a short mono sha, "Regenerate" and "Open
   in browser". The body is a sandboxed `iframe` without scripts, styled with Korev's
