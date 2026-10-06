@@ -14,12 +14,14 @@ import {
   fetchNotifications,
 } from './notifications';
 import {
+  type CheckContextNode,
   type Connection,
   type PullRequestNode,
   type ReviewThreadNode,
   presentNodes,
 } from './nodes';
 import {
+  CHECK_CONTEXTS_QUERY,
   INBOX_SEARCH,
   type InboxQueryVariables,
   type RepoAccessTarget,
@@ -161,6 +163,12 @@ interface ReviewThreadsData {
   node?: { reviewThreads?: Connection<ReviewThreadNode> } | null;
 }
 
+interface CheckContextsData {
+  node?: {
+    statusCheckRollup?: { contexts?: Connection<CheckContextNode> } | null;
+  } | null;
+}
+
 type SuggestedReposData = Record<
   string,
   Connection<{ repository?: { nameWithOwner: string } }>
@@ -224,8 +232,17 @@ class GithubApiClient implements GithubClient {
     if (repos.length === 0) return this.#emptyInbox();
     const searches = await this.#collectSearches(token, repos, signal);
     const mineNodes = await Promise.all(
-      searches.progress.mine.nodes.map((node) =>
-        this.#withAllReviewThreads(token, node, signal),
+      searches.progress.mine.nodes.map(async (node) =>
+        this.#withAllCheckContexts(
+          token,
+          await this.#withAllReviewThreads(token, node, signal),
+          signal,
+        ),
+      ),
+    );
+    const reviewNodes = await Promise.all(
+      searches.progress.reviews.nodes.map((node) =>
+        this.#withAllCheckContexts(token, node, signal),
       ),
     );
     const teamLookup = await this.#viewerTeams(
@@ -237,9 +254,7 @@ class GithubApiClient implements GithubClient {
       viewerLogin: searches.viewerLogin,
       viewerTeams: teamLookup.teams,
       mine: mineNodes.map((node) => toPullRequest(node)),
-      reviews: searches.progress.reviews.nodes.map((node) =>
-        toPullRequest(node),
-      ),
+      reviews: reviewNodes.map((node) => toPullRequest(node)),
       truncated: {
         mine: searches.progress.mine.truncated,
         reviews: searches.progress.reviews.truncated,
@@ -390,27 +405,39 @@ class GithubApiClient implements GithubClient {
   ): Promise<PullRequestNode> {
     const firstPage = node.reviewThreads;
     if (!firstPage?.pageInfo?.hasNextPage) return node;
-    const threads = presentNodes(firstPage);
-    let cursor = firstPage.pageInfo.endCursor ?? null;
-    while (cursor) {
-      const page = await this.#reviewThreadsPage(
-        token,
-        node.id,
-        cursor,
-        signal,
-      );
-      threads.push(...presentNodes(page));
-      cursor = page?.pageInfo?.hasNextPage
-        ? (page.pageInfo.endCursor ?? null)
-        : null;
-    }
-    return {
-      ...node,
-      reviewThreads: {
-        pageInfo: { hasNextPage: false, endCursor: null },
-        nodes: threads,
-      },
-    };
+    const reviewThreads = await allPages(firstPage, (cursor) =>
+      this.#reviewThreadsPage(token, node.id, cursor, signal),
+    );
+    return { ...node, reviewThreads };
+  }
+
+  async #withAllCheckContexts(
+    token: string,
+    node: PullRequestNode,
+    signal?: AbortSignal,
+  ): Promise<PullRequestNode> {
+    const rollup = node.statusCheckRollup;
+    const firstPage = rollup?.contexts;
+    if (!rollup || !firstPage?.pageInfo?.hasNextPage) return node;
+    const contexts = await allPages(firstPage, (cursor) =>
+      this.#checkContextsPage(token, node.id, cursor, signal),
+    );
+    return { ...node, statusCheckRollup: { ...rollup, contexts } };
+  }
+
+  async #checkContextsPage(
+    token: string,
+    id: string,
+    cursor: string,
+    signal?: AbortSignal,
+  ): Promise<Connection<CheckContextNode> | undefined> {
+    const result = await this.#query<CheckContextsData>(
+      token,
+      CHECK_CONTEXTS_QUERY,
+      { id, cursor },
+      signal,
+    );
+    return result.data.node?.statusCheckRollup?.contexts;
   }
 
   async #reviewThreadsPage(
@@ -495,6 +522,24 @@ class GithubApiClient implements GithubClient {
 
 function startProgress(): SearchProgress {
   return { nodes: [], cursor: null, done: false, truncated: false };
+}
+
+async function allPages<TNode>(
+  firstPage: Connection<TNode>,
+  fetchPage: (cursor: string) => Promise<Connection<TNode> | undefined>,
+): Promise<Connection<TNode>> {
+  const nodes = presentNodes(firstPage);
+  let cursor = nextCursor(firstPage);
+  while (cursor) {
+    const page = await fetchPage(cursor);
+    nodes.push(...presentNodes(page));
+    cursor = nextCursor(page);
+  }
+  return { pageInfo: { hasNextPage: false, endCursor: null }, nodes };
+}
+
+function nextCursor<TNode>(page: Connection<TNode> | undefined): string | null {
+  return page?.pageInfo?.hasNextPage ? (page.pageInfo.endCursor ?? null) : null;
 }
 
 function inboxVariables(

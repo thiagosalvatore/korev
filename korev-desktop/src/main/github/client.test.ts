@@ -577,6 +577,61 @@ describe('createGithubClient', () => {
       expect(inbox.mine[0].unresolvedThreads).toBe(1);
     });
 
+    it('fetches the remaining checks so a running check past #100 is listed', async () => {
+      const busyNode: PullRequestNode = {
+        ...pr(stackedNode, 9),
+        statusCheckRollup: {
+          state: 'PENDING',
+          contexts: {
+            pageInfo: { hasNextPage: true, endCursor: 'checks-100' },
+            nodes: Array.from({ length: 100 }, (_, index) => ({
+              __typename: 'CheckRun',
+              name: `done ${index}`,
+              status: 'COMPLETED',
+              conclusion: 'SUCCESS',
+            })),
+          },
+        },
+      };
+      const { fake, client } = setup(
+        ...inboxReplies({ mine: [busyNode], reviews: [] }),
+        {
+          body: {
+            data: {
+              node: {
+                statusCheckRollup: {
+                  contexts: {
+                    pageInfo: { hasNextPage: false, endCursor: 'checks-101' },
+                    nodes: [
+                      {
+                        __typename: 'CheckRun',
+                        name: 'backend tests',
+                        status: 'IN_PROGRESS',
+                        conclusion: null,
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+        ...teamsResponses,
+      );
+
+      const inbox = await client.fetchInbox(TOKEN, ['acme/api']);
+
+      expect(variablesOf(fake, 2)).toEqual({
+        id: busyNode.id,
+        cursor: 'checks-100',
+      });
+      expect(inbox.mine[0].checks).toHaveLength(101);
+      expect(inbox.mine[0].checks).toContainEqual({
+        name: 'backend tests',
+        outcome: 'pending',
+      });
+    });
+
     it('fetches the viewer teams once per session', async () => {
       const { fake, client } = setup(
         ...inboxReplies({ mine: [], reviews: [] }),

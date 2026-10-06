@@ -137,6 +137,18 @@ const REVIEW_THREAD_CONNECTION = `
   nodes { isResolved }
 `;
 
+const CHECK_CONTEXT_CONNECTION = `
+  pageInfo { hasNextPage endCursor }
+  nodes {
+    __typename
+    ... on CheckRun {
+      name status conclusion
+      checkSuite { workflowRun { databaseId event workflow { name } } }
+    }
+    ... on StatusContext { context state }
+  }
+`;
+
 function prCoreFragment({ includeStacks }: InboxQueryOptions): string {
   return `
 fragment PrCore on PullRequest {
@@ -164,16 +176,7 @@ fragment PrCore on PullRequest {
   changedFiles
   statusCheckRollup {
     state
-    contexts(first: ${CHECK_CONTEXTS_LIMIT}) {
-      nodes {
-        __typename
-        ... on CheckRun {
-          name status conclusion
-          checkSuite { workflowRun { databaseId event workflow { name } } }
-        }
-        ... on StatusContext { context state }
-      }
-    }
+    contexts(first: ${CHECK_CONTEXTS_LIMIT}) { ${CHECK_CONTEXT_CONNECTION} }
   }
   latestReviews(first: ${LATEST_REVIEWS_LIMIT}) {
     nodes { author { __typename login } state }
@@ -288,6 +291,19 @@ query ReviewThreads($id: ID!, $cursor: String) {
     ... on PullRequest {
       reviewThreads(first: ${REVIEW_THREADS_LIMIT}, after: $cursor) {
         ${REVIEW_THREAD_CONNECTION}
+      }
+    }
+  }
+}`;
+
+export const CHECK_CONTEXTS_QUERY = `
+query CheckContexts($id: ID!, $cursor: String) {
+  node(id: $id) {
+    ... on PullRequest {
+      statusCheckRollup {
+        contexts(first: ${CHECK_CONTEXTS_LIMIT}, after: $cursor) {
+          ${CHECK_CONTEXT_CONNECTION}
+        }
       }
     }
   }
