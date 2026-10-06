@@ -25,6 +25,7 @@ export interface RunOptions {
   schema: OutputSchema | null;
   network: boolean;
   skillPlugins: string[];
+  cacheDir: string;
 }
 
 export interface ProviderDefinition {
@@ -76,15 +77,23 @@ const CODEX_NETWORK_ARGS = [
   'sandbox_workspace_write.network_access=true',
 ];
 
-function claudeSandboxSettings(network: boolean): string {
+function claudeSandboxSettings(network: boolean, cacheDir: string): string {
+  const sandbox = {
+    ...CLAUDE_SANDBOX,
+    filesystem: { allowWrite: [cacheDir] },
+  };
   return JSON.stringify({
     sandbox: network
-      ? { ...CLAUDE_SANDBOX, network: CLAUDE_REGISTRY_NETWORK }
-      : CLAUDE_SANDBOX,
+      ? { ...sandbox, network: CLAUDE_REGISTRY_NETWORK }
+      : sandbox,
   });
 }
 
-function claudeAccessArgs(access: AgentAccess, network: boolean): string[] {
+function claudeAccessArgs(
+  access: AgentAccess,
+  network: boolean,
+  cacheDir: string,
+): string[] {
   if (access === 'read-only') {
     return [
       '--restricted',
@@ -103,12 +112,16 @@ function claudeAccessArgs(access: AgentAccess, network: boolean): string[] {
     '--permission-prompts',
     'none',
     '--settings',
-    claudeSandboxSettings(network),
+    claudeSandboxSettings(network, cacheDir),
   ];
 }
 
 function codexNetworkArgs(access: AgentAccess, network: boolean): string[] {
   return access === 'edit' && network ? CODEX_NETWORK_ARGS : [];
+}
+
+function codexCacheArgs(access: AgentAccess, cacheDir: string): string[] {
+  return access === 'edit' ? ['--add-dir', cacheDir] : [];
 }
 
 const CODEX_SANDBOX: Record<AgentAccess, string> = {
@@ -320,13 +333,13 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
     parseStatus: parseClaudeStatus,
     loginArgs: null,
     listModels: async () => CLAUDE_MODELS,
-    runArgs: ({ model, access, schema, network, skillPlugins }) => [
+    runArgs: ({ model, access, schema, network, skillPlugins, cacheDir }) => [
       '-p',
       '--output-format',
       'stream-json',
       '--verbose',
       '--no-session-persistence',
-      ...claudeAccessArgs(access, network),
+      ...claudeAccessArgs(access, network, cacheDir),
       ...skillPlugins.flatMap((pluginDir) => ['--plugin-dir', pluginDir]),
       ...optionArgs('--model', model),
       ...optionArgs('--json-schema', schema?.json),
@@ -342,7 +355,7 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
     loginArgs: ['login'],
     listModels: async (run) =>
       parseCodexModels((await run(['debug', 'models'])).stdout),
-    runArgs: ({ model, access, schema, network }) => [
+    runArgs: ({ model, access, schema, network, cacheDir }) => [
       'exec',
       '--json',
       '--ephemeral',
@@ -350,6 +363,7 @@ export const PROVIDERS: Record<AgentProvider, ProviderDefinition> = {
       '--sandbox',
       CODEX_SANDBOX[access],
       ...codexNetworkArgs(access, network),
+      ...codexCacheArgs(access, cacheDir),
       ...optionArgs('--model', model),
       ...optionArgs('--output-schema', schema?.path),
       STDIN_PROMPT,

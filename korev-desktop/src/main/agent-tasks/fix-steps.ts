@@ -9,6 +9,8 @@ import {
 } from '../checkouts';
 import { TaskError, UnpushedChangesError } from './engine';
 
+export const REGISTRY_NETWORK_RULE =
+  'Network is open only to package registries (npm, PyPI, crates.io, the Go module proxy and RubyGems) so you can install dependencies. Every other host is blocked.';
 export const FIX_TIMEOUT_MS = 30 * 60_000;
 const CONFLICT_MARKER = 'conflict marker';
 

@@ -110,6 +110,25 @@ describe('agents service', () => {
     });
   });
 
+  it("points the package managers' caches at a folder the sandbox lets the run write", async () => {
+    const { agents, callTo, fs } = setup(
+      { claude: ok('{"type":"result","result":"OK"}') },
+      { provider: 'claude', models: {} },
+    );
+    const cacheDir = join(SCRATCH, 'agent-cache');
+
+    await agents.run({ prompt: 'Fix CI', cwd: '/repo', access: 'edit' });
+
+    const [, args, options] = callTo('claude') ?? [];
+    expect(fs.dirs).toContain(cacheDir);
+    expect(args?.join(' ')).toContain(`"allowWrite":["${cacheDir}"]`);
+    expect(options?.env).toMatchObject({
+      XDG_CACHE_HOME: cacheDir,
+      PIP_CACHE_DIR: cacheDir,
+      npm_config_cache: cacheDir,
+    });
+  });
+
   it('leaves the model to the CLI when none is saved', async () => {
     const { agents, callTo } = setup({
       claude: ok('{"type":"result","result":"OK"}'),

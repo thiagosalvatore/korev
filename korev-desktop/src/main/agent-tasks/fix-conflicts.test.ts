@@ -128,7 +128,7 @@ describe('fix conflicts task', () => {
       'export const limit = 25;',
     );
     expect(runAgent).toHaveBeenCalledWith(
-      expect.objectContaining({ access: 'edit' }),
+      expect.objectContaining({ access: 'edit', network: true }),
     );
   });
 

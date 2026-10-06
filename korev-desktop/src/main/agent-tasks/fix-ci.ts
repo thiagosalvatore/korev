@@ -16,6 +16,7 @@ import {
 } from './engine';
 import {
   FIX_TIMEOUT_MS,
+  REGISTRY_NETWORK_RULE,
   commitAndPush,
   openForFix,
   retryIfHeadMoved,
@@ -66,7 +67,7 @@ export function fixCiPrompt(input: FixCiInput): string {
   return buildPrompt({
     task: `You are Korev's CI agent. The current folder is a checkout of ${pr.repo} pull request #${pr.number} ("${pr.title}") at its head. The checks listed below fail on it. Make them pass.`,
     rules: [
-      'Network is open only to package registries (npm, PyPI, crates.io, the Go module proxy and RubyGems) so you can install dependencies. Every other host is blocked.',
+      REGISTRY_NETWORK_RULE,
       'Do not run git commands that change the repository, such as add, commit, merge, rebase, reset or checkout. Korev commits and pushes.',
       'Never weaken, skip or delete a test or a check to make it pass. If that looks like the only fix, ask instead.',
       'If a failure is flaky or comes from the CI infrastructure (a timeout, a runner problem, a service that was down) and no code change would fix it, change nothing: set "changed" to false and say why in "summary".',

@@ -13,6 +13,7 @@ export interface FileSystem {
   writeAtomic(path: string, contents: Buffer | string): Promise<void>;
   remove(path: string): Promise<void>;
   link(target: string, path: string): Promise<void>;
+  makeDir(path: string): Promise<void>;
 }
 
 const MISSING_FILE_CODE = 'ENOENT';
@@ -54,11 +55,18 @@ export const nodeFileSystem: FileSystem = {
       if (!isExistingFile(error)) throw error;
     }
   },
+  async makeDir(path) {
+    await mkdir(path, { recursive: true });
+  },
 };
 
 export function createMemoryFileSystem(
   initial: Record<string, Buffer | string> = {},
-): FileSystem & { files: Map<string, Buffer>; links: Map<string, string> } {
+): FileSystem & {
+  files: Map<string, Buffer>;
+  links: Map<string, string>;
+  dirs: Set<string>;
+} {
   const files = new Map<string, Buffer>(
     Object.entries(initial).map(([path, contents]) => [
       path,
@@ -66,9 +74,11 @@ export function createMemoryFileSystem(
     ]),
   );
   const links = new Map<string, string>();
+  const dirs = new Set<string>();
   return {
     files,
     links,
+    dirs,
     async read(path) {
       return files.get(path) ?? null;
     },
@@ -80,6 +90,9 @@ export function createMemoryFileSystem(
     },
     async link(target, path) {
       links.set(path, target);
+    },
+    async makeDir(path) {
+      dirs.add(path);
     },
   };
 }

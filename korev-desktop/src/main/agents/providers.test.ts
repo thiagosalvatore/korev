@@ -205,12 +205,17 @@ const NO_EXTRAS = {
   schema: null,
   network: false,
   skillPlugins: [],
+  cacheDir: '/tmp/korev/agent-cache',
 };
 const SCHEMA = { json: '{"type":"object"}', path: '/tmp/schema.json' };
 const SANDBOX = {
   enabled: true,
   allowUnsandboxedCommands: false,
   failIfUnavailable: true,
+};
+const EDIT_SANDBOX = {
+  ...SANDBOX,
+  filesystem: { allowWrite: ['/tmp/korev/agent-cache'] },
 };
 
 function claudeSandbox(args: string[]) {
@@ -237,7 +242,7 @@ describe('run access', () => {
       expect.arrayContaining(['Edit', 'Write', 'Bash']),
     );
     expect(flagValue(args, '--permission-mode')).toBe('acceptEdits');
-    expect(claudeSandbox(args)).toEqual(SANDBOX);
+    expect(claudeSandbox(args)).toEqual(EDIT_SANDBOX);
   });
 
   it("loads the user's skills into Claude Code from each plugin folder", () => {
@@ -262,6 +267,12 @@ describe('run access', () => {
     expect(flagValue(args, '--sandbox')).toBe(sandbox);
   });
 
+  it('lets a Codex edit run write to the package cache', () => {
+    const args = PROVIDERS.codex.runArgs({ ...NO_EXTRAS, access: 'edit' });
+
+    expect(flagValue(args, '--add-dir')).toBe('/tmp/korev/agent-cache');
+  });
+
   it('lets a Claude Code edit run with network reach only the package registries', () => {
     const args = PROVIDERS.claude.runArgs({
       ...NO_EXTRAS,
@@ -270,7 +281,7 @@ describe('run access', () => {
     });
 
     expect(claudeSandbox(args)).toEqual({
-      ...SANDBOX,
+      ...EDIT_SANDBOX,
       network: {
         allowedDomains: [...PACKAGE_REGISTRY_DOMAINS],
         strictAllowlist: true,

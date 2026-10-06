@@ -23,8 +23,9 @@ const FORMAT_OPTIONS: { id: ExplainFormat; label: string }[] = [
 const TEXTAREA_CLASS =
   'min-h-36 w-full resize-y rounded-sm border border-border-2 bg-inset p-2.5 type-ui text-fg-1 outline-none hover:border-border-strong focus:border-accent focus:shadow-halo';
 
-const FIX_CI_NETWORK_NOTE =
-  'Fix CI lets the agent install dependencies. Claude Code can reach only npm, PyPI, crates.io, the Go module proxy and RubyGems. Codex can only turn the network fully on, so a Codex run can reach any host.';
+const NETWORK_TASKS: readonly AgentTaskKind[] = ['fix-ci', 'fix-conflicts'];
+const NETWORK_NOTE =
+  'This task lets the agent install dependencies. Claude Code can reach only npm, PyPI, crates.io, the Go module proxy and RubyGems. Codex can only turn the network fully on, so a Codex run can reach any host.';
 
 const BYTE_UNITS = ['KB', 'MB', 'GB'];
 const BYTES_PER_UNIT = 1024;
@@ -166,8 +167,8 @@ function InstructionsCard({ settings }: { settings: AiTaskSettings }) {
           onBlur={() => save(draft)}
         />
       </Field>
-      {kind === 'fix-ci' ? (
-        <p className="mt-2 mb-0 text-xs text-fg-3">{FIX_CI_NETWORK_NOTE}</p>
+      {NETWORK_TASKS.includes(kind) ? (
+        <p className="mt-2 mb-0 text-xs text-fg-3">{NETWORK_NOTE}</p>
       ) : null}
       <Button
         className="mt-2"

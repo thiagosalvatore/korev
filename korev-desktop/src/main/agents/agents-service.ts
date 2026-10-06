@@ -28,6 +28,8 @@ const SIGN_IN_TIMEOUT_MS = 5 * 60_000;
 export const RUN_TIMEOUT_MS = 10 * 60_000;
 const MS_PER_MINUTE = 60_000;
 const SCHEMA_DIR = 'korev-schemas';
+const CACHE_DIR = 'agent-cache';
+const CACHE_VARIABLES = ['XDG_CACHE_HOME', 'PIP_CACHE_DIR', 'npm_config_cache'];
 const SCHEMA_EXTENSION = '.json';
 const TEST_PROMPT = 'Reply with exactly: OK';
 const NO_AGENT_CHOSEN = 'Choose an AI agent in Settings first.';
@@ -61,6 +63,10 @@ export interface AgentsService {
   run(request: AgentRunRequest): Promise<AgentRunResult>;
   test(provider: AgentProvider): Promise<AgentRunResult>;
   stop(): void;
+}
+
+function cacheEnv(cacheDir: string): NodeJS.ProcessEnv {
+  return Object.fromEntries(CACHE_VARIABLES.map((name) => [name, cacheDir]));
 }
 
 function errorMessage(error: unknown): string {
@@ -118,6 +124,7 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
     provider: AgentProvider,
     args: string[],
     options: Omit<CommandOptions, 'env'>,
+    extraEnv: NodeJS.ProcessEnv = {},
   ): Promise<CommandResult> {
     loginPath ??= resolveLoginPath(deps.run, deps.env);
     const signal = AbortSignal.any(
@@ -126,7 +133,7 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
     return deps.run(PROVIDERS[provider].binary, args, {
       ...options,
       signal,
-      env: childEnv(deps.env, await loginPath),
+      env: { ...childEnv(deps.env, await loginPath), ...extraEnv },
     });
   }
 
@@ -226,9 +233,11 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
         : request.model;
     const definition = PROVIDERS[provider];
     const timeoutMs = request.timeoutMs ?? RUN_TIMEOUT_MS;
+    const cacheDir = join(deps.scratchDir, CACHE_DIR);
     try {
       const schema = request.schema ? await outputSchema(request.schema) : null;
       const plugins = await skillPlugins();
+      await deps.fs.makeDir(cacheDir);
       const result = await exec(
         provider,
         definition.runArgs({
@@ -237,6 +246,7 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
           schema,
           network: request.network ?? false,
           skillPlugins: plugins,
+          cacheDir,
         }),
         {
           cwd: request.cwd,
@@ -245,6 +255,7 @@ export function createAgentsService(deps: AgentsServiceDeps): AgentsService {
           signal: request.signal,
           onStdoutLine: activityReader(provider, request),
         },
+        cacheEnv(cacheDir),
       );
       return (
         definition.parseRun(result.stdout) ?? {

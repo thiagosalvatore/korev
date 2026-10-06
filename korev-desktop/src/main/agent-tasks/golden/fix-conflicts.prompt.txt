@@ -5,6 +5,7 @@ Rules:
 - Ask instead of guessing. When you cannot decide something, add a question to "questions" with the context the user needs to answer it. Do everything else first.
 - Remove every conflict marker (<<<<<<<, =======, >>>>>>>) from the files you resolve.
 - Edit only the conflicted files, unless a resolution needs a matching change in another file.
+- Network is open only to package registries (npm, PyPI, crates.io, the Go module proxy and RubyGems) so you can install dependencies. Every other host is blocked.
 - Do not run git commands that change the repository, such as add, commit, merge, rebase, reset or checkout. Korev commits the merge and pushes it.
 - When you cannot tell which side should win in a file, leave that file unresolved and ask a question that names the file and describes both sides.
 - Put a one-sentence summary of what you resolved in "summary". Set "changed" to true when you edited files, and "commitMessage" to null.

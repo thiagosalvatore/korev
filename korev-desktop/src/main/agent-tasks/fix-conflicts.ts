@@ -14,6 +14,7 @@ import {
 } from './engine';
 import {
   FIX_TIMEOUT_MS,
+  REGISTRY_NETWORK_RULE,
   commitAndPush,
   leftoverMarkers,
   openForFix,
@@ -41,6 +42,7 @@ export function fixConflictsPrompt(input: FixConflictsInput): string {
     rules: [
       'Remove every conflict marker (<<<<<<<, =======, >>>>>>>) from the files you resolve.',
       'Edit only the conflicted files, unless a resolution needs a matching change in another file.',
+      REGISTRY_NETWORK_RULE,
       'Do not run git commands that change the repository, such as add, commit, merge, rebase, reset or checkout. Korev commits the merge and pushes it.',
       'When you cannot tell which side should win in a file, leave that file unresolved and ask a question that names the file and describes both sides.',
       'Put a one-sentence summary of what you resolved in "summary". Set "changed" to true when you edited files, and "commitMessage" to null.',
@@ -125,6 +127,7 @@ export function createFixConflictsTask(deps: FixConflictsDeps): AgentTask {
         }),
         cwd: checkout.path,
         access: 'edit',
+        network: true,
         schema: FIX_CONFLICTS_SCHEMA,
         timeoutMs: FIX_CONFLICTS_TIMEOUT_MS,
         signal,
