@@ -1,36 +1,37 @@
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   Menu,
   nativeTheme,
   Notification,
-  powerMonitor,
-  safeStorage,
   screen,
   shell,
   type WebContents,
 } from 'electron';
+import { randomUUID } from 'node:crypto';
+import { homedir } from 'node:os';
 import path from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
 import started from 'electron-squirrel-startup';
 import { spawn as spawnPty } from 'node-pty';
-import { IpcChannel, type AppCommand } from './shared/ipc-contract';
-import type { WindowBounds } from './shared/settings';
+import { eventChannel, type KorevEvents } from './shared/api';
+import type { AppCommand, WindowBounds } from './shared/model';
 import { appMenuTemplate } from './main/app-menu';
-import { isAppUrl, type AppOrigin } from './main/app-origin';
+import { isAppUrl, isWebUrl, type AppOrigin } from './main/app-origin';
+import { runProcess } from './main/command-runner';
+import type { Notice } from './main/context';
 import { nodeFileSystem } from './main/file-system';
 import { registerIpcHandlers } from './main/ipc';
-import { githubEndpoints } from './main/github/config';
-import { runProcess } from './main/agents/command-runner';
-import { createKorev, type Korev, type TaskNote } from './main/korev';
-import { createSafeStorageCipher } from './main/safe-storage-cipher';
+import { createKorev, type Korev } from './main/korev';
+import { childEnv, resolveLoginPath } from './main/login-path';
 import { restorableBounds } from './main/window-bounds';
 
-const DEFAULT_WINDOW_SIZE = { width: 1280, height: 832 };
-const MIN_WINDOW_SIZE = { width: 760, height: 520 };
-const TRAFFIC_LIGHT_POSITION = { x: 18, y: 17 };
+const DEFAULT_WINDOW_SIZE = { width: 1440, height: 900 };
+const MIN_WINDOW_SIZE = { width: 960, height: 600 };
+const TRAFFIC_LIGHT_POSITION = { x: 16, y: 16 };
 const DEV_ICON_PATH = '../../assets/icon.png';
+const COMMAND_EVENT = 'command';
 
 const appOrigin: AppOrigin = {
   devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
@@ -45,15 +46,15 @@ if (started) {
   app.quit();
 }
 
-function broadcast(channel: string, payload: unknown) {
+function emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]) {
   for (const window of BrowserWindow.getAllWindows()) {
-    window.webContents.send(channel, payload);
+    window.webContents.send(eventChannel(event), payload);
   }
 }
 
 function sendToFocusedWindow(command: AppCommand) {
   BrowserWindow.getFocusedWindow()?.webContents.send(
-    IpcChannel.AppCommand,
+    eventChannel(COMMAND_EVENT),
     command,
   );
 }
@@ -67,73 +68,90 @@ function installAppMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function showTaskNote(note: TaskNote) {
-  if (BrowserWindow.getFocusedWindow() || !Notification.isSupported()) return;
-  const notification = new Notification({ title: note.title, body: note.body });
+function showNotice(korev: () => Korev | null, notice: Notice) {
+  if (!korev()?.settings().notifications || !Notification.isSupported()) return;
+  const notification = new Notification({
+    title: notice.title,
+    body: notice.body,
+  });
   notification.on('click', () => {
     const [window] = BrowserWindow.getAllWindows();
     if (!window) return;
     window.show();
     window.focus();
-    window.webContents.send(IpcChannel.AppFocusPr, note.ref);
+    window.webContents.send(eventChannel('focus-workspace'), notice.workspaceId);
   });
   notification.show();
 }
 
-function createKorevApp(): Korev {
-  return createKorev({
+async function chooseDirectory(): Promise<string | null> {
+  const window = BrowserWindow.getFocusedWindow();
+  const options: Electron.OpenDialogOptions = {
+    properties: ['openDirectory'],
+    buttonLabel: 'Open project',
+  };
+  const result = window
+    ? await dialog.showOpenDialog(window, options)
+    : await dialog.showOpenDialog(options);
+  return result.canceled ? null : (result.filePaths[0] ?? null);
+}
+
+async function createKorevApp(): Promise<Korev> {
+  const loginPath = await resolveLoginPath(runProcess, process.env);
+  const env = childEnv(process.env, loginPath);
+  let korev: Korev | null = null;
+  korev = await createKorev({
+    run: runProcess,
+    env,
+    shell: process.env.SHELL,
+    home: homedir(),
     userDataPath: app.getPath('userData'),
-    tempPath: app.getPath('temp'),
-    env: process.env,
-    runCommand: runProcess,
-    spawnPty,
     fs: nodeFileSystem,
-    cipher: createSafeStorageCipher(safeStorage, process.platform),
-    fetch: (input, init) => fetch(input, init),
-    github: githubEndpoints(app.isPackaged, process.env),
-    sleep: (milliseconds, signal) => delay(milliseconds, undefined, { signal }),
-    openExternal: (url) => shell.openExternal(url),
-    openPath: async (filePath) => {
-      const problem = await shell.openPath(filePath);
+    spawnPty,
+    emit,
+    notify: (notice) => showNotice(() => korev, notice),
+    isWindowFocused: () => BrowserWindow.getFocusedWindow() !== null,
+    setBadge: (count) => app.setBadgeCount(count),
+    now: () => new Date(),
+    newId: () => randomUUID(),
+    chooseDirectory,
+    openPath: async (target) => {
+      const problem = await shell.openPath(target);
       if (problem) console.warn(problem);
     },
-    prefersDark: () => nativeTheme.shouldUseDarkColors,
-    notify: showTaskNote,
+    openExternal: async (url) => {
+      if (isWebUrl(url)) await shell.openExternal(url);
+    },
     applyTheme: (theme) => {
       nativeTheme.themeSource = theme;
     },
-    broadcast,
-    warn: (message) => console.warn(message),
   });
+  nativeTheme.themeSource = korev.settings().theme;
+  return korev;
 }
 
 function hardenWebContents(contents: WebContents) {
-  contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  contents.setWindowOpenHandler(({ url }) => {
+    if (isWebUrl(url)) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
   contents.on('will-navigate', (event, url) => {
     if (!isAppUrl(url, appOrigin)) event.preventDefault();
   });
 }
 
-function keepInboxFresh(korev: Korev) {
-  app.on('browser-window-focus', () => void korev.inbox.trigger('focus'));
-  powerMonitor.on('suspend', () => korev.inbox.suspend());
-  powerMonitor.on('resume', () => void korev.inbox.resume());
-  app.on('before-quit', () => korev.inbox.stop());
-}
-
 function rememberBounds(window: BrowserWindow, korev: Korev) {
   window.on('close', () => {
     const windowBounds: WindowBounds = window.getNormalBounds();
-    void korev.settings.update({ windowBounds });
+    void korev.updateSettings({ windowBounds });
   });
 }
 
 const createWindow = (korev: Korev) => {
   const savedBounds = restorableBounds(
-    korev.settings.current().windowBounds,
+    korev.settings().windowBounds,
     screen.getAllDisplays().map((display) => display.workArea),
   );
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
     ...DEFAULT_WINDOW_SIZE,
     ...savedBounds,
@@ -150,18 +168,12 @@ const createWindow = (korev: Korev) => {
   });
   rememberBounds(mainWindow, korev);
 
-  // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
     mainWindow.loadFile(
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
-  }
-
-  // Open the DevTools.
-  if (!app.isPackaged) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 };
 
@@ -174,22 +186,22 @@ function showDevDockIcon() {
   app.dock?.setIcon(path.join(__dirname, DEV_ICON_PATH));
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
   showDevDockIcon();
   installAppMenu();
-  const korev = createKorevApp();
-  registerIpcHandlers(ipcMain, korev.handlers, (url) =>
+  const korev = await createKorevApp();
+  registerIpcHandlers(ipcMain, { ...korev.api }, (url) =>
     isAppUrl(url, appOrigin),
   );
-  await korev.start();
-  keepInboxFresh(korev);
+  let shuttingDown = false;
+  app.on('before-quit', (event) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    event.preventDefault();
+    void korev.shutdown().finally(() => app.quit());
+  });
   createWindow(korev);
 
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow(korev);
@@ -197,14 +209,8 @@ app.whenReady().then(async () => {
   });
 });
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.

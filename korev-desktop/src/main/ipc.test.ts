@@ -1,8 +1,12 @@
 import type { IpcMainInvokeEvent } from 'electron';
 import { describe, expect, it, vi } from 'vitest';
-import { IpcChannel } from '../shared/ipc-contract';
-import { isAppUrl, isGithubUrl, type AppOrigin } from './app-origin';
-import { registerIpcHandlers, UntrustedSenderError } from './ipc';
+import { CALL_CHANNEL } from '../shared/api';
+import { isAppUrl, isWebUrl, type AppOrigin } from './app-origin';
+import {
+  registerIpcHandlers,
+  UnknownMethodError,
+  UntrustedSenderError,
+} from './ipc';
 
 const DEV_ORIGIN: AppOrigin = {
   devServerUrl: 'http://localhost:5173',
@@ -15,30 +19,39 @@ const PACKAGED_ORIGIN: AppOrigin = {
 
 type Listener = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown;
 
-function invokeFrom(senderUrl: string, handler: () => unknown) {
-  const listeners = new Map<string, Listener>();
+function callFrom(senderUrl: string, method: string, handler: () => unknown) {
+  let listener: Listener | undefined;
   registerIpcHandlers(
-    { handle: (channel, listener) => listeners.set(channel, listener) },
-    { [IpcChannel.InboxRefresh]: handler },
+    {
+      handle: (channel, registered) => {
+        if (channel === CALL_CHANNEL) listener = registered;
+      },
+    },
+    { getState: handler },
     (url) => isAppUrl(url, DEV_ORIGIN),
   );
   const event = { senderFrame: { url: senderUrl } } as IpcMainInvokeEvent;
-  return () => listeners.get(IpcChannel.InboxRefresh)?.(event);
+  return () => listener?.(event, method, []);
 }
 
 describe('IPC sender guard', () => {
   it('runs the handler for the app origin', () => {
     const handler = vi.fn(() => 'ok');
-    expect(invokeFrom('http://localhost:5173/index.html', handler)()).toBe(
-      'ok',
-    );
+    expect(
+      callFrom('http://localhost:5173/index.html', 'getState', handler)(),
+    ).toBe('ok');
   });
 
   it('rejects a sender outside the app origin', () => {
     const handler = vi.fn();
-    const invoke = invokeFrom('https://evil.example/', handler);
-    expect(invoke).toThrow(UntrustedSenderError);
+    const call = callFrom('https://evil.example/', 'getState', handler);
+    expect(call).toThrow(UntrustedSenderError);
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('rejects methods that are not handlers', () => {
+    const call = callFrom('http://localhost:5173/', 'toString', vi.fn());
+    expect(call).toThrow(UnknownMethodError);
   });
 });
 
@@ -53,9 +66,9 @@ describe('app origin', () => {
     expect(isAppUrl('file:///etc/passwd', PACKAGED_ORIGIN)).toBe(false);
   });
 
-  it('allows external links only to github.com', () => {
-    expect(isGithubUrl('https://github.com/acme/api/pull/1')).toBe(true);
-    expect(isGithubUrl('https://github.com.evil.example/')).toBe(false);
-    expect(isGithubUrl('http://github.com/acme')).toBe(false);
+  it('opens only web links externally', () => {
+    expect(isWebUrl('https://github.com/acme/api/pull/1')).toBe(true);
+    expect(isWebUrl('file:///etc/passwd')).toBe(false);
+    expect(isWebUrl('javascript:alert(1)')).toBe(false);
   });
 });

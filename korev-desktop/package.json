@@ -21,8 +21,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vite.renderer.config.mts",
     "test:e2e": "electron-forge package && playwright test",
-    "icons": "./scripts/build-icons.sh",
-    "eval:agents": "vitest run --config vite.eval.config.mts"
+    "icons": "./scripts/build-icons.sh"
   },
   "devDependencies": {
     "@electron-forge/cli": "^8.0.1",

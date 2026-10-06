@@ -1,4 +1,4 @@
-import type { WindowBounds } from '../shared/settings';
+import type { WindowBounds } from '../shared/model';
 
 export type Area = WindowBounds;
 

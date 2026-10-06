@@ -1,8 +1,9 @@
-import type { TerminalSize } from '../shared/terminal';
-import { DEFAULT_SHELL, isElectronVariable } from './agents/login-path';
+import type { TerminalSize } from '../shared/model';
+import { DEFAULT_SHELL } from './login-path';
 
 const SCROLLBACK_CHARS = 256 * 1024;
 const LOGIN_SHELL_ARGS = ['-l'];
+const COMMAND_FLAG = '-lc';
 const TERMINAL_TYPE = 'xterm-256color';
 
 export interface Pty {
@@ -27,16 +28,28 @@ export type SpawnPty = (
 
 export interface TerminalsDeps {
   spawnPty: SpawnPty;
-  env: NodeJS.ProcessEnv;
+  shell: string | undefined;
   onOutput(ref: string, data: string): void;
-  onExit(ref: string): void;
+  onExit(ref: string, exitCode: number): void;
 }
 
+export interface TerminalLaunch {
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  command?: string;
+}
+
+const DEFAULT_SIZE: TerminalSize = { cols: 120, rows: 30 };
+
 export interface Terminals {
-  open(ref: string, cwd: string, size: TerminalSize): string;
+  attach(ref: string, size: TerminalSize): string | null;
+  start(ref: string, launch: TerminalLaunch, size?: TerminalSize): void;
+  isRunning(ref: string): boolean;
+  running(): string[];
   write(ref: string, data: string): void;
   resize(ref: string, size: TerminalSize): void;
   close(ref: string): void;
+  closeMatching(prefix: string): void;
   closeAll(): void;
 }
 
@@ -45,48 +58,43 @@ interface Session {
   scrollback: string;
 }
 
-function shellEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const inherited = Object.entries(env).filter(
-    ([name]) => !isElectronVariable(name),
-  );
-  return {
-    ...Object.fromEntries(inherited),
-    TERM: TERMINAL_TYPE,
-    COLORTERM: 'truecolor',
-  };
-}
-
 export function createTerminals(deps: TerminalsDeps): Terminals {
   const sessions = new Map<string, Session>();
+  const finished = new Map<string, string>();
 
-  function start(ref: string, cwd: string, size: TerminalSize): Session {
-    const pty = deps.spawnPty(
-      deps.env.SHELL || DEFAULT_SHELL,
-      LOGIN_SHELL_ARGS,
-      {
-        name: TERMINAL_TYPE,
-        cwd,
-        env: shellEnv(deps.env),
-        ...size,
-      },
-    );
+  function start(
+    ref: string,
+    launch: TerminalLaunch,
+    size: TerminalSize = DEFAULT_SIZE,
+  ) {
+    close(ref);
+    const args = launch.command
+      ? [COMMAND_FLAG, launch.command]
+      : LOGIN_SHELL_ARGS;
+    const pty = deps.spawnPty(deps.shell || DEFAULT_SHELL, args, {
+      name: TERMINAL_TYPE,
+      cwd: launch.cwd,
+      env: { ...launch.env, TERM: TERMINAL_TYPE, COLORTERM: 'truecolor' },
+      ...size,
+    });
     const session: Session = { pty, scrollback: '' };
     pty.onData((data) => {
       session.scrollback = (session.scrollback + data).slice(-SCROLLBACK_CHARS);
       deps.onOutput(ref, data);
     });
-    pty.onExit(() => {
+    pty.onExit(({ exitCode }) => {
       if (sessions.get(ref) !== session) return;
       sessions.delete(ref);
-      deps.onExit(ref);
+      finished.set(ref, session.scrollback);
+      deps.onExit(ref, exitCode);
     });
     sessions.set(ref, session);
-    return session;
+    finished.delete(ref);
   }
 
-  function open(ref: string, cwd: string, size: TerminalSize): string {
+  function attach(ref: string, size: TerminalSize): string | null {
     const running = sessions.get(ref);
-    if (!running) return start(ref, cwd, size).scrollback;
+    if (!running) return finished.get(ref) ?? null;
     running.pty.resize(size.cols, size.rows);
     return running.scrollback;
   }
@@ -95,15 +103,21 @@ export function createTerminals(deps: TerminalsDeps): Terminals {
     const session = sessions.get(ref);
     if (!session) return;
     sessions.delete(ref);
+    finished.set(ref, session.scrollback);
     session.pty.kill();
-    deps.onExit(ref);
+    deps.onExit(ref, -1);
   }
 
   return {
-    open,
+    attach,
+    start,
+    isRunning: (ref) => sessions.has(ref),
+    running: () => [...sessions.keys()],
     write: (ref, data) => sessions.get(ref)?.pty.write(data),
     resize: (ref, size) => sessions.get(ref)?.pty.resize(size.cols, size.rows),
     close,
+    closeMatching: (prefix) =>
+      [...sessions.keys()].filter((ref) => ref.startsWith(prefix)).forEach(close),
     closeAll: () => [...sessions.keys()].forEach(close),
   };
 }

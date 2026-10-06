@@ -1,961 +1,462 @@
-import { join } from 'node:path';
-import {
-  AGENT_TASK_WORDS,
-  DEFAULT_INSTRUCTIONS,
-  isAgentTaskKind,
-  isKeptMergeable,
-} from '../shared/agent-tasks';
+import { existsSync } from 'node:fs';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import type { KorevApi } from '../shared/api';
 import type {
-  AgentActivityEvent,
-  AgentTaskKind,
-  AgentTaskState,
-  AiTaskSettings,
-  ExplanationView,
-  ReviewEvent,
-} from '../shared/agent-tasks';
-import {
-  AGENT_INFO,
-  isAgentProvider,
-  type AgentModel,
-  type AgentPreference,
-  type AgentProvider,
-} from '../shared/agents';
-import type { AuthState, Connection } from '../shared/auth';
-import type { InboxSnapshot } from '../shared/inbox';
-import type { ActionResult, PrTarget } from '../shared/merge';
-import { prRef } from '../shared/pr-ref';
-import type { PullRequest } from '../shared/pull-request';
-import { explanationDocument } from '../shared/explanation-document';
-import { IpcChannel } from '../shared/ipc-contract';
-import type {
-  TerminalExit,
-  TerminalOpenResult,
-  TerminalOutput,
-} from '../shared/terminal';
-import type { RepoOwner, RepoPage } from '../shared/repos';
-import type {
-  InboxView,
-  ListView,
+  AgentAvailability,
+  AppState,
+  EditorApp,
+  EditorId,
+  Repo,
+  Result,
   Settings,
-  ThemePreference,
-} from '../shared/settings';
-import { buildInbox } from '../inbox/build-inbox';
-import { liveKeeps } from '../inbox/keep';
-import { myPrsIn, pullRequestsIn } from '../inbox/stacks';
+  WorkspaceRuntime,
+  WorkspaceStatus,
+} from '../shared/model';
+import { detectAgents } from './agents';
+import { createChats } from './chats';
 import {
-  parseAnswers,
-  parseMergeRequest,
-  parseReviewDraft,
-  parseReviewSubmission,
-  parseMergeTool,
-  parseTarget,
-  parseTargets,
-  parseTerminalSize,
-} from './action-input';
-import { createAgentTasks } from './agent-tasks/engine';
-import { createExplainTask } from './agent-tasks/explain';
-import { createAddressCommentsTask } from './agent-tasks/address-comments';
-import { createReviewTask } from './agent-tasks/review';
-import { createFixCiTask, type CiFailure } from './agent-tasks/fix-ci';
-import { createFixConflictsTask } from './agent-tasks/fix-conflicts';
-import {
-  createExplanations,
-  explanationBody,
-} from './agent-tasks/explanations';
-import { createTaskStore } from './agent-tasks/task-store';
-import { createAgentsService } from './agents/agents-service';
-import type { CommandRunner } from './agents/command-runner';
-import { isGithubUrl } from './app-origin';
-import { createCheckouts } from './checkouts';
-import { createTerminals, type SpawnPty } from './terminals';
-import { isPrRef, splitRepoName } from './repo-names';
-import { createAuthService } from './auth-service';
-import type { SecretCipher } from './encrypted-file';
+  errorMessage,
+  NotFoundError,
+  terminalRef,
+  type Context,
+  type CoreDeps,
+} from './context';
 import type { FileSystem } from './file-system';
-import { DeviceFlowLogin } from './github/auth';
-import { describeError } from './github/errors';
-import { createGithubClient } from './github/client';
 import {
-  createInboxPoller,
-  type InboxPoller,
-  type Scheduler,
-} from './github/inbox-poller';
-import { createGithubWriter } from './github/mutations';
-import { createPrActions } from './github/pr-actions';
+  changedFiles,
+  cloneRepo,
+  createGit,
+  defaultBranch,
+  fileDiff,
+  listFiles,
+  repoRoot,
+} from './git';
 import {
-  GITHUB_OAUTH_CLIENT_ID,
-  GITHUB_OAUTH_SCOPES,
-  type GithubEndpoints,
-} from './github/config';
-import { applyRenames, type RepoRename } from './github/repo-access';
-import { createTaskReads, type FailingCheck } from './github/task-reads';
-import { emptyRepoPage } from './github/repo-picker';
-import type { FetchLike } from './github/request';
-import { createInboxCache } from './inbox-cache';
-import type { IpcHandlers } from './ipc';
+  createPrPrompt,
+  fetchPrStatus,
+  fixChecksPrompt,
+  mergePr,
+  resolveConflictsPrompt,
+} from './pull-requests';
+import { openStore } from './store';
+import { createTerminals, type SpawnPty } from './terminals';
 import {
-  createSettingsStore,
-  notifyOnChange,
-  type SettingsStore,
-} from './settings-store';
-import { createTokenStore } from './token-store';
+  archiveWorkspace,
+  createWorkspace,
+  deleteWorkspace,
+  newChatSession,
+  onScriptExit,
+  refreshStats,
+  restoreWorkspace,
+  scriptEnv,
+  startScript,
+} from './workspaces';
 
-const SETTINGS_FILE = 'settings.json';
-const TOKEN_FILE = 'github-token.bin';
-const INBOX_CACHE_FILE = 'inbox-cache.bin';
-const AGENT_TASKS_FILE = 'agent-tasks.bin';
-const EXPLANATIONS_FILE = 'explanations.bin';
-const EXPLANATION_COPIES_DIR = 'korev-explanations';
-const WORKFLOW_SCOPE = 'workflow';
-const CI_CHECKS_READ = 10;
-const SUBMITTED_REVIEW: Record<ReviewEvent, string> = {
-  COMMENT: 'Submitted your review as a comment',
-  REQUEST_CHANGES: 'Submitted your review requesting changes',
-};
-const CHECKOUTS_BUSY = 'Wait for Korev to finish its running tasks first.';
-const NO_CHECKOUT = 'Korev no longer has a checkout of this pull request.';
-const INVALID_ACTION: Extract<ActionResult, { ok: false }> = {
-  ok: false,
-  message: 'Korev could not read that request.',
-};
-const NO_AGENT_MODELS: AgentModel[] = [];
+const FILE_MAX_BYTES = 1_000_000;
+const CONTEXT_DIR = '.context';
+const ATTACHMENTS_DIR = 'attachments';
+const COMMAND_EXTENSION = '.md';
+const BUILTIN_COMMANDS = ['compact', 'review', 'init'];
 
-const timers: Scheduler = {
-  setTimeout: (callback, milliseconds) => setTimeout(callback, milliseconds),
-  clearTimeout: (handle) => clearTimeout(handle),
-};
+async function commandNames(dir: string): Promise<string[]> {
+  const entries = await readdir(dir).catch(() => []);
+  return entries
+    .filter((entry) => entry.endsWith(COMMAND_EXTENSION))
+    .map((entry) => entry.slice(0, -COMMAND_EXTENSION.length));
+}
+const REPOS_DIR = 'repos';
+const REPO_NAME_FROM_URL = /([^/:]+?)(?:\.git)?\/?$/;
 
-export interface KorevDeps {
-  userDataPath: string;
-  tempPath: string;
-  env: NodeJS.ProcessEnv;
-  runCommand: CommandRunner;
-  spawnPty: SpawnPty;
-  fs: FileSystem;
-  cipher: SecretCipher;
-  fetch: FetchLike;
-  github: GithubEndpoints;
-  sleep(milliseconds: number, signal: AbortSignal): Promise<void>;
-  openExternal(url: string): Promise<void>;
-  openPath(path: string): Promise<void>;
-  notify(note: TaskNote): void;
-  prefersDark(): boolean;
-  applyTheme(theme: ThemePreference): void;
-  broadcast(
-    channel: IpcChannel,
-    payload:
-      | InboxSnapshot
-      | AuthState
-      | Settings
-      | TerminalOutput
-      | TerminalExit
-      | AgentActivityEvent,
-  ): void;
-  warn(message: string): void;
+interface EditorDefinition extends EditorApp {
+  app: string | null;
 }
 
-export interface TaskNote {
-  title: string;
-  body: string;
-  ref: string;
+const EDITORS: EditorDefinition[] = [
+  { id: 'cursor', label: 'Cursor', app: 'Cursor' },
+  { id: 'vscode', label: 'VS Code', app: 'Visual Studio Code' },
+  { id: 'zed', label: 'Zed', app: 'Zed' },
+  { id: 'xcode', label: 'Xcode', app: 'Xcode' },
+  { id: 'terminal', label: 'Terminal', app: 'Terminal' },
+  { id: 'iterm', label: 'iTerm', app: 'iTerm' },
+  { id: 'ghostty', label: 'Ghostty', app: 'Ghostty' },
+  { id: 'warp', label: 'Warp', app: 'Warp' },
+  { id: 'finder', label: 'Finder', app: null },
+];
+
+const APPLICATION_DIRS = [
+  '/Applications',
+  '/System/Applications',
+  '/System/Applications/Utilities',
+];
+
+function installedEditors(home: string): EditorApp[] {
+  const dirs = [...APPLICATION_DIRS, path.join(home, 'Applications')];
+  return EDITORS.filter(
+    (editor) =>
+      editor.app === null ||
+      dirs.some((dir) => existsSync(path.join(dir, `${editor.app}.app`))),
+  ).map(({ id, label }) => ({ id, label }));
+}
+
+export interface KorevDeps extends CoreDeps {
+  fs: FileSystem;
+  spawnPty: SpawnPty;
+  userDataPath: string;
+  chooseDirectory(): Promise<string | null>;
+  openPath(target: string): Promise<void>;
+  openExternal(url: string): Promise<void>;
+  applyTheme(theme: Settings['theme']): void;
 }
 
 export interface Korev {
-  handlers: IpcHandlers;
-  settings: SettingsStore;
-  inbox: Pick<InboxPoller, 'trigger' | 'suspend' | 'resume' | 'stop'>;
-  start(): Promise<void>;
+  api: KorevApi;
+  settings(): Settings;
+  updateSettings(patch: Partial<Settings>): Promise<void>;
+  shutdown(): Promise<void>;
 }
 
-function isPrRefString(value: unknown): value is string {
-  return typeof value === 'string' && isPrRef(value);
+const IDLE: WorkspaceRuntime = {
+  status: 'idle',
+  unread: false,
+  stats: null,
+  pr: null,
+  message: null,
+};
+
+function ok<T>(value: T): Result<T> {
+  return { ok: true, value };
 }
 
-function sameRepoSet(left: string[], right: string[]): boolean {
-  const rightSet = new Set(right);
-  return (
-    left.length === right.length && left.every((repo) => rightSet.has(repo))
-  );
+function fail(message: string): Result<never> {
+  return { ok: false, message };
 }
 
-export function createKorev(deps: KorevDeps): Korev {
-  const settings = notifyOnChange(
-    createSettingsStore({
-      fs: deps.fs,
-      path: join(deps.userDataPath, SETTINGS_FILE),
+function insideWorkspace(root: string, file: string): string | null {
+  const resolved = path.resolve(root, file);
+  return resolved.startsWith(`${root}${path.sep}`) ? resolved : null;
+}
+
+export async function createKorev(deps: KorevDeps): Promise<Korev> {
+  const store = await openStore(deps.fs, deps.userDataPath, deps.home);
+  const git = createGit(deps.run, deps.env);
+  const runtimes = new Map<string, WorkspaceRuntime>();
+  let agents: AgentAvailability[] = [];
+  const editors = installedEditors(deps.home);
+
+  const ctx: Context = {
+    deps,
+    store,
+    git,
+    terminals: createTerminals({
+      spawnPty: deps.spawnPty,
+      shell: deps.shell,
+      onOutput: (ref, data) => deps.emit('terminal-output', { ref, data }),
+      onExit: (ref, exitCode) => {
+        deps.emit('terminal-exit', { ref, exitCode });
+        onScriptExit(ctx, ref, exitCode);
+      },
     }),
-    (changed) => deps.broadcast(IpcChannel.SettingsChanged, changed),
-  );
-  const tokenStore = createTokenStore({
-    cipher: deps.cipher,
-    fs: deps.fs,
-    path: join(deps.userDataPath, TOKEN_FILE),
-  });
-  const inboxCache = createInboxCache({
-    cipher: deps.cipher,
-    fs: deps.fs,
-    path: join(deps.userDataPath, INBOX_CACHE_FILE),
-  });
-  const github = createGithubClient({
-    fetch: deps.fetch,
-    apiUrl: deps.github.apiUrl,
-  });
-
-  const inbox = createInboxPoller({
-    client: github,
-    buildInbox,
-    token: () => auth.token(),
-    repos: () => settings.current().repos,
-    mergeWith: () => settings.current().mergeWith,
-    keptPrs: () => settings.current().keptPrs,
-    needsAnswer: () => agentTasks.keptRefs(),
-    korevWorking: () => agentTasks.workingRefs(),
-    renameRepos: followRepoRenames,
-    now: () => new Date(),
-    scheduler: timers,
-    publish: publishInbox,
-  });
-
-  const writer = createGithubWriter({
-    fetch: deps.fetch,
-    apiUrl: deps.github.apiUrl,
-  });
-
-  const prActions = createPrActions({
-    writer,
-    token: () => auth.token(),
-    repoMerge: (repo) => inbox.snapshot().repoMerge[repo],
-    mergeWith: (repo) => settings.current().mergeWith[repo] ?? 'github',
-    now: () => Date.now(),
-    scheduler: timers,
-    onChange: () => broadcastInbox(inbox.snapshot()),
-    refresh: () => void inbox.trigger('manual'),
-  });
-
-  const agents = createAgentsService({
-    run: deps.runCommand,
-    env: deps.env,
-    scratchDir: deps.tempPath,
-    fs: deps.fs,
-    preference: () => settings.current().agent,
-  });
-
-  const checkouts = createCheckouts({
-    run: deps.runCommand,
-    env: deps.env,
-    root: deps.userDataPath,
-    gitUrl: deps.github.gitUrl,
-    token: () => auth.token(),
-    now: () => Date.now(),
-  });
-
-  const terminals = createTerminals({
-    spawnPty: deps.spawnPty,
-    env: deps.env,
-    onOutput: (ref, data) =>
-      deps.broadcast(IpcChannel.TerminalOutput, { ref, data }),
-    onExit: (ref) => deps.broadcast(IpcChannel.TerminalExit, { ref }),
-  });
-
-  const taskReads = createTaskReads({
-    fetch: deps.fetch,
-    apiUrl: deps.github.apiUrl,
-  });
-
-  const explanations = createExplanations({
-    cipher: deps.cipher,
-    fs: deps.fs,
-    path: join(deps.userDataPath, EXPLANATIONS_FILE),
-  });
-  const explanationCopies = new Set<string>();
-
-  const agentTasks = createAgentTasks({
-    tasks: {
-      explain: createExplainTask({
-        checkouts,
-        runAgent: agents.run,
-        prBody,
-        format: () => settings.current().aiTasks.explainFormat,
-        save: (ref, explanation) => explanations.save(ref, explanation),
-        now: () => Date.now(),
-      }),
-      'fix-conflicts': createFixConflictsTask({
-        checkouts,
-        runAgent: agents.run,
-        canPushWorkflows,
-      }),
-      'fix-ci': createFixCiTask({
-        checkouts,
-        runAgent: agents.run,
-        canPushWorkflows,
-        readFailures: readCiFailures,
-        rerunFailedJobs,
-      }),
-      review: createReviewTask({ checkouts, runAgent: agents.run, prBody }),
-      'address-comments': createAddressCommentsTask({
-        checkouts,
-        runAgent: agents.run,
-        canPushWorkflows,
-        viewerLogin: () => auth.state().connection?.login ?? null,
-        readThreads: async (pr) => {
-          const token = auth.token();
-          return token ? taskReads.unresolvedThreads(token, pr) : [];
-        },
-        reply: async (threadId, body) => {
-          const token = auth.token();
-          if (token) await writer.replyToThread(token, threadId, body);
-        },
-      }),
+    runningSessions: new Set(),
+    focusedWorkspaceId: null,
+    runtime(workspaceId) {
+      let runtime = runtimes.get(workspaceId);
+      if (!runtime) {
+        runtime = { ...IDLE };
+        runtimes.set(workspaceId, runtime);
+      }
+      return runtime;
     },
-    findPr,
-    isWatched: (ref) =>
-      isKeptMergeable(settings.current().aiTasks.keepMergeable, ref),
-    prState: async (ref) => {
-      const [repo, number] = ref.split('#');
-      return (
-        (await readPrText({ repo, number: Number(number) }))?.state ?? null
-      );
+    setStatus(workspaceId, status: WorkspaceStatus, message = null) {
+      const runtime = ctx.runtime(workspaceId);
+      runtime.status = status;
+      runtime.message = message;
     },
-    instructions: taskInstructions,
-    store: createTaskStore({
-      cipher: deps.cipher,
-      fs: deps.fs,
-      path: join(deps.userDataPath, AGENT_TASKS_FILE),
-    }),
-    login: () => auth.state().connection?.login ?? null,
-    releaseCheckout: (ref) => {
-      terminals.close(ref);
-      const [repo, number] = ref.split('#');
-      return checkouts.remove({ repo, number: Number(number) });
+    emitState: () => {
+      deps.emit('state', snapshot());
+      deps.setBadge([...runtimes.values()].filter((runtime) => runtime.unread).length);
     },
-    now: () => Date.now(),
-    onChange: followTasks,
-    onSettled: (ref, state) => {
-      void inbox.trigger('manual');
-      noteSettledTask(ref, state);
+    workspace(workspaceId) {
+      const found = store.state.workspaces.find((ws) => ws.id === workspaceId);
+      if (!found) throw new NotFoundError('Workspace', workspaceId);
+      return found;
     },
-    onActivity: (event) => deps.broadcast(IpcChannel.AiActivity, event),
-    warn: deps.warn,
-  });
-
-  const auth = createAuthService({
-    tokenStore,
-    fetchViewer: (token) => github.fetchViewer(token),
-    createDeviceFlow: (onToken) =>
-      new DeviceFlowLogin({
-        fetch: deps.fetch,
-        webUrl: deps.github.webUrl,
-        clientId: GITHUB_OAUTH_CLIENT_ID,
-        scopes: GITHUB_OAUTH_SCOPES,
-        now: () => Date.now(),
-        sleep: deps.sleep,
-        onToken,
-      }),
-    onStateChange: (state) => deps.broadcast(IpcChannel.AuthChanged, state),
-    onConnectionChange: followConnection,
-    warn: deps.warn,
-  });
-
-  function withActions(snapshot: InboxSnapshot): InboxSnapshot {
-    return {
-      ...snapshot,
-      actions: prActions.state(),
-      agentTasks: agentTasks.state(),
-      agentHistory: agentTasks.history(),
-    };
-  }
-
-  function noteSettledTask(ref: string, state: AgentTaskState): void {
-    if (!settings.current().aiTasks.notify) return;
-    const number = ref.slice(ref.lastIndexOf('#'));
-    const pr = findPr(ref);
-    if (state.status === 'needs-input') {
-      deps.notify({
-        title: `Korev needs your answer on ${number}`,
-        body: pr?.title ?? ref,
-        ref,
-      });
-    }
-    if (state.status === 'done' && state.review) {
-      deps.notify({
-        title: `Review draft ready for ${number}`,
-        body: pr?.title ?? ref,
-        ref,
-      });
-    }
-    if (state.status === 'failed') {
-      deps.notify({
-        title: `${AGENT_TASK_WORDS[state.kind].failed} on ${number}`,
-        body: state.message,
-        ref,
-      });
-    }
-  }
-
-  let classifiedTasks = '';
-
-  function taskClassKey(): string {
-    const waiting = agentTasks.keptRefs().sort().join(' ');
-    const working = agentTasks.workingRefs().sort().join(' ');
-    return `${waiting}|${working}`;
-  }
-
-  function followTasks(): void {
-    const key = taskClassKey();
-    if (key === classifiedTasks) {
-      broadcastInbox(inbox.snapshot());
-      return;
-    }
-    classifiedTasks = key;
-    inbox.rebuild();
-  }
-
-  const workflowScopes = new Map<string, Promise<boolean>>();
-
-  function canPushWorkflows(): Promise<boolean> {
-    const token = auth.token();
-    if (!token) return Promise.resolve(false);
-    const known = workflowScopes.get(token);
-    if (known) return known;
-    const checking = github
-      .fetchViewer(token)
-      .then((viewer) => viewer.scopes.includes(WORKFLOW_SCOPE))
-      .catch(() => false);
-    workflowScopes.set(token, checking);
-    return checking;
-  }
-
-  function findPr(ref: string): PullRequest | null {
-    return (
-      pullRequestsIn(inbox.snapshot()).find((pr) => prRef(pr) === ref) ?? null
-    );
-  }
-
-  async function prBody(pr: PullRequest): Promise<string> {
-    return (await readPrText(pr))?.body ?? '';
-  }
-
-  function readPrText(pr: { repo: string; number: number }) {
-    const token = auth.token();
-    return token ? taskReads.pullRequestText(token, pr) : Promise.resolve(null);
-  }
-
-  async function readCiFailures(pr: PullRequest): Promise<CiFailure[]> {
-    const token = auth.token();
-    if (!token) return [];
-    const checks = await taskReads.failingChecks(token, pr);
-    return Promise.all(
-      checks.map((check, index) =>
-        index < CI_CHECKS_READ
-          ? readCiFailureDetails(token, pr, check)
-          : { check, annotations: [], logTail: null },
-      ),
-    );
-  }
-
-  async function readCiFailureDetails(
-    token: string,
-    pr: PullRequest,
-    check: FailingCheck,
-  ): Promise<CiFailure> {
-    return {
-      check,
-      annotations: check.checkRunId
-        ? await taskReads
-            .annotations(token, pr.repo, check.checkRunId)
-            .catch(() => [])
-        : [],
-      logTail:
-        check.isActionsJob && check.checkRunId
-          ? await taskReads
-              .jobLogTail(token, pr.repo, check.checkRunId)
-              .catch(() => null)
-          : null,
-    };
-  }
-
-  async function submitReview(
-    target: PrTarget,
-    value: unknown,
-  ): Promise<ActionResult> {
-    const review = parseReviewSubmission(value);
-    const token = auth.token();
-    if (!review || !token) return INVALID_ACTION;
-    try {
-      await writer.submitReview(token, target.id, review);
-    } catch (error) {
-      return { ok: false, message: describeError(error) };
-    }
-    agentTasks.updateReview(
-      prRef(target),
-      null,
-      SUBMITTED_REVIEW[review.event],
-    );
-    void inbox.trigger('manual');
-    return { ok: true };
-  }
-
-  function saveReviewDraft(target: PrTarget, value: unknown): void {
-    const draft = parseReviewDraft(value);
-    if (draft) agentTasks.updateReview(prRef(target), draft);
-  }
-
-  async function rerunFailedJobs(
-    pr: PullRequest,
-    runIds: number[],
-  ): Promise<void> {
-    const token = auth.token();
-    if (!token) return;
-    await Promise.all(
-      runIds.map((runId) => writer.rerunFailedJobs(token, pr.repo, runId)),
-    );
-    void inbox.trigger('manual');
-  }
-
-  function taskInstructions(kind: AgentTaskKind): string {
-    return (
-      settings.current().aiTasks.instructions[kind] ??
-      DEFAULT_INSTRUCTIONS[kind]
-    );
-  }
-
-  function broadcastInbox(snapshot: InboxSnapshot): void {
-    deps.broadcast(IpcChannel.InboxUpdated, withActions(snapshot));
-  }
-
-  function pruneKeeps(snapshot: InboxSnapshot): void {
-    if (snapshot.truncated.mine) return;
-    const { keptPrs } = settings.current();
-    const openPrs = myPrsIn(snapshot.mine).map((item) => item.pr);
-    const live = liveKeeps(keptPrs, openPrs, new Date());
-    if (Object.keys(live).length === Object.keys(keptPrs).length) return;
-    settings.update({ keptPrs: live }).catch((error: unknown) => {
-      deps.warn(`Could not prune kept PRs: ${String(error)}`);
-    });
-  }
-
-  function pruneKeepMergeable(snapshot: InboxSnapshot): void {
-    if (snapshot.truncated.mine) return;
-    const { aiTasks } = settings.current();
-    const open = new Set(myPrsIn(snapshot.mine).map((item) => prRef(item.pr)));
-    const prs = Object.fromEntries(
-      Object.entries(aiTasks.keepMergeable.prs).filter(([ref]) =>
-        open.has(ref),
-      ),
-    );
-    if (
-      Object.keys(prs).length === Object.keys(aiTasks.keepMergeable.prs).length
-    ) {
-      return;
-    }
-    settings
-      .update({
-        aiTasks: {
-          ...aiTasks,
-          keepMergeable: { ...aiTasks.keepMergeable, prs },
-        },
-      })
-      .catch((error: unknown) => {
-        deps.warn(`Could not prune Keep mergeable PRs: ${String(error)}`);
-      });
-  }
-
-  function publishInbox(snapshot: InboxSnapshot): void {
-    if (snapshot.status === 'live') {
-      prActions.reconcile(snapshot);
-      agentTasks.reconcile(snapshot);
-    }
-    broadcastInbox(snapshot);
-    if (snapshot.status !== 'live') return;
-    pruneKeeps(snapshot);
-    pruneKeepMergeable(snapshot);
-    inboxCache.save(snapshot).catch((error: unknown) => {
-      deps.warn(`Could not cache the inbox: ${String(error)}`);
-    });
-  }
-
-  async function restoreCachedInbox(): Promise<void> {
-    const login = auth.state().connection?.login;
-    if (!login) return;
-    const cached = await inboxCache.load(login).catch((error: unknown) => {
-      deps.warn(`Could not read the cached inbox: ${String(error)}`);
-      return null;
-    });
-    if (cached) inbox.restore(cached);
-  }
-
-  async function removeExplanationCopies(): Promise<void> {
-    const copies = [...explanationCopies];
-    explanationCopies.clear();
-    await Promise.all(copies.map((path) => deps.fs.remove(path)));
-  }
-
-  async function forgetAiWork(): Promise<void> {
-    workflowScopes.clear();
-    await agentTasks.clear();
-    await explanations.clear();
-    await removeExplanationCopies();
-    await checkouts.removeAll([]);
-  }
-
-  function sweepCheckouts(): void {
-    checkouts
-      .sweep(settings.current().repos, agentTasks.keptRefs())
-      .catch((error: unknown) => {
-        deps.warn(`Could not clean up checkouts: ${String(error)}`);
-      });
-  }
-
-  async function restoreAiWork(): Promise<void> {
-    const login = auth.state().connection?.login;
-    if (!login) return;
-    await agentTasks.restore(login);
-    await explanations.load(login).catch((error: unknown) => {
-      deps.warn(`Could not read saved explanations: ${String(error)}`);
-    });
-    sweepCheckouts();
-  }
-
-  async function followConnection(connection: Connection | null) {
-    github.clearSessionCache();
-    if (!connection) {
-      inbox.reset();
-      await inboxCache.clear();
-      await forgetAiWork().catch((error: unknown) => {
-        deps.warn(`Could not remove Korev's AI work: ${String(error)}`);
-      });
-      return;
-    }
-    await restoreCachedInbox();
-    await restoreAiWork();
-    void inbox.restart();
-  }
-
-  async function setRepos(repos: string[]): Promise<Settings> {
-    const previous = settings.current().repos;
-    const updated = await settings.update({ repos });
-    if (sameRepoSet(previous, updated.repos)) inbox.rebuild();
-    else {
-      void inbox.restart();
-      sweepCheckouts();
-    }
-    return updated;
-  }
-
-  async function setTheme(theme: ThemePreference): Promise<Settings> {
-    const updated = await settings.update({ theme });
-    deps.applyTheme(updated.theme);
-    return updated;
-  }
-
-  function setCollapsedSection(section: string, collapsed: unknown) {
-    const { collapsedSections } = settings.current();
-    return settings.update({
-      collapsedSections: { ...collapsedSections, [section]: collapsed },
-    });
-  }
-
-  async function setKept(refs: unknown, kept: unknown): Promise<Settings> {
-    const current = settings.current();
-    const valid = Array.isArray(refs) && refs.every(isPrRefString);
-    if (!valid || typeof kept !== 'boolean') return current;
-    const keptAt = new Date().toISOString();
-    const keptPrs = { ...current.keptPrs };
-    for (const ref of refs) {
-      if (kept) keptPrs[ref] = keptAt;
-      else delete keptPrs[ref];
-    }
-    const updated = await settings.update({ keptPrs });
-    inbox.rebuild();
-    return updated;
-  }
-
-  function setRepoFilter(view: InboxView, repos: unknown) {
-    const { repoFilter } = settings.current();
-    return settings.update({ repoFilter: { ...repoFilter, [view]: repos } });
-  }
-
-  async function setMergeWith(repo: unknown, tool: unknown) {
-    const mergeTool = parseMergeTool(tool);
-    const current = settings.current();
-    if (typeof repo !== 'string' || !mergeTool) return current;
-    const updated = await settings.update({
-      mergeWith: { ...current.mergeWith, [repo]: mergeTool },
-    });
-    inbox.rebuild();
-    return updated;
-  }
-
-  function forAgent<T>(
-    run: (provider: AgentProvider) => Promise<T>,
-    invalid: () => Promise<T>,
-  ): (value: unknown) => Promise<T> {
-    return (value) => (isAgentProvider(value) ? run(value) : invalid());
-  }
-
-  function withParsed<T>(
-    parse: (value: unknown) => T | null,
-    run: (parsed: T) => Promise<ActionResult>,
-  ): (value: unknown) => Promise<ActionResult> {
-    return (value) => {
-      const parsed = parse(value);
-      return parsed ? run(parsed) : Promise.resolve(INVALID_ACTION);
-    };
-  }
-
-  async function followRepoRenames(renames: RepoRename[]): Promise<void> {
-    const repos = applyRenames(settings.current().repos, renames);
-    await settings.update({ repos });
-  }
-
-  function withToken<T>(
-    disconnected: T,
-    run: (token: string) => Promise<T>,
-  ): Promise<T> {
-    const token = auth.token();
-    return token ? run(token) : Promise.resolve(disconnected);
-  }
-
-  function suggestedRepos(): Promise<string[]> {
-    return withToken([], (token) => github.fetchSuggestedRepos(token));
-  }
-
-  function repoOwners(): Promise<RepoOwner[]> {
-    return withToken([], (token) => github.fetchRepoOwners(token));
-  }
-
-  function repoPage(owner: string, cursor: unknown): Promise<RepoPage> {
-    const pageCursor = typeof cursor === 'string' ? cursor : null;
-    return withToken(emptyRepoPage(owner), (token) =>
-      github.fetchRepoPage(token, owner, pageCursor),
-    );
-  }
-
-  function searchRepos(owner: string, term: unknown): Promise<string[]> {
-    const searchTerm = typeof term === 'string' ? term : '';
-    return withToken([], (token) =>
-      github.searchRepos(token, owner, searchTerm),
-    );
-  }
-
-  async function openGithub(url: string): Promise<void> {
-    if (isGithubUrl(url)) await deps.openExternal(url);
-  }
-
-  async function openAgentInstall(provider: AgentProvider): Promise<void> {
-    await deps.openExternal(AGENT_INFO[provider].installUrl);
-  }
-
-  async function setAiTasks(patch: unknown): Promise<Settings> {
-    if (typeof patch !== 'object' || patch === null) return settings.current();
-    const aiTasks: AiTaskSettings = {
-      ...settings.current().aiTasks,
-      ...(patch as Partial<AiTaskSettings>),
-    };
-    const updated = await settings.update({ aiTasks });
-    const snapshot = inbox.snapshot();
-    if ('keepMergeable' in patch && snapshot.status === 'live') {
-      agentTasks.reconcile(snapshot);
-    }
-    return updated;
-  }
-
-  function explain(target: PrTarget, regenerate: unknown): ActionResult {
-    const ref = prRef(target);
-    const stored = explanations.get(ref);
-    const current = findPr(ref)?.headRefOid;
-    if (regenerate !== true && stored && stored.headOid === current) {
-      return { ok: true };
-    }
-    return agentTasks.start(ref, 'explain');
-  }
-
-  function explanationView(target: PrTarget): ExplanationView | null {
-    const ref = prRef(target);
-    const stored = explanations.get(ref);
-    if (!stored) return null;
-    const current = findPr(ref)?.headRefOid;
-    return {
-      headOid: stored.headOid,
-      body: explanationBody(stored),
-      stale: current !== undefined && current !== stored.headOid,
-    };
-  }
-
-  async function openExplanation(target: PrTarget): Promise<void> {
-    const view = explanationView(target);
-    if (!view) return;
-    const { owner, name } = splitRepoName(target.repo);
-    const path = join(
-      deps.tempPath,
-      EXPLANATION_COPIES_DIR,
-      `${owner}-${name}-${target.number}.html`,
-    );
-    const theme = deps.prefersDark() ? 'dark' : 'light';
-    await deps.fs.writeAtomic(path, explanationDocument(view.body, theme));
-    explanationCopies.add(path);
-    await deps.openPath(path);
-  }
-
-  async function openTerminal(
-    target: PrTarget,
-    size: unknown,
-  ): Promise<TerminalOpenResult> {
-    const parsedSize = parseTerminalSize(size);
-    if (!parsedSize) return INVALID_ACTION;
-    const path = await checkouts.pathOf(target);
-    if (!path) return { ok: false, message: NO_CHECKOUT };
-    return {
-      ok: true,
-      scrollback: terminals.open(prRef(target), path, parsedSize),
-    };
-  }
-
-  function writeTerminal(target: PrTarget, data: unknown): void {
-    if (typeof data === 'string') terminals.write(prRef(target), data);
-  }
-
-  function resizeTerminal(target: PrTarget, size: unknown): void {
-    const parsedSize = parseTerminalSize(size);
-    if (parsedSize) terminals.resize(prRef(target), parsedSize);
-  }
-
-  async function removeCheckouts(): Promise<ActionResult> {
-    if (agentTasks.isBusy()) return { ok: false, message: CHECKOUTS_BUSY };
-    await checkouts.removeAll(agentTasks.keptRefs());
-    return { ok: true };
-  }
-
-  function withTarget<T>(
-    run: (target: PrTarget, ...rest: unknown[]) => T,
-    invalid: T,
-  ): (value: unknown, ...rest: unknown[]) => T {
-    return (value, ...rest) => {
-      const target = parseTarget(value);
-      return target ? run(target, ...rest) : invalid;
-    };
-  }
-
-  async function useToken(token: unknown) {
-    if (typeof token !== 'string') {
-      return { ok: false as const, message: 'Paste a GitHub token.' };
-    }
-    return auth.useToken(token);
-  }
-
-  const handlers: IpcHandlers = {
-    [IpcChannel.InboxLoad]: () => withActions(inbox.snapshot()),
-    [IpcChannel.InboxRefresh]: () => inbox.trigger('manual'),
-    [IpcChannel.AuthGetState]: () => auth.state(),
-    [IpcChannel.AuthStartDeviceFlow]: () => auth.startDeviceFlow(),
-    [IpcChannel.AuthCancelDeviceFlow]: () => auth.cancelDeviceFlow(),
-    [IpcChannel.AuthUseToken]: useToken,
-    [IpcChannel.AuthDisconnect]: () => auth.disconnect(),
-    [IpcChannel.AuthRetryUnlock]: () => auth.retryUnlock(),
-    [IpcChannel.SettingsLoad]: () => settings.current(),
-    [IpcChannel.SettingsSetRepos]: setRepos,
-    [IpcChannel.SettingsSetTheme]: setTheme,
-    [IpcChannel.SettingsSetLastView]: (lastView: ListView) =>
-      settings.update({ lastView }),
-    [IpcChannel.SettingsSetCollapsedSection]: setCollapsedSection,
-    [IpcChannel.SettingsSuggestedRepos]: suggestedRepos,
-    [IpcChannel.ReposOwners]: repoOwners,
-    [IpcChannel.ReposPage]: repoPage,
-    [IpcChannel.ReposSearch]: searchRepos,
-    [IpcChannel.ShellOpenGithub]: openGithub,
-    [IpcChannel.ShellOpenAgentInstall]: forAgent(
-      openAgentInstall,
-      async () => undefined,
-    ),
-    [IpcChannel.SettingsSetMergeWith]: setMergeWith,
-    [IpcChannel.SettingsSetKept]: setKept,
-    [IpcChannel.SettingsSetRepoFilter]: setRepoFilter,
-    [IpcChannel.PrMerge]: withParsed(parseMergeRequest, prActions.merge),
-    [IpcChannel.PrClose]: withParsed(parseTargets, prActions.close),
-    [IpcChannel.PrReopen]: withParsed(parseTarget, prActions.reopen),
-    [IpcChannel.PrCancelQueue]: withParsed(parseTarget, prActions.cancelQueue),
-    [IpcChannel.SettingsSetAgent]: (agent: AgentPreference) =>
-      settings.update({ agent }),
-    [IpcChannel.AgentsStatuses]: () => agents.statuses(),
-    [IpcChannel.AgentsSignIn]: forAgent(agents.signIn, agents.statuses),
-    [IpcChannel.AgentsCancelSignIn]: () => agents.cancelSignIn(),
-    [IpcChannel.AgentsModels]: forAgent(
-      agents.models,
-      async () => NO_AGENT_MODELS,
-    ),
-    [IpcChannel.AgentsTest]: forAgent(agents.test, async () => INVALID_ACTION),
-    [IpcChannel.SettingsSetAiTasks]: setAiTasks,
-    [IpcChannel.AiStart]: withTarget(
-      (target, kind) =>
-        isAgentTaskKind(kind)
-          ? agentTasks.start(prRef(target), kind)
-          : INVALID_ACTION,
-      INVALID_ACTION,
-    ),
-    [IpcChannel.AiExplain]: withTarget(explain, INVALID_ACTION),
-    [IpcChannel.AiExplanation]: withTarget(explanationView, null),
-    [IpcChannel.AiOpenExplanation]: withTarget(
-      openExplanation,
-      Promise.resolve(),
-    ),
-    [IpcChannel.AiAnswer]: withTarget((target, answers) => {
-      const parsed = parseAnswers(answers);
-      return parsed ? agentTasks.answer(prRef(target), parsed) : INVALID_ACTION;
-    }, INVALID_ACTION),
-    [IpcChannel.AiCancel]: withTarget(
-      (target) => agentTasks.cancel(prRef(target)),
-      undefined,
-    ),
-    [IpcChannel.AiDismiss]: withTarget(
-      (target) => agentTasks.dismiss(prRef(target)),
-      Promise.resolve(),
-    ),
-    [IpcChannel.AiSaveReviewDraft]: withTarget(saveReviewDraft, undefined),
-    [IpcChannel.AiSubmitReview]: withTarget(
-      submitReview,
-      Promise.resolve(INVALID_ACTION),
-    ),
-    [IpcChannel.AiCheckoutsSize]: () => checkouts.size(),
-    [IpcChannel.AiRemoveCheckouts]: removeCheckouts,
-    [IpcChannel.AiActivityLog]: withTarget(
-      (target) => agentTasks.activity(prRef(target)),
-      [],
-    ),
-    [IpcChannel.TerminalOpen]: withTarget(
-      openTerminal,
-      Promise.resolve(INVALID_ACTION),
-    ),
-    [IpcChannel.TerminalWrite]: withTarget(writeTerminal, undefined),
-    [IpcChannel.TerminalResize]: withTarget(resizeTerminal, undefined),
-    [IpcChannel.TerminalClose]: withTarget(
-      (target) => terminals.close(prRef(target)),
-      undefined,
-    ),
+    repo(repoId) {
+      const found = store.state.repos.find((repo) => repo.id === repoId);
+      if (!found) throw new NotFoundError('Repository', repoId);
+      return found;
+    },
   };
+  const chats = createChats(ctx);
 
-  async function start(): Promise<void> {
-    const { settings: loaded, problem } = await settings.load();
-    if (problem) deps.warn(problem);
-    deps.applyTheme(loaded.theme);
-    await auth.init();
-    await restoreCachedInbox();
-    await restoreAiWork();
-    void inbox.start();
+  function snapshot(): AppState {
+    const { repos, workspaces, settings } = store.state;
+    return {
+      repos,
+      workspaces,
+      settings,
+      runtime: Object.fromEntries(
+        workspaces.map((ws) => [ws.id, ctx.runtime(ws.id)]),
+      ),
+      runningSessions: [...ctx.runningSessions],
+      runningTerminals: ctx.terminals.running(),
+      agents,
+      editors,
+    };
   }
 
-  const lifecycle: Korev['inbox'] = {
-    trigger: (reason) => inbox.trigger(reason),
-    suspend: () => inbox.suspend(),
-    resume: () => inbox.resume(),
-    stop: () => {
-      inbox.stop();
-      prActions.stop();
-      agentTasks.stop();
-      agents.stop();
-      terminals.closeAll();
-      void removeExplanationCopies();
+  async function registerRepo(dir: string): Promise<Result<Repo>> {
+    const root = await repoRoot(git, dir);
+    if (!root) return fail(`${dir} is not a git repository`);
+    const existing = store.state.repos.find((repo) => repo.path === root);
+    if (existing) return ok(existing);
+    const repo: Repo = {
+      id: deps.newId(),
+      name: path.basename(root),
+      path: root,
+      defaultBranch: await defaultBranch(git, root),
+      scripts: { setup: '', run: '', archive: '', runMode: 'concurrent' },
+    };
+    store.state.repos.push(repo);
+    store.save();
+    ctx.emitState();
+    return ok(repo);
+  }
+
+  async function refreshPr(workspaceId: string) {
+    const workspace = ctx.workspace(workspaceId);
+    if (workspace.archivedAt) return null;
+    const pr = await fetchPrStatus(deps.run, deps.env, workspace.path, workspace.branch);
+    const runtime = ctx.runtime(workspaceId);
+    if (JSON.stringify(runtime.pr) !== JSON.stringify(pr)) {
+      runtime.pr = pr;
+      ctx.emitState();
+    }
+    return pr;
+  }
+
+  function workspacePath(workspaceId: string) {
+    const workspace = ctx.workspace(workspaceId);
+    if (workspace.archivedAt) throw new Error('Workspace is archived');
+    return workspace;
+  }
+
+  function openShell(ref: string, workspaceId: string) {
+    const workspace = workspacePath(workspaceId);
+    const repo = ctx.repo(workspace.repoId);
+    ctx.terminals.start(ref, { cwd: workspace.path, env: scriptEnv(ctx, repo, workspace) });
+  }
+
+  function assertOwnRef(ref: string, workspaceId: string) {
+    if (!ref.startsWith(`${workspaceId}:`)) throw new Error('Terminal does not belong to workspace');
+  }
+
+  async function updateSettings(patch: Partial<Settings>) {
+    Object.assign(store.state.settings, patch);
+    if (patch.theme) deps.applyTheme(patch.theme);
+    store.save();
+    ctx.emitState();
+  }
+
+  async function sendToActiveSession(workspaceId: string, sessionId: string, text: string) {
+    const workspace = ctx.workspace(workspaceId);
+    const session = workspace.sessions.find((entry) => entry.id === sessionId) ?? workspace.sessions[0];
+    if (!session) return fail('No chat in this workspace');
+    return chats.send(session.id, {
+      text,
+      model: session.model,
+      effort: session.effort,
+      planMode: false,
+    });
+  }
+
+  const api: KorevApi = {
+    getState: async () => snapshot(),
+    async addRepo() {
+      const dir = await deps.chooseDirectory();
+      if (!dir) return ok(null);
+      return registerRepo(dir);
+    },
+    async cloneRepo(url) {
+      const name = REPO_NAME_FROM_URL.exec(url.trim())?.[1];
+      if (!name) return fail('That does not look like a git URL');
+      const destination = path.join(deps.userDataPath, REPOS_DIR, name);
+      try {
+        await cloneRepo(deps.run, deps.env, url.trim(), destination);
+      } catch (error) {
+        return fail(errorMessage(error));
+      }
+      return registerRepo(destination);
+    },
+    async removeRepo(repoId) {
+      const { state } = store;
+      const workspaces = state.workspaces.filter((ws) => ws.repoId === repoId);
+      for (const workspace of workspaces) {
+        await archiveWorkspace(ctx, workspace.id, chats.stopWorkspace);
+        await deleteWorkspace(ctx, workspace.id);
+      }
+      state.repos = state.repos.filter((repo) => repo.id !== repoId);
+      store.save();
+      ctx.emitState();
+    },
+    async updateRepo(repoId, patch) {
+      const repo = ctx.repo(repoId);
+      if (patch.defaultBranch?.trim()) repo.defaultBranch = patch.defaultBranch.trim();
+      store.save();
+      ctx.emitState();
+    },
+    async updateRepoScripts(repoId, scripts) {
+      ctx.repo(repoId).scripts = scripts;
+      store.save();
+      ctx.emitState();
+    },
+    createWorkspace: (repoId) => createWorkspace(ctx, repoId),
+    archiveWorkspace: (workspaceId) => archiveWorkspace(ctx, workspaceId, chats.stopWorkspace),
+    restoreWorkspace: (workspaceId) => restoreWorkspace(ctx, workspaceId),
+    deleteWorkspace: (workspaceId) => deleteWorkspace(ctx, workspaceId),
+    async focusWorkspace(workspaceId) {
+      ctx.focusedWorkspaceId = workspaceId;
+      if (!workspaceId) return;
+      const runtime = ctx.runtime(workspaceId);
+      if (!runtime.unread) return;
+      runtime.unread = false;
+      ctx.emitState();
+    },
+    async newSession(workspaceId, agent) {
+      const session = newChatSession(ctx, agent);
+      ctx.workspace(workspaceId).sessions.push(session);
+      store.save();
+      ctx.emitState();
+      return session;
+    },
+    async closeSession(workspaceId, sessionId) {
+      const workspace = ctx.workspace(workspaceId);
+      if (workspace.sessions.length <= 1) return;
+      workspace.sessions = workspace.sessions.filter((entry) => entry.id !== sessionId);
+      await chats.forget(sessionId);
+      store.save();
+      ctx.emitState();
+    },
+    transcript: (sessionId) => chats.transcript(sessionId),
+    send: (sessionId, options) => chats.send(sessionId, options),
+    stop: async (sessionId) => chats.stop(sessionId),
+    revert: (sessionId, itemId) => chats.revert(sessionId, itemId),
+    async changes(workspaceId) {
+      const workspace = workspacePath(workspaceId);
+      const files = await refreshStats(ctx, workspace);
+      return files.length ? files : changedFiles(git, workspace.path, workspace.baseBranch).catch(() => []);
+    },
+    async fileDiff(workspaceId, file) {
+      const workspace = workspacePath(workspaceId);
+      return fileDiff(git, workspace.path, workspace.baseBranch, file);
+    },
+    async listFiles(workspaceId) {
+      return listFiles(git, workspacePath(workspaceId).path);
+    },
+    async readFile(workspaceId, file) {
+      const target = insideWorkspace(workspacePath(workspaceId).path, file);
+      if (!target) return null;
+      const contents = await readFile(target).catch(() => null);
+      if (!contents || contents.length > FILE_MAX_BYTES) return null;
+      return contents.toString('utf8');
+    },
+    prStatus: (workspaceId) => refreshPr(workspaceId),
+    async mergePr(workspaceId) {
+      const workspace = workspacePath(workspaceId);
+      const pr = ctx.runtime(workspaceId).pr ?? (await refreshPr(workspaceId));
+      if (!pr) return fail('No pull request for this branch');
+      const problem = await mergePr(deps.run, deps.env, workspace.path, pr.number);
+      await refreshPr(workspaceId);
+      return problem ? fail(problem) : ok(undefined);
+    },
+    async createPr(workspaceId, sessionId) {
+      const workspace = ctx.workspace(workspaceId);
+      return sendToActiveSession(workspaceId, sessionId, createPrPrompt(workspace.baseBranch));
+    },
+    async resolveConflicts(workspaceId, sessionId) {
+      const workspace = ctx.workspace(workspaceId);
+      return sendToActiveSession(workspaceId, sessionId, resolveConflictsPrompt(workspace.baseBranch));
+    },
+    async saveAttachment(workspaceId, name, base64) {
+      const workspace = workspacePath(workspaceId);
+      const safeName = `${deps.now().getTime()}-${path.basename(name).replace(/[^\w.-]+/g, '_')}`;
+      const relative = path.join(CONTEXT_DIR, ATTACHMENTS_DIR, safeName);
+      await mkdir(path.join(workspace.path, CONTEXT_DIR, ATTACHMENTS_DIR), { recursive: true });
+      await writeFile(path.join(workspace.path, relative), Buffer.from(base64, 'base64'));
+      return ok(relative);
+    },
+    async slashCommands(workspaceId) {
+      const workspace = workspacePath(workspaceId);
+      const dirs = [
+        path.join(workspace.path, '.claude', 'commands'),
+        path.join(deps.home, '.claude', 'commands'),
+      ];
+      const names = await Promise.all(dirs.map((dir) => commandNames(dir)));
+      return [...new Set([...BUILTIN_COMMANDS, ...names.flat()])].sort();
+    },
+    async fixChecks(workspaceId, sessionId) {
+      const pr = ctx.runtime(workspaceId).pr;
+      if (!pr) return fail('No pull request for this branch');
+      return sendToActiveSession(workspaceId, sessionId, fixChecksPrompt(pr.checks));
+    },
+    async openIn(workspaceId, editorId: EditorId) {
+      const workspace = workspacePath(workspaceId);
+      const editor = EDITORS.find((entry) => entry.id === editorId);
+      if (!editor) return fail('Unknown app');
+      if (!editor.app) {
+        await deps.openPath(workspace.path);
+        return ok(undefined);
+      }
+      const result = await deps.run('open', ['-a', editor.app, workspace.path], {
+        env: deps.env,
+        timeoutMs: 15_000,
+      });
+      return result.exitCode === 0 ? ok(undefined) : fail(result.stderr.trim() || `Could not open ${editor.label}`);
+    },
+    openExternal: (url) => deps.openExternal(url),
+    updateSettings,
+    async openTerminal(ref, workspaceId, kind, size) {
+      assertOwnRef(ref, workspaceId);
+      const scrollback = ctx.terminals.attach(ref, size);
+      if (scrollback !== null) return ok(scrollback);
+      if (kind === 'shell') {
+        openShell(ref, workspaceId);
+        ctx.terminals.resize(ref, size);
+        ctx.emitState();
+      }
+      return ok('');
+    },
+    startScript: (workspaceId, kind) => startScript(ctx, workspacePath(workspaceId), kind),
+    async stopScript(workspaceId, kind) {
+      ctx.terminals.close(terminalRef(workspaceId, kind));
+      ctx.emitState();
+    },
+    writeTerminal: async (ref, data) => ctx.terminals.write(ref, data),
+    resizeTerminal: async (ref, size) => ctx.terminals.resize(ref, size),
+    async closeTerminal(ref) {
+      ctx.terminals.close(ref);
+      ctx.emitState();
     },
   };
 
-  return { handlers, settings, inbox: lifecycle, start };
+  void detectAgents(deps.run, deps.env).then((detected) => {
+    agents = detected;
+    ctx.emitState();
+  });
+  for (const workspace of store.state.workspaces) {
+    if (workspace.archivedAt) continue;
+    void refreshStats(ctx, workspace);
+    void refreshPr(workspace.id).catch(() => null);
+  }
+
+  return {
+    api,
+    settings: () => store.state.settings,
+    updateSettings,
+    async shutdown() {
+      for (const workspace of store.state.workspaces) chats.stopWorkspace(workspace);
+      ctx.terminals.closeAll();
+      await store.flush();
+    },
+  };
 }

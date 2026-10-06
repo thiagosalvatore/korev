@@ -1,5 +1,5 @@
 import type { MenuItemConstructorOptions } from 'electron';
-import type { AppCommand } from '../shared/ipc-contract';
+import type { AppCommand } from '../shared/model';
 
 export interface AppMenuOptions {
   appName: string;
@@ -9,20 +9,24 @@ export interface AppMenuOptions {
 
 const SEPARATOR: MenuItemConstructorOptions = { type: 'separator' };
 
-function commandItem(
-  label: string,
-  accelerator: string,
-  command: AppCommand,
+type CommandEntry = [label: string, accelerator: string, command: AppCommand];
+
+function items(
+  entries: (CommandEntry | null)[],
   send: (command: AppCommand) => void,
-): MenuItemConstructorOptions {
-  return { label, accelerator, click: () => send(command) };
+): MenuItemConstructorOptions[] {
+  return entries.map((entry) =>
+    entry
+      ? { label: entry[0], accelerator: entry[1], click: () => send(entry[2]) }
+      : SEPARATOR,
+  );
 }
 
 function appSubmenu(options: AppMenuOptions): MenuItemConstructorOptions[] {
   return [
     { role: 'about' },
     SEPARATOR,
-    commandItem('Settings…', 'CmdOrCtrl+,', 'show-settings', options.send),
+    ...items([['Settings…', 'CmdOrCtrl+,', 'show-settings']], options.send),
     SEPARATOR,
     { role: 'services' },
     SEPARATOR,
@@ -34,36 +38,77 @@ function appSubmenu(options: AppMenuOptions): MenuItemConstructorOptions[] {
   ];
 }
 
-function developmentItems(
-  isDevelopment: boolean,
-): MenuItemConstructorOptions[] {
+const FILE_ENTRIES: (CommandEntry | null)[] = [
+  ['New Workspace', 'CmdOrCtrl+N', 'new-workspace'],
+  ['New Chat', 'CmdOrCtrl+T', 'new-chat'],
+  ['Close Tab', 'CmdOrCtrl+W', 'close-tab'],
+  null,
+  ['Archive Workspace', 'CmdOrCtrl+Shift+A', 'archive-workspace'],
+  ['Open In…', 'CmdOrCtrl+O', 'open-in'],
+];
+
+const VIEW_ENTRIES: (CommandEntry | null)[] = [
+  ['Command Palette', 'CmdOrCtrl+K', 'show-palette'],
+  null,
+  ['Toggle Left Sidebar', 'CmdOrCtrl+B', 'toggle-sidebar'],
+  ['Toggle Right Sidebar', 'CmdOrCtrl+Alt+B', 'toggle-panel'],
+  ['Toggle Terminal', 'CmdOrCtrl+J', 'toggle-terminal'],
+  ['Toggle Zen Mode', 'CmdOrCtrl+.', 'toggle-zen'],
+  ['Toggle Theme', 'CmdOrCtrl+Alt+T', 'toggle-theme'],
+  null,
+  ['Open Diff View', 'CmdOrCtrl+Shift+D', 'open-diff'],
+];
+
+const WORKSPACE_ENTRIES: (CommandEntry | null)[] = [
+  ['Previous Workspace', 'CmdOrCtrl+Alt+Up', 'previous-workspace'],
+  ['Next Workspace', 'CmdOrCtrl+Alt+Down', 'next-workspace'],
+  null,
+  ...Array.from(
+    { length: 9 },
+    (_, index): CommandEntry => [
+      `Workspace ${index + 1}`,
+      `CmdOrCtrl+${index + 1}`,
+      `select-workspace-${index + 1}` as AppCommand,
+    ],
+  ),
+  null,
+  ['Start or Stop Run Script', 'CmdOrCtrl+R', 'run-script'],
+  ['Create PR', 'CmdOrCtrl+Shift+P', 'create-pr'],
+  ['Merge PR', 'CmdOrCtrl+Shift+M', 'merge-pr'],
+  ['Fix Errors', 'CmdOrCtrl+Shift+X', 'fix-errors'],
+];
+
+const CHAT_ENTRIES: (CommandEntry | null)[] = [
+  ['Focus Chat Input', 'CmdOrCtrl+L', 'focus-composer'],
+  ['Cancel Agent', 'CmdOrCtrl+Shift+Backspace', 'cancel-agent'],
+];
+
+function developmentItems(isDevelopment: boolean): MenuItemConstructorOptions[] {
   if (!isDevelopment) return [];
   return [SEPARATOR, { role: 'forceReload' }, { role: 'toggleDevTools' }];
-}
-
-function viewSubmenu(options: AppMenuOptions): MenuItemConstructorOptions[] {
-  const { send } = options;
-  return [
-    commandItem('Go to…', 'CmdOrCtrl+K', 'show-palette', send),
-    SEPARATOR,
-    commandItem('Review Requests', 'CmdOrCtrl+1', 'show-review', send),
-    commandItem('Open', 'CmdOrCtrl+2', 'show-open', send),
-    commandItem('Ready to Merge', 'CmdOrCtrl+3', 'show-ready', send),
-    commandItem('Stale', 'CmdOrCtrl+4', 'show-stale', send),
-    SEPARATOR,
-    commandItem('Refresh', 'CmdOrCtrl+R', 'refresh', send),
-    commandItem('Keyboard Shortcuts', 'CmdOrCtrl+/', 'show-shortcuts', send),
-    ...developmentItems(options.isDevelopment),
-  ];
 }
 
 export function appMenuTemplate(
   options: AppMenuOptions,
 ): MenuItemConstructorOptions[] {
+  const { send } = options;
   return [
     { label: options.appName, submenu: appSubmenu(options) },
+    { label: 'File', submenu: items(FILE_ENTRIES, send) },
     { role: 'editMenu' },
-    { label: 'View', submenu: viewSubmenu(options) },
+    {
+      label: 'View',
+      submenu: [
+        ...items(VIEW_ENTRIES, send),
+        SEPARATOR,
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        ...developmentItems(options.isDevelopment),
+      ],
+    },
+    { label: 'Workspace', submenu: items(WORKSPACE_ENTRIES, send) },
+    { label: 'Chat', submenu: items(CHAT_ENTRIES, send) },
     { role: 'windowMenu' },
   ];
 }

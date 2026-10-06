@@ -1,5 +1,5 @@
 const FILE_PROTOCOL = 'file:';
-const GITHUB_WEB_ORIGIN = 'https://github.com';
+const WEB_PROTOCOLS = new Set(['https:', 'http:']);
 
 export interface AppOrigin {
   devServerUrl: string | undefined;
@@ -34,7 +34,7 @@ export function isAppUrl(url: string | undefined, origin: AppOrigin): boolean {
   );
 }
 
-export function isGithubUrl(url: string): boolean {
+export function isWebUrl(url: string): boolean {
   const parsed = parseUrl(url);
-  return parsed?.origin === GITHUB_WEB_ORIGIN;
+  return parsed !== null && WEB_PROTOCOLS.has(parsed.protocol);
 }

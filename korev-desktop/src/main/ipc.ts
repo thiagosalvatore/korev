@@ -1,9 +1,7 @@
 import type { IpcMainInvokeEvent } from 'electron';
-import type { IpcChannel } from '../shared/ipc-contract';
+import { CALL_CHANNEL } from '../shared/api';
 
-export type IpcHandler = (...args: never[]) => unknown;
-
-export type IpcHandlers = Partial<Record<IpcChannel, IpcHandler>>;
+export type IpcHandlers = Record<string, (...args: never[]) => unknown>;
 
 export interface IpcRegistrar {
   handle(
@@ -13,9 +11,16 @@ export interface IpcRegistrar {
 }
 
 export class UntrustedSenderError extends Error {
-  constructor(channel: string) {
-    super(`Rejected ${channel} from an untrusted sender`);
+  constructor(method: string) {
+    super(`Rejected ${method} from an untrusted sender`);
     this.name = 'UntrustedSenderError';
+  }
+}
+
+export class UnknownMethodError extends Error {
+  constructor(method: string) {
+    super(`Unknown method ${method}`);
+    this.name = 'UnknownMethodError';
   }
 }
 
@@ -24,12 +29,13 @@ export function registerIpcHandlers(
   handlers: IpcHandlers,
   isTrustedSender: (senderUrl: string | undefined) => boolean,
 ): void {
-  for (const [channel, handler] of Object.entries(handlers)) {
-    ipc.handle(channel, (event, ...args) => {
-      if (!isTrustedSender(event.senderFrame?.url)) {
-        throw new UntrustedSenderError(channel);
-      }
-      return (handler as (...values: unknown[]) => unknown)(...args);
-    });
-  }
+  ipc.handle(CALL_CHANNEL, (event, method, args) => {
+    const name = String(method);
+    if (!isTrustedSender(event.senderFrame?.url)) {
+      throw new UntrustedSenderError(name);
+    }
+    if (!Object.hasOwn(handlers, name)) throw new UnknownMethodError(name);
+    const values = Array.isArray(args) ? args : [];
+    return (handlers[name] as (...values: unknown[]) => unknown)(...values);
+  });
 }

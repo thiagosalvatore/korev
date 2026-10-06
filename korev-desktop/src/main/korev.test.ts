@@ -1,479 +1,147 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { IpcChannel } from '../shared/ipc-contract';
-import { createMemoryFileSystem } from './file-system';
-import { githubEndpoints } from './github/config';
-import { emptySnapshot } from './github/inbox-poller';
-import { CACHE_VERSION } from './inbox-cache';
-import {
-  type CannedReply,
-  type CannedResponse,
-  createFakeFetch,
-  graphqlBody,
-} from './github/test-fetch';
-import inboxPage from './github/fixtures/inbox-page.json';
+import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { runProcess } from './command-runner';
+import { nodeFileSystem } from './file-system';
 import { createKorev, type Korev } from './korev';
-import type { SecretCipher } from './encrypted-file';
 
-const VIEWER = { login: 'maria', avatarUrl: 'https://example.test/maria.png' };
-const EMPTY_SEARCH = {
-  pageInfo: { hasNextPage: false, endCursor: null },
-  nodes: [],
-};
+const FAKE_AGENT_BIN = path.resolve(__dirname, '../../test-support/bin');
+const WAIT_TIMEOUT_MS = 10_000;
 
-const plainCipher: SecretCipher = {
-  isAvailable: async () => true,
-  storageBackend: () => 'keychain',
-  encrypt: async (plainText) => Buffer.from(plainText),
-  decrypt: async (encrypted) => ({
-    result: encrypted.toString(),
-    shouldReEncrypt: false,
-  }),
-};
-
-const viewerResponse: CannedResponse = {
-  headers: { 'X-OAuth-Scopes': 'repo, read:org' },
-  body: { data: { viewer: VIEWER } },
-};
-
-const teamsResponse: CannedResponse = {
-  body: { data: { viewer: { organizations: { nodes: [] } } } },
-};
-
-const [OPEN_PR_NODE] = inboxPage.data.mine.nodes;
-const OPEN_PR_REF = 'acme/api#412';
-
-function inboxReplies(...names: string[]): CannedResponse[] {
-  return inboxRepliesWith(EMPTY_SEARCH, names);
+function git(cwd: string, ...args: string[]) {
+  return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 }
 
-const OPEN_PR_HEAD = 'f00dcafe';
-const OPEN_PR_TARGET = { id: 'PR_412', repo: 'acme/api', number: 412 };
-
-function inboxWithOpenPr(): CannedResponse[] {
-  return inboxRepliesWith(
-    { ...EMPTY_SEARCH, nodes: [{ ...OPEN_PR_NODE, headRefOid: OPEN_PR_HEAD }] },
-    ['acme/api'],
-  );
+async function waitFor(check: () => Promise<boolean>) {
+  const deadline = Date.now() + WAIT_TIMEOUT_MS;
+  while (!(await check())) {
+    if (Date.now() > deadline) throw new Error('Timed out waiting');
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
 }
 
-function storedExplanation(headOid: string): Record<string, string> {
-  return {
-    [`${USER_DATA}/explanations.bin`]: JSON.stringify({
-      version: 1,
-      login: VIEWER.login,
-      entries: {
-        [OPEN_PR_REF]: {
-          headOid,
-          format: 'markdown',
-          document: '# Why',
-          createdAt: '2026-10-04T10:00:00.000Z',
-        },
-      },
-    }),
-  };
-}
-
-function inboxRepliesWith(
-  mine: { nodes: unknown[] },
-  names: string[],
-): CannedResponse[] {
-  const access = names.map((nameWithOwner, index) => [
-    `repo${index}`,
-    { nameWithOwner, viewerPermission: 'WRITE', isArchived: false },
-  ]);
-  const bothSearches: CannedResponse = {
-    body: {
-      data: {
-        viewer: VIEWER,
-        ...Object.fromEntries(access),
-        mine,
-        reviews: EMPTY_SEARCH,
-      },
-    },
-  };
-  return [bothSearches, bothSearches];
-}
-
-const USER_DATA = '/user-data';
-const CACHED_PR_TITLE = 'Cached from the last session';
-
-const neverAnswers: CannedReply = () => new Promise(() => undefined);
-
-function previousSession(): Record<string, string> {
-  const snapshot = {
-    ...emptySnapshot(1),
-    status: 'live',
-    syncedAt: '2026-10-02T18:40:00.000Z',
-    viewerLogin: VIEWER.login,
-    reviews: {
-      entries: [{ kind: 'pr', item: { pr: { title: CACHED_PR_TITLE } } }],
-      approved: [],
-    },
-  };
-  return {
-    [`${USER_DATA}/settings.json`]: JSON.stringify({ repos: ['acme/api'] }),
-    [`${USER_DATA}/github-token.bin`]: JSON.stringify({
-      token: 'gho_saved',
-      method: 'oauth',
-      login: VIEWER.login,
-      avatarUrl: null,
-    }),
-    [`${USER_DATA}/inbox-cache.bin`]: JSON.stringify({
-      version: CACHE_VERSION,
-      snapshot,
-    }),
-  };
-}
-
-let running: Korev | null = null;
-
-function setup(
-  replies: CannedReply[] = [],
-  files: Record<string, string> = {},
-) {
-  const fake = createFakeFetch(...replies);
-  const broadcast = vi.fn();
-  const fs = createMemoryFileSystem(files);
-  const korev = createKorev({
-    userDataPath: USER_DATA,
-    tempPath: '/tmp',
-    env: {},
-    runCommand: async () => {
-      throw new Error('No CLI in tests');
-    },
-    spawnPty: () => {
-      throw new Error('No terminal in tests');
-    },
-    fs,
-    cipher: plainCipher,
-    fetch: fake.fetch,
-    github: githubEndpoints(true, {}),
-    sleep: async () => undefined,
-    openExternal: async () => undefined,
-    openPath: async () => undefined,
-    notify: () => undefined,
-    prefersDark: () => false,
-    applyTheme: () => undefined,
-    broadcast,
-    warn: () => undefined,
-  });
-  const invoke = (channel: IpcChannel, ...args: unknown[]) =>
-    (korev.handlers[channel] as (...values: unknown[]) => unknown)(...args);
-  const settingsBroadcasts = () =>
-    broadcast.mock.calls
-      .filter(([channel]) => channel === IpcChannel.SettingsChanged)
-      .map(([, settings]) => settings);
-  running = korev;
-  return { korev, fs, fake, invoke, settingsBroadcasts };
-}
-
-afterEach(() => {
-  running?.inbox.stop();
-  running = null;
+const noPty = () => ({
+  onData: () => undefined,
+  onExit: () => undefined,
+  write: () => undefined,
+  resize: () => undefined,
+  kill: () => undefined,
 });
 
-describe('korev', () => {
-  it('broadcasts the settings after a setter changes them', async () => {
-    const { korev, invoke, settingsBroadcasts } = setup();
-    await korev.start();
+describe('Korev core', () => {
+  let home: string;
+  let repoPath: string;
+  let korev: Korev;
 
-    await invoke(IpcChannel.SettingsSetTheme, 'dark');
+  beforeEach(async () => {
+    home = await mkdtemp(path.join(tmpdir(), 'korev-core-'));
+    repoPath = path.join(home, 'acme');
+    execFileSync('git', ['init', '-q', '-b', 'main', repoPath]);
+    git(repoPath, 'config', 'user.email', 'dev@example.com');
+    git(repoPath, 'config', 'user.name', 'Dev');
+    git(repoPath, 'config', 'commit.gpgsign', 'false');
+    await writeFile(path.join(repoPath, 'README.md'), '# acme\n');
+    await writeFile(path.join(repoPath, '.gitignore'), '.env\n');
+    await writeFile(path.join(repoPath, '.env'), 'SECRET=1\n');
+    git(repoPath, 'add', 'README.md', '.gitignore');
+    git(repoPath, 'commit', '-q', '-m', 'init');
+    korev = await createKorev({
+      run: runProcess,
+      env: { ...process.env, PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}` },
+      shell: '/bin/sh',
+      home,
+      userDataPath: path.join(home, 'user-data'),
+      fs: nodeFileSystem,
+      spawnPty: noPty,
+      emit: () => undefined,
+      notify: () => undefined,
+      isWindowFocused: () => true,
+      setBadge: () => undefined,
+      now: () => new Date(),
+      newId: () => randomUUID(),
+      chooseDirectory: async () => repoPath,
+      openPath: async () => undefined,
+      openExternal: async () => undefined,
+      applyTheme: () => undefined,
+    });
+    await korev.api.updateSettings({ branchPrefix: 'dev', autoRenameBranches: false });
+  });
 
-    expect(settingsBroadcasts()).toEqual([
-      expect.objectContaining({ theme: 'dark' }),
+  afterEach(async () => {
+    await korev.shutdown();
+    await rm(home, { recursive: true, force: true });
+  });
+
+  async function createWorkspace() {
+    const added = await korev.api.addRepo();
+    if (!added.ok || !added.value) throw new Error('repo not added');
+    const created = await korev.api.createWorkspace(added.value.id);
+    if (!created.ok) throw new Error(created.message);
+    return created.value;
+  }
+
+  async function sendAndWait(sessionId: string, text: string) {
+    const sent = await korev.api.send(sessionId, {
+      text,
+      model: 'claude-sonnet-5-5',
+      effort: 'high',
+      planMode: false,
+    });
+    expect(sent.ok).toBe(true);
+    await waitFor(async () => (await korev.api.getState()).runningSessions.length === 0);
+  }
+
+  it('creates a worktree on a city branch with .context ignored and .env copied', async () => {
+    const workspace = await createWorkspace();
+
+    expect(workspace.branch).toBe(`dev/${workspace.name}`);
+    expect(git(workspace.path, 'branch', '--show-current')).toBe(workspace.branch);
+    expect(existsSync(path.join(workspace.path, '.context'))).toBe(true);
+    expect(await readFile(path.join(workspace.path, '.env'), 'utf8')).toBe('SECRET=1\n');
+    expect(await korev.api.changes(workspace.id)).toEqual([]);
+  });
+
+  it('runs an agent turn, shows its changes and reverts them from a checkpoint', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+
+    await sendAndWait(session.id, 'Add a note');
+
+    const transcript = await korev.api.transcript(session.id);
+    expect(transcript.map((item) => item.kind)).toEqual(['user', 'assistant', 'tool', 'result']);
+    expect(await korev.api.changes(workspace.id)).toEqual([
+      { path: 'agent-note.txt', status: 'A', additions: 1, deletions: 0 },
     ]);
-  });
-
-  it('saves the new name of a renamed repo in the same position', async () => {
-    const { korev, invoke, settingsBroadcasts } = setup([
-      viewerResponse,
-      ...inboxReplies('acme/web', 'acme/api-v2'),
-      teamsResponse,
-      ...inboxReplies('acme/web', 'acme/api-v2'),
-    ]);
-    await korev.start();
-    await invoke(IpcChannel.AuthUseToken, 'ghp_token');
-
-    await invoke(IpcChannel.SettingsSetRepos, ['acme/web', 'acme/api']);
-
-    await vi.waitFor(() =>
-      expect(korev.settings.current().repos).toEqual([
-        'acme/web',
-        'acme/api-v2',
-      ]),
-    );
-    expect(settingsBroadcasts().map((settings) => settings.repos)).toEqual([
-      ['acme/web', 'acme/api'],
-      ['acme/web', 'acme/api-v2'],
-    ]);
-  });
-
-  it('reorders repos without asking GitHub again', async () => {
-    const { korev, fake, invoke } = setup([
-      viewerResponse,
-      ...inboxReplies('acme/api', 'acme/web'),
-      teamsResponse,
-    ]);
-    await korev.start();
-    await invoke(IpcChannel.AuthUseToken, 'ghp_token');
-    await invoke(IpcChannel.SettingsSetRepos, ['acme/api', 'acme/web']);
-    await vi.waitFor(() =>
-      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
-        status: 'live',
-      }),
-    );
-    const requestsBefore = fake.requests.length;
-
-    await invoke(IpcChannel.SettingsSetRepos, ['acme/web', 'acme/api']);
-
-    expect(fake.requests).toHaveLength(requestsBefore);
-    expect(korev.settings.current().repos).toEqual(['acme/web', 'acme/api']);
-  });
-
-  it('keeps a PR without asking GitHub again', async () => {
-    const { korev, fake, invoke } = setup([
-      viewerResponse,
-      ...inboxWithOpenPr(),
-      teamsResponse,
-    ]);
-    await korev.start();
-    await invoke(IpcChannel.AuthUseToken, 'ghp_token');
-    await invoke(IpcChannel.SettingsSetRepos, ['acme/api']);
-    await vi.waitFor(() =>
-      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
-        status: 'live',
-      }),
-    );
-    const requestsBefore = fake.requests.length;
-
-    await invoke(IpcChannel.SettingsSetKept, [OPEN_PR_REF], true);
-
-    expect(Object.keys(korev.settings.current().keptPrs)).toEqual([
-      OPEN_PR_REF,
-    ]);
-    expect(fake.requests).toHaveLength(requestsBefore);
-  });
-
-  it('prunes keeps for PRs that are no longer open after a sync', async () => {
-    const keptAt = new Date().toISOString();
-    const { korev, invoke } = setup(
-      [viewerResponse, ...inboxWithOpenPr(), teamsResponse],
-      {
-        [`${USER_DATA}/settings.json`]: JSON.stringify({
-          repos: ['acme/api'],
-          keptPrs: { [OPEN_PR_REF]: keptAt, 'acme/api#999': keptAt },
-        }),
-      },
-    );
-    await korev.start();
-    await invoke(IpcChannel.AuthUseToken, 'ghp_token');
-
-    await vi.waitFor(() =>
-      expect(korev.settings.current().keptPrs).toEqual({
-        [OPEN_PR_REF]: keptAt,
-      }),
-    );
-  });
-
-  it('shows the cached inbox from the last session while the first sync runs', async () => {
-    const { korev, invoke } = setup([neverAnswers], previousSession());
-
-    await korev.start();
-
-    expect(await invoke(IpcChannel.AuthGetState)).toMatchObject({
-      connection: { login: VIEWER.login },
+    const state = await korev.api.getState();
+    expect(state.workspaces[0].sessions[0]).toMatchObject({
+      title: 'Add a note',
+      agentSessionId: 'fake-session',
     });
-    expect(await invoke(IpcChannel.InboxLoad)).toMatchObject({
-      status: 'syncing',
-      fromCache: true,
-      reviews: { entries: [{ item: { pr: { title: CACHED_PR_TITLE } } }] },
-    });
+
+    const reverted = await korev.api.revert(session.id, transcript[0].id);
+
+    expect(reverted).toEqual({ ok: true, value: 'Add a note' });
+    expect(existsSync(path.join(workspace.path, 'agent-note.txt'))).toBe(false);
+    expect(await korev.api.transcript(session.id)).toEqual([]);
   });
 
-  it('deletes the cached inbox on disconnect', async () => {
-    const { korev, fs, invoke } = setup([neverAnswers], previousSession());
-    await korev.start();
+  it('archives a workspace and restores its uncommitted work', async () => {
+    const workspace = await createWorkspace();
+    await writeFile(path.join(workspace.path, 'draft.txt'), 'wip\n');
 
-    await invoke(IpcChannel.AuthDisconnect);
+    const archived = await korev.api.archiveWorkspace(workspace.id);
 
-    expect(fs.files.has(`${USER_DATA}/inbox-cache.bin`)).toBe(false);
-  });
+    expect(archived.ok).toBe(true);
+    expect(existsSync(workspace.path)).toBe(false);
+    expect(git(repoPath, 'branch', '--list', workspace.branch)).toContain(workspace.branch);
 
-  it('does not open a terminal for a pull request Korev has no checkout of', async () => {
-    const { invoke } = setup();
+    const restored = await korev.api.restoreWorkspace(workspace.id);
 
-    expect(
-      await invoke(IpcChannel.TerminalOpen, OPEN_PR_TARGET, {
-        cols: 80,
-        rows: 24,
-      }),
-    ).toEqual({ ok: false, message: expect.stringContaining('no longer') });
-  });
-
-  it('opens the saved explanation for the same head commit without running the agent', async () => {
-    const { korev, invoke } = setup([...inboxWithOpenPr(), teamsResponse], {
-      ...previousSession(),
-      ...storedExplanation(OPEN_PR_HEAD),
-    });
-    await korev.start();
-    await vi.waitFor(() =>
-      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
-        status: 'live',
-        fromCache: false,
-      }),
-    );
-
-    expect(await invoke(IpcChannel.AiExplain, OPEN_PR_TARGET, false)).toEqual({
-      ok: true,
-    });
-    expect(await invoke(IpcChannel.InboxLoad)).toMatchObject({
-      agentTasks: {},
-    });
-    expect(await invoke(IpcChannel.AiExplanation, OPEN_PR_TARGET)).toEqual({
-      headOid: OPEN_PR_HEAD,
-      body: '<h1>Why</h1>\n',
-      stale: false,
-    });
-  });
-
-  it('marks an explanation made for an older head commit as stale', async () => {
-    const { korev, invoke } = setup([...inboxWithOpenPr(), teamsResponse], {
-      ...previousSession(),
-      ...storedExplanation('0ldhead'),
-    });
-    await korev.start();
-    await vi.waitFor(() =>
-      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
-        fromCache: false,
-      }),
-    );
-
-    expect(
-      await invoke(IpcChannel.AiExplanation, OPEN_PR_TARGET),
-    ).toMatchObject({ stale: true });
-  });
-
-  it('finishes Fix CI with nothing to do and fetches the inbox again when no check is failing', async () => {
-    const noChecks: CannedResponse = {
-      body: {
-        data: { repository: { pullRequest: { statusCheckRollup: null } } },
-      },
-    };
-    const { korev, fake, invoke } = setup(
-      [...inboxWithOpenPr(), teamsResponse, noChecks, ...inboxWithOpenPr()],
-      previousSession(),
-    );
-    await korev.start();
-    await vi.waitFor(() =>
-      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
-        status: 'live',
-        fromCache: false,
-      }),
-    );
-    const requestsBefore = fake.requests.length;
-
-    await invoke(IpcChannel.AiStart, OPEN_PR_TARGET, 'fix-ci');
-
-    await vi.waitFor(() =>
-      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
-        agentTasks: {
-          [OPEN_PR_REF]: { status: 'done', nothingToDo: true },
-        },
-      }),
-    );
-    await vi.waitFor(() =>
-      expect(fake.requests.length).toBeGreaterThan(requestsBefore + 1),
-    );
-    expect(graphqlBody(fake.requests[requestsBefore]).query).toContain(
-      'FailingChecks',
-    );
-    expect(graphqlBody(fake.requests[requestsBefore + 1]).query).toContain(
-      'mine',
-    );
-  });
-
-  it('re-runs every cancelled workflow run when more checks fail than Fix CI reads details for', async () => {
-    const runIds = Array.from({ length: 12 }, (_, index) => 100 + index);
-    const cancelledChecks: CannedResponse = {
-      body: {
-        data: {
-          repository: {
-            pullRequest: {
-              statusCheckRollup: {
-                contexts: {
-                  pageInfo: { hasNextPage: false, endCursor: null },
-                  nodes: runIds.map((runId) => ({
-                    __typename: 'CheckRun',
-                    databaseId: runId * 10,
-                    name: `job ${runId}`,
-                    status: 'COMPLETED',
-                    conclusion: 'CANCELLED',
-                    checkSuite: {
-                      app: { slug: 'github-actions' },
-                      workflowRun: { databaseId: runId },
-                    },
-                  })),
-                },
-              },
-            },
-          },
-        },
-      },
-    };
-    const [inboxAfterRerun] = inboxWithOpenPr();
-    const routeByUrl: CannedReply = async (request) => {
-      if (request.url.includes('/annotations')) return { body: [] };
-      if (request.url.includes('/logs')) return { status: 404 };
-      if (request.url.includes('/rerun-failed-jobs')) return { status: 201 };
-      return inboxAfterRerun;
-    };
-    const { korev, fake, invoke } = setup(
-      [...inboxWithOpenPr(), teamsResponse],
-      previousSession(),
-    );
-    await korev.start();
-    await vi.waitFor(() =>
-      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
-        status: 'live',
-        fromCache: false,
-      }),
-    );
-    fake.enqueue(cancelledChecks, ...Array(40).fill(routeByUrl));
-
-    await invoke(IpcChannel.AiStart, OPEN_PR_TARGET, 'fix-ci');
-
-    await vi.waitFor(() =>
-      expect(korev.handlers[IpcChannel.InboxLoad]?.()).toMatchObject({
-        agentTasks: { [OPEN_PR_REF]: { status: 'done' } },
-      }),
-    );
-    const urls = fake.requests.map((request) => request.url);
-    expect(
-      urls.filter((url) => url.includes('/rerun-failed-jobs')).sort(),
-    ).toEqual(
-      runIds.map(
-        (runId) =>
-          `https://api.github.com/repos/acme/api/actions/runs/${runId}/rerun-failed-jobs`,
-      ),
-    );
-    expect(urls.filter((url) => url.includes('/annotations'))).toHaveLength(10);
-  });
-
-  it("deletes saved explanations and Korev's task records on disconnect", async () => {
-    const { korev, fs, invoke } = setup([neverAnswers], {
-      ...previousSession(),
-      ...storedExplanation(OPEN_PR_HEAD),
-      [`${USER_DATA}/agent-tasks.bin`]: JSON.stringify({
-        version: 1,
-        login: VIEWER.login,
-        records: {},
-      }),
-    });
-    await korev.start();
-
-    await invoke(IpcChannel.AuthDisconnect);
-
-    expect(fs.files.has(`${USER_DATA}/explanations.bin`)).toBe(false);
-    expect(fs.files.has(`${USER_DATA}/agent-tasks.bin`)).toBe(false);
+    expect(restored.ok).toBe(true);
+    expect(await readFile(path.join(workspace.path, 'draft.txt'), 'utf8')).toBe('wip\n');
   });
 });

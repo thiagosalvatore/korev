@@ -1,6 +1,5 @@
 import { cn } from '../../cn';
 import { DiffStat } from './DiffStat';
-import { RiskBadge, type RiskLevel } from './RiskBadge';
 
 export type FileStatus = 'A' | 'M' | 'D' | 'R';
 
@@ -9,7 +8,6 @@ export interface FileRowProps {
   status?: FileStatus;
   additions?: number;
   deletions?: number;
-  risk?: RiskLevel;
   reviewed?: boolean;
   active?: boolean;
   onClick?: () => void;
@@ -28,7 +26,6 @@ export function FileRow({
   status = 'M',
   additions = 0,
   deletions = 0,
-  risk,
   reviewed = false,
   active = false,
   onClick,
@@ -54,7 +51,6 @@ export function FileRow({
       >
         <bdi>{path}</bdi>
       </span>
-      {risk ? <RiskBadge level={risk} iconOnly /> : null}
       {showStat ? (
         <DiffStat additions={additions} deletions={deletions} showBar={false} />
       ) : null}
