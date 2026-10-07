@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   CODEX_DEFAULT_MODEL,
-  planBlock,
   type AgentKind,
   type ChatSession,
   type GitWorktree,
@@ -17,6 +16,7 @@ import {
   type WorkspaceSource,
 } from '../shared/model';
 import { errorMessage, terminalRef, type Context } from './context';
+import { planBlock } from '../shared/message';
 import {
   addBranchWorktree,
   addDetachedWorktree,

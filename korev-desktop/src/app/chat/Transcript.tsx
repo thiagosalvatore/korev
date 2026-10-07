@@ -20,9 +20,11 @@ import type {
   TurnChanges,
   TurnRange,
 } from '../../shared/model';
-import { duration } from '../../shared/format';
+import { duration, fileName } from '../../shared/format';
+import { messageParts, type MessageParts } from '../../shared/message';
 import { Markdown } from './Markdown';
 import { PermissionCard } from './PermissionCard';
+import { PlanChip } from './PlanChip';
 
 type ToolItem = Extract<ChatItem, { kind: 'tool' }>;
 
@@ -214,6 +216,40 @@ function Thinking({ text }: { text: string }) {
   );
 }
 
+const MESSAGE_CHIP =
+  'inline-flex h-7 max-w-full items-center gap-1.5 rounded-md border border-border-1 bg-inset px-2 text-xs';
+
+function MessageAttachments({
+  plans,
+  files,
+}: Pick<MessageParts, 'plans' | 'files'>) {
+  if (!plans.length && !files.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 whitespace-normal">
+      {plans.map((plan, index) => (
+        <PlanChip
+          key={index}
+          name={plan.name}
+          markdown={plan.markdown}
+          className={cn(MESSAGE_CHIP, 'text-fg-1 hover:bg-hover')}
+        >
+          <Icon name="file-text" size={13} className="text-fg-3" />
+          <span className="truncate font-mono">{plan.name}</span>
+          {plan.from ? (
+            <span className="truncate text-fg-3">from {plan.from}</span>
+          ) : null}
+        </PlanChip>
+      ))}
+      {files.map((file) => (
+        <span key={file} title={file} className={cn(MESSAGE_CHIP, 'text-fg-2')}>
+          <Icon name="paperclip" size={13} className="text-fg-3" />
+          <span className="truncate font-mono">{fileName(file)}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function UserMessage({
   item,
   canRevert,
@@ -223,6 +259,7 @@ function UserMessage({
   canRevert: boolean;
   onRevert: () => void;
 }) {
+  const { body, plans, files } = messageParts(item.text);
   return (
     <div className="group flex justify-end gap-1">
       <div className="flex items-start gap-0.5 pt-1 opacity-0 group-hover:opacity-100">
@@ -243,7 +280,7 @@ function UserMessage({
       </div>
       <div
         className={cn(
-          'max-w-[85%] rounded-lg border border-border-1 bg-raised px-3.5 py-2.5 text-md whitespace-pre-wrap text-fg-1',
+          'flex max-w-[85%] flex-col gap-2 rounded-lg border border-border-1 bg-raised px-3.5 py-2.5 text-md whitespace-pre-wrap text-fg-1',
           item.queued && 'border-dashed opacity-60',
         )}
       >
@@ -252,7 +289,8 @@ function UserMessage({
             Queued
           </span>
         ) : null}
-        {item.text}
+        {body ? <span>{body}</span> : null}
+        <MessageAttachments plans={plans} files={files} />
       </div>
     </div>
   );

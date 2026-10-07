@@ -595,11 +595,6 @@ export const PLAN_TOOL = 'ExitPlanMode';
 export const PENDING_PLAN_PLACEHOLDER =
   'Add instructions, or send to implement the plan';
 
-export function planBlock(plan: string, from?: string): string {
-  const source = from ? ` from="${from.replaceAll('"', "'")}"` : '';
-  return `<plan${source}>\n${plan}\n</plan>`;
-}
-
 export function planOf(items: ChatItem[]): string | null {
   const planTool = items.findLast(
     (item) => item.kind === 'tool' && item.name === PLAN_TOOL,

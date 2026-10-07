@@ -18,12 +18,18 @@ import {
   type Snippet,
   type TurnUsage,
 } from '../../shared/model';
+import {
+  formatAttachments,
+  planFileName,
+  TAB_CONTEXT_HEADER,
+} from '../../shared/message';
 import { api } from '../bridge';
 import { fileName } from '../../shared/format';
 import { reportFailure } from '../ui/toast';
 import type { DiffComment } from '../ui-store';
 import { readAsBase64 } from './attachments';
 import { ComposerToolbar } from './ComposerToolbar';
+import { PlanChip } from './PlanChip';
 import {
   applySuggestion,
   createSuggestionLoader,
@@ -79,14 +85,9 @@ export function formatComments(comments: DiffComment[]): string {
   return `\n\nReview comments on the diff:\n${lines.join('\n')}`;
 }
 
-function formatAttachments(paths: string[]): string {
-  if (!paths.length) return '';
-  return `\n\nAttached files (read them):\n${paths.map((file) => `- ${file}`).join('\n')}`;
-}
-
 function formatTabContext(contexts: TabContext[]): string {
   if (!contexts.length) return '';
-  return `\n\nContext from other tabs:\n\n${contexts.map((context) => context.prompt).join('\n\n')}`;
+  return `\n\n${TAB_CONTEXT_HEADER}\n\n${contexts.map((context) => context.prompt).join('\n\n')}`;
 }
 
 function nextEffort(agent: AgentKind, effort: string): string {
@@ -351,8 +352,14 @@ export function Composer(props: ComposerProps) {
           <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
             {pendingPlan ? (
               <span className="inline-flex h-6 max-w-72 items-center gap-1.5 rounded-sm bg-accent-subtle px-2 text-xs text-accent-text">
-                <Icon name="list-checks" size={12} />
-                <span className="truncate">Plan · {pendingPlan.from}</span>
+                <PlanChip
+                  name={planFileName(pendingPlan.plan)}
+                  markdown={pendingPlan.plan}
+                  className="flex min-w-0 items-center gap-1.5 border-0 bg-transparent p-0 text-accent-text"
+                >
+                  <Icon name="list-checks" size={12} />
+                  <span className="truncate">Plan · {pendingPlan.from}</span>
+                </PlanChip>
                 <button
                   type="button"
                   aria-label="Remove the handed-off plan"

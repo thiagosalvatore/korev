@@ -23,6 +23,7 @@ import {
 } from '../../../korev-desktop/src/shared/model';
 import { MONO_FONT, useTheme, type Theme } from '../theme';
 import { Button } from '../ui';
+import { MarkdownView } from './MarkdownView';
 
 type PermissionItem = Extract<ChatItem, { kind: 'permission' }>;
 
@@ -152,11 +153,7 @@ export function PlanReview({
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Plan ready for review</Text>
-      {showPlan ? (
-        <Text selectable style={styles.body}>
-          {plan}
-        </Text>
-      ) : null}
+      {showPlan ? <MarkdownView value={plan} /> : null}
       {here ? (
         <LaneList here={here} drafts={drafts} onChange={setDrafts} />
       ) : null}

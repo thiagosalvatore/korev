@@ -16,11 +16,13 @@ import {
   type ChatSession,
   type ModelChoice,
 } from '../../../korev-desktop/src/shared/model';
+import { planFileName } from '../../../korev-desktop/src/shared/message';
 import { attempt } from '../attempt';
 import { useConnection } from '../korev';
 import { ModelPicker } from '../ModelPicker';
 import { useTheme, type Theme } from '../theme';
 import { Button } from '../ui';
+import { PlanChip } from './PlanChip';
 
 export function Composer({
   state,
@@ -86,10 +88,16 @@ export function Composer({
     >
       {pendingPlan ? (
         <View style={styles.chip}>
-          <ListChecks size={14} color={theme.accentText} />
-          <Text style={styles.chipLabel} numberOfLines={1}>
-            Plan · {pendingPlan.from}
-          </Text>
+          <PlanChip
+            name={planFileName(pendingPlan.plan)}
+            markdown={pendingPlan.plan}
+            style={styles.chipPreview}
+          >
+            <ListChecks size={14} color={theme.accentText} />
+            <Text style={styles.chipLabel} numberOfLines={1}>
+              Plan · {pendingPlan.from}
+            </Text>
+          </PlanChip>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Remove the handed-off plan"
@@ -162,6 +170,12 @@ function makeStyles(theme: Theme) {
       paddingVertical: 4,
       borderRadius: 6,
       backgroundColor: theme.accentSubtle,
+    },
+    chipPreview: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 1,
+      gap: 6,
     },
     chipLabel: { flexShrink: 1, color: theme.accentText, fontSize: 13 },
     input: { maxHeight: 160, color: theme.fg1, fontSize: 15 },

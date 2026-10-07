@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { KorevApi } from '../shared/api';
+import { planBlock } from '../shared/message';
 import {
   EMPTY_SCRIPTS,
   hasWorktree,
@@ -13,7 +14,6 @@ import {
   type EditorApp,
   type EditorId,
   latestPlan,
-  planBlock,
   type PlanLane,
   type PromptKind,
   type PrStatus,

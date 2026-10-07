@@ -1,12 +1,8 @@
 import { useState } from 'react';
 import { IconButton } from '../../design-system';
 
-import {
-  conversationText,
-  planBlock,
-  planOf,
-  type ChatItem,
-} from '../../shared/model';
+import { planBlock } from '../../shared/message';
+import { conversationText, planOf, type ChatItem } from '../../shared/model';
 import { api } from '../bridge';
 import { Menu, type MenuItem } from '../ui/Menu';
 import { reportFailure } from '../ui/toast';
