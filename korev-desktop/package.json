@@ -21,6 +21,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vite.renderer.config.mts",
     "test:e2e": "electron-forge package && playwright test",
+    "docs:screenshots": "electron-forge package && playwright test --config docs-screenshots/playwright.config.ts",
     "icons": "./scripts/build-icons.sh"
   },
   "devDependencies": {

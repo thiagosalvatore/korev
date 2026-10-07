@@ -133,7 +133,7 @@ git tag -d vX.Y.Z
 4. Follow `DESIGN.md` for UI changes: semantic tokens only, one accent colour.
 5. Add a line under `## [Unreleased]` in `CHANGELOG.md` when you change what the user sees. Korev shows these notes after an update.
 6. Run the checks above, then start CI on your branch.
-7. Update the docs in `korev-frontend/content/docs` when you change what the user sees. To preview them, run `npm run dev` in `korev-frontend` and open `/docs`.
+7. Update the docs in `korev-frontend/content/docs` when you change what the user sees. To preview them, run `npm run dev` in `korev-frontend` and open `/docs`. If you change a screen that the docs show, run `npm run docs:screenshots` in `korev-desktop` to take the screenshots again.
 8. Write the commit and pull request title as one sentence that says what the user sees change, for example "Keep the Mac awake while an agent is running". Pull requests are squash-merged.
 
 For things to work on, see `TODOS.md`.

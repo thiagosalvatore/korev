@@ -1,11 +1,14 @@
 import { existsSync, globSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { screenshotPath } from '@/components/docs/screenshot-path';
 
 const DOCS_DIR = 'content/docs';
 const MDX_LINK = /\]\((?!https?:)([^)#]+\.mdx)(?:#[^)]*)?\)/g;
 const FILE_RELATIVE = /^\.\.?\//;
 const DOCS_HREF = /href="\/docs\/?([^"#]*)"/g;
+const SCREENSHOT_NAME = /<Screenshot\s+name="([^"]+)"/g;
+const PUBLIC_DIR = 'public';
 
 function pages() {
   return globSync('**/*.mdx', { cwd: DOCS_DIR }).map((page) => ({
@@ -40,5 +43,19 @@ describe('docs links', () => {
     );
     expect(hrefs.length).toBeGreaterThan(0);
     expect(hrefs.filter(({ urlPath }) => !pageExistsAt(urlPath))).toEqual([]);
+  });
+
+  it('screenshots have a dark and a light image', () => {
+    const names = pages().flatMap(({ text }) =>
+      [...text.matchAll(SCREENSHOT_NAME)].map(([, name]) => name),
+    );
+    expect(names.length).toBeGreaterThan(0);
+    const missing = names
+      .flatMap((name) => [
+        screenshotPath(name, 'dark'),
+        screenshotPath(name, 'light'),
+      ])
+      .filter((image) => !existsSync(join(PUBLIC_DIR, image)));
+    expect(missing).toEqual([]);
   });
 });
