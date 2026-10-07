@@ -25,11 +25,24 @@ export function activeWorkspaces(state: AppState): Workspace[] {
       .flatMap((section) => section.repos)
       .map((repo, index) => [repo.id, index]),
   );
-  return state.workspaces
-    .filter((ws) => !ws.archivedAt)
-    .sort(
-      (a, b) =>
-        (repoOrder.get(a.repoId) ?? 0) - (repoOrder.get(b.repoId) ?? 0) ||
-        a.createdAt.localeCompare(b.createdAt),
-    );
+  const active = state.workspaces.filter((ws) => !ws.archivedAt);
+  const groupStart = groupStartTimes(active);
+  const startOf = (ws: Workspace) =>
+    (ws.groupId && groupStart.get(ws.groupId)) || ws.createdAt;
+  return active.sort(
+    (a, b) =>
+      (repoOrder.get(a.repoId) ?? 0) - (repoOrder.get(b.repoId) ?? 0) ||
+      startOf(a).localeCompare(startOf(b)) ||
+      a.createdAt.localeCompare(b.createdAt),
+  );
+}
+
+function groupStartTimes(workspaces: Workspace[]): Map<string, string> {
+  const starts = new Map<string, string>();
+  for (const ws of workspaces) {
+    if (!ws.groupId) continue;
+    const start = starts.get(ws.groupId);
+    if (!start || ws.createdAt < start) starts.set(ws.groupId, ws.createdAt);
+  }
+  return starts;
 }

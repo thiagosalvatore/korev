@@ -21,4 +21,4 @@ A task that spans repositories, say a frontend and a backend, gets one linked wo
 - It can read the linked workspaces. Korev gives Claude Code access with `--add-dir`.
 - It is told to leave notes for the other agents in their `.context/` folders.
 
-In the sidebar, linked workspaces show a link icon. Hover it to see which workspaces are linked.
+In the sidebar, linked workspaces sit next to each other and show a link icon. Hover it to see which workspaces are linked.

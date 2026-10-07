@@ -18,8 +18,13 @@ function repo(id: string, folderId: string | null = null): Repo {
   };
 }
 
-function workspace(id: string, repoId: string, createdAt: string): Workspace {
-  return { id, repoId, createdAt, archivedAt: null } as Workspace;
+function workspace(
+  id: string,
+  repoId: string,
+  createdAt: string,
+  groupId: string | null = null,
+): Workspace {
+  return { id, repoId, createdAt, groupId, archivedAt: null } as Workspace;
 }
 
 const state = {
@@ -68,6 +73,22 @@ describe('activeWorkspaces', () => {
       'web-1',
       'scratch-1',
       'blog-1',
+    ]);
+  });
+
+  it('keeps the workspaces of one group next to each other', () => {
+    const lanes = {
+      ...state,
+      workspaces: [
+        workspace('lane-1', 'scratch', '2026-01-01', 'plan'),
+        workspace('other', 'scratch', '2026-01-02'),
+        workspace('lane-2', 'scratch', '2026-01-03', 'plan'),
+      ],
+    } as AppState;
+    expect(activeWorkspaces(lanes).map((ws) => ws.id)).toEqual([
+      'lane-1',
+      'lane-2',
+      'other',
     ]);
   });
 });

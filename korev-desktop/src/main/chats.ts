@@ -93,10 +93,10 @@ export interface LinkedWorkspace {
 function linkedLines(linked: LinkedWorkspace[]): string[] {
   if (!linked.length) return [];
   return [
-    `This workspace is linked with workspaces in other repositories that work on the same task:`,
+    `This workspace is linked with other workspaces that work on the same task:`,
     ...linked.map(
       ({ repo, workspace }) =>
-        `- ${repo.name}: ${workspace.path} (branch ${workspace.branch})`,
+        `- ${workspace.name} in ${repo.name}: ${workspace.path} (branch ${workspace.branch})`,
     ),
     `You can read their files to keep every side consistent. Do not edit them: each has its own agent. Use their .context directories to leave notes for the other agents.`,
   ];

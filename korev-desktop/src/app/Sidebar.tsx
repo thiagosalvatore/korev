@@ -157,18 +157,22 @@ function LinkedIcon({
   workspace: Workspace;
 }) {
   if (!workspace.groupId) return null;
-  const linkedRepos = state.workspaces
+  const linkedNames = state.workspaces
     .filter(
       (other) =>
         other !== workspace &&
         other.groupId === workspace.groupId &&
         !other.archivedAt,
     )
-    .map((other) => state.repos.find((repo) => repo.id === other.repoId)?.name);
-  if (!linkedRepos.length) return null;
+    .map((other) =>
+      other.repoId === workspace.repoId
+        ? other.name
+        : state.repos.find((repo) => repo.id === other.repoId)?.name,
+    );
+  if (!linkedNames.length) return null;
   return (
     <span
-      title={`Linked with ${linkedRepos.join(', ')}`}
+      title={`Linked with ${linkedNames.join(', ')}`}
       className="flex flex-none"
     >
       <Icon name="link" size={11} />
