@@ -1,78 +1,24 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
 } from 'react-native';
-import { modelLabel } from '../../../../korev-desktop/src/shared/format';
 import type {
   AppState,
-  ChatSession,
-  PermissionResponse,
   Workspace,
 } from '../../../../korev-desktop/src/shared/model';
 import { attempt } from '../../attempt';
-import { ChatItemView } from '../../chat/ChatItemView';
-import { Composer } from '../../chat/Composer';
-import { useAppState, useTranscript } from '../../hooks';
+import { Chat } from '../../chat/Chat';
+import { useAppState } from '../../hooks';
 import { useConnection } from '../../korev';
 import { PrBar } from '../../PrBar';
 import { useTheme, type Theme } from '../../theme';
 
 type Styles = ReturnType<typeof makeStyles>;
-
-function Chat({
-  state,
-  session,
-  styles,
-}: {
-  state: AppState;
-  session: ChatSession;
-  styles: Styles;
-}) {
-  const { api } = useConnection();
-  const items = useTranscript(session.id);
-  const headerHeight = useHeaderHeight();
-
-  const respond = (itemId: string, response: PermissionResponse) =>
-    void attempt('Korev could not send your answer', () =>
-      api.respondPermission(session.id, itemId, response),
-    );
-
-  return (
-    <KeyboardAvoidingView
-      style={styles.fill}
-      behavior="padding"
-      keyboardVerticalOffset={headerHeight}
-    >
-      {items ? (
-        <FlatList
-          inverted
-          data={[...items].reverse()}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ChatItemView item={item} onRespond={respond} />
-          )}
-          contentContainerStyle={styles.transcript}
-          keyboardDismissMode="interactive"
-        />
-      ) : (
-        <ActivityIndicator style={styles.fill} />
-      )}
-      <Composer
-        session={session}
-        running={state.runningSessions.includes(session.id)}
-        modelLabel={modelLabel(state, session)}
-      />
-    </KeyboardAvoidingView>
-  );
-}
 
 function SessionTabs({
   state,
@@ -160,12 +106,7 @@ export default function WorkspaceScreen() {
         styles={styles}
       />
       {session ? (
-        <Chat
-          key={session.id}
-          state={state}
-          session={session}
-          styles={styles}
-        />
+        <Chat key={session.id} state={state} session={session} />
       ) : (
         <Text style={styles.empty}>This workspace has no chats.</Text>
       )}
@@ -177,7 +118,6 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
     fill: { flex: 1 },
     empty: { padding: 24, color: theme.fg3, textAlign: 'center' },
-    transcript: { padding: 12, gap: 12 },
     tabsBar: {
       flexGrow: 0,
       borderBottomWidth: StyleSheet.hairlineWidth,

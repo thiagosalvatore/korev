@@ -20,7 +20,7 @@ import { repoSections } from '../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../attempt';
 import { useAppState } from '../hooks';
 import { useConnection } from '../korev';
-import { RepoAvatar } from '../RepoAvatar';
+import { RepoPicker } from '../RepoPicker';
 import { useTheme, type Theme } from '../theme';
 import { Button } from '../ui';
 
@@ -79,24 +79,11 @@ function NewWorkspaceForm({
       keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.label}>Repository</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.repos}
-      >
-        {repos.map((repo) => (
-          <Pressable
-            key={repo.id}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: repo.id === repoId }}
-            style={[styles.repo, repo.id === repoId && styles.repoSelected]}
-            onPress={() => setRepoId(repo.id)}
-          >
-            <RepoAvatar repo={repo} />
-            <Text style={styles.repoName}>{repo.name}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <RepoPicker
+        repos={repos}
+        selected={repoId ? [repoId] : []}
+        onToggle={setRepoId}
+      />
       <TextInput
         style={[styles.input, planMode && styles.inputPlanMode]}
         value={prompt}
@@ -140,22 +127,6 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
     page: { padding: 16, gap: 12 },
     label: { color: theme.fg3, fontSize: 13, fontWeight: '600' },
-    repos: { gap: 8 },
-    repo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: theme.border2,
-    },
-    repoSelected: {
-      borderColor: theme.accent,
-      backgroundColor: theme.accentSubtle,
-    },
-    repoName: { color: theme.fg1, fontSize: 14, fontWeight: '600' },
     input: {
       minHeight: 140,
       padding: 12,

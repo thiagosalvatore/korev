@@ -1,5 +1,7 @@
 import { router, Stack } from 'expo-router';
 import {
+  ChevronDown,
+  ChevronRight,
   GitBranch,
   GitMerge,
   GitPullRequest,
@@ -12,6 +14,7 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from 'lucide-react-native';
+import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -25,8 +28,11 @@ import {
 import {
   prBadge,
   primaryPr,
+  type AppState,
+  type AskChat,
   type PrBadge,
   type Repo,
+  type RepoFolder,
   type Workspace,
   type WorkspaceRuntime,
   type WorkspaceStatus,
@@ -35,12 +41,14 @@ import {
   activeWorkspaces,
   repoSections,
 } from '../../../korev-desktop/src/shared/workspaces';
+import { timeAgo } from '../../../korev-desktop/src/shared/format';
 import { useAppState } from '../hooks';
 import { useKorev } from '../korev';
 import { RepoAvatar } from '../RepoAvatar';
 import { MONO_FONT, useTheme, type Theme } from '../theme';
 
 const LOGO = require('../../assets/icon.png');
+const ASK_CHATS_KEY = 'ask-chats';
 const ICON_SIZE = 16;
 
 const BUSY_STATUSES: ReadonlySet<WorkspaceStatus> = new Set([
@@ -73,6 +81,12 @@ function badgeColor(theme: Theme, badge: PrBadge): string {
 }
 
 type Styles = ReturnType<typeof makeStyles>;
+
+function toggled(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
+  const next = new Set(set);
+  if (!next.delete(id)) next.add(id);
+  return next;
+}
 
 function openNewWorkspace(repoId?: string) {
   router.push({ pathname: '/new', params: repoId ? { repoId } : {} });
@@ -164,25 +178,43 @@ function WorkspaceRow({
   );
 }
 
+function Chevron({ collapsed }: { collapsed: boolean }) {
+  const theme = useTheme();
+  const Icon = collapsed ? ChevronRight : ChevronDown;
+  return <Icon size={ICON_SIZE - 3} color={theme.fg4} />;
+}
+
 function RepoGroup({
   repo,
   workspaces,
   runtime,
+  collapsed,
+  onToggle,
   styles,
 }: {
   repo: Repo;
   workspaces: Workspace[];
   runtime: Record<string, WorkspaceRuntime>;
+  collapsed: boolean;
+  onToggle: () => void;
   styles: Styles;
 }) {
   const theme = useTheme();
   return (
     <View style={styles.group}>
       <View style={styles.repoHeader}>
-        <RepoAvatar repo={repo} />
-        <Text style={styles.repoName} numberOfLines={1}>
-          {repo.name}
-        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: !collapsed }}
+          style={styles.repoToggle}
+          onPress={onToggle}
+        >
+          <RepoAvatar repo={repo} />
+          <Text style={styles.repoName} numberOfLines={1}>
+            {repo.name}
+          </Text>
+          <Chevron collapsed={collapsed} />
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`New workspace in ${repo.name}`}
@@ -192,15 +224,153 @@ function RepoGroup({
           <Plus size={ICON_SIZE + 2} color={theme.fg3} />
         </Pressable>
       </View>
-      {workspaces.map((workspace) => (
-        <WorkspaceRow
-          key={workspace.id}
-          workspace={workspace}
-          runtime={runtime[workspace.id]}
-          styles={styles}
-        />
-      ))}
+      {collapsed
+        ? null
+        : workspaces.map((workspace) => (
+            <WorkspaceRow
+              key={workspace.id}
+              workspace={workspace}
+              runtime={runtime[workspace.id]}
+              styles={styles}
+            />
+          ))}
     </View>
+  );
+}
+
+function FolderGroup({
+  folder,
+  collapsed,
+  onToggle,
+  children,
+  styles,
+}: {
+  folder: RepoFolder;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+  styles: Styles;
+}) {
+  return (
+    <View style={styles.group}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: !collapsed }}
+        style={styles.overlineRow}
+        onPress={onToggle}
+      >
+        <Text style={styles.overline} numberOfLines={1}>
+          {folder.name}
+        </Text>
+        <Chevron collapsed={collapsed} />
+      </Pressable>
+      {collapsed ? null : children}
+    </View>
+  );
+}
+
+function AskChatRow({
+  state,
+  ask,
+  styles,
+}: {
+  state: AppState;
+  ask: AskChat;
+  styles: Styles;
+}) {
+  const theme = useTheme();
+  const running = state.runningSessions.includes(ask.session.id);
+  const repoNames = ask.repoIds
+    .map((id) => state.repos.find((repo) => repo.id === id)?.name)
+    .filter(Boolean)
+    .join(', ');
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Ask ${ask.session.title}`}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      onPress={() =>
+        router.push({ pathname: '/ask/[id]', params: { id: ask.id } })
+      }
+    >
+      <View style={styles.statusSlot}>
+        {running ? (
+          <ActivityIndicator size="small" color={theme.accentText} />
+        ) : (
+          <MessageCircleQuestion size={ICON_SIZE} color={theme.fg4} />
+        )}
+      </View>
+      <View style={styles.rowText}>
+        <Text style={styles.branch} numberOfLines={1}>
+          {ask.session.title}
+        </Text>
+        <Text style={styles.name} numberOfLines={1}>
+          {repoNames}
+        </Text>
+      </View>
+      <Text style={styles.age}>{timeAgo(ask.lastMessageAt)}</Text>
+    </Pressable>
+  );
+}
+
+function AskChats({
+  state,
+  collapsed,
+  onToggle,
+  styles,
+}: {
+  state: AppState;
+  collapsed: boolean;
+  onToggle: () => void;
+  styles: Styles;
+}) {
+  if (!state.askChats.length) return null;
+  const newestFirst = [...state.askChats].sort((a, b) =>
+    b.lastMessageAt.localeCompare(a.lastMessageAt),
+  );
+  return (
+    <View style={styles.group}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: !collapsed }}
+        style={styles.overlineRow}
+        onPress={onToggle}
+      >
+        <Text style={styles.overline}>Ask chats</Text>
+        <Chevron collapsed={collapsed} />
+        <View style={styles.fill} />
+        <Text style={styles.count}>{state.askChats.length}</Text>
+      </Pressable>
+      {collapsed
+        ? null
+        : newestFirst.map((ask) => (
+            <AskChatRow key={ask.id} state={state} ask={ask} styles={styles} />
+          ))}
+    </View>
+  );
+}
+
+function NavRow({
+  icon: Icon,
+  label,
+  onPress,
+  styles,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onPress: () => void;
+  styles: Styles;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
+      onPress={onPress}
+    >
+      <Icon size={ICON_SIZE} color={theme.fg2} />
+      <Text style={styles.navLabel}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -218,6 +388,8 @@ export default function WorkspacesScreen() {
   const { unpair } = useKorev();
   const theme = useTheme();
   const styles = makeStyles(theme);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (id: string) => setCollapsed(toggled(collapsed, id));
 
   const header = (
     <Stack.Screen
@@ -246,30 +418,59 @@ export default function WorkspacesScreen() {
     );
 
   const workspaces = activeWorkspaces(state);
-  const repos = repoSections(state).flatMap((section) => section.repos);
+  const sections = repoSections(state);
+  const repoGroup = (repo: Repo) => (
+    <RepoGroup
+      key={repo.id}
+      repo={repo}
+      workspaces={workspaces.filter((ws) => ws.repoId === repo.id)}
+      runtime={state.runtime}
+      collapsed={collapsed.has(repo.id)}
+      onToggle={() => toggle(repo.id)}
+      styles={styles}
+    />
+  );
 
   return (
     <>
       {header}
       <ScrollView contentContainerStyle={styles.page}>
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
-          onPress={() => openNewWorkspace()}
-        >
-          <SquarePen size={ICON_SIZE} color={theme.fg2} />
-          <Text style={styles.navLabel}>New workspace</Text>
-        </Pressable>
-        {repos.map((repo) => (
-          <RepoGroup
-            key={repo.id}
-            repo={repo}
-            workspaces={workspaces.filter((ws) => ws.repoId === repo.id)}
-            runtime={state.runtime}
+        <View style={styles.nav}>
+          <NavRow
+            icon={SquarePen}
+            label="New workspace"
+            onPress={() => openNewWorkspace()}
             styles={styles}
           />
-        ))}
-        {repos.length === 0 && (
+          <NavRow
+            icon={MessageCircleQuestion}
+            label="Ask"
+            onPress={() => router.push('/ask/new')}
+            styles={styles}
+          />
+        </View>
+        <AskChats
+          state={state}
+          collapsed={collapsed.has(ASK_CHATS_KEY)}
+          onToggle={() => toggle(ASK_CHATS_KEY)}
+          styles={styles}
+        />
+        {sections.map(({ folder, repos }) =>
+          folder ? (
+            <FolderGroup
+              key={folder.id}
+              folder={folder}
+              collapsed={collapsed.has(folder.id)}
+              onToggle={() => toggle(folder.id)}
+              styles={styles}
+            >
+              {repos.map(repoGroup)}
+            </FolderGroup>
+          ) : (
+            repos.map(repoGroup)
+          ),
+        )}
+        {sections.length === 0 && (
           <Text style={styles.empty}>
             Add a repository in Korev on your Mac to start.
           </Text>
@@ -287,6 +488,35 @@ function makeStyles(theme: Theme) {
     logo: { width: 24, height: 24, borderRadius: 6 },
     brandName: { color: theme.fg1, fontSize: 17, fontWeight: '700' },
     pressed: { backgroundColor: theme.bgHover },
+    fill: { flex: 1 },
+    nav: {
+      marginBottom: 8,
+      paddingBottom: 8,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.border1,
+    },
+    overlineRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    overline: {
+      color: theme.fg4,
+      fontSize: 11,
+      fontWeight: '600',
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+    },
+    count: { color: theme.fg4, fontFamily: MONO_FONT, fontSize: 11 },
+    age: { color: theme.fg4, fontSize: 11, paddingTop: 2 },
+    repoToggle: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
     navRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -294,7 +524,6 @@ function makeStyles(theme: Theme) {
       paddingHorizontal: 10,
       paddingVertical: 10,
       borderRadius: 8,
-      marginBottom: 8,
     },
     navLabel: { color: theme.fg2, fontSize: 15, fontWeight: '500' },
     group: { marginBottom: 12 },
@@ -305,7 +534,12 @@ function makeStyles(theme: Theme) {
       paddingHorizontal: 10,
       paddingVertical: 8,
     },
-    repoName: { flex: 1, color: theme.fg1, fontSize: 15, fontWeight: '600' },
+    repoName: {
+      flexShrink: 1,
+      color: theme.fg1,
+      fontSize: 15,
+      fontWeight: '600',
+    },
     row: {
       flexDirection: 'row',
       alignItems: 'flex-start',

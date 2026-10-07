@@ -48,7 +48,7 @@ The phone shows next to Settings in the Korev sidebar while the app is open.
 
 ## What the app shows
 
-The first screen looks like the Korev sidebar. It lists your repositories in the same order, each with its icon, and the workspaces of each repository.
+The first screen looks like the Korev sidebar. It shows your Ask chats, your folders, and your repositories in the same order as on the Mac. Each repository shows its icon and its workspaces. Tap a folder or a repository name to collapse it.
 
 - The icon on the left of a workspace shows a spinner while an agent or the setup script runs. It shows a question mark when an agent waits for your answer, and a warning sign when the setup or the agent failed.
 - Otherwise the icon shows the state of the PR, in the same colors as on the Mac. A workspace with no PR shows a branch icon.
@@ -60,6 +60,10 @@ The first screen looks like the Korev sidebar. It lists your repositories in the
 Tap **New workspace** at the top, or **+** next to a repository. Pick the repository, describe the task, and tap **Create and start**. Korev creates the workspace on the Mac, starts your default agent with the task, and the phone opens the new workspace. Tap **Plan** first to start in plan mode.
 
 If you leave the task empty, tap **Create** to make the workspace without starting an agent.
+
+## Ask a question
+
+Tap **Ask**, pick one or more repositories, type the question and tap **Ask**. The agent reads the code and changes nothing, the same as Ask on the Mac. Your Ask chats show under **Ask chats** on the first screen. Tap one to read it and ask a follow-up. Tap the trash icon to delete it.
 
 ## Chat with an agent
 
