@@ -231,7 +231,7 @@ async function mergeBase(git: Git, worktree: string, base: string) {
   return 'HEAD';
 }
 
-function parseNumstat(output: string) {
+export function parseNumstat(output: string) {
   const stats = new Map<string, { additions: number; deletions: number }>();
   for (const line of output.split('\n')) {
     const [added, deleted, ...rest] = line.split('\t');
@@ -244,7 +244,7 @@ function parseNumstat(output: string) {
   return stats;
 }
 
-function parseNameStatus(output: string): Map<string, FileStatus> {
+export function parseNameStatus(output: string): Map<string, FileStatus> {
   const statuses = new Map<string, FileStatus>();
   for (const line of output.split('\n')) {
     const [code, ...paths] = line.split('\t');

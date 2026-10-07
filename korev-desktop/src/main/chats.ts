@@ -38,6 +38,7 @@ import {
   renameBranch,
   restoreCheckpoint,
 } from './git';
+import { rangeFiles } from './git-review';
 import { withPrompt } from './repo-config';
 import { isUntitledName } from './workspace-setup';
 import {
@@ -166,6 +167,7 @@ interface ActiveTurn {
   written: number;
   acknowledged: number;
   permissions: Map<string, ControlRequest>;
+  start: Checkpoint | null;
 }
 
 export interface Chats {
@@ -181,11 +183,13 @@ export interface Chats {
   ): Result;
   revert(sessionId: string, itemId: string): Promise<Result<string>>;
   forget(sessionId: string): Promise<void>;
+  settled(): Promise<void>;
 }
 
 export function createChats(ctx: Context): Chats {
   const transcripts = new Map<string, ChatItem[]>();
   const turns = new Map<string, ActiveTurn>();
+  const running = new Set<Promise<void>>();
 
   function locate(sessionId: string): { owner: Owner; session: ChatSession } {
     for (const workspace of ctx.store.state.workspaces) {
@@ -474,6 +478,7 @@ export function createChats(ctx: Context): Chats {
     } finally {
       session.agentSessionId = parser?.sessionId() ?? session.agentSessionId;
       expirePermissions(session.id, items, turn);
+      await recordTurnChanges(session.id, items, turn);
       turns.delete(session.id);
       finishTurn(turn.owner, session, items);
       void sendQueued(session.id, options);
@@ -486,16 +491,48 @@ export function createChats(ctx: Context): Chats {
       item.kind === 'user' && item.queued ? [item] : [],
     );
     if (!queued.length || turns.has(sessionId)) return;
+    const { owner } = locate(sessionId);
+    const start =
+      owner.kind === 'workspace'
+        ? await createCheckpoint(ctx.git, owner.workspace.path).catch(
+            () => null,
+          )
+        : null;
+    if (turns.has(sessionId)) return;
     for (const item of queued)
       upsert(sessionId, items, { ...item, queued: false });
     const text = queued.map((item) => item.text).join('\n\n');
-    startTurn(sessionId, items, { ...options, text });
+    startTurn(sessionId, items, { ...options, text }, start);
+  }
+
+  async function recordTurnChanges(
+    sessionId: string,
+    items: ChatItem[],
+    turn: ActiveTurn,
+  ) {
+    if (turn.owner.kind !== 'workspace' || !turn.start) return;
+    const { workspace } = turn.owner;
+    const result = items.findLast(
+      (item) => item.kind === 'result' && item.id.startsWith(`${turn.id}:`),
+    );
+    if (result?.kind !== 'result') return;
+    try {
+      const end = await createCheckpoint(ctx.git, workspace.path);
+      if (!end) return;
+      const range = { from: turn.start.snapshot, to: end.snapshot };
+      const files = await rangeFiles(ctx.git, workspace.path, range);
+      if (files.length)
+        upsert(sessionId, items, { ...result, turn: { range, files } });
+    } catch {
+      return;
+    }
   }
 
   function startTurn(
     sessionId: string,
     items: ChatItem[],
     options: SendOptions,
+    start: Checkpoint | null,
   ) {
     const { owner, session } = locate(sessionId);
     const turn: ActiveTurn = {
@@ -506,13 +543,16 @@ export function createChats(ctx: Context): Chats {
       written: 0,
       acknowledged: 0,
       permissions: new Map(),
+      start,
     };
     turns.set(sessionId, turn);
     ctx.runningSessions.add(sessionId);
     refreshStatus(owner);
     ctx.store.save();
     ctx.emitState();
-    void runTurn(session, options, items, turn);
+    const done = runTurn(session, options, items, turn);
+    running.add(done);
+    void done.finally(() => running.delete(done));
   }
 
   function steer(
@@ -578,7 +618,7 @@ export function createChats(ctx: Context): Chats {
     session.model = options.model;
     session.effort = options.effort;
     session.fast = options.fast;
-    startTurn(sessionId, items, options);
+    startTurn(sessionId, items, options, checkpoint);
     if (workspace && firstMessage && session === workspace.sessions[0]) {
       void autoRenameBranch(workspace, options.text);
     }
@@ -706,6 +746,9 @@ export function createChats(ctx: Context): Chats {
       workspace.sessions.forEach((session) => stop(session.id)),
     respondPermission,
     revert,
+    async settled() {
+      while (running.size) await Promise.allSettled([...running]);
+    },
     async forget(sessionId) {
       stop(sessionId);
       transcripts.delete(sessionId);

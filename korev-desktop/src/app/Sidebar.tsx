@@ -626,7 +626,7 @@ export function Sidebar({ state }: { state: AppState }) {
           icon="search"
           label="Search"
           hint="⌘K"
-          onClick={() => setUi({ palette: true })}
+          onClick={() => setUi({ palette: 'all' })}
         />
         <NavRow
           icon="square-pen"

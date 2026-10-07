@@ -12,6 +12,10 @@ import type {
   PermissionResponse,
   PullRequestSummary,
   RepoConfig,
+  ReviewComment,
+  SearchMatch,
+  SearchOptions,
+  TurnRange,
   WorkspaceSource,
   PrStatus,
   Repo,
@@ -77,7 +81,23 @@ export interface KorevApi {
   fixChecks(workspaceId: string, sessionId: string): Promise<Result>;
   resolveConflicts(workspaceId: string, sessionId: string): Promise<Result>;
   changes(workspaceId: string): Promise<FileChange[]>;
-  fileDiff(workspaceId: string, path: string): Promise<string>;
+  fileDiff(
+    workspaceId: string,
+    path: string,
+    range?: TurnRange | null,
+  ): Promise<string>;
+  rangeChanges(workspaceId: string, range: TurnRange): Promise<FileChange[]>;
+  searchFiles(
+    workspaceId: string,
+    query: string,
+    options: SearchOptions,
+  ): Promise<SearchMatch[]>;
+  writeFile(
+    workspaceId: string,
+    path: string,
+    contents: string,
+  ): Promise<Result>;
+  reviewComments(workspaceId: string): Promise<ReviewComment[]>;
   listFiles(workspaceId: string): Promise<string[]>;
   readFile(workspaceId: string, path: string): Promise<string | null>;
   prStatus(workspaceId: string): Promise<PrStatus | null>;

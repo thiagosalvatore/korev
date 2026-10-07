@@ -210,3 +210,75 @@ test('asks before a tool call when approvals are on and continues after Allow', 
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test('reviews a turn, searches the workspace and edits a file', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const app = await electron.launch({
+    args: [
+      APP_ENTRY,
+      '--use-mock-keychain',
+      `--user-data-dir=${path.join(home, 'user-data')}`,
+    ],
+    env: {
+      ...process.env,
+      HOME: home,
+      SHELL: '/bin/sh',
+      PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}`,
+    },
+  });
+  try {
+    await app.evaluate(({ dialog }, repoPath) => {
+      dialog.showOpenDialog = (async () => ({
+        canceled: false,
+        filePaths: [repoPath],
+      })) as typeof dialog.showOpenDialog;
+    }, repo);
+    const window = await app.firstWindow();
+    await window.setViewportSize({ width: 1440, height: 900 });
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window.getByRole('textbox', { name: 'Message' }).fill('Add a note');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+
+    await window.getByRole('button', { name: '1 file changed' }).click();
+    await window
+      .getByRole('main')
+      .getByRole('button', { name: /^A\s*agent-note\.txt/ })
+      .click();
+    await expect(
+      window.getByRole('tab', { name: /Turn changes/ }),
+    ).toBeVisible();
+    await window.getByRole('button', { name: 'Split' }).click();
+    await expect(
+      window.getByRole('main').getByText('written by the fake agent'),
+    ).toBeVisible();
+    await snap(window, '07-turn-split');
+
+    await window
+      .getByRole('navigation', { name: 'Workspaces' })
+      .getByRole('button', { name: 'Search' })
+      .click();
+    await window
+      .getByRole('textbox', { name: 'Search' })
+      .fill('Search in files');
+    await window.getByRole('textbox', { name: 'Search' }).press('Enter');
+    await window
+      .getByRole('textbox', { name: 'Search in files' })
+      .fill('fake agent');
+    await window
+      .getByRole('main')
+      .getByRole('button', { name: /written by the fake agent/ })
+      .click();
+
+    await window.getByRole('button', { name: 'Edit' }).click();
+    await window
+      .getByRole('textbox', { name: 'File contents' })
+      .fill('edited by hand\n');
+    await window.getByRole('button', { name: 'Save' }).click();
+    await expect(window.getByText('Saved agent-note.txt')).toBeVisible();
+    await snap(window, '08-edited');
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});

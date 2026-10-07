@@ -6,13 +6,16 @@ import {
   createPr,
   newChat,
   openDiff,
+  openFile,
+  openSearch,
   openNewWorkspace,
   openSettings,
   restoreWorkspace,
   selectWorkspace,
 } from './actions';
 import { fuzzyRank } from './fuzzy';
-import { timeAgo } from './format';
+import { api } from './bridge';
+import { fileName, timeAgo } from './format';
 import { openProject } from './Sidebar';
 import { setUi, useUi } from './ui-store';
 
@@ -104,6 +107,26 @@ function paletteItems(
           } as PaletteItem,
         ]
       : []),
+    ...(current
+      ? [
+          {
+            id: 'quick-open',
+            label: 'Quick open file',
+            icon: 'file-search',
+            hint: '⌘P',
+            section: 'Actions',
+            run: () => setUi({ palette: 'files' }),
+          } as PaletteItem,
+          {
+            id: 'search',
+            label: 'Search in files',
+            icon: 'search',
+            hint: '⌘⇧F',
+            section: 'Actions',
+            run: () => openSearch(current.id),
+          } as PaletteItem,
+        ]
+      : []),
     {
       id: 'settings',
       label: 'Settings',
@@ -125,15 +148,43 @@ function paletteItems(
   return [...workspaces, ...actions];
 }
 
+function useWorkspaceFiles(workspaceId: string | null): string[] {
+  const [files, setFiles] = useState<string[]>([]);
+  useEffect(() => {
+    if (!workspaceId) return;
+    void api
+      .listFiles(workspaceId)
+      .then(setFiles)
+      .catch(() => setFiles([]));
+  }, [workspaceId]);
+  return files;
+}
+
+function fileItems(workspaceId: string | null, files: string[]): PaletteItem[] {
+  if (!workspaceId) return [];
+  return files.map((file) => ({
+    id: `file:${file}`,
+    label: fileName(file),
+    detail: file,
+    icon: 'file',
+    section: 'Files',
+    run: () => openFile(workspaceId, file),
+  }));
+}
+
 export function CommandPalette({ state }: { state: AppState }) {
   const open = useUi((ui) => ui.palette);
   const workspaceId = useUi((ui) => ui.workspaceId);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const input = useRef<HTMLInputElement>(null);
+  const files = useWorkspaceFiles(open === 'files' ? workspaceId : null);
   const items = useMemo(
-    () => paletteItems(state, workspaceId),
-    [state, workspaceId],
+    () =>
+      open === 'files'
+        ? fileItems(workspaceId, files)
+        : paletteItems(state, workspaceId),
+    [open, state, workspaceId, files],
   );
   const results = useMemo(() => {
     if (!query.trim()) return items.slice(0, RESULT_LIMIT);
@@ -156,7 +207,7 @@ export function CommandPalette({ state }: { state: AppState }) {
   const close = () => setUi({ palette: false });
   const run = (item: PaletteItem | undefined) => {
     if (!item) return;
-    close();
+    if (item.id !== 'quick-open') close();
     item.run();
   };
   let lastSection = '';
@@ -176,7 +227,11 @@ export function CommandPalette({ state }: { state: AppState }) {
             ref={input}
             aria-label="Search"
             value={query}
-            placeholder="Search workspaces, actions and settings"
+            placeholder={
+              open === 'files'
+                ? 'Go to file'
+                : 'Search workspaces, actions and settings'
+            }
             className="h-12 flex-1 border-0 bg-transparent text-md text-fg-1 outline-none placeholder:text-fg-4"
             onChange={(event) => {
               setQuery(event.target.value);

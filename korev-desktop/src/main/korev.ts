@@ -40,6 +40,7 @@ import {
 import {
   createPrPrompt,
   fetchPrStatus,
+  fetchReviewComments,
   fixChecksPrompt,
   mergePr,
   resolveConflictsPrompt,
@@ -47,6 +48,7 @@ import {
 } from './pull-requests';
 import { expandPort, loadRepoConfig, withPrompt } from './repo-config';
 import { listIssues, listPullRequests } from './sources';
+import { rangeFileDiff, rangeFiles, searchFiles } from './git-review';
 import { findLocalUrl } from './workspace-setup';
 import { openStore } from './store';
 import { createTerminals, type SpawnPty } from './terminals';
@@ -548,9 +550,32 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
             () => [],
           );
     },
-    async fileDiff(workspaceId, file) {
+    async fileDiff(workspaceId, file, range) {
       const workspace = workspacePath(workspaceId);
+      if (range) return rangeFileDiff(git, workspace.path, range, file);
       return fileDiff(git, workspace.path, workspace.baseBranch, file);
+    },
+    rangeChanges: (workspaceId, range) =>
+      rangeFiles(git, workspacePath(workspaceId).path, range),
+    searchFiles: (workspaceId, query, options) =>
+      searchFiles(git, workspacePath(workspaceId).path, query, options),
+    async writeFile(workspaceId, file, contents) {
+      const target = insideWorkspace(workspacePath(workspaceId).path, file);
+      if (!target) return fail('That file is outside the workspace');
+      try {
+        await writeFile(target, contents);
+      } catch (error) {
+        return fail(errorMessage(error));
+      }
+      void refreshStats(ctx, ctx.workspace(workspaceId));
+      return ok(undefined);
+    },
+    async reviewComments(workspaceId) {
+      const workspace = workspacePath(workspaceId);
+      const pr = ctx.runtime(workspaceId).pr ?? (await refreshPr(workspaceId));
+      return pr
+        ? fetchReviewComments(deps.run, deps.env, workspace.path, pr.number)
+        : [];
     },
     async listFiles(workspaceId) {
       return listFiles(git, workspacePath(workspaceId).path);
@@ -696,6 +721,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     updateSettings,
     async shutdown() {
       for (const session of allSessions()) chats.stop(session.id);
+      await chats.settled();
       ctx.terminals.closeAll();
       await store.flush();
     },

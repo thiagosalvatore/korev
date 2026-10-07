@@ -308,6 +308,7 @@ export type ChatItem =
       text: string;
       durationMs: number | null;
       costUsd: number | null;
+      turn?: TurnChanges | null;
     }
   | { id: string; kind: 'notice'; text: string }
   | {
@@ -401,6 +402,8 @@ export type AppCommand =
   | 'cancel-agent'
   | 'toggle-theme'
   | 'toggle-zen'
+  | 'quick-open'
+  | 'search-files'
   | 'select-workspace-1'
   | 'select-workspace-2'
   | 'select-workspace-3'
@@ -410,3 +413,35 @@ export type AppCommand =
   | 'select-workspace-7'
   | 'select-workspace-8'
   | 'select-workspace-9';
+
+export interface TurnRange {
+  from: string;
+  to: string;
+}
+
+export interface TurnChanges {
+  range: TurnRange;
+  files: FileChange[];
+}
+
+export interface SearchOptions {
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  regex: boolean;
+}
+
+export interface SearchMatch {
+  file: string;
+  line: number;
+  column: number;
+  text: string;
+}
+
+export interface ReviewComment {
+  id: number;
+  path: string;
+  line: number | null;
+  body: string;
+  author: string;
+  url: string;
+}

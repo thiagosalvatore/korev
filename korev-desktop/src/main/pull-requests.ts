@@ -1,4 +1,9 @@
-import type { CheckState, PrCheck, PrStatus } from '../shared/model';
+import type {
+  CheckState,
+  PrCheck,
+  PrStatus,
+  ReviewComment,
+} from '../shared/model';
 import type { CommandRunner } from './command-runner';
 
 const GH_TIMEOUT_MS = 60_000;
@@ -123,3 +128,51 @@ export function resolveConflictsPrompt(baseBranch: string): string {
 
 export const REVIEW_PROMPT =
   'Review the changes on this branch compared to its target branch (committed and uncommitted). Look for bugs, missing tests and unclear code. List concrete findings with file and line, most severe first. Do not edit files.';
+
+export function parseReviewComments(json: string): ReviewComment[] {
+  let rows: unknown;
+  try {
+    rows = JSON.parse(json);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(rows)) return [];
+  return (rows as JsonRecord[]).flatMap((row) =>
+    typeof row.id === 'number'
+      ? [
+          {
+            id: row.id,
+            path: str(row.path),
+            line: typeof row.line === 'number' ? row.line : null,
+            body: str(row.body),
+            author: str((row.user as JsonRecord | undefined)?.login),
+            url: str(row.html_url),
+          },
+        ]
+      : [],
+  );
+}
+
+export async function fetchReviewComments(
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  number: number,
+): Promise<ReviewComment[]> {
+  try {
+    const result = await run(
+      'gh',
+      [
+        'api',
+        `repos/{owner}/{repo}/pulls/${number}/comments`,
+        '--paginate',
+        '--jq',
+        '.',
+      ],
+      { cwd, env, timeoutMs: GH_TIMEOUT_MS },
+    );
+    return result.exitCode === 0 ? parseReviewComments(result.stdout) : [];
+  } catch {
+    return [];
+  }
+}

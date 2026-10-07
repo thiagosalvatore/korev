@@ -1,10 +1,15 @@
 import { useSyncExternalStore } from 'react';
-import type { TerminalKind } from '../shared/model';
+import type { TerminalKind, TurnRange } from '../shared/model';
 
 export type MainTab =
   | { kind: 'chat'; sessionId: string }
-  | { kind: 'diff'; file: string | null }
-  | { kind: 'file'; file: string };
+  | { kind: 'diff'; file: string | null; range?: TurnRange | null }
+  | { kind: 'file'; file: string; line?: number | null; editing?: boolean }
+  | { kind: 'search' };
+
+export type DiffLayout = 'unified' | 'split';
+
+export type PaletteMode = false | 'all' | 'files';
 
 export type GitPanelTab = 'files' | 'changes' | 'checks';
 
@@ -28,12 +33,14 @@ export interface WorkspaceUi {
   terminalTab: TerminalKind;
   comments: DiffComment[];
   runScriptId?: string | null;
+  viewed?: Record<string, string>;
 }
 
 export function tabKey(tab: MainTab): string {
   if (tab.kind === 'chat') return `chat:${tab.sessionId}`;
   if (tab.kind === 'file') return `file:${tab.file}`;
-  return 'diff';
+  if (tab.kind === 'search') return 'search';
+  return tab.range ? `diff:${tab.range.to}` : 'diff';
 }
 
 export interface UiState {
@@ -46,7 +53,8 @@ export interface UiState {
   collapsedRepos: string[];
   historyOpen: boolean;
   workspaces: Record<string, WorkspaceUi>;
-  palette: boolean;
+  palette: PaletteMode;
+  diffLayout: DiffLayout;
 }
 
 const STORAGE_KEY = 'korev:ui';
@@ -62,6 +70,7 @@ const INITIAL: UiState = {
   historyOpen: false,
   workspaces: {},
   palette: false,
+  diffLayout: 'unified',
 };
 
 export const EMPTY_WORKSPACE_UI: WorkspaceUi = {

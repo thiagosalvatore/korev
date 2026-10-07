@@ -11,6 +11,7 @@ import {
   mergePr,
   newChat,
   openDiff,
+  openSearch,
   openIn,
   openNewWorkspace,
   openSettings,
@@ -59,7 +60,9 @@ export function runCommand(state: AppState, command: AppCommand) {
     case 'show-settings':
       return openSettings();
     case 'show-palette':
-      return setUi({ palette: !getUi().palette });
+      return setUi({ palette: getUi().palette ? false : 'all' });
+    case 'quick-open':
+      return setUi({ palette: getUi().palette ? false : 'files' });
     case 'toggle-sidebar':
       return setUi({ sidebar: !getUi().sidebar });
     case 'toggle-panel':
@@ -104,6 +107,8 @@ export function runCommand(state: AppState, command: AppCommand) {
       return void fixErrors(workspace);
     case 'open-diff':
       return openDiff(workspace.id);
+    case 'search-files':
+      return openSearch(workspace.id);
     case 'run-script':
       return void toggleRunScript(state, workspace);
     case 'cancel-agent':

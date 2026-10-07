@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePrStatus } from './pull-requests';
+import { parsePrStatus, parseReviewComments } from './pull-requests';
 
 describe('PR status', () => {
   it('maps check runs and status contexts to check states', () => {
@@ -53,5 +53,36 @@ describe('PR status', () => {
 
   it('returns null when there is no PR', () => {
     expect(parsePrStatus('no pull requests found')).toBeNull();
+  });
+});
+
+describe('review comments', () => {
+  it('keeps the current line, or null when GitHub marks the comment outdated', () => {
+    const comments = parseReviewComments(
+      JSON.stringify([
+        {
+          id: 1,
+          path: 'src/a.ts',
+          line: 12,
+          body: 'Rename this',
+          user: { login: 'sakce' },
+          html_url: 'https://github.com/x/1',
+        },
+        {
+          id: 2,
+          path: 'src/b.ts',
+          line: null,
+          body: 'Old',
+          user: { login: 'sakce' },
+          html_url: 'https://github.com/x/2',
+        },
+      ]),
+    );
+    expect(
+      comments.map((comment) => [comment.path, comment.line, comment.author]),
+    ).toEqual([
+      ['src/a.ts', 12, 'sakce'],
+      ['src/b.ts', null, 'sakce'],
+    ]);
   });
 });

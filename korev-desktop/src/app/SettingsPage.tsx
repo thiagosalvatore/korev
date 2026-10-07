@@ -428,6 +428,8 @@ function Storage({ settings }: { settings: Settings }) {
 
 const SHORTCUTS: [string, string][] = [
   ['⌘K', 'Command palette'],
+  ['⌘P', 'Quick open file'],
+  ['⌘⇧F', 'Search in files'],
   ['⌘N', 'New workspace'],
   ['⌘T', 'New chat'],
   ['⌘W', 'Close tab'],

@@ -6,6 +6,7 @@ import {
   type ChatSession,
   type Workspace,
 } from '../../shared/model';
+import { openDiff } from '../actions';
 import { api } from '../bridge';
 import { loadoutFor } from '../format';
 import { useTranscript } from '../hooks';
@@ -95,6 +96,9 @@ export function ChatView({
             ) : null)
           }
           onRevert={(itemId) => void revert(itemId)}
+          onOpenTurnFile={(file, range) => {
+            if (workspace) openDiff(workspace.id, file, range);
+          }}
           onRespond={(itemId, response) => {
             const approvedPlan =
               response.allow &&

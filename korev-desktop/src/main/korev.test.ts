@@ -189,6 +189,14 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       'tool',
       'result',
     ]);
+    expect(transcript[3]).toMatchObject({
+      kind: 'result',
+      turn: {
+        files: [
+          { path: 'agent-note.txt', status: 'A', additions: 1, deletions: 0 },
+        ],
+      },
+    });
     expect(await korev.api.changes(workspace.id)).toEqual([
       { path: 'agent-note.txt', status: 'A', additions: 1, deletions: 0 },
     ]);

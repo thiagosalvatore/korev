@@ -5,6 +5,7 @@ import type {
   EditorId,
   Result,
   SendOptions,
+  TurnRange,
   Workspace,
   WorkspaceSource,
 } from '../shared/model';
@@ -82,12 +83,24 @@ function openExtraTab(workspaceId: string, tab: MainTab) {
   });
 }
 
-export function openDiff(workspaceId: string, file: string | null = null) {
-  openExtraTab(workspaceId, { kind: 'diff', file });
+export function openDiff(
+  workspaceId: string,
+  file: string | null = null,
+  range: TurnRange | null = null,
+) {
+  openExtraTab(workspaceId, { kind: 'diff', file, range });
 }
 
-export function openFile(workspaceId: string, file: string) {
-  openExtraTab(workspaceId, { kind: 'file', file });
+export function openFile(
+  workspaceId: string,
+  file: string,
+  options: { line?: number | null; editing?: boolean } = {},
+) {
+  openExtraTab(workspaceId, { kind: 'file', file, ...options });
+}
+
+export function openSearch(workspaceId: string) {
+  openExtraTab(workspaceId, { kind: 'search' });
 }
 
 export async function newChat(workspace: Workspace, agent: AgentKind) {

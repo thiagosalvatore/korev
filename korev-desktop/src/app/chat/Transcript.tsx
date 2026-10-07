@@ -13,7 +13,13 @@ import {
   IconButton,
   type IconName,
 } from '../../design-system';
-import type { ChatItem, PermissionResponse, Todo } from '../../shared/model';
+import type {
+  ChatItem,
+  PermissionResponse,
+  Todo,
+  TurnChanges,
+  TurnRange,
+} from '../../shared/model';
 import { duration } from '../format';
 import { Markdown } from './Markdown';
 import { PermissionCard } from './PermissionCard';
@@ -252,12 +258,55 @@ function UserMessage({
   );
 }
 
+function TurnFiles({
+  turn,
+  onOpen,
+}: {
+  turn: TurnChanges;
+  onOpen: (file: string, range: TurnRange) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const count = turn.files.length;
+  return (
+    <>
+      {' · '}
+      <button
+        type="button"
+        aria-expanded={open}
+        className="cursor-pointer border-0 bg-transparent p-0 text-xs text-fg-3 underline-offset-2 hover:text-fg-1 hover:underline"
+        onClick={() => setOpen((value) => !value)}
+      >
+        {count} file{count === 1 ? '' : 's'} changed
+      </button>
+      {open ? (
+        <div className="mt-1 flex flex-col">
+          {turn.files.map((file) => (
+            <button
+              key={file.path}
+              type="button"
+              className="flex h-6 cursor-pointer items-center gap-2 rounded-sm border-0 bg-transparent px-1 text-left font-mono text-xs text-fg-2 hover:bg-hover"
+              onClick={() => onOpen(file.path, turn.range)}
+            >
+              <span className="w-3 text-fg-4">{file.status}</span>
+              <span className="truncate">{file.path}</span>
+              <span className="text-diff-add-fg">+{file.additions}</span>
+              <span className="text-diff-del-fg">−{file.deletions}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function ResultLine({
   item,
   onRetry,
+  onOpenTurnFile,
 }: {
   item: Extract<ChatItem, { kind: 'result' }>;
   onRetry: (() => void) | null;
+  onOpenTurnFile: (file: string, range: TurnRange) => void;
 }) {
   if (!item.ok) {
     return (
@@ -285,7 +334,14 @@ function ResultLine({
       : 'Completed',
     item.costUsd !== null ? `$${item.costUsd.toFixed(2)}` : null,
   ].filter(Boolean);
-  return <div className="px-1.5 text-xs text-fg-4">{parts.join(' · ')}</div>;
+  return (
+    <div className="px-1.5 text-xs text-fg-4">
+      {parts.join(' · ')}
+      {item.turn ? (
+        <TurnFiles turn={item.turn} onOpen={onOpenTurnFile} />
+      ) : null}
+    </div>
+  );
 }
 
 type Block =
@@ -332,6 +388,7 @@ export interface TranscriptProps {
   onRevert: (itemId: string) => void;
   onRespond: (itemId: string, response: PermissionResponse) => void;
   onRetry: (text: string) => void;
+  onOpenTurnFile: (file: string, range: TurnRange) => void;
 }
 
 const STICK_THRESHOLD_PX = 80;
@@ -343,6 +400,7 @@ export function Transcript({
   onRevert,
   onRespond,
   onRetry,
+  onOpenTurnFile,
 }: TranscriptProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -411,6 +469,7 @@ export function Transcript({
                 <ResultLine
                   key={item.id}
                   item={item}
+                  onOpenTurnFile={onOpenTurnFile}
                   onRetry={
                     !running && item === lastResult && lastUserText
                       ? () => onRetry(lastUserText)

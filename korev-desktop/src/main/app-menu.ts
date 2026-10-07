@@ -49,6 +49,8 @@ const FILE_ENTRIES: (CommandEntry | null)[] = [
 
 const VIEW_ENTRIES: (CommandEntry | null)[] = [
   ['Command Palette', 'CmdOrCtrl+K', 'show-palette'],
+  ['Quick Open File', 'CmdOrCtrl+P', 'quick-open'],
+  ['Search in Files', 'CmdOrCtrl+Shift+F', 'search-files'],
   null,
   ['Toggle Left Sidebar', 'CmdOrCtrl+B', 'toggle-sidebar'],
   ['Toggle Right Sidebar', 'CmdOrCtrl+Alt+B', 'toggle-panel'],

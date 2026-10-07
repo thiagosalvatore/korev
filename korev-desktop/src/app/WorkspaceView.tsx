@@ -15,8 +15,9 @@ import {
   newChat,
 } from './actions';
 import { ChatView } from './chat/ChatView';
-import { DiffView } from './DiffView';
+import { DiffView } from './diff/DiffView';
 import { FileView } from './FileView';
+import { SearchView } from './SearchView';
 import { fileName } from './format';
 import { DRAG_REGION } from './layout';
 import { GitPanel } from './GitPanel';
@@ -48,19 +49,25 @@ function tabsOf(
   const others = extraTabs.map((tab) => ({
     key: tabKey(tab),
     tab,
-    label:
-      tab.kind === 'diff'
-        ? 'Changes'
-        : tab.kind === 'file'
-          ? fileName(tab.file)
-          : '',
+    label: extraTabLabel(tab),
     running: false,
     closable: true,
   }));
   return [...chats, ...others];
 }
 
-const TAB_ICONS = { diff: 'git-compare', file: 'file' } as const;
+const TAB_ICONS = {
+  diff: 'git-compare',
+  file: 'file',
+  search: 'search',
+} as const;
+
+function extraTabLabel(tab: MainTab): string {
+  if (tab.kind === 'diff') return tab.range ? 'Turn changes' : 'Changes';
+  if (tab.kind === 'file') return fileName(tab.file);
+  if (tab.kind === 'search') return 'Search';
+  return '';
+}
 
 function TabStrip({
   state,
@@ -118,7 +125,7 @@ function TabStrip({
                     ? session.agent === 'claude'
                       ? 'sparkle'
                       : 'hexagon'
-                    : TAB_ICONS[entry.tab.kind as 'diff' | 'file']
+                    : TAB_ICONS[entry.tab.kind as 'diff' | 'file' | 'search']
                 }
                 size={13}
               />
@@ -282,8 +289,11 @@ function WorkspaceWithWorktree({
           ) : null}
           {activeTab?.kind === 'diff' ? (
             <DiffView
+              key={activeTab.range?.to ?? 'live'}
+              state={state}
               workspace={workspace}
               focusFile={activeTab.file}
+              range={activeTab.range ?? null}
               onSendComments={() => {
                 const key =
                   ui.extraTabs.length && lastChatKey ? lastChatKey : null;
@@ -293,7 +303,16 @@ function WorkspaceWithWorktree({
             />
           ) : null}
           {activeTab?.kind === 'file' ? (
-            <FileView workspace={workspace} file={activeTab.file} />
+            <FileView
+              key={activeTab.file}
+              workspace={workspace}
+              file={activeTab.file}
+              line={activeTab.line ?? null}
+              editing={activeTab.editing ?? false}
+            />
+          ) : null}
+          {activeTab?.kind === 'search' ? (
+            <SearchView workspace={workspace} />
           ) : null}
         </main>
         {panel ? (

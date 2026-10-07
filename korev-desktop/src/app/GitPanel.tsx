@@ -13,6 +13,7 @@ import type {
   CheckState,
   FileChange,
   PrStatus,
+  ReviewComment,
   Workspace,
 } from '../shared/model';
 import {
@@ -28,7 +29,7 @@ import { api } from './bridge';
 import { fileName } from './format';
 import { usePolling } from './hooks';
 import { reportFailure } from './ui/toast';
-import { setUi, useUi, type GitPanelTab } from './ui-store';
+import { setUi, updateWorkspaceUi, useUi, type GitPanelTab } from './ui-store';
 
 const CHANGES_REFRESH_MS = 4_000;
 const PR_REFRESH_MS = 30_000;
@@ -335,6 +336,67 @@ function PrCard({ workspace, pr }: { workspace: Workspace; pr: PrStatus }) {
   );
 }
 
+function ReviewComments({
+  workspace,
+  prNumber,
+}: {
+  workspace: Workspace;
+  prNumber: number;
+}) {
+  const [comments, setComments] = useState<ReviewComment[]>([]);
+  usePolling(
+    () => void api.reviewComments(workspace.id).then(setComments),
+    PR_REFRESH_MS,
+    [workspace.id, prNumber],
+  );
+  if (!comments.length) return null;
+  const addToChat = (comment: ReviewComment) =>
+    updateWorkspaceUi(workspace.id, (current) => ({
+      comments: [
+        ...current.comments,
+        {
+          id: `gh-${comment.id}`,
+          file: comment.path,
+          line: comment.line ?? 0,
+          code: '',
+          body: `@${comment.author} on GitHub: ${comment.body}`,
+        },
+      ],
+    }));
+  return (
+    <div>
+      <div className="mb-1 type-overline text-fg-4">Review comments</div>
+      {comments.map((comment) => (
+        <div
+          key={comment.id}
+          className="mb-1.5 rounded-md border border-border-1 bg-surface p-2 text-xs"
+        >
+          <button
+            type="button"
+            className="mb-1 flex w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left font-mono text-fg-3 hover:text-fg-1"
+            onClick={() => openDiff(workspace.id, comment.path)}
+          >
+            {comment.path}
+            {comment.line ? `:${comment.line}` : ' (outdated)'}
+          </button>
+          <p className="m-0 mb-1.5 whitespace-pre-wrap text-fg-1">
+            <span className="font-medium">@{comment.author}</span>{' '}
+            {comment.body}
+          </p>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="message-square-plus"
+            onClick={() => addToChat(comment)}
+          >
+            Add to chat
+          </Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Checks({
   state,
   workspace,
@@ -365,6 +427,7 @@ function Checks({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
       <PrCard workspace={workspace} pr={pr} />
+      <ReviewComments workspace={workspace} prNumber={pr.number} />
       <div>
         <div className="mb-1 type-overline text-fg-4">Checks</div>
         {pr.checks.length ? (

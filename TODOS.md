@@ -6,9 +6,6 @@ Features Korev does not have yet, roughly in the order they would help.
   `workspace-write` sandbox (`read-only` in plan mode) instead.
 - **Voice input.** macOS Dictation (press Fn twice) already works in the composer; there is no
   built-in speech-to-text.
-- **Diff viewer extras.** Split view, viewed state, GitHub review comments, editing in
-  the diff, turn diffs.
-- **Quick open (⌘P) and search in files (⌘⇧F).**
 - **Spotlight testing, the in-app browser and Big Terminal Mode.**
 - **Sign and notarize the macOS build.** Unsigned builds are blocked by Gatekeeper on
   other machines. Needs an Apple Developer ID certificate, `osxSign` + `osxNotarize` in
