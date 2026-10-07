@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
+import { cn, Logo, Spinner } from '../design-system';
 import type { AppState } from '../shared/model';
 import { activeWorkspaces, openNewWorkspace, selectWorkspace } from './actions';
 import { AskPage } from './AskPage';
 import { api } from './bridge';
 import { CommandPalette } from './CommandPalette';
 import { useAppState, useMediaQuery } from './hooks';
+import { DRAG_REGION } from './layout';
 import { NewWorkspacePage } from './NewWorkspacePage';
 import { SettingsPage } from './SettingsPage';
 import { Sidebar } from './Sidebar';
@@ -73,11 +75,25 @@ function Shell({ state }: { state: AppState }) {
   );
 }
 
+function Loading() {
+  return (
+    <div className="flex h-screen flex-col bg-app">
+      <div className={cn('h-11 flex-none', DRAG_REGION)} />
+      <div className="flex flex-1 flex-col items-center justify-center gap-6 pb-20">
+        <Logo size={36} />
+        <div className="flex h-6">
+          <Spinner />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const state = useAppState();
   useTheme(state);
   useCommands(state);
-  if (!state) return <div className="h-screen bg-app" />;
+  if (!state) return <Loading />;
   return (
     <>
       {state.repos.length ? <Shell state={state} /> : <Welcome state={state} />}
