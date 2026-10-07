@@ -215,3 +215,13 @@ export function isUserMessageAck(event: Record<string, unknown>): boolean {
   const message = event.message as { content?: unknown } | undefined;
   return event.type === 'user' && typeof message?.content === 'string';
 }
+
+const BACKGROUND_TASKS_CHANGED = 'background_tasks_changed';
+
+export function backgroundTaskCount(
+  event: Record<string, unknown>,
+): number | null {
+  if (event.type !== 'system' || event.subtype !== BACKGROUND_TASKS_CHANGED)
+    return null;
+  return Array.isArray(event.tasks) ? event.tasks.length : 0;
+}

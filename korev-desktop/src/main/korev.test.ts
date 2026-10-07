@@ -857,6 +857,37 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     });
   });
 
+  it('still takes approvals after a background task ends the first result', async () => {
+    await korev.api.updateSettings({ toolApprovals: true });
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await korev.api.send(session.id, {
+      text: 'background-approval',
+      agent: 'claude',
+      model: 'claude-sonnet-5-5',
+      effort: 'high',
+      planMode: false,
+      fast: false,
+    });
+    let permissionId = '';
+    await waitFor(async () => {
+      const pending = (await korev.api.transcript(session.id)).find(
+        (item) => item.kind === 'permission',
+      );
+      permissionId = pending?.id ?? '';
+      return Boolean(pending);
+    });
+
+    await korev.api.respondPermission(session.id, permissionId, {
+      allow: true,
+    });
+    await waitFor(
+      async () => (await korev.api.getState()).runningSessions.length === 0,
+    );
+
+    expect(existsSync(path.join(workspace.path, 'approved.txt'))).toBe(true);
+  });
+
   it('leaves plan mode once the user approves the plan', async () => {
     const workspace = await createWorkspace();
     const [session] = workspace.sessions;

@@ -25,6 +25,7 @@ import {
 import { spawnAgent, type AgentProcess } from './agent-process';
 import {
   AGENTS,
+  backgroundTaskCount,
   claudeUserMessage,
   codexPrompt,
   isUserMessageAck,
@@ -179,6 +180,7 @@ interface ActiveTurn {
   stopRequested: boolean;
   written: number;
   acknowledged: number;
+  backgroundTasks: number;
   permissions: Map<string, ControlRequest>;
   start: Checkpoint | null;
 }
@@ -439,12 +441,14 @@ export function createChats(
       return 1;
     }
     if (isUserMessageAck(event)) turn.acknowledged += 1;
+    turn.backgroundTasks = backgroundTaskCount(event) ?? turn.backgroundTasks;
     const updates = parser.feed(event);
     for (const item of updates)
       upsert(session.id, items, { ...item, id: `${turn.id}:${item.id}` });
     const allConsumed =
       turn.acknowledged >= turn.written || turn.acknowledged === 0;
-    if (event.type === 'result' && allConsumed) turn.process?.closeInput();
+    if (event.type === 'result' && allConsumed && turn.backgroundTasks === 0)
+      turn.process?.closeInput();
     return updates.length;
   }
 
@@ -603,6 +607,7 @@ export function createChats(
       stopRequested: false,
       written: 0,
       acknowledged: 0,
+      backgroundTasks: 0,
       permissions: new Map(),
       start,
     };
