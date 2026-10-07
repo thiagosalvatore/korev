@@ -163,6 +163,7 @@ test('asks a question about a repository without creating a workspace', async ()
       chat.getByText('Implement your part of the plan below.'),
     ).toBeVisible();
     await expect(chat.getByText('Where is the README?')).toBeVisible();
+    await expect(chat.getByText('I added agent-note.txt.')).toHaveCount(2);
     await snap(window, '06b-ask-moved-to-workspace');
     await waitForAgentsToFinish(window);
   } finally {
