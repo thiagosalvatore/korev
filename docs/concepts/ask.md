@@ -19,6 +19,8 @@ One Ask chat can cover several repositories. Pick them in the repository picker 
 
 Korev titles each Ask chat with Claude Haiku after your first message, so you can find it later in the **Ask chats** list in the sidebar.
 
+The **Ask chats** list puts the chat with the latest message first and shows how long ago each chat had its last message.
+
 ## Start a workspace from an Ask chat
 
 When you are ready to build what you discussed, press **Start workspace**. The new workspace's chat starts with the whole Ask conversation, and its agent continues from there. If the agent wrote a plan, the new chat starts with that plan.
