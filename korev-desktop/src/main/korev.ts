@@ -75,8 +75,10 @@ import {
   switchAgent,
   workspaceConfig,
   type SendTask,
+  activeWorkspaces,
 } from './workspaces';
 
+export const PR_POLL_MS = 30_000;
 const FILE_MAX_BYTES = 1_000_000;
 const CONTEXT_DIR = '.context';
 const ATTACHMENTS_DIR = 'attachments';
@@ -347,11 +349,24 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       ctx.emitState();
     }
     if (pr && mergedSinceRestore(workspace, pr))
-      await archiveIfConfigured(workspaceId);
+      await archiveIfConfigured(workspaceId, pr);
     return pr;
   }
 
-  async function archiveIfConfigured(workspaceId: string) {
+  let checkingPrs = false;
+
+  async function refreshAllPrs() {
+    if (checkingPrs) return;
+    checkingPrs = true;
+    try {
+      for (const workspace of activeWorkspaces(ctx))
+        await refreshPr(workspace.id).catch(() => null);
+    } finally {
+      checkingPrs = false;
+    }
+  }
+
+  async function archiveIfConfigured(workspaceId: string, pr: PrStatus) {
     const workspace = ctx.workspace(workspaceId);
     const config = await workspaceConfig(ctx, workspace);
     if (!(config.archiveOnMerge ?? store.state.settings.archiveOnMerge)) return;
@@ -360,7 +375,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       workspace.sessions.some((session) => ctx.runningSessions.has(session.id))
     )
       return;
-    await archive(workspaceId);
+    const archived = await archive(workspaceId);
+    if (!archived.ok) return;
+    deps.emit('toast', {
+      title: `PR #${pr.number} merged. Archived ${workspace.name}`,
+      tone: 'success',
+    });
   }
 
   async function actionPrompt(
@@ -888,11 +908,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     agents = detected;
     ctx.emitState();
   });
-  for (const workspace of store.state.workspaces) {
-    if (workspace.archivedAt) continue;
+  for (const workspace of activeWorkspaces(ctx))
     void refreshStats(ctx, workspace);
-    void refreshPr(workspace.id).catch(() => null);
-  }
+  void refreshAllPrs();
+  const prWatch = setInterval(() => void refreshAllPrs(), PR_POLL_MS);
 
   return {
     api,
@@ -900,6 +919,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     settings: () => store.state.settings,
     updateSettings,
     async shutdown() {
+      clearInterval(prWatch);
       await spotlight.disableAll();
       for (const session of allSessions()) chats.stop(session.id);
       await chats.settled();

@@ -34,7 +34,7 @@ import { reportFailure } from './ui/toast';
 import { setUi, updateWorkspaceUi, useUi, type GitPanelTab } from './ui-store';
 
 const CHANGES_REFRESH_MS = 4_000;
-export const PR_REFRESH_MS = 30_000;
+const PR_REFRESH_MS = 30_000;
 
 const CHECK_ICONS: Record<CheckState, { icon: IconName; className: string }> = {
   success: { icon: 'circle-check', className: 'text-success-text' },

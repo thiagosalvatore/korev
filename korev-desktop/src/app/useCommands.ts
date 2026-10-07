@@ -19,6 +19,7 @@ import {
   toggleRunScript,
 } from './actions';
 import { api, on } from './bridge';
+import { toast } from './ui/toast';
 import { EMPTY_WORKSPACE_UI, getUi, setUi } from './ui-store';
 
 const SELECT_WORKSPACE_PREFIX = 'select-workspace-';
@@ -130,9 +131,11 @@ export function useCommands(state: AppState | null) {
     const stopFocus = on('focus-workspace', (workspaceId) =>
       selectWorkspace(workspaceId),
     );
+    const stopToasts = on('toast', ({ title, tone }) => toast(title, tone));
     return () => {
       stopCommands();
       stopFocus();
+      stopToasts();
     };
   }, []);
 }

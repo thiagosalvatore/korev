@@ -153,6 +153,11 @@ export interface KorevApi {
   closeTerminal(ref: string): Promise<void>;
 }
 
+export interface Toast {
+  title: string;
+  tone: 'danger' | 'success' | 'neutral';
+}
+
 export interface KorevEvents {
   state: AppState;
   chat: ChatUpdate;
@@ -160,6 +165,7 @@ export interface KorevEvents {
   'terminal-exit': TerminalExit;
   command: AppCommand;
   'focus-workspace': string;
+  toast: Toast;
 }
 
 export type Unsubscribe = () => void;

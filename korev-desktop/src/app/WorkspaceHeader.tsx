@@ -10,8 +10,6 @@ import {
   resolveConflicts,
 } from './actions';
 import { api } from './bridge';
-import { PR_REFRESH_MS } from './GitPanel';
-import { usePolling } from './hooks';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { Menu } from './ui/Menu';
 import { toast } from './ui/toast';
@@ -146,9 +144,6 @@ export function WorkspaceHeader({
   const panel = useUi((ui) => ui.panel);
   const runtime = state.runtime[workspace.id];
   const pr = runtime?.pr ?? null;
-  usePolling(() => void api.prStatus(workspace.id), PR_REFRESH_MS, [
-    workspace.id,
-  ]);
   const action = nextAction(state, workspace, pr);
   const editor =
     state.editors.find((entry) => entry.id === state.settings.editor) ??

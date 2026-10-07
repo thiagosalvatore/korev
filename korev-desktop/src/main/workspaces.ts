@@ -118,7 +118,7 @@ export async function scriptEnv(
   };
 }
 
-function activeWorkspaces(ctx: Context): Workspace[] {
+export function activeWorkspaces(ctx: Context): Workspace[] {
   return ctx.store.state.workspaces.filter((ws) => !ws.archivedAt);
 }
 

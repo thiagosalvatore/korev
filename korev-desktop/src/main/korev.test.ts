@@ -21,7 +21,7 @@ import {
   type Workspace,
   type WorkspaceSource,
 } from '../shared/model';
-import { createKorev, type Korev } from './korev';
+import { createKorev, PR_POLL_MS, type Korev } from './korev';
 
 const FAKE_AGENT_BIN = path.resolve(__dirname, '../../test-support/bin');
 const WAIT_TIMEOUT_MS = 10_000;
@@ -92,6 +92,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   let chosenDirectory: string;
   let korev: Korev;
   let playSound: Mock<() => void>;
+  let emit: Mock<(event: string, payload: unknown) => void>;
 
   async function initRepo(name: string) {
     const dir = path.join(home, name);
@@ -116,7 +117,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       userDataPath: path.join(home, 'user-data'),
       fs: nodeFileSystem,
       spawnPty: noPty,
-      emit: () => undefined,
+      emit,
       notify: () => undefined,
       playSound,
       isWindowFocused: () => true,
@@ -135,6 +136,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     repoPath = await initRepo('acme');
     chosenDirectory = repoPath;
     playSound = vi.fn();
+    emit = vi.fn();
     korev = await openKorev();
     await korev.api.updateSettings({
       branchPrefix: 'dev',
@@ -145,6 +147,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   afterEach(async () => {
     openPr = null;
     await korev.shutdown();
+    vi.useRealTimers();
     await rm(home, { recursive: true, force: true });
   });
 
@@ -258,6 +261,24 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     await waitFor(
       async () =>
         (await workspaceState(workspace.id)).workspace.archivedAt !== null,
+    );
+    expect(emit).toHaveBeenCalledWith(
+      'toast',
+      expect.objectContaining({ tone: 'success' }),
+    );
+  });
+
+  it('checks the PR of every workspace on a timer', async () => {
+    await korev.shutdown();
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    korev = await openKorev();
+    const workspace = await createWorkspace();
+    openPr = { number: 7, state: 'OPEN' };
+
+    vi.advanceTimersByTime(PR_POLL_MS);
+
+    await waitFor(
+      async () => (await workspaceState(workspace.id)).runtime.pr?.number === 7,
     );
   });
 
