@@ -49,7 +49,7 @@ The response is `{ "result": ... }`. If the method fails, the response is `{ "er
 
 A remote device can call only these methods:
 
-`getState`, `transcript`, `send`, `stop`, `respondPermission`, `newSession`, `closeSession`, `updateSession`, `createWorkspaces`, `archiveWorkspace`, `listBranches`, `listPullRequests`, `listIssues`, `slashCommands`, `changes`, `fileDiff`, `rangeChanges`, `listFiles`, `readFile`, `prStatuses`, `reviewComments`, `createPr`, `fixChecks`, `resolveConflicts`, `mergePr`.
+`getState`, `transcript`, `send`, `stop`, `respondPermission`, `newSession`, `closeSession`, `updateSession`, `createWorkspaces`, `archiveWorkspace`, `listBranches`, `listPullRequests`, `listIssues`, `slashCommands`, `changes`, `fileDiff`, `rangeChanges`, `listFiles`, `readFile`, `prStatuses`, `reviewComments`, `createPr`, `fixChecks`, `resolveConflicts`, `mergePr`, `repoIcon`.
 
 The arguments for each method are the same as in `KorevApi` in `korev-desktop/src/shared/api.ts`.
 

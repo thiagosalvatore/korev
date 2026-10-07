@@ -34,6 +34,7 @@ export const REMOTE_METHODS = [
   'fixChecks',
   'resolveConflicts',
   'mergePr',
+  'repoIcon',
 ] as const satisfies readonly (keyof KorevApi)[];
 
 const REMOTE_EVENTS: ReadonlySet<keyof KorevEvents> = new Set([

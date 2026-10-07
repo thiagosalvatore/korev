@@ -4,6 +4,7 @@ const DARK = {
   bgApp: '#0b0d10',
   bgSurface: '#101317',
   bgRaised: '#151920',
+  bgHover: '#1b2028',
   bgActive: '#232933',
   border1: '#1e232b',
   border2: '#2a303a',
@@ -22,6 +23,8 @@ const DARK = {
   warning: '#e3b341',
   warningText: '#f0c865',
   merged: '#a371f7',
+  diffAdd: '#5bd08f',
+  diffDel: '#ff7a70',
 };
 
 export type Theme = typeof DARK;
@@ -31,6 +34,7 @@ const LIGHT: Theme = {
   bgApp: '#f7f8fa',
   bgSurface: '#ffffff',
   bgRaised: '#ffffff',
+  bgHover: '#f0f2f5',
   bgActive: '#e7eaef',
   border1: '#e6e9ee',
   border2: '#d7dbe2',
@@ -44,6 +48,8 @@ const LIGHT: Theme = {
   successText: '#1f7a4d',
   dangerText: '#b4302a',
   warningText: '#8e6b12',
+  diffAdd: '#1f7a4d',
+  diffDel: '#b4302a',
 };
 
 export const MONO_FONT = Platform.select({

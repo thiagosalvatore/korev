@@ -34,7 +34,10 @@ export function formatTokens(tokens: number): string {
   return String(tokens);
 }
 
-export function modelLabel(state: AppState, session: ChatSession): string {
+export function modelLabel(
+  state: AppState,
+  session: Pick<ChatSession, 'agent' | 'model'>,
+): string {
   const agent = state.agents.find((entry) => entry.agent === session.agent);
   const model = agent?.models.find((entry) => entry.id === session.model);
   return model?.label ?? (session.model || AGENT_LABELS[session.agent]);

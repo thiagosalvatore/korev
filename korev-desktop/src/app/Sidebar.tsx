@@ -17,8 +17,11 @@ import {
   type IconName,
 } from '../design-system';
 import {
+  prBadge,
+  PR_BADGE_LABELS,
   primaryPr,
   type AppState,
+  type PrBadge,
   type PrStatus,
   type Repo,
   type RepoFolder,
@@ -69,48 +72,29 @@ function NavRow({
   );
 }
 
+const PR_BADGE_ICONS: Record<PrBadge, { icon: IconName; className: string }> = {
+  merged: { icon: 'git-merge', className: 'text-[#a371f7]' },
+  closed: { icon: 'git-pull-request-closed', className: 'text-fg-4' },
+  conflicts: { icon: 'git-pull-request', className: 'text-warning-text' },
+  'checks-failing': {
+    icon: 'git-pull-request',
+    className: 'text-danger-text',
+  },
+  'checks-running': {
+    icon: 'git-pull-request',
+    className: 'text-warning-text animate-pulse',
+  },
+  draft: { icon: 'git-pull-request-draft', className: 'text-fg-3' },
+  open: { icon: 'git-pull-request', className: 'text-success-text' },
+};
+
 export function prIcon(pr: PrStatus): {
   icon: IconName;
   className: string;
   label: string;
 } {
-  if (pr.state === 'MERGED')
-    return { icon: 'git-merge', className: 'text-[#a371f7]', label: 'Merged' };
-  if (pr.state === 'CLOSED')
-    return {
-      icon: 'git-pull-request-closed',
-      className: 'text-fg-4',
-      label: 'Closed',
-    };
-  if (pr.mergeable === 'CONFLICTING')
-    return {
-      icon: 'git-pull-request',
-      className: 'text-warning-text',
-      label: 'Conflicts',
-    };
-  if (pr.checks.some((check) => check.state === 'failure'))
-    return {
-      icon: 'git-pull-request',
-      className: 'text-danger-text',
-      label: 'Checks failing',
-    };
-  if (pr.checks.some((check) => check.state === 'pending'))
-    return {
-      icon: 'git-pull-request',
-      className: 'text-warning-text animate-pulse',
-      label: 'Checks running',
-    };
-  if (pr.isDraft)
-    return {
-      icon: 'git-pull-request-draft',
-      className: 'text-fg-3',
-      label: 'Draft',
-    };
-  return {
-    icon: 'git-pull-request',
-    className: 'text-success-text',
-    label: 'Open',
-  };
+  const badge = prBadge(pr);
+  return { ...PR_BADGE_ICONS[badge], label: PR_BADGE_LABELS[badge] };
 }
 
 function prSummary(pr: PrStatus): string {

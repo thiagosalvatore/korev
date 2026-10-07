@@ -347,6 +347,37 @@ export function nextPrStep(pr: PrStatus | null): PrStep {
   return 'merge';
 }
 
+export type PrBadge =
+  | 'merged'
+  | 'closed'
+  | 'conflicts'
+  | 'checks-failing'
+  | 'checks-running'
+  | 'draft'
+  | 'open';
+
+export const PR_BADGE_LABELS: Record<PrBadge, string> = {
+  merged: 'Merged',
+  closed: 'Closed',
+  conflicts: 'Conflicts',
+  'checks-failing': 'Checks failing',
+  'checks-running': 'Checks running',
+  draft: 'Draft',
+  open: 'Open',
+};
+
+export function prBadge(pr: PrStatus): PrBadge {
+  if (pr.state === 'MERGED') return 'merged';
+  if (pr.state === 'CLOSED') return 'closed';
+  if (pr.mergeable === 'CONFLICTING') return 'conflicts';
+  if (pr.checks.some((check) => check.state === 'failure'))
+    return 'checks-failing';
+  if (pr.checks.some((check) => check.state === 'pending'))
+    return 'checks-running';
+  if (pr.isDraft) return 'draft';
+  return 'open';
+}
+
 export function primaryPr(
   workspace: Workspace,
   runtime: WorkspaceRuntime | undefined,

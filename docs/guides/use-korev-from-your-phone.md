@@ -48,12 +48,18 @@ The phone shows next to Settings in the Korev sidebar while the app is open.
 
 ## What the app shows
 
-The first screen lists the workspaces of each repository, in the same order as the Korev sidebar.
+The first screen looks like the Korev sidebar. It lists your repositories in the same order, each with its icon, and the workspaces of each repository.
 
-- A spinner shows while an agent or the setup script runs.
-- **Needs input** shows when an agent waits for an answer.
+- The icon on the left of a workspace shows a spinner while an agent or the setup script runs. It shows a question mark when an agent waits for your answer, and a warning sign when the setup or the agent failed.
+- Otherwise the icon shows the state of the PR, in the same colors as on the Mac. A workspace with no PR shows a branch icon.
+- `+N −M` shows the lines the workspace adds and removes against its target branch.
 - A dot shows when a workspace has agent output that you did not read.
-- The PR number shows in the colour of its state: green when it is ready to merge, red when checks fail or changes are requested, amber for conflicts or running checks, and purple when it is merged.
+
+## Start a workspace
+
+Tap **New workspace** at the top, or **+** next to a repository. Pick the repository, describe the task, and tap **Create and start**. Korev creates the workspace on the Mac, starts your default agent with the task, and the phone opens the new workspace. Tap **Plan** first to start in plan mode.
+
+If you leave the task empty, tap **Create** to make the workspace without starting an agent.
 
 ## Chat with an agent
 
@@ -82,4 +88,4 @@ Tap the PR title to see its checks. Tap a check to open it.
 
 ## Unpair the phone
 
-Tap **Unpair** at the top of the workspace list. To disconnect every device, click **Revoke all** in **Settings → Remote access** on the Mac. The phone then goes back to the pairing screen.
+Tap the settings icon at the top of the workspace list, then **Unpair**. To disconnect every device, click **Revoke all** in **Settings → Remote access** on the Mac. The phone then goes back to the pairing screen.

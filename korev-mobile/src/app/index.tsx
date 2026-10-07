@@ -1,18 +1,31 @@
 import { router, Stack } from 'expo-router';
 import {
+  GitBranch,
+  GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  GitPullRequestDraft,
+  MessageCircleQuestion,
+  Plus,
+  Settings,
+  SquarePen,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react-native';
+import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
-  SectionList,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import {
-  nextPrStep,
+  prBadge,
   primaryPr,
-  type AppState,
-  type PrStep,
+  type PrBadge,
   type Repo,
   type Workspace,
   type WorkspaceRuntime,
@@ -24,7 +37,11 @@ import {
 } from '../../../korev-desktop/src/shared/workspaces';
 import { useAppState } from '../hooks';
 import { useKorev } from '../korev';
-import { useTheme, type Theme } from '../theme';
+import { RepoAvatar } from '../RepoAvatar';
+import { MONO_FONT, useTheme, type Theme } from '../theme';
+
+const LOGO = require('../../assets/icon.png');
+const ICON_SIZE = 16;
 
 const BUSY_STATUSES: ReadonlySet<WorkspaceStatus> = new Set([
   'creating',
@@ -32,30 +49,33 @@ const BUSY_STATUSES: ReadonlySet<WorkspaceStatus> = new Set([
   'working',
 ]);
 
-function prColor(theme: Theme, step: PrStep): string {
-  if (step === 'archive') return theme.merged;
-  if (step === 'fix-errors' || step === 'changes-requested')
-    return theme.dangerText;
-  if (step === 'resolve-conflicts' || step === 'checks-running')
-    return theme.warningText;
-  if (step === 'merge') return theme.successText;
-  return theme.fg3;
+const BADGE_ICONS: Record<PrBadge, LucideIcon> = {
+  merged: GitMerge,
+  closed: GitPullRequestClosed,
+  conflicts: GitPullRequest,
+  'checks-failing': GitPullRequest,
+  'checks-running': GitPullRequest,
+  draft: GitPullRequestDraft,
+  open: GitPullRequest,
+};
+
+function badgeColor(theme: Theme, badge: PrBadge): string {
+  const colors: Record<PrBadge, string> = {
+    merged: theme.merged,
+    closed: theme.fg4,
+    conflicts: theme.warningText,
+    'checks-failing': theme.dangerText,
+    'checks-running': theme.warningText,
+    draft: theme.fg3,
+    open: theme.successText,
+  };
+  return colors[badge];
 }
 
-interface RepoGroup {
-  repo: Repo;
-  data: Workspace[];
-}
+type Styles = ReturnType<typeof makeStyles>;
 
-function repoGroups(state: AppState): RepoGroup[] {
-  const workspaces = activeWorkspaces(state);
-  return repoSections(state)
-    .flatMap((section) => section.repos)
-    .map((repo) => ({
-      repo,
-      data: workspaces.filter((workspace) => workspace.repoId === repo.id),
-    }))
-    .filter((group) => group.data.length > 0);
+function openNewWorkspace(repoId?: string) {
+  router.push({ pathname: '/new', params: repoId ? { repoId } : {} });
 }
 
 function confirmUnpair(unpair: () => Promise<void>) {
@@ -69,6 +89,27 @@ function confirmUnpair(unpair: () => Promise<void>) {
   );
 }
 
+function StatusIcon({
+  workspace,
+  runtime,
+}: {
+  workspace: Workspace;
+  runtime: WorkspaceRuntime;
+}) {
+  const theme = useTheme();
+  if (BUSY_STATUSES.has(runtime.status))
+    return <ActivityIndicator size="small" color={theme.accentText} />;
+  if (runtime.status === 'waiting')
+    return <MessageCircleQuestion size={ICON_SIZE} color={theme.warningText} />;
+  if (runtime.status === 'error' || runtime.status === 'failed')
+    return <TriangleAlert size={ICON_SIZE} color={theme.dangerText} />;
+  const pr = primaryPr(workspace, runtime);
+  if (!pr) return <GitBranch size={ICON_SIZE} color={theme.fg4} />;
+  const badge = prBadge(pr);
+  const Badge = BADGE_ICONS[badge];
+  return <Badge size={ICON_SIZE} color={badgeColor(theme, badge)} />;
+}
+
 function WorkspaceRow({
   workspace,
   runtime,
@@ -78,13 +119,14 @@ function WorkspaceRow({
   runtime: WorkspaceRuntime | undefined;
   styles: Styles;
 }) {
-  const theme = useTheme();
-  const waiting = runtime?.status === 'waiting';
-  const pr = primaryPr(workspace, runtime);
+  const highlighted = runtime?.unread || runtime?.status === 'waiting';
+  const stats = runtime?.stats;
+  const hasStats = stats && (stats.additions > 0 || stats.deletions > 0);
   return (
     <Pressable
       accessibilityRole="button"
-      style={styles.row}
+      accessibilityLabel={`Workspace ${workspace.name}`}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       onPress={() =>
         router.push({
           pathname: '/workspace/[id]',
@@ -93,30 +135,81 @@ function WorkspaceRow({
       }
     >
       <View style={styles.statusSlot}>
-        {runtime && BUSY_STATUSES.has(runtime.status) && (
-          <ActivityIndicator size="small" />
-        )}
+        {runtime && <StatusIcon workspace={workspace} runtime={runtime} />}
       </View>
       <View style={styles.rowText}>
         <Text
-          style={[styles.branch, runtime?.unread && styles.unread]}
+          style={[styles.branch, highlighted && styles.branchHighlighted]}
           numberOfLines={1}
         >
           {workspace.branch}
         </Text>
         <Text style={styles.name} numberOfLines={1}>
           {workspace.name}
-          {runtime?.message ? ` · ${runtime.message}` : ''}
+          {runtime?.message ? (
+            <Text style={styles.error}> · {runtime.message}</Text>
+          ) : null}
         </Text>
       </View>
-      {waiting && <Text style={styles.badge}>Needs input</Text>}
-      {pr && (
-        <Text style={[styles.pr, { color: prColor(theme, nextPrStep(pr)) }]}>
-          #{pr.number}
-        </Text>
-      )}
-      {(runtime?.unread || waiting) && <View style={styles.dot} />}
+      <View style={styles.rowEnd}>
+        {hasStats ? (
+          <Text style={styles.stats}>
+            <Text style={styles.additions}>+{stats.additions}</Text>{' '}
+            <Text style={styles.deletions}>−{stats.deletions}</Text>
+          </Text>
+        ) : null}
+        {runtime?.unread ? <View style={styles.dot} /> : null}
+      </View>
     </Pressable>
+  );
+}
+
+function RepoGroup({
+  repo,
+  workspaces,
+  runtime,
+  styles,
+}: {
+  repo: Repo;
+  workspaces: Workspace[];
+  runtime: Record<string, WorkspaceRuntime>;
+  styles: Styles;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={styles.group}>
+      <View style={styles.repoHeader}>
+        <RepoAvatar repo={repo} />
+        <Text style={styles.repoName} numberOfLines={1}>
+          {repo.name}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`New workspace in ${repo.name}`}
+          hitSlop={8}
+          onPress={() => openNewWorkspace(repo.id)}
+        >
+          <Plus size={ICON_SIZE + 2} color={theme.fg3} />
+        </Pressable>
+      </View>
+      {workspaces.map((workspace) => (
+        <WorkspaceRow
+          key={workspace.id}
+          workspace={workspace}
+          runtime={runtime[workspace.id]}
+          styles={styles}
+        />
+      ))}
+    </View>
+  );
+}
+
+function HeaderTitle({ styles }: { styles: Styles }) {
+  return (
+    <View style={styles.brand}>
+      <Image source={LOGO} style={styles.logo} />
+      <Text style={styles.brandName}>Korev</Text>
+    </View>
   );
 }
 
@@ -126,82 +219,115 @@ export default function WorkspacesScreen() {
   const theme = useTheme();
   const styles = makeStyles(theme);
 
+  const header = (
+    <Stack.Screen
+      options={{
+        headerTitle: () => <HeaderTitle styles={styles} />,
+        headerRight: () => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            hitSlop={8}
+            onPress={() => confirmUnpair(unpair)}
+          >
+            <Settings size={ICON_SIZE + 4} color={theme.fg2} />
+          </Pressable>
+        ),
+      }}
+    />
+  );
+
+  if (!state)
+    return (
+      <>
+        {header}
+        <ActivityIndicator style={styles.loading} />
+      </>
+    );
+
+  const workspaces = activeWorkspaces(state);
+  const repos = repoSections(state).flatMap((section) => section.repos);
+
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerRight: () => (
-            <Pressable onPress={() => confirmUnpair(unpair)}>
-              <Text style={styles.headerAction}>Unpair</Text>
-            </Pressable>
-          ),
-        }}
-      />
-      {state ? (
-        <SectionList
-          sections={repoGroups(state)}
-          keyExtractor={(workspace) => workspace.id}
-          renderSectionHeader={({ section }) => (
-            <Text style={styles.section}>{section.repo.name}</Text>
-          )}
-          renderItem={({ item }) => (
-            <WorkspaceRow
-              workspace={item}
-              runtime={state.runtime[item.id]}
-              styles={styles}
-            />
-          )}
-          ListEmptyComponent={
-            <Text style={styles.empty}>
-              No workspaces yet. Create one in Korev on your Mac.
-            </Text>
-          }
-          stickySectionHeadersEnabled={false}
-        />
-      ) : (
-        <ActivityIndicator style={styles.loading} />
-      )}
+      {header}
+      <ScrollView contentContainerStyle={styles.page}>
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
+          onPress={() => openNewWorkspace()}
+        >
+          <SquarePen size={ICON_SIZE} color={theme.fg2} />
+          <Text style={styles.navLabel}>New workspace</Text>
+        </Pressable>
+        {repos.map((repo) => (
+          <RepoGroup
+            key={repo.id}
+            repo={repo}
+            workspaces={workspaces.filter((ws) => ws.repoId === repo.id)}
+            runtime={state.runtime}
+            styles={styles}
+          />
+        ))}
+        {repos.length === 0 && (
+          <Text style={styles.empty}>
+            Add a repository in Korev on your Mac to start.
+          </Text>
+        )}
+      </ScrollView>
     </>
   );
 }
 
-type Styles = ReturnType<typeof makeStyles>;
-
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
     loading: { marginTop: 40 },
-    headerAction: { color: theme.accentText, fontSize: 16 },
-    section: {
-      paddingHorizontal: 16,
-      paddingTop: 20,
-      paddingBottom: 6,
-      color: theme.fg3,
-      fontSize: 13,
-      fontWeight: '600',
-    },
-    row: {
+    page: { paddingHorizontal: 8, paddingVertical: 8 },
+    brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    logo: { width: 24, height: 24, borderRadius: 6 },
+    brandName: { color: theme.fg1, fontSize: 17, fontWeight: '700' },
+    pressed: { backgroundColor: theme.bgHover },
+    navRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-      paddingHorizontal: 16,
+      paddingHorizontal: 10,
       paddingVertical: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.border1,
+      borderRadius: 8,
+      marginBottom: 8,
     },
-    statusSlot: { width: 20, alignItems: 'center' },
+    navLabel: { color: theme.fg2, fontSize: 15, fontWeight: '500' },
+    group: { marginBottom: 12 },
+    repoHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    repoName: { flex: 1, color: theme.fg1, fontSize: 15, fontWeight: '600' },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      minHeight: 48,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    statusSlot: { width: 20, alignItems: 'center', paddingTop: 1 },
     rowText: { flex: 1, gap: 2 },
-    branch: { color: theme.fg1, fontSize: 15 },
-    unread: { fontWeight: '700' },
+    branch: { color: theme.fg2, fontSize: 15, fontWeight: '500' },
+    branchHighlighted: { color: theme.fg1, fontWeight: '700' },
     name: { color: theme.fg3, fontSize: 13 },
-    badge: {
-      color: theme.warningText,
-      fontSize: 12,
-      fontWeight: '600',
-    },
-    pr: { fontSize: 13, fontWeight: '600' },
+    error: { color: theme.dangerText },
+    rowEnd: { alignItems: 'flex-end', gap: 6, paddingTop: 2 },
+    stats: { fontFamily: MONO_FONT, fontSize: 11 },
+    additions: { color: theme.diffAdd },
+    deletions: { color: theme.diffDel },
     dot: {
-      width: 8,
-      height: 8,
+      width: 7,
+      height: 7,
       borderRadius: 4,
       backgroundColor: theme.accent,
     },
