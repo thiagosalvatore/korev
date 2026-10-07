@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { cn, Icon, Kbd, type IconName } from '../../design-system';
 
 export interface MenuItem {
@@ -22,8 +29,30 @@ export interface MenuProps {
   label: string;
 }
 
-const PANEL =
+export const PANEL =
   'absolute z-50 max-h-[60vh] min-w-48 animate-fade-fast overflow-y-auto rounded-md bg-raised p-1 shadow-pop';
+
+export function useDismiss(
+  root: RefObject<HTMLElement | null>,
+  open: boolean,
+  dismiss: () => void,
+) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (event: MouseEvent) => {
+      if (!root.current?.contains(event.target as Node)) dismiss();
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') dismiss();
+    };
+    window.addEventListener('mousedown', close);
+    window.addEventListener('keydown', escape);
+    return () => {
+      window.removeEventListener('mousedown', close);
+      window.removeEventListener('keydown', escape);
+    };
+  }, [root, open, dismiss]);
+}
 
 export function Menu({
   trigger,
@@ -35,21 +64,8 @@ export function Menu({
 }: MenuProps) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = (event: MouseEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    window.addEventListener('mousedown', close);
-    window.addEventListener('keydown', escape);
-    return () => {
-      window.removeEventListener('mousedown', close);
-      window.removeEventListener('keydown', escape);
-    };
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(root, open, close);
 
   let lastSection: string | undefined;
   return (
