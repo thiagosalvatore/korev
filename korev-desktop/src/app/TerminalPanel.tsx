@@ -195,7 +195,7 @@ function RunControls({
           icon={running ? 'square' : 'play'}
           title={selected ? `${selected.command} (⌘R)` : '⌘R'}
           className={scripts.length > 1 ? 'rounded-r-none' : ''}
-          onClick={() => void toggleRunScript(state, workspace)}
+          onClick={() => toggleRunScript(state, workspace)}
         >
           {running
             ? 'Stop'

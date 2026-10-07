@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, cn, highlightCode, Icon } from '../design-system';
+import { Button, cn, highlightCode, Icon, Spinner } from '../design-system';
 import type { Workspace } from '../shared/model';
 import { api } from './bridge';
 import { languageOf } from './diff/language';
@@ -86,7 +86,7 @@ export function FileView({
     toast(`Saved ${file}`, 'success');
   }
 
-  if (contents === undefined) return <div className="flex-1" />;
+  if (contents === undefined) return <Spinner />;
   if (contents === null) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 text-fg-3">
@@ -121,7 +121,7 @@ export function FileView({
               variant="primary"
               disabled={!dirty}
               title="⌘S"
-              onClick={() => void save()}
+              onClick={() => save()}
             >
               Save
             </Button>

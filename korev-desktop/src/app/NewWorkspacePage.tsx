@@ -258,7 +258,7 @@ export function NewWorkspacePage({
               icon="plus"
               loading={creating}
               disabled={!repos.length}
-              onClick={() => void create(null)}
+              onClick={() => create(null)}
             >
               {from?.kind === 'issue'
                 ? 'Create workspace for this issue'

@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile } from 'node:fs/promises';
+import { appendFile, copyFile, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Checkpoint, FileChange, FileStatus } from '../shared/model';
 import type { CommandRunner } from './command-runner';
@@ -338,12 +338,16 @@ export async function createCheckpoint(
 ): Promise<Checkpoint | null> {
   const head = (await git.tryRun(worktree, ['rev-parse', 'HEAD']))?.trim();
   if (!head) return null;
-  const indexFile = path.join(
-    (await git.run(worktree, ['rev-parse', '--absolute-git-dir'])).trim(),
-    'korev-checkpoint-index',
-  );
+  const gitDir = (
+    await git.run(worktree, ['rev-parse', '--absolute-git-dir'])
+  ).trim();
+  const indexFile = path.join(gitDir, 'korev-checkpoint-index');
   const env = { GIT_INDEX_FILE: indexFile };
-  await git.run(worktree, ['read-tree', head], env);
+  const seeded = await copyFile(path.join(gitDir, 'index'), indexFile).then(
+    () => true,
+    () => false,
+  );
+  if (!seeded) await git.run(worktree, ['read-tree', head], env);
   await git.run(worktree, ['add', '-A'], env);
   const tree = (await git.run(worktree, ['write-tree'], env)).trim();
   const snapshot = (

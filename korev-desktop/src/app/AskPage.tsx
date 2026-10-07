@@ -133,7 +133,7 @@ function AskChatView({ state, ask }: { state: AppState; ask: AskChat }) {
           label="Delete chat"
           size="sm"
           className={NO_DRAG}
-          onClick={() => void deleteAsk(ask)}
+          onClick={() => deleteAsk(ask)}
         />
       </header>
       <ChatView

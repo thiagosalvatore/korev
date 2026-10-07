@@ -5,6 +5,7 @@ import {
   DiffStat,
   FileRow,
   Icon,
+  Spinner,
   Tabs,
   type IconName,
 } from '../design-system';
@@ -205,7 +206,7 @@ function Changes({
   workspace: Workspace;
   changes: FileChange[] | null;
 }) {
-  if (!changes) return <div className="flex-1" />;
+  if (!changes) return <Spinner />;
   const additions = changes.reduce((sum, change) => sum + change.additions, 0);
   const deletions = changes.reduce((sum, change) => sum + change.deletions, 0);
   return (
@@ -306,7 +307,7 @@ function PrCard({ workspace, pr }: { workspace: Workspace; pr: PrStatus }) {
               size="sm"
               variant="danger"
               icon="git-compare-arrows"
-              onClick={() => void resolveConflicts(workspace)}
+              onClick={() => resolveConflicts(workspace)}
             >
               Resolve conflicts
             </Button>
@@ -316,7 +317,7 @@ function PrCard({ workspace, pr }: { workspace: Workspace; pr: PrStatus }) {
               size="sm"
               variant="danger"
               icon="wrench"
-              onClick={() => void fixErrors(workspace)}
+              onClick={() => fixErrors(workspace)}
             >
               Fix errors
             </Button>
@@ -326,7 +327,7 @@ function PrCard({ workspace, pr }: { workspace: Workspace; pr: PrStatus }) {
             variant="success"
             icon="git-merge"
             disabled={pr.mergeable === 'CONFLICTING'}
-            onClick={() => void mergePr(workspace)}
+            onClick={() => mergePr(workspace)}
           >
             Merge
           </Button>
@@ -417,7 +418,7 @@ function Checks({
           size="sm"
           variant="primary"
           icon="git-pull-request-arrow"
-          onClick={() => void createPr(workspace)}
+          onClick={() => createPr(workspace)}
         >
           Create PR
         </Button>

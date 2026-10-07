@@ -264,7 +264,7 @@ function WorkspaceWithoutWorktree({
             size="sm"
             variant="ghost"
             icon="archive"
-            onClick={() => void archiveWorkspace(state, workspace)}
+            onClick={() => archiveWorkspace(state, workspace)}
           >
             Archive workspace
           </Button>

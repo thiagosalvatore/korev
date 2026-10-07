@@ -19,7 +19,7 @@ interface NextAction {
   label: string;
   icon: IconName;
   variant: 'primary' | 'secondary' | 'success' | 'danger';
-  run: () => void;
+  run: () => unknown;
 }
 
 function nextAction(
@@ -32,7 +32,7 @@ function nextAction(
       label: 'Create PR',
       icon: 'git-pull-request-arrow',
       variant: 'primary',
-      run: () => void createPr(workspace),
+      run: () => createPr(workspace),
     };
   }
   if (pr.state === 'MERGED') {
@@ -40,7 +40,7 @@ function nextAction(
       label: 'Archive',
       icon: 'archive',
       variant: 'secondary',
-      run: () => void archiveWorkspace(state, workspace),
+      run: () => archiveWorkspace(state, workspace),
     };
   }
   if (pr.mergeable === 'CONFLICTING') {
@@ -48,7 +48,7 @@ function nextAction(
       label: 'Resolve conflicts',
       icon: 'git-compare-arrows',
       variant: 'danger',
-      run: () => void resolveConflicts(workspace),
+      run: () => resolveConflicts(workspace),
     };
   }
   if (pr.checks.some((check) => check.state === 'failure')) {
@@ -56,14 +56,14 @@ function nextAction(
       label: 'Fix errors',
       icon: 'wrench',
       variant: 'danger',
-      run: () => void fixErrors(workspace),
+      run: () => fixErrors(workspace),
     };
   }
   return {
     label: 'Merge',
     icon: 'git-merge',
     variant: 'success',
-    run: () => void mergePr(workspace),
+    run: () => mergePr(workspace),
   };
 }
 
@@ -168,7 +168,7 @@ export function WorkspaceHeader({
               icon={EDITOR_ICONS[editor.id] ?? 'code'}
               className="rounded-r-none"
               title={`Open in ${editor.label} (⌘O)`}
-              onClick={() => void openIn(workspace, editor.id)}
+              onClick={() => openIn(workspace, editor.id)}
             >
               Open
             </Button>

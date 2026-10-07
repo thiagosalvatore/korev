@@ -485,13 +485,13 @@ function History({ state }: { state: AppState }) {
                   icon="archive-restore"
                   label={`Unarchive ${workspace.name}`}
                   size="sm"
-                  onClick={() => void restoreWorkspace(workspace)}
+                  onClick={() => restoreWorkspace(workspace)}
                 />
                 <IconButton
                   icon="trash-2"
                   label={`Delete ${workspace.name}`}
                   size="sm"
-                  onClick={() => void api.deleteWorkspace(workspace.id)}
+                  onClick={() => api.deleteWorkspace(workspace.id)}
                 />
               </span>
             </div>
@@ -535,7 +535,7 @@ function CloneDialog({
             variant="primary"
             loading={cloning}
             disabled={!url.trim()}
-            onClick={() => void clone()}
+            onClick={() => clone()}
           >
             Clone
           </Button>

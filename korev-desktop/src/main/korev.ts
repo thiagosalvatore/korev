@@ -510,11 +510,14 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         ...newChatSession(ctx, reviewModel?.agent ?? defaultAgent),
         ...reviewModel,
       };
+      const text = await actionPrompt(
+        workspaceId,
+        'code_review',
+        REVIEW_PROMPT,
+      );
       workspace.sessions.push(session);
-      store.save();
-      ctx.emitState();
       const sent = await chats.send(session.id, {
-        text: await actionPrompt(workspaceId, 'code_review', REVIEW_PROMPT),
+        text,
         agent: session.agent,
         model: session.model,
         effort: session.effort,

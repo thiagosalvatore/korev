@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Button, cn, DiffStat, FileRow, Icon } from '../../design-system';
+import {
+  Button,
+  cn,
+  DiffStat,
+  FileRow,
+  Icon,
+  Spinner,
+} from '../../design-system';
 import type {
   AppState,
   FileChange,
@@ -77,7 +84,7 @@ export function DiffView({
     if (focusFile && changes) scrollToFile(focusFile);
   }, [focusFile, changes]);
 
-  if (!changes) return <div className="flex-1" />;
+  if (!changes) return <Spinner />;
   if (!changes.length) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 text-fg-3">

@@ -21,7 +21,7 @@ export function Welcome({ state }: { state: AppState }) {
             variant="primary"
             size="lg"
             icon="folder-open"
-            onClick={() => void openProject()}
+            onClick={() => openProject()}
           >
             Open project
           </Button>

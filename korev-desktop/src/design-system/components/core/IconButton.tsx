@@ -1,14 +1,16 @@
 import type { ButtonHTMLAttributes } from 'react';
 import { cn } from '../../cn';
 import { Icon, type IconName } from './Icon';
+import { usePendingClick, type ClickHandler } from './usePendingClick';
 
 export type IconButtonVariant = 'ghost' | 'secondary';
 export type IconButtonSize = 'sm' | 'md';
 
 export interface IconButtonProps extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
-  'children'
+  'children' | 'onClick'
 > {
+  onClick?: ClickHandler;
   icon: IconName;
   label: string;
   variant?: IconButtonVariant;
@@ -36,8 +38,11 @@ export function IconButton({
   size = 'md',
   active,
   className,
+  disabled,
+  onClick,
   ...rest
 }: IconButtonProps) {
+  const { pending, handleClick } = usePendingClick(onClick);
   return (
     <button
       type="button"
@@ -45,9 +50,16 @@ export function IconButton({
       title={label}
       aria-pressed={active}
       className={cn(BASE, VARIANTS[variant], SIZES[size], className)}
+      disabled={disabled || pending}
+      aria-busy={pending || undefined}
+      onClick={handleClick}
       {...rest}
     >
-      <Icon name={icon} size={size === 'sm' ? 14 : 16} />
+      <Icon
+        name={pending ? 'loader-circle' : icon}
+        size={size === 'sm' ? 14 : 16}
+        className={pending ? 'animate-spin' : undefined}
+      />
     </button>
   );
 }

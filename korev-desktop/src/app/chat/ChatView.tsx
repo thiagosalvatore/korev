@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Icon } from '../../design-system';
+import { Icon, Spinner } from '../../design-system';
 import {
   AGENT_LABELS,
   type AppState,
@@ -142,7 +142,7 @@ export function ChatView({
           }
         />
       ) : (
-        <div className="flex-1" />
+        <Spinner />
       )}
       <div className="mx-auto w-full max-w-[820px] px-6 pb-4">
         {archived ? (
