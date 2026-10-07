@@ -1296,6 +1296,70 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(prompt).toContain('Do not build them here: ui.');
   });
 
+  it('hands a Claude plan off to a new tab that implements it', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await korev.api.send(session.id, {
+      ...task('make-plan for the login page'),
+      planMode: true,
+    });
+    await waitFor(async () =>
+      (await korev.api.transcript(session.id)).some(
+        (item) => item.kind === 'permission',
+      ),
+    );
+
+    const handoff = await korev.api.handoffPlan(session.id);
+
+    if (!handoff.ok) throw new Error(handoff.message);
+    const { workspace: after } = await workspaceState(workspace.id);
+    expect(after.sessions.map((entry) => entry.id)).toEqual([
+      session.id,
+      handoff.value,
+    ]);
+    expect(after.sessions[1].planMode).toBe(false);
+    expect((await userMessages(handoff.value))[0]).toContain(
+      'Implement the plan below.\n\n<plan>\n1. Add the login page\n</plan>',
+    );
+    const card = (await korev.api.transcript(session.id)).find(
+      (item) => item.kind === 'permission',
+    );
+    expect(card).toMatchObject({ status: 'handed-off' });
+    const answerFile = path.join(workspace.path, '.context', 'plan-answer');
+    await waitFor(async () => existsSync(answerFile));
+    expect(await readFile(answerFile, 'utf8')).toContain('"behavior":"deny"');
+  });
+
+  it('hands a finished Codex plan off to a new tab', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    const codex = {
+      ...task('make-plan for the settings page'),
+      agent: 'codex' as const,
+      model: 'gpt-6.1-sol',
+      planMode: true,
+    };
+    await korev.api.updateSession(session.id, codex);
+    await korev.api.send(session.id, codex);
+    await waitFor(
+      async () => (await korev.api.getState()).runningSessions.length === 0,
+    );
+
+    const handoff = await korev.api.handoffPlan(session.id);
+
+    if (!handoff.ok) throw new Error(handoff.message);
+    const { workspace: after } = await workspaceState(workspace.id);
+    expect(after.sessions[0].planMode).toBe(false);
+    expect(after.sessions[1]).toMatchObject({
+      id: handoff.value,
+      agent: 'codex',
+      model: 'gpt-6.1-sol',
+    });
+    expect((await userMessages(handoff.value))[0]).toContain(
+      '<plan>\n# Settings',
+    );
+  });
+
   it('offers skills as slash commands', async () => {
     const workspace = await createWorkspace();
     const skillDir = path.join(home, '.claude', 'skills', 'browse');

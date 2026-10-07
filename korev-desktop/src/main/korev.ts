@@ -6,6 +6,7 @@ import {
   EMPTY_SCRIPTS,
   hasWorktree,
   type AgentAvailability,
+  type AgentKind,
   type AppState,
   type ChatItem,
   type ChatSession,
@@ -83,6 +84,7 @@ import {
   forkChatSession,
   strayWorktrees,
   deleteWorkspace,
+  firstPrompt,
   newChatSession,
   onScriptExit,
   refreshStats,
@@ -103,6 +105,7 @@ const COMMAND_EXTENSION = '.md';
 const BUILTIN_COMMANDS = ['compact', 'review', 'init'];
 const IMPLEMENT_PLAN_TASK = 'Implement your part of the plan below.';
 const IMPLEMENT_APPROVED_PLAN = 'Implement the plan.';
+const HANDOFF_TASK = 'Implement the plan below.';
 const IMPLEMENT_CONVERSATION_TASK =
   'Implement your part of what we discussed above.';
 const GITHUB_AVATAR_SIZE = 64;
@@ -613,6 +616,44 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     return chats.send(sessionId, implementOptions(chat.session, text));
   }
 
+  function addSession(workspace: Workspace, agent: AgentKind) {
+    const session = newChatSession(ctx, agent);
+    workspace.sessions.push(session);
+    store.save();
+    ctx.emitState();
+    return session;
+  }
+
+  async function finishedPlan(sessionId: string): Promise<Result<string>> {
+    const plan = latestPlan(await chats.transcript(sessionId));
+    return plan
+      ? { ok: true, value: plan }
+      : fail('There is no plan to hand off');
+  }
+
+  async function handoffPlan(sessionId: string): Promise<Result<string>> {
+    const chat = workspaceChat(sessionId);
+    if (!chat) return fail('Only a plan in a workspace can be handed off');
+    const plan = chats.isRunning(sessionId)
+      ? chats.handoffPlan(sessionId)
+      : await finishedPlan(sessionId);
+    if (!plan.ok) return plan;
+    chat.session.planMode = false;
+    const session = addSession(chat.workspace, chat.session.agent);
+    const text = firstPrompt(
+      HANDOFF_TASK,
+      plan.value,
+      ctx.repo(chat.workspace.repoId),
+      false,
+    );
+    const sent = await chats.send(
+      session.id,
+      implementOptions(chat.session, text),
+    );
+    if (!sent.ok) return sent;
+    return { ok: true, value: session.id };
+  }
+
   async function moveChat(from: ChatSession | null, to: Workspace) {
     if (!from) return to.sessions[0].id;
     const copy = forkChatSession(ctx, from);
@@ -975,13 +1016,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       return ask;
     },
     deleteAskChat,
-    async newSession(workspaceId, agent) {
-      const session = newChatSession(ctx, agent);
-      ctx.workspace(workspaceId).sessions.push(session);
-      store.save();
-      ctx.emitState();
-      return session;
-    },
+    newSession: async (workspaceId, agent) =>
+      addSession(ctx.workspace(workspaceId), agent),
     async closeSession(workspaceId, sessionId) {
       const workspace = ctx.workspace(workspaceId);
       if (workspace.sessions.length <= 1) return;
@@ -1018,6 +1054,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       return splitIntoLanes(sessionId, itemId, response.lanes);
     },
     approvePlan,
+    handoffPlan,
     revert: (sessionId, itemId) => chats.revert(sessionId, itemId),
     async changes(workspaceId) {
       const workspace = workspacePath(workspaceId);

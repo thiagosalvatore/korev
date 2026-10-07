@@ -21,12 +21,14 @@ type PermissionItem = Extract<ChatItem, { kind: 'permission' }>;
 export interface PermissionCardProps {
   item: PermissionItem;
   onRespond(response: PermissionResponse): void;
+  onHandoff?(): void;
 }
 
 const STATUS_LABELS: Record<Exclude<PermissionStatus, 'pending'>, string> = {
   allowed: 'Approved',
   denied: 'Denied',
   expired: 'No longer waiting',
+  'handed-off': 'Handed off to a new tab',
 };
 
 const OTHER_OPTION = 'Other';
@@ -152,6 +154,7 @@ export interface PlanReviewProps {
   showPlan: boolean;
   onApprove(lanes: PlanLane[]): void;
   onKeepPlanning(feedback: string): void;
+  onHandoff?(): void;
 }
 
 export function PlanReview({
@@ -159,6 +162,7 @@ export function PlanReview({
   showPlan,
   onApprove,
   onKeepPlanning,
+  onHandoff,
 }: PlanReviewProps) {
   const [feedback, setFeedback] = useState('');
   const [here, ...others] = planLanes(plan);
@@ -200,6 +204,17 @@ export function PlanReview({
         >
           {here ? 'Approve here' : 'Approve plan'}
         </Button>
+        {onHandoff ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="forward"
+            title="Implement this plan in a new tab, with a fresh context"
+            onClick={onHandoff}
+          >
+            Hand off
+          </Button>
+        ) : null}
         <Button
           size="sm"
           variant="secondary"
@@ -213,11 +228,12 @@ export function PlanReview({
   );
 }
 
-function PlanApproval({ item, onRespond }: PermissionCardProps) {
+function PlanApproval({ item, onRespond, onHandoff }: PermissionCardProps) {
   return (
     <PlanReview
       plan={item.plan ?? ''}
       showPlan
+      onHandoff={onHandoff}
       onApprove={(lanes) => onRespond({ allow: true, lanes })}
       onKeepPlanning={(message) => onRespond({ allow: false, message })}
     />
@@ -321,10 +337,16 @@ function QuestionForm({ item, onRespond }: PermissionCardProps) {
   );
 }
 
-export function PermissionCard({ item, onRespond }: PermissionCardProps) {
+export function PermissionCard({
+  item,
+  onRespond,
+  onHandoff,
+}: PermissionCardProps) {
   if (item.status !== 'pending') return <Resolved item={item} />;
   if (item.plan !== null)
-    return <PlanApproval item={item} onRespond={onRespond} />;
+    return (
+      <PlanApproval item={item} onRespond={onRespond} onHandoff={onHandoff} />
+    );
   if (item.questions) return <QuestionForm item={item} onRespond={onRespond} />;
   return <ToolApproval item={item} onRespond={onRespond} />;
 }

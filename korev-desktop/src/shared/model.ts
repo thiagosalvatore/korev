@@ -563,7 +563,12 @@ export type ChatItem =
       status: PermissionStatus;
     };
 
-export type PermissionStatus = 'pending' | 'allowed' | 'denied' | 'expired';
+export type PermissionStatus =
+  | 'pending'
+  | 'allowed'
+  | 'denied'
+  | 'expired'
+  | 'handed-off';
 
 export interface AgentQuestion {
   question: string;

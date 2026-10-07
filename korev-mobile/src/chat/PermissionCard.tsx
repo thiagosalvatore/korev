@@ -35,6 +35,7 @@ const STATUS_LABELS: Record<Exclude<PermissionStatus, 'pending'>, string> = {
   allowed: 'Approved',
   denied: 'Denied',
   expired: 'No longer waiting',
+  'handed-off': 'Handed off to a new tab',
 };
 
 function useStyles() {

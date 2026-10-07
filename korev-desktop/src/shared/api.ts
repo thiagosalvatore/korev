@@ -107,6 +107,7 @@ export interface KorevApi {
     response: PermissionResponse,
   ): Promise<Result>;
   approvePlan(sessionId: string, lanes: PlanLane[]): Promise<Result>;
+  handoffPlan(sessionId: string): Promise<Result<string>>;
   revert(sessionId: string, itemId: string): Promise<Result<string>>;
   saveAttachment(
     workspaceId: string | null,

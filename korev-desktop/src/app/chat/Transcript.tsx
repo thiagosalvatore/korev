@@ -388,6 +388,7 @@ export interface TranscriptProps {
   footer?: ReactNode;
   onRevert: (itemId: string) => void;
   onRespond: (itemId: string, response: PermissionResponse) => void;
+  onHandoff?: () => void;
   onRetry: (text: string) => void;
   onOpenTurnFile: (file: string, range: TurnRange) => void;
   onOpenFile?: (file: string, line: number | null) => void;
@@ -402,6 +403,7 @@ export function Transcript({
   footer,
   onRevert,
   onRespond,
+  onHandoff,
   onRetry,
   onOpenTurnFile,
   onOpenFile,
@@ -492,6 +494,7 @@ export function Transcript({
                   key={item.id}
                   item={item}
                   onRespond={(response) => onRespond(item.id, response)}
+                  onHandoff={onHandoff}
                 />
               );
             case 'notice':

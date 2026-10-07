@@ -11,7 +11,7 @@ import {
   type ModelChoice,
   type Workspace,
 } from '../../shared/model';
-import { openDiff, openFile } from '../actions';
+import { handoffPlan, openDiff, openFile } from '../actions';
 import { api } from '../bridge';
 import { loadoutChoices, modelChoices } from '../../shared/format';
 import { useTranscript } from '../hooks';
@@ -122,6 +122,9 @@ export function ChatView({
   const codexPlan = workspace
     ? finishedCodexPlan(session, items, running)
     : null;
+  const handoff = workspace
+    ? () => void handoffPlan(workspace, session.id)
+    : undefined;
 
   async function revert(itemId: string) {
     const result = await api.revert(session.id, itemId);
@@ -162,6 +165,7 @@ export function ChatView({
               .then(reportFailure)
           }
           onRetry={(text) => void send(text)}
+          onHandoff={handoff}
           footer={
             codexPlan ? (
               <PlanReview
@@ -172,6 +176,7 @@ export function ChatView({
                   void api.approvePlan(session.id, lanes).then(reportFailure)
                 }
                 onKeepPlanning={(feedback) => void send(feedback, true)}
+                onHandoff={handoff}
               />
             ) : null
           }

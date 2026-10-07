@@ -117,6 +117,12 @@ export async function newChat(workspace: Workspace, agent: AgentKind) {
   return session;
 }
 
+export async function handoffPlan(workspace: Workspace, sessionId: string) {
+  const result = await api.handoffPlan(sessionId);
+  if (!reportFailure(result)) return;
+  activateTab(workspace.id, tabKey({ kind: 'chat', sessionId: result.value }));
+}
+
 export function activeSessionId(workspace: Workspace): string {
   const ui = getUi().workspaces[workspace.id] ?? EMPTY_WORKSPACE_UI;
   const key = ui.activeKey ?? '';

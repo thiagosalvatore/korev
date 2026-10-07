@@ -8,6 +8,7 @@ import {
   type ChatSession,
   type Checkpoint,
   type PermissionResponse,
+  type PermissionStatus,
   type PlanLane,
   type PlanLimit,
   type Repo,
@@ -65,6 +66,10 @@ const STDERR_TAIL_CHARS = 2_000;
 const REPLAY_ITEM_CHARS = 2_000;
 const REPLAY_TOTAL_CHARS = 24_000;
 const DENIED_MESSAGE = 'The user denied this request.';
+const NOT_WAITING_MESSAGE = 'This request is no longer waiting for an answer';
+const NO_PLAN_WAITING_MESSAGE = 'No plan is waiting for an answer';
+const HANDOFF_MESSAGE =
+  'The user handed this plan off to a new chat tab, where another agent will implement it. Do not implement it here. End your turn.';
 const ASK_PLAN_MESSAGE =
   'This is a read-only Ask chat, so the plan cannot be carried out here. The user sees your plan in the chat and can start workspaces from it. Finish your reply.';
 const LANES_ELSEWHERE_NOTE =
@@ -225,6 +230,7 @@ export interface Chats {
     itemId: string,
     response: PermissionResponse,
   ): Result;
+  handoffPlan(sessionId: string): Result<string>;
   revert(sessionId: string, itemId: string): Promise<Result<string>>;
   forget(sessionId: string): Promise<void>;
   settled(): Promise<void>;
@@ -803,21 +809,38 @@ export function createChats(
       : 'bypassPermissions';
   }
 
+  function pendingPermission(sessionId: string, itemId: string) {
+    const turn = turns.get(sessionId);
+    const request = turn?.permissions.get(itemId);
+    const items = transcripts.get(sessionId);
+    const item = items?.find((entry) => entry.id === itemId);
+    if (!turn?.process || !request || !items || item?.kind !== 'permission')
+      return null;
+    return { turn, request, items, item };
+  }
+
+  function resolvePermission(
+    sessionId: string,
+    pending: NonNullable<ReturnType<typeof pendingPermission>>,
+    body: Record<string, unknown>,
+    status: PermissionStatus,
+  ) {
+    const { turn, request, items, item } = pending;
+    answerControl(turn, request, body);
+    turn.permissions.delete(item.id);
+    upsert(sessionId, items, { ...item, status });
+    refreshStatus(turn.owner);
+    ctx.emitState();
+  }
+
   function respondPermission(
     sessionId: string,
     itemId: string,
     response: PermissionResponse,
   ): Result {
-    const turn = turns.get(sessionId);
-    const request = turn?.permissions.get(itemId);
-    const items = transcripts.get(sessionId);
-    const item = items?.find((entry) => entry.id === itemId);
-    if (!turn?.process || !request || !items || item?.kind !== 'permission') {
-      return {
-        ok: false,
-        message: 'This request is no longer waiting for an answer',
-      };
-    }
+    const pending = pendingPermission(sessionId, itemId);
+    if (!pending) return { ok: false, message: NOT_WAITING_MESSAGE };
+    const { request } = pending;
     const body = response.allow
       ? allowResponse(
           withLanesElsewhere(request, response.lanes),
@@ -825,19 +848,38 @@ export function createChats(
           nextModeAfterPlan(),
         )
       : denyResponse(response.message?.trim() || DENIED_MESSAGE);
-    answerControl(turn, request, body);
-    turn.permissions.delete(itemId);
     if (response.allow && request.tool === PLAN_TOOL) {
       locate(sessionId).session.planMode = false;
       ctx.store.save();
     }
-    upsert(sessionId, items, {
-      ...item,
-      status: response.allow ? 'allowed' : 'denied',
-    });
-    refreshStatus(turn.owner);
-    ctx.emitState();
+    resolvePermission(
+      sessionId,
+      pending,
+      body,
+      response.allow ? 'allowed' : 'denied',
+    );
     return { ok: true, value: undefined };
+  }
+
+  function waitingPlanId(sessionId: string): string | undefined {
+    const permissions = turns.get(sessionId)?.permissions ?? new Map();
+    return Array.from(permissions).find(
+      ([, request]) => request.tool === PLAN_TOOL,
+    )?.[0];
+  }
+
+  function handoffPlan(sessionId: string): Result<string> {
+    const itemId = waitingPlanId(sessionId);
+    const pending = itemId ? pendingPermission(sessionId, itemId) : null;
+    if (pending?.item.plan == null)
+      return { ok: false, message: NO_PLAN_WAITING_MESSAGE };
+    resolvePermission(
+      sessionId,
+      pending,
+      denyResponse(HANDOFF_MESSAGE),
+      'handed-off',
+    );
+    return { ok: true, value: pending.item.plan };
   }
 
   async function restoreFiles(
@@ -891,6 +933,7 @@ export function createChats(
     stopWorkspace: (workspace) =>
       workspace.sessions.forEach((session) => stop(session.id)),
     respondPermission,
+    handoffPlan,
     revert,
     async settled() {
       while (running.size) await Promise.allSettled(running);
