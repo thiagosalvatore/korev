@@ -55,9 +55,9 @@ export interface KorevApi {
   deleteFolder(folderId: string): Promise<void>;
   moveRepo(
     repoId: string,
-    target: { folderId: string | null; beforeRepoId: string | null },
+    target: { folderId: string | null; beforeId: string | null },
   ): Promise<void>;
-  moveFolder(folderId: string, beforeFolderId: string | null): Promise<void>;
+  moveFolder(folderId: string, beforeId: string | null): Promise<void>;
   createWorkspaces(
     repoIds: string[],
     task: SendOptions | null,

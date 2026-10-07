@@ -300,6 +300,7 @@ export interface AgentAvailability {
 export interface AppState {
   repos: Repo[];
   folders: RepoFolder[];
+  rootOrder: string[];
   workspaces: Workspace[];
   askChats: AskChat[];
   settings: Settings;

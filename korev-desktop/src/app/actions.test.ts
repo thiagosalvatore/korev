@@ -23,6 +23,7 @@ function workspace(id: string, repoId: string, createdAt: string): Workspace {
 }
 
 const state = {
+  rootOrder: ['work', 'scratch', 'personal', 'orphan'],
   folders: [
     { id: 'work', name: 'Work' },
     { id: 'personal', name: 'Personal' },
@@ -44,16 +45,17 @@ const state = {
 } as unknown as AppState;
 
 describe('repoSections', () => {
-  it('lists repositories without a folder first, then each folder in order', () => {
+  it('lists folders and repositories without a folder in the root order', () => {
     expect(
       repoSections(state).map((section) => [
         section.folder?.name ?? null,
         section.repos.map((entry) => entry.id),
       ]),
     ).toEqual([
-      [null, ['scratch', 'orphan']],
       ['Work', ['api', 'web']],
+      [null, ['scratch']],
       ['Personal', ['blog']],
+      [null, ['orphan']],
     ]);
   });
 });
@@ -61,10 +63,10 @@ describe('repoSections', () => {
 describe('activeWorkspaces', () => {
   it('follows the sidebar order of repositories', () => {
     expect(activeWorkspaces(state).map((ws) => ws.id)).toEqual([
-      'scratch-1',
       'api-1',
       'api-2',
       'web-1',
+      'scratch-1',
       'blog-1',
     ]);
   });

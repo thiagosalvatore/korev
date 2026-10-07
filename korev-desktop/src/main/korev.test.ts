@@ -920,8 +920,12 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   }
 
   async function sidebarLayout() {
-    const { repos, folders } = await korev.api.getState();
+    const { repos, folders, rootOrder } = await korev.api.getState();
+    const names = new Map(
+      [...repos, ...folders].map((item) => [item.id, item.name]),
+    );
     return {
+      root: rootOrder.map((id) => names.get(id)),
       folders: folders.map((folder) => folder.name),
       repos: repos.map((repo) => [
         repo.name,
@@ -936,14 +940,15 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
     await korev.api.moveRepo(acme.id, {
       folderId: work.id,
-      beforeRepoId: null,
+      beforeId: null,
     });
     await korev.api.moveRepo(web.id, {
       folderId: work.id,
-      beforeRepoId: acme.id,
+      beforeId: acme.id,
     });
 
     expect(await sidebarLayout()).toEqual({
+      root: ['api', 'Work'],
       folders: ['Work'],
       repos: [
         ['api', null],
@@ -959,19 +964,20 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     const personal = await korev.api.createFolder('Personal');
     await korev.api.moveRepo(acme.id, {
       folderId: work.id,
-      beforeRepoId: null,
+      beforeId: null,
     });
     await korev.api.moveRepo(api.id, {
       folderId: personal.id,
-      beforeRepoId: null,
+      beforeId: null,
     });
 
     await korev.api.moveFolder(personal.id, work.id);
     await korev.api.renameFolder(personal.id, 'Side projects');
-    expect((await sidebarLayout()).folders).toEqual(['Side projects', 'Work']);
+    expect((await sidebarLayout()).root).toEqual(['Side projects', 'Work']);
     await korev.api.deleteFolder(work.id);
 
     expect(await sidebarLayout()).toEqual({
+      root: ['Side projects', 'acme'],
       folders: ['Side projects'],
       repos: [
         ['acme', null],
@@ -980,13 +986,36 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     });
   });
 
+  it('orders folders and repositories without a folder together at the root', async () => {
+    const [acme, api] = await addRepos('api', 'web');
+    const work = await korev.api.createFolder('Work');
+    expect((await sidebarLayout()).root).toEqual([
+      'acme',
+      'api',
+      'web',
+      'Work',
+    ]);
+
+    await korev.api.moveFolder(work.id, acme.id);
+    await korev.api.moveRepo(api.id, { folderId: null, beforeId: work.id });
+    await korev.api.moveRepo(acme.id, { folderId: null, beforeId: null });
+
+    expect((await sidebarLayout()).root).toEqual([
+      'api',
+      'Work',
+      'web',
+      'acme',
+    ]);
+  });
+
   it('keeps folders and repository order after a restart', async () => {
-    const [acme] = await addRepos('api');
+    const [acme, api] = await addRepos('api');
     const work = await korev.api.createFolder('Work');
     await korev.api.moveRepo(acme.id, {
       folderId: work.id,
-      beforeRepoId: null,
+      beforeId: null,
     });
+    await korev.api.moveFolder(work.id, api.id);
     const before = await sidebarLayout();
 
     await korev.shutdown();

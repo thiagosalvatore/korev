@@ -22,6 +22,7 @@ const SAVE_DELAY_MS = 400;
 export interface PersistedState {
   repos: Repo[];
   folders: RepoFolder[];
+  rootOrder: string[];
   workspaces: Workspace[];
   askChats: AskChat[];
   settings: Settings;
@@ -75,6 +76,7 @@ function sanitize(raw: unknown, home: string): PersistedState {
       folderId: repo.folderId ?? null,
     })),
     folders: Array.isArray(value.folders) ? value.folders : [],
+    rootOrder: Array.isArray(value.rootOrder) ? value.rootOrder : [],
     workspaces: (Array.isArray(value.workspaces) ? value.workspaces : []).map(
       (workspace) => ({
         ...workspace,

@@ -12,6 +12,7 @@ import {
   type PromptKind,
   type PrStatus,
   type Repo,
+  type RepoFolder,
   type RepoScripts,
   type TerminalPreset,
   type Result,
@@ -60,7 +61,7 @@ import { rangeFileDiff, rangeFiles, searchFiles } from './git-review';
 import { findLocalUrl } from './workspace-setup';
 import { createSpotlight } from './spotlight';
 import { repoFavicon } from './repo-icon';
-import { openStore } from './store';
+import { openStore, type PersistedState } from './store';
 import { createTerminals, type SpawnPty } from './terminals';
 import {
   archiveWorkspace,
@@ -173,6 +174,20 @@ function moveBefore<T extends { id: string }>(
   const index = rest.findIndex((entry) => entry.id === beforeId);
   rest.splice(index === -1 ? rest.length : index, 0, item);
   return rest;
+}
+
+function rootItems({
+  repos,
+  folders,
+  rootOrder,
+}: PersistedState): (Repo | RepoFolder)[] {
+  const inFolder = (repo: Repo) =>
+    folders.some((folder) => folder.id === repo.folderId);
+  const unordered = [...repos.filter((repo) => !inFolder(repo)), ...folders];
+  const ordered = rootOrder.flatMap(
+    (id) => unordered.find((item) => item.id === id) ?? [],
+  );
+  return [...ordered, ...unordered.filter((item) => !ordered.includes(item))];
 }
 
 const IDLE: WorkspaceRuntime = {
@@ -299,6 +314,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     return {
       repos,
       folders,
+      rootOrder: rootItems(store.state).map((item) => item.id),
       workspaces,
       askChats,
       settings,
@@ -443,6 +459,14 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     return found;
   }
 
+  function moveToRoot(item: Repo | RepoFolder, beforeId: string | null) {
+    store.state.rootOrder = moveBefore(
+      rootItems(store.state),
+      item,
+      beforeId,
+    ).map((entry) => entry.id);
+  }
+
   function saveAndEmit() {
     store.save();
     ctx.emitState();
@@ -566,18 +590,19 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       }
       saveAndEmit();
     },
-    async moveRepo(repoId, { folderId, beforeRepoId }) {
+    async moveRepo(repoId, { folderId, beforeId }) {
       const repo = ctx.repo(repoId);
-      repo.folderId = folderId === null ? null : folder(folderId).id;
-      store.state.repos = moveBefore(store.state.repos, repo, beforeRepoId);
+      if (folderId === null) {
+        repo.folderId = null;
+        moveToRoot(repo, beforeId);
+      } else {
+        repo.folderId = folder(folderId).id;
+        store.state.repos = moveBefore(store.state.repos, repo, beforeId);
+      }
       saveAndEmit();
     },
-    async moveFolder(folderId, beforeFolderId) {
-      store.state.folders = moveBefore(
-        store.state.folders,
-        folder(folderId),
-        beforeFolderId,
-      );
+    async moveFolder(folderId, beforeId) {
+      moveToRoot(folder(folderId), beforeId);
       saveAndEmit();
     },
     createWorkspaces: async (repoIds, task, source) =>

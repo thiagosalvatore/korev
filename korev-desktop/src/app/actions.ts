@@ -32,12 +32,14 @@ export function repoSections(state: AppState): RepoSection[] {
   const folderIds = new Set(state.folders.map((folder) => folder.id));
   const folderOf = (repo: Repo) =>
     repo.folderId && folderIds.has(repo.folderId) ? repo.folderId : null;
-  const inFolder = (folderId: string | null) =>
+  const inFolder = (folderId: string) =>
     state.repos.filter((repo) => folderOf(repo) === folderId);
-  return [
-    { folder: null, repos: inFolder(null) },
-    ...state.folders.map((folder) => ({ folder, repos: inFolder(folder.id) })),
-  ];
+  return state.rootOrder.flatMap((id): RepoSection[] => {
+    const folder = state.folders.find((entry) => entry.id === id);
+    if (folder) return [{ folder, repos: inFolder(folder.id) }];
+    const repo = state.repos.find((entry) => entry.id === id);
+    return repo ? [{ folder: null, repos: [repo] }] : [];
+  });
 }
 
 export function activeWorkspaces(state: AppState): Workspace[] {

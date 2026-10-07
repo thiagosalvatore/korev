@@ -439,7 +439,7 @@ function moveToFolderItems(
   onNewFolder: () => void,
 ): MenuItem[] {
   const moveTo = (target: string | null) =>
-    void api.moveRepo(repo.id, { folderId: target, beforeRepoId: null });
+    void api.moveRepo(repo.id, { folderId: target, beforeId: null });
   return [
     ...state.folders.map((folder) => ({
       id: folder.id,
@@ -486,11 +486,15 @@ function RepoGroup({
   const [naming, setNaming] = useState(false);
   const drop = useDropTarget({
     [REPO_DRAG_TYPE]: (draggedId) =>
-      void api.moveRepo(draggedId, { folderId, beforeRepoId: repo.id }),
+      void api.moveRepo(draggedId, { folderId, beforeId: repo.id }),
+    ...(folderId === null && {
+      [FOLDER_DRAG_TYPE]: (draggedId: string) =>
+        void api.moveFolder(draggedId, repo.id),
+    }),
   });
   async function createFolderWithRepo(name: string) {
     const folder = await api.createFolder(name);
-    await api.moveRepo(repo.id, { folderId: folder.id, beforeRepoId: null });
+    await api.moveRepo(repo.id, { folderId: folder.id, beforeId: null });
   }
   return (
     <section aria-label={repo.name} className="mb-2">
@@ -603,7 +607,7 @@ function FolderSection({
   const [renaming, setRenaming] = useState(false);
   const drop = useDropTarget({
     [REPO_DRAG_TYPE]: (draggedId) =>
-      void api.moveRepo(draggedId, { folderId: folder.id, beforeRepoId: null }),
+      void api.moveRepo(draggedId, { folderId: folder.id, beforeId: null }),
     [FOLDER_DRAG_TYPE]: (draggedId) =>
       void api.moveFolder(draggedId, folder.id),
   });
@@ -682,6 +686,20 @@ function FolderSection({
         </div>
       )}
     </section>
+  );
+}
+
+function RootEndDropZone() {
+  const drop = useDropTarget({
+    [REPO_DRAG_TYPE]: (draggedId) =>
+      void api.moveRepo(draggedId, { folderId: null, beforeId: null }),
+    [FOLDER_DRAG_TYPE]: (draggedId) => void api.moveFolder(draggedId, null),
+  });
+  return (
+    <div
+      {...drop.props}
+      className={cn('h-8 rounded-md', drop.over && DROP_INDICATOR)}
+    />
   );
 }
 
@@ -964,9 +982,10 @@ export function Sidebar({ state }: { state: AppState }) {
               {groups}
             </FolderSection>
           ) : (
-            <Fragment key="no-folder">{groups}</Fragment>
+            <Fragment key={repos[0].id}>{groups}</Fragment>
           );
         })}
+        <RootEndDropZone />
       </div>
       <History state={state} />
       <div className="flex items-center gap-1 border-t border-border-1 p-2">
