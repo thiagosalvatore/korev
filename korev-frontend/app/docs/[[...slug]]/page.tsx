@@ -7,6 +7,7 @@ import {
   DocsPage,
   DocsTitle,
 } from 'fumadocs-ui/page';
+import { SectionCards } from '@/components/docs/SectionCards';
 import { GITHUB_OWNER, GITHUB_REPO } from '@/components/landing/links';
 import { source } from '@/lib/source';
 import { getMDXComponents } from '@/mdx-components';
@@ -37,7 +38,10 @@ export default async function Page({ params }: PageProps<'/docs/[[...slug]]'>) {
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
         <MDX
-          components={getMDXComponents({ a: createRelativeLink(source, page) })}
+          components={getMDXComponents({
+            a: createRelativeLink(source, page),
+            SectionCards: () => <SectionCards url={page.url} />,
+          })}
         />
       </DocsBody>
     </DocsPage>
