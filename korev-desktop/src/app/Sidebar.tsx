@@ -711,21 +711,24 @@ function AskChats({ state }: { state: AppState }) {
   if (!state.askChats.length) return null;
   const repoNames = new Map(state.repos.map((repo) => [repo.id, repo.name]));
   const newestFirst = [...state.askChats].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    b.lastMessageAt.localeCompare(a.lastMessageAt),
   );
   return (
     <section aria-label="Ask" className="border-b border-border-1 px-2 py-1.5">
       <button
         type="button"
-        className={cn(ROW, 'h-7')}
+        className={cn(ROW, 'h-6 gap-1 text-fg-4 hover:text-fg-2')}
         aria-expanded={open}
         onClick={() => setUi({ askOpen: !open })}
       >
-        <Icon name="message-circle-question" size={15} className="text-fg-3" />
-        <span className="flex-1">Ask chats</span>
-        <span className="font-mono text-2xs text-fg-4">
-          {state.askChats.length}
-        </span>
+        <span className="type-overline">Ask chats</span>
+        <Icon
+          name="chevron-down"
+          size={12}
+          className={cn('transition-transform', !open && '-rotate-90')}
+        />
+        <span className="flex-1" />
+        <span className="font-mono text-2xs">{state.askChats.length}</span>
       </button>
       {open ? (
         <div className="max-h-56 overflow-y-auto">
@@ -762,6 +765,9 @@ function AskChats({ state }: { state: AppState }) {
                   <span className="block truncate text-xs text-fg-3">
                     {ask.repoIds.map((id) => repoNames.get(id)).join(', ')}
                   </span>
+                </span>
+                <span className="text-2xs text-fg-4 group-hover:hidden">
+                  {timeAgo(ask.lastMessageAt)}
                 </span>
                 <span className="hidden group-hover:flex">
                   <IconButton
