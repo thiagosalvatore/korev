@@ -23,6 +23,18 @@ npm start
 
 Korev keeps its state in `~/Library/Application Support/Korev`: `korev-state.json`, chat transcripts in `transcripts/`, and repositories added with **Clone from URL** in `repos/`. Workspaces and the shared Ask checkouts live in `~/korev/workspaces` (Settings → Storage). The development build keeps its own state in `~/Library/Application Support/Korev Dev`, so it can run next to the packaged app. It starts empty: add your repositories again in the development build.
 
+## Run the phone app
+
+`korev-mobile` is the phone app, built with [Expo](https://expo.dev). It uses Korev on your Mac through remote access, over Tailscale.
+
+```sh
+cd korev-mobile
+npm ci
+REACT_NATIVE_PACKAGER_HOSTNAME=<tailscale-ip> npx expo start
+```
+
+Open the app with Expo Go on your phone, then pair it from Settings → Remote access. See [Use Korev from your phone](https://thiagosalvatore.github.io/korev/guides/use-korev-from-your-phone.html).
+
 ## Package it
 
 From the repository root:
@@ -47,6 +59,7 @@ To change the app icon, edit `korev-desktop/assets/icon.svg` and run `npm run ic
 | `korev-desktop/src/app` | React renderer: sidebar, workspace view, chat, settings |
 | `korev-desktop/src/shared` | The API between the main process and the renderer, and the types both use |
 | `korev-desktop/src/design-system` | Tokens, styles and shared UI components |
+| `korev-mobile` | The phone app (Expo and React Native). It imports the types in `korev-desktop/src/shared` |
 | `docs` | The docs site, built by GitHub Pages |
 | `korev-desktop/e2e` | Playwright tests that drive the packaged app |
 | `korev-desktop/test-support/bin/claude` | The fake `claude` CLI that the e2e tests run |
@@ -67,6 +80,8 @@ npm run lint        # oxlint and oxfmt; npm run lint:fix applies the fixes
 npm test            # Vitest unit tests
 npm run test:e2e    # packages the app and drives it with a fake agent
 ```
+
+`korev-mobile` has the same `typecheck`, `lint` and `test` scripts.
 
 CI runs the same checks, but only when you start it by hand:
 

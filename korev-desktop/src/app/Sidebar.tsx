@@ -25,15 +25,14 @@ import {
   type Workspace,
   type WorkspaceRuntime,
 } from '../shared/model';
+import { activeWorkspaces, repoSections } from '../shared/workspaces';
 import {
-  activeWorkspaces,
   archiveWorkspace,
   deleteAsk,
   openAsk,
   openIn,
   openNewWorkspace,
   openSettings,
-  repoSections,
   restoreWorkspace,
   selectWorkspace,
 } from './actions';

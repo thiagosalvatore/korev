@@ -4,8 +4,8 @@ import {
   type AppState,
   type Repo,
   type Workspace,
-} from '../shared/model';
-import { activeWorkspaces, repoSections } from './actions';
+} from './model';
+import { activeWorkspaces, repoSections } from './workspaces';
 
 function repo(id: string, folderId: string | null = null): Repo {
   return {

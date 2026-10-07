@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { cn, Logo, Spinner } from '../design-system';
 import type { AppState } from '../shared/model';
-import { activeWorkspaces, openNewWorkspace, selectWorkspace } from './actions';
+import { activeWorkspaces } from '../shared/workspaces';
+import { openNewWorkspace, selectWorkspace } from './actions';
 import { AskPage } from './AskPage';
 import { api } from './bridge';
 import { CommandPalette } from './CommandPalette';

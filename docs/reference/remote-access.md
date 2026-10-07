@@ -12,7 +12,7 @@ Remote access lets another device, such as a phone, use Korev on your Mac. The o
 
 1. Open **Settings → Remote access**.
 2. Turn on **Remote access**.
-3. Click **Show code** and scan the code with the Korev app.
+3. Click **Show code** and scan the code with the Korev app. See [Use Korev from your phone](../guides/use-korev-from-your-phone.html).
 
 When remote access is on, Korev listens on the Mac's Tailscale address. If Tailscale is not running, Korev listens on `127.0.0.1` only, and the page says so. Start Tailscale, then turn remote access off and on again.
 

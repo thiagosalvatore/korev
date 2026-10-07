@@ -5,9 +5,9 @@ import {
   type AppState,
   type Workspace,
 } from '../shared/model';
+import { activeWorkspaces } from '../shared/workspaces';
 import {
   activeSessionId,
-  activeWorkspaces,
   archiveWorkspace,
   closeTab,
   createPr,
