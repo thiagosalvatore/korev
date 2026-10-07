@@ -143,8 +143,11 @@ export interface Repo {
   scripts: RepoScripts;
   spotlightTesting?: boolean;
   prompts?: RepoPrompts;
+  fileIncludeGlobs?: string;
   folderId?: string | null;
 }
+
+export const DEFAULT_INCLUDE_GLOBS = '.env*';
 
 export interface RepoFolder {
   id: string;

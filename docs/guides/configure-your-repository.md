@@ -73,13 +73,15 @@ archive = "./scripts/archive.sh"
 
 A new worktree has only the files that git tracks. Korev copies gitignored files from the main checkout into each new workspace. By default it copies `.env*` files.
 
-To copy other files, list glob patterns, one per line, in `file_include_globs`:
+To choose the files on your Mac only, open **Settings → Repositories → your repo → Files to copy**. Put one entry per line. An entry can be a file name, such as `.env` or `config/secrets.json`, or a pattern, such as `*.local.json`. Entries use `.gitignore` syntax.
+
+To share the list with everyone, put it in `file_include_globs`:
 
 ```toml
 file_include_globs = ".env*\nconfig/*.local.json"
 ```
 
-Or put the patterns in a `.worktreeinclude` file in the repository root. That file replaces `file_include_globs`. Korev copies only files that git ignores.
+Or put the patterns in a `.worktreeinclude` file in the repository root. Korev uses the first list it finds: `.worktreeinclude`, then `file_include_globs`, then **Files to copy** in the app. Korev copies only files that git ignores.
 
 ## Environment variables
 

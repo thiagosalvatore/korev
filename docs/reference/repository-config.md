@@ -58,7 +58,7 @@ branch_prefix = "agent"
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `file_include_globs` | string | Glob patterns, one per line, for gitignored files to copy into new workspaces. A `.worktreeinclude` file in the repository root replaces it. Without both, Korev copies `.env*`. |
+| `file_include_globs` | string | Glob patterns, one per line, for gitignored files to copy into new workspaces. A `.worktreeinclude` file in the repository root replaces it. Without either, Korev uses **Files to copy** from the app's repository settings, and then `.env*`. |
 | `spotlight_testing` | bool | Shows the **Spotlight** button in each workspace's Run tab. See [Spotlight testing](../guides/spotlight.md). |
 
 ## `[scripts]`

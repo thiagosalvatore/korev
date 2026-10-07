@@ -834,6 +834,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       if (patch.spotlightTesting !== undefined)
         repo.spotlightTesting = patch.spotlightTesting;
       if (patch.prompts) repo.prompts = patch.prompts;
+      if (patch.fileIncludeGlobs !== undefined)
+        repo.fileIncludeGlobs = patch.fileIncludeGlobs.trim();
       store.save();
       ctx.emitState();
     },

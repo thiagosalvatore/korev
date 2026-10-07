@@ -48,6 +48,7 @@ export interface KorevApi {
       defaultBranch?: string;
       spotlightTesting?: boolean;
       prompts?: RepoPrompts;
+      fileIncludeGlobs?: string;
     },
   ): Promise<void>;
   toggleSpotlight(workspaceId: string): Promise<Result>;

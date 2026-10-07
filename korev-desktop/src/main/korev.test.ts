@@ -1024,6 +1024,25 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(existsSync(path.join(workspace.path, '.env'))).toBe(false);
   });
 
+  it('copies the gitignored files listed in the repository settings', async () => {
+    await mkdir(path.join(repoPath, 'config'));
+    await writeFile(path.join(repoPath, 'config', 'app.local.json'), '{}');
+    await writeFile(
+      path.join(repoPath, '.gitignore'),
+      '.env\nconfig/*.local.json\n',
+    );
+    await korev.api.updateRepo((await addRepo()).id, {
+      fileIncludeGlobs: 'config/*.local.json',
+    });
+
+    const workspace = await createWorkspace();
+
+    expect(
+      existsSync(path.join(workspace.path, 'config', 'app.local.json')),
+    ).toBe(true);
+    expect(existsSync(path.join(workspace.path, '.env'))).toBe(false);
+  });
+
   it('checks out an existing branch instead of creating one', async () => {
     git(repoPath, 'branch', 'feature/login');
 
