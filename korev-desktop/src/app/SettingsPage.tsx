@@ -508,7 +508,7 @@ function Git({ settings }: { settings: Settings }) {
       </Row>
       <Row
         title="Name workspaces from the task"
-        description="Let Claude Haiku name each workspace and branch from its task. When off, the first words of the task are used."
+        description="Let Claude Haiku name each workspace, branch and chat tab from its task. When off, the first words of the task are used."
       >
         <Switch
           checked={settings.autoRenameBranches}

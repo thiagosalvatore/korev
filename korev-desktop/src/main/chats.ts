@@ -739,10 +739,14 @@ export function createChats(
     if (workspace && firstMessage && session === workspace.sessions[0]) {
       void autoRenameBranch(workspace, options.text);
     }
-    if (owner.kind === 'ask' && firstMessage) {
+    if (firstMessage && namesWithHaiku(owner)) {
       void autoTitle(session, options.text);
     }
     return { ok: true, value: undefined };
+  }
+
+  function namesWithHaiku(owner: Owner) {
+    return owner.kind === 'ask' || ctx.store.state.settings.autoRenameBranches;
   }
 
   function isPlaceholderBranch(workspace: Workspace) {

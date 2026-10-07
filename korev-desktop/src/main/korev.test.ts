@@ -601,6 +601,19 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     );
   });
 
+  it('titles a workspace chat tab from its first message', async () => {
+    await korev.api.updateSettings({ autoRenameBranches: true });
+    const workspace = await createWorkspace();
+
+    await sendAndWait(workspace.sessions[0].id, 'Add a note');
+
+    await waitFor(
+      async () =>
+        (await korev.api.getState()).workspaces[0].sessions[0].title ===
+        'Finding the README',
+    );
+  });
+
   it('returns before the worktree exists, then names it from the task and sends the task', async () => {
     await korev.api.updateSettings({ autoRenameBranches: true });
     const repo = await addRepo();
