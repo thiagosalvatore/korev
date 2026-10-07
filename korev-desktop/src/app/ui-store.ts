@@ -57,6 +57,7 @@ export interface UiState {
   collapsedRepos: string[];
   collapsedFolders: string[];
   historyOpen: boolean;
+  askOpen: boolean;
   workspaces: Record<string, WorkspaceUi>;
   palette: PaletteMode;
   diffLayout: DiffLayout;
@@ -74,6 +75,7 @@ const INITIAL: UiState = {
   collapsedRepos: [],
   collapsedFolders: [],
   historyOpen: false,
+  askOpen: true,
   workspaces: {},
   palette: false,
   diffLayout: 'unified',

@@ -689,63 +689,78 @@ function AskChats({ state }: { state: AppState }) {
   const selectedId = useUi((ui) =>
     ui.page.kind === 'ask' ? ui.page.askChatId : null,
   );
+  const open = useUi((ui) => ui.askOpen);
   if (!state.askChats.length) return null;
   const repoNames = new Map(state.repos.map((repo) => [repo.id, repo.name]));
   const newestFirst = [...state.askChats].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt),
   );
   return (
-    <section aria-label="Ask" className="mb-2">
-      <div className="flex h-8 items-center px-2 type-overline text-fg-4">
-        Ask
-      </div>
-      {newestFirst.map((ask) => {
-        const running = state.runningSessions.includes(ask.session.id);
-        return (
-          <div
-            key={ask.id}
-            role="button"
-            tabIndex={0}
-            aria-current={ask.id === selectedId ? 'page' : undefined}
-            aria-label={`Ask ${ask.session.title}`}
-            onClick={() => openAsk(ask.id)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') openAsk(ask.id);
-            }}
-            className={cn(
-              'group flex min-h-9 cursor-pointer items-center gap-2 rounded-md py-1 pr-1.5 pl-2 text-fg-2 hover:bg-hover',
-              ask.id === selectedId && 'bg-active text-fg-1 hover:bg-active',
-            )}
-          >
-            <Icon
-              name={running ? 'loader-circle' : 'message-circle-question'}
-              size={14}
-              className={cn(
-                running ? 'animate-spin text-accent-text' : 'text-fg-4',
-              )}
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">
-                {ask.session.title}
-              </span>
-              <span className="block truncate text-xs text-fg-3">
-                {ask.repoIds.map((id) => repoNames.get(id)).join(', ')}
-              </span>
-            </span>
-            <span className="hidden group-hover:flex">
-              <IconButton
-                icon="trash-2"
-                label={`Delete ${ask.session.title}`}
-                size="sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void deleteAsk(ask);
+    <section aria-label="Ask" className="border-b border-border-1 px-2 py-1.5">
+      <button
+        type="button"
+        className={cn(ROW, 'h-7')}
+        aria-expanded={open}
+        onClick={() => setUi({ askOpen: !open })}
+      >
+        <Icon name="message-circle-question" size={15} className="text-fg-3" />
+        <span className="flex-1">Ask chats</span>
+        <span className="font-mono text-2xs text-fg-4">
+          {state.askChats.length}
+        </span>
+      </button>
+      {open ? (
+        <div className="max-h-56 overflow-y-auto">
+          {newestFirst.map((ask) => {
+            const running = state.runningSessions.includes(ask.session.id);
+            return (
+              <div
+                key={ask.id}
+                role="button"
+                tabIndex={0}
+                aria-current={ask.id === selectedId ? 'page' : undefined}
+                aria-label={`Ask ${ask.session.title}`}
+                onClick={() => openAsk(ask.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') openAsk(ask.id);
                 }}
-              />
-            </span>
-          </div>
-        );
-      })}
+                className={cn(
+                  'group flex min-h-9 cursor-pointer items-center gap-2 rounded-md py-1 pr-1.5 pl-2 text-fg-2 hover:bg-hover',
+                  ask.id === selectedId &&
+                    'bg-active text-fg-1 hover:bg-active',
+                )}
+              >
+                <Icon
+                  name={running ? 'loader-circle' : 'message-circle-question'}
+                  size={14}
+                  className={cn(
+                    running ? 'animate-spin text-accent-text' : 'text-fg-4',
+                  )}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">
+                    {ask.session.title}
+                  </span>
+                  <span className="block truncate text-xs text-fg-3">
+                    {ask.repoIds.map((id) => repoNames.get(id)).join(', ')}
+                  </span>
+                </span>
+                <span className="hidden group-hover:flex">
+                  <IconButton
+                    icon="trash-2"
+                    label={`Delete ${ask.session.title}`}
+                    size="sm"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void deleteAsk(ask);
+                    }}
+                  />
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -945,8 +960,8 @@ export function Sidebar({ state }: { state: AppState }) {
           onClick={() => openAsk(null)}
         />
       </div>
+      <AskChats state={state} />
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-1">
-        <AskChats state={state} />
         {repoSections(state).map(({ folder, repos }) => {
           const groups = repos.map((repo) => (
             <RepoGroup
