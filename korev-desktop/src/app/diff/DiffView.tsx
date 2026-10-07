@@ -48,7 +48,7 @@ function useChanges(workspace: Workspace, range: TurnRange | null) {
         : api.changes(workspace.id);
       void load.then(setChanges);
     },
-    range ? Number.MAX_SAFE_INTEGER : REFRESH_MS,
+    range ? null : REFRESH_MS,
     [workspace.id, range?.to],
   );
   return changes;

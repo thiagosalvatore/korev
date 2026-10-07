@@ -58,7 +58,7 @@ export function useTranscript(sessionId: string): ChatItem[] | null {
 
 export function usePolling(
   callback: () => void,
-  intervalMs: number,
+  intervalMs: number | null,
   deps: unknown[],
 ) {
   const latest = useRef(callback);
@@ -67,6 +67,7 @@ export function usePolling(
   });
   useEffect(() => {
     latest.current();
+    if (intervalMs === null) return;
     const timer = setInterval(() => latest.current(), intervalMs);
     return () => clearInterval(timer);
     // oxlint-disable-next-line react-hooks/exhaustive-deps
