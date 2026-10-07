@@ -190,7 +190,7 @@ export function ComposerToolbar(props: ComposerToolbarProps) {
         </button>
       ) : null}
       <div className="flex-1" />
-      {props.usage?.context ? (
+      {props.usage ? (
         <ContextMeter
           context={props.usage.context}
           limits={props.usage.limits}

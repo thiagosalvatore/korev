@@ -18,8 +18,10 @@ const RESET_FORMAT: Intl.DateTimeFormatOptions = {
   minute: '2-digit',
 };
 
+const UNKNOWN_PERCENT = '—';
+
 export interface ContextMeterProps {
-  context: ContextUsage;
+  context: ContextUsage | null;
   limits: PlanLimit[];
 }
 
@@ -49,6 +51,15 @@ function UsageBar({ percent, label }: { percent: number; label: string }) {
         style={{ width: `${clamped}%` }}
       />
     </div>
+  );
+}
+
+function PendingContextSection() {
+  return (
+    <section className="flex flex-col gap-2">
+      <div className="type-overline text-fg-4">Context window</div>
+      <div className="text-xs text-fg-3">Appears after the first reply</div>
+    </section>
   );
 }
 
@@ -142,10 +153,9 @@ export function ContextMeter({ context, limits }: ContextMeterProps) {
   const root = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useDismiss(root, open, close);
-  const percent = Math.min(
-    PERCENT,
-    (context.usedTokens / context.windowTokens) * PERCENT,
-  );
+  const percent = context
+    ? Math.min(PERCENT, (context.usedTokens / context.windowTokens) * PERCENT)
+    : 0;
   const now = Date.now();
   const currentLimits = limits.filter((limit) => isCurrent(limit, now));
   return (
@@ -162,7 +172,7 @@ export function ContextMeter({ context, limits }: ContextMeterProps) {
         onClick={() => setOpen((value) => !value)}
       >
         <Ring percent={percent} />
-        {Math.round(percent)}%
+        {context ? `${Math.round(percent)}%` : UNKNOWN_PERCENT}
       </button>
       {open ? (
         <div
@@ -170,7 +180,11 @@ export function ContextMeter({ context, limits }: ContextMeterProps) {
           aria-label="Usage"
           className={cn(PANEL, 'right-0 bottom-[calc(100%+4px)] w-72 p-3')}
         >
-          <ContextSection context={context} percent={percent} />
+          {context ? (
+            <ContextSection context={context} percent={percent} />
+          ) : (
+            <PendingContextSection />
+          )}
           {currentLimits.length ? (
             <LimitsSection limits={currentLimits} />
           ) : null}

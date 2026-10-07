@@ -32,4 +32,22 @@ describe('ContextMeter', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
   });
+
+  it('shows plan limits before the first reply reports context usage', () => {
+    render(
+      <ContextMeter
+        context={null}
+        limits={[{ label: '5-hour', usedPercent: 42, resetsAt: null }]}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: 'Context usage' });
+    expect(button.textContent).toBe('—');
+
+    fireEvent.click(button);
+
+    const dialog = screen.getByRole('dialog', { name: 'Usage' });
+    expect(dialog.textContent).toContain('Appears after the first reply');
+    expect(dialog.textContent).toContain('5-hour');
+  });
 });
