@@ -25,6 +25,7 @@ export interface TurnRequest {
   resumeId: string | null;
   newSessionId: string;
   systemPrompt: string;
+  addDirs: string[];
 }
 
 export interface AgentDefinition {
@@ -51,6 +52,7 @@ function claudeArgs(request: TurnRequest): string[] {
     request.effort,
     '--append-system-prompt',
     request.systemPrompt,
+    ...request.addDirs.flatMap((dir) => ['--add-dir', dir]),
     ...session,
   ];
 }

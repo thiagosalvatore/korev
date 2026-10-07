@@ -6,6 +6,7 @@ import {
   DEFAULT_EFFORT,
   EMPTY_SCRIPTS,
   type AgentKind,
+  type AskChat,
   type ChatItem,
   type Repo,
   type Settings,
@@ -20,6 +21,7 @@ const SAVE_DELAY_MS = 400;
 export interface PersistedState {
   repos: Repo[];
   workspaces: Workspace[];
+  askChats: AskChat[];
   settings: Settings;
 }
 
@@ -73,6 +75,7 @@ function sanitize(raw: unknown, home: string): PersistedState {
         })),
       }),
     ),
+    askChats: Array.isArray(value.askChats) ? value.askChats : [],
     settings,
   };
 }

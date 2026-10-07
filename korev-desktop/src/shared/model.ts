@@ -95,6 +95,13 @@ export interface Workspace {
   sessions: ChatSession[];
 }
 
+export interface AskChat {
+  id: string;
+  repoIds: string[];
+  session: ChatSession;
+  createdAt: string;
+}
+
 export interface Settings {
   theme: ThemePreference;
   defaultAgent: AgentKind;
@@ -172,6 +179,7 @@ export interface AgentAvailability {
 export interface AppState {
   repos: Repo[];
   workspaces: Workspace[];
+  askChats: AskChat[];
   settings: Settings;
   runtime: Record<string, WorkspaceRuntime>;
   runningSessions: string[];

@@ -11,6 +11,7 @@ export type GitPanelTab = 'files' | 'changes' | 'checks';
 export type Page =
   | { kind: 'workspace' }
   | { kind: 'new-workspace'; repoId: string | null }
+  | { kind: 'ask'; askChatId: string | null; repoIds: string[] }
   | { kind: 'settings'; section: string };
 
 export interface DiffComment {

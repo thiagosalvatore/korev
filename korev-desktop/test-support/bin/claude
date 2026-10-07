@@ -4,6 +4,7 @@ case " $* " in
   *" --version "*) echo "9.9.9 (Claude Code)"; exit 0 ;;
   *" text "*) echo "add-agent-note"; exit 0 ;;
 esac
+[ -d .context ] && echo "$*" > .context/claude-args
 echo '{"type":"system","subtype":"init","session_id":"fake-session"}'
 echo "written by the fake agent" > agent-note.txt
 echo '{"type":"stream_event","event":{"type":"message_start","message":{"id":"m1"}}}'

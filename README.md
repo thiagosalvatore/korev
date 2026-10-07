@@ -2,6 +2,8 @@
 
 Korev is a Mac app that runs coding agents (Claude Code and Codex) in parallel. Each task gets its own workspace: a git worktree on a new branch, with its own chats, terminal, diff and pull request.
 
+To ask about code without starting a task, use **Ask**. The agent reads a shared checkout of each repository's default branch and cannot change anything. One Ask chat can cover several repositories.
+
 It follows [Conductor](https://www.conductor.build)'s model and UI closely, including `conductor.json` scripts and the `CONDUCTOR_*` environment variables, so a repository set up for Conductor works here unchanged.
 
 ## Run it

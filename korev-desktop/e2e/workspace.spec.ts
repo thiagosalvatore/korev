@@ -36,9 +36,7 @@ async function snap(window: Page, name: string) {
     await window.screenshot({ path: path.join(SCREENSHOT_DIR, `${name}.png`) });
 }
 
-test('creates a workspace, runs an agent turn, shows the diff and archives it', async () => {
-  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
-  const repo = await createRepo(home);
+async function launch(home: string, repo: string) {
   const app = await electron.launch({
     args: [
       APP_ENTRY,
@@ -52,16 +50,22 @@ test('creates a workspace, runs an agent turn, shows the diff and archives it', 
       PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}`,
     },
   });
-  try {
-    await app.evaluate(({ dialog }, repoPath) => {
-      dialog.showOpenDialog = (async () => ({
-        canceled: false,
-        filePaths: [repoPath],
-      })) as typeof dialog.showOpenDialog;
-    }, repo);
-    const window = await app.firstWindow();
-    await window.setViewportSize({ width: 1440, height: 900 });
+  await app.evaluate(({ dialog }, repoPath) => {
+    dialog.showOpenDialog = (async () => ({
+      canceled: false,
+      filePaths: [repoPath],
+    })) as typeof dialog.showOpenDialog;
+  }, repo);
+  const window = await app.firstWindow();
+  await window.setViewportSize({ width: 1440, height: 900 });
+  return { app, window };
+}
 
+test('creates a workspace, runs an agent turn, shows the diff and archives it', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const { app, window } = await launch(home, repo);
+  try {
     await expect(window.getByText('Run a team of coding agents')).toBeVisible();
     await snap(window, '01-welcome');
     await window.getByRole('button', { name: 'Open project' }).click();
@@ -97,6 +101,35 @@ test('creates a workspace, runs an agent turn, shows the diff and archives it', 
       window.getByRole('heading', { name: 'New workspace' }),
     ).toBeVisible();
     await expect(window.getByRole('region', { name: 'History' })).toBeVisible();
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('asks a question about a repository without creating a workspace', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const { app, window } = await launch(home, repo);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
+    await sidebar.getByRole('button', { name: 'Ask', exact: true }).click();
+    await expect(window.getByRole('heading', { name: 'Ask' })).toBeVisible();
+    await window
+      .getByRole('textbox', { name: 'Message' })
+      .fill('Where is the README?');
+    await snap(window, '05-ask');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+
+    await expect(window.getByText('I added agent-note.txt.')).toBeVisible();
+    await expect(
+      sidebar.getByRole('button', { name: 'Ask Where is the README?' }),
+    ).toBeVisible();
+    await expect(
+      sidebar.getByRole('button', { name: /^Workspace / }),
+    ).toHaveCount(0);
+    await snap(window, '06-ask-answer');
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });

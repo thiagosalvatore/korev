@@ -15,6 +15,7 @@ import {
   type WorkspaceStatus,
 } from '../shared/model';
 import { detectAgents } from './agents';
+import { askWorktreePath } from './ask-worktrees';
 import { createChats } from './chats';
 import {
   errorMessage,
@@ -31,6 +32,7 @@ import {
   defaultBranch,
   fileDiff,
   listFiles,
+  removeWorktree,
   repoRoot,
 } from './git';
 import {
@@ -195,10 +197,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   const chats = createChats(ctx);
 
   function snapshot(): AppState {
-    const { repos, workspaces, settings } = store.state;
+    const { repos, workspaces, askChats, settings } = store.state;
     return {
       repos,
       workspaces,
+      askChats,
       settings,
       runtime: Object.fromEntries(
         workspaces.map((ws) => [ws.id, ctx.runtime(ws.id)]),
@@ -267,6 +270,36 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       throw new Error('Terminal does not belong to workspace');
   }
 
+  function allSessions() {
+    return [
+      ...store.state.workspaces.flatMap((workspace) => workspace.sessions),
+      ...store.state.askChats.map((ask) => ask.session),
+    ];
+  }
+
+  async function deleteAskChat(askChatId: string) {
+    const ask = store.state.askChats.find((entry) => entry.id === askChatId);
+    if (!ask) return;
+    store.state.askChats = store.state.askChats.filter(
+      (entry) => entry !== ask,
+    );
+    await chats.forget(ask.session.id);
+    store.save();
+    ctx.emitState();
+  }
+
+  async function removeRepoFromAskChats(repo: Repo) {
+    for (const ask of store.state.askChats) {
+      ask.repoIds = ask.repoIds.filter((repoId) => repoId !== repo.id);
+      if (!ask.repoIds.length) await deleteAskChat(ask.id);
+    }
+    await removeWorktree(
+      git,
+      repo.path,
+      askWorktreePath(store.state.settings.workspacesRoot, repo),
+    );
+  }
+
   async function updateSettings(patch: Partial<Settings>) {
     Object.assign(store.state.settings, patch);
     if (patch.theme) deps.applyTheme(patch.theme);
@@ -317,6 +350,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         await archiveWorkspace(ctx, workspace.id, chats.stopWorkspace);
         await deleteWorkspace(ctx, workspace.id);
       }
+      await removeRepoFromAskChats(ctx.repo(repoId));
       state.repos = state.repos.filter((repo) => repo.id !== repoId);
       store.save();
       ctx.emitState();
@@ -347,6 +381,20 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       runtime.unread = false;
       ctx.emitState();
     },
+    async createAskChat(repoIds) {
+      for (const repoId of repoIds) ctx.repo(repoId);
+      const ask = {
+        id: deps.newId(),
+        repoIds,
+        session: newChatSession(ctx, store.state.settings.defaultAgent),
+        createdAt: deps.now().toISOString(),
+      };
+      store.state.askChats.push(ask);
+      store.save();
+      ctx.emitState();
+      return ask;
+    },
+    deleteAskChat,
     async newSession(workspaceId, agent) {
       const session = newChatSession(ctx, agent);
       ctx.workspace(workspaceId).sessions.push(session);
@@ -365,15 +413,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       ctx.emitState();
     },
     async updateSession(sessionId, patch) {
-      for (const workspace of store.state.workspaces) {
-        const session = workspace.sessions.find(
-          (entry) => entry.id === sessionId,
-        );
-        if (!session) continue;
-        if (patch.model) session.model = patch.model;
-        if (patch.effort) session.effort = patch.effort;
-        if (patch.title?.trim()) session.title = patch.title.trim();
-      }
+      const session = allSessions().find((entry) => entry.id === sessionId);
+      if (!session) return;
+      if (patch.model) session.model = patch.model;
+      if (patch.effort) session.effort = patch.effort;
+      if (patch.title?.trim()) session.title = patch.title.trim();
       store.save();
       ctx.emitState();
     },
@@ -525,8 +569,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     settings: () => store.state.settings,
     updateSettings,
     async shutdown() {
-      for (const workspace of store.state.workspaces)
-        chats.stopWorkspace(workspace);
+      for (const session of allSessions()) chats.stop(session.id);
       ctx.terminals.closeAll();
       await store.flush();
     },

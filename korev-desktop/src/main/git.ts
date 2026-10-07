@@ -108,25 +108,49 @@ async function excludeContextDir(git: Git, worktree: string): Promise<void> {
   await appendFile(excludeFile, `${separator}${entry}\n`);
 }
 
-export async function addWorktree(
+async function createWorktree(
+  git: Git,
+  repo: string,
+  worktree: string,
+  args: string[],
+): Promise<void> {
+  await mkdir(path.dirname(worktree), { recursive: true });
+  await git.run(repo, ['worktree', 'add', ...args]);
+  await mkdir(path.join(worktree, CONTEXT_DIR), { recursive: true });
+  await excludeContextDir(git, worktree);
+}
+
+export function addWorktree(
   git: Git,
   repo: string,
   worktree: string,
   branch: string,
   from: string,
 ): Promise<void> {
-  await mkdir(path.dirname(worktree), { recursive: true });
-  await git.run(repo, [
-    'worktree',
-    'add',
+  return createWorktree(git, repo, worktree, [
     '--no-track',
     '-b',
     branch,
     worktree,
     from,
   ]);
-  await mkdir(path.join(worktree, CONTEXT_DIR), { recursive: true });
-  await excludeContextDir(git, worktree);
+}
+
+export function addDetachedWorktree(
+  git: Git,
+  repo: string,
+  worktree: string,
+  from: string,
+): Promise<void> {
+  return createWorktree(git, repo, worktree, ['--detach', worktree, from]);
+}
+
+export async function checkoutDetached(
+  git: Git,
+  worktree: string,
+  from: string,
+): Promise<void> {
+  await git.run(worktree, ['checkout', '--detach', '--force', from]);
 }
 
 export async function restoreWorktree(

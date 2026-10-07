@@ -1,6 +1,7 @@
 import type {
   AgentKind,
   AppCommand,
+  AskChat,
   AppState,
   ChatItem,
   ChatSession,
@@ -35,6 +36,8 @@ export interface KorevApi {
   restoreWorkspace(workspaceId: string): Promise<Result>;
   deleteWorkspace(workspaceId: string): Promise<void>;
   focusWorkspace(workspaceId: string | null): Promise<void>;
+  createAskChat(repoIds: string[]): Promise<AskChat>;
+  deleteAskChat(askChatId: string): Promise<void>;
   newSession(workspaceId: string, agent: AgentKind): Promise<ChatSession>;
   closeSession(workspaceId: string, sessionId: string): Promise<void>;
   updateSession(

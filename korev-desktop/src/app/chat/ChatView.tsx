@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Icon } from '../../design-system';
 import {
   AGENT_LABELS,
@@ -9,15 +9,24 @@ import {
 import { api } from '../bridge';
 import { useTranscript } from '../hooks';
 import { reportFailure } from '../ui/toast';
-import { updateWorkspaceUi, useUi, EMPTY_WORKSPACE_UI } from '../ui-store';
+import {
+  EMPTY_WORKSPACE_UI,
+  updateWorkspaceUi,
+  useUi,
+  type DiffComment,
+} from '../ui-store';
 import { Composer, saveDraft } from './Composer';
 import { Transcript } from './Transcript';
 
 export interface ChatViewProps {
   state: AppState;
-  workspace: Workspace;
+  workspace: Workspace | null;
   session: ChatSession;
+  empty?: ReactNode;
+  placeholder?: string;
 }
+
+const NO_COMMENTS: DiffComment[] = [];
 
 function EmptyChat({
   session,
@@ -44,16 +53,24 @@ function EmptyChat({
   );
 }
 
-export function ChatView({ state, workspace, session }: ChatViewProps) {
+export function ChatView({
+  state,
+  workspace,
+  session,
+  empty,
+  placeholder,
+}: ChatViewProps) {
   const items = useTranscript(session.id);
   const running = state.runningSessions.includes(session.id);
-  const comments = useUi(
-    (ui) => (ui.workspaces[workspace.id] ?? EMPTY_WORKSPACE_UI).comments,
+  const comments = useUi((ui) =>
+    workspace
+      ? (ui.workspaces[workspace.id] ?? EMPTY_WORKSPACE_UI).comments
+      : NO_COMMENTS,
   );
   const [planMode, setPlanMode] = useState(state.settings.defaultPlanMode);
   const [draftVersion, setDraftVersion] = useState(0);
   const agent = state.agents.find((entry) => entry.agent === session.agent);
-  const archived = Boolean(workspace.archivedAt);
+  const archived = Boolean(workspace?.archivedAt);
 
   async function revert(itemId: string) {
     const result = await api.revert(session.id, itemId);
@@ -68,7 +85,12 @@ export function ChatView({ state, workspace, session }: ChatViewProps) {
         <Transcript
           items={items}
           running={running}
-          empty={<EmptyChat session={session} workspace={workspace} />}
+          empty={
+            empty ??
+            (workspace ? (
+              <EmptyChat session={session} workspace={workspace} />
+            ) : null)
+          }
           onRevert={(itemId) => void revert(itemId)}
         />
       ) : (
@@ -90,8 +112,9 @@ export function ChatView({ state, workspace, session }: ChatViewProps) {
             effort={session.effort}
             planMode={planMode}
             running={running}
-            workspaceId={workspace.id}
+            workspaceId={workspace?.id ?? null}
             comments={comments}
+            placeholder={placeholder}
             autoFocus
             onModelChange={(model) =>
               void api.updateSession(session.id, { model })
@@ -100,9 +123,10 @@ export function ChatView({ state, workspace, session }: ChatViewProps) {
               void api.updateSession(session.id, { effort })
             }
             onPlanModeChange={setPlanMode}
-            onClearComments={() =>
-              updateWorkspaceUi(workspace.id, () => ({ comments: [] }))
-            }
+            onClearComments={() => {
+              if (workspace)
+                updateWorkspaceUi(workspace.id, () => ({ comments: [] }));
+            }}
             onStop={() => void api.stop(session.id)}
             onSend={async (text) =>
               reportFailure(

@@ -20,9 +20,9 @@ How the Korev desktop app looks and behaves. The tokens live in
 
 Three columns, like Conductor:
 
-- **Left sidebar** (`--sidebar-w`): Search (⌘K), New workspace (⌘N), then one group per
-  repository with its workspaces, then History (archived workspaces), then Add repository
-  and Settings.
+- **Left sidebar** (`--sidebar-w`): Search (⌘K), New workspace (⌘N), Ask, then the Ask
+  chats, then one group per repository with its workspaces, then History (archived
+  workspaces), then Add repository and Settings.
 - **Centre**: the workspace header (workspace name, branch, target branch, Open in, PR number,
   the next git action), a tab strip (chats, Changes, open files) and the active tab.
 - **Right panel** (`--panel-w`): the git panel (All files / Changes / Checks) on top and

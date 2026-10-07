@@ -37,20 +37,27 @@ const noPty = () => ({
 describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   let home: string;
   let repoPath: string;
+  let chosenDirectory: string;
   let korev: Korev;
+
+  async function initRepo(name: string) {
+    const dir = path.join(home, name);
+    execFileSync('git', ['init', '-q', '-b', 'main', dir]);
+    git(dir, 'config', 'user.email', 'dev@example.com');
+    git(dir, 'config', 'user.name', 'Dev');
+    git(dir, 'config', 'commit.gpgsign', 'false');
+    await writeFile(path.join(dir, 'README.md'), `# ${name}\n`);
+    await writeFile(path.join(dir, '.gitignore'), '.env\n');
+    await writeFile(path.join(dir, '.env'), 'SECRET=1\n');
+    git(dir, 'add', 'README.md', '.gitignore');
+    git(dir, 'commit', '-q', '-m', 'init');
+    return dir;
+  }
 
   beforeEach(async () => {
     home = await mkdtemp(path.join(tmpdir(), 'korev-core-'));
-    repoPath = path.join(home, 'acme');
-    execFileSync('git', ['init', '-q', '-b', 'main', repoPath]);
-    git(repoPath, 'config', 'user.email', 'dev@example.com');
-    git(repoPath, 'config', 'user.name', 'Dev');
-    git(repoPath, 'config', 'commit.gpgsign', 'false');
-    await writeFile(path.join(repoPath, 'README.md'), '# acme\n');
-    await writeFile(path.join(repoPath, '.gitignore'), '.env\n');
-    await writeFile(path.join(repoPath, '.env'), 'SECRET=1\n');
-    git(repoPath, 'add', 'README.md', '.gitignore');
-    git(repoPath, 'commit', '-q', '-m', 'init');
+    repoPath = await initRepo('acme');
+    chosenDirectory = repoPath;
     korev = await createKorev({
       run: runProcess,
       env: { ...process.env, PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}` },
@@ -65,7 +72,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       setBadge: () => undefined,
       now: () => new Date(),
       newId: () => randomUUID(),
-      chooseDirectory: async () => repoPath,
+      chooseDirectory: async () => chosenDirectory,
       openPath: async () => undefined,
       openExternal: async () => undefined,
       applyTheme: () => undefined,
@@ -266,6 +273,59 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     const { runtime } = await waitUntilCreated(created.value.id);
     expect(runtime.status).toBe('failed');
     expect(runtime.message).toMatch(/Could not create the worktree/);
+  });
+
+  async function askAndWait(repoIds: string[], text: string) {
+    const ask = await korev.api.createAskChat(repoIds);
+    await sendAndWait(ask.session.id, text);
+    return ask;
+  }
+
+  it('answers questions in a read-only checkout of the default branch without a workspace', async () => {
+    const repo = await addRepo();
+    const askDir = path.join(home, 'korev', 'workspaces', 'acme', '.ask');
+
+    const ask = await askAndWait([repo.id], 'Where is the README?');
+
+    const state = await korev.api.getState();
+    expect(state.workspaces).toEqual([]);
+    expect(state.askChats.map((entry) => entry.id)).toEqual([ask.id]);
+    expect(git(askDir, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('HEAD');
+    expect(
+      await readFile(path.join(askDir, '.context', 'claude-args'), 'utf8'),
+    ).toContain('--permission-mode plan');
+    expect(
+      (await korev.api.transcript(ask.session.id)).map((item) => item.kind),
+    ).toEqual(['user', 'assistant', 'tool', 'result']);
+  });
+
+  it('moves the read-only checkout to the latest default branch before each question', async () => {
+    const repo = await addRepo();
+    const askDir = path.join(home, 'korev', 'workspaces', 'acme', '.ask');
+    const ask = await askAndWait([repo.id], 'First question');
+    await writeFile(path.join(repoPath, 'NEW.md'), 'new\n');
+    git(repoPath, 'add', 'NEW.md');
+    git(repoPath, 'commit', '-q', '-m', 'new');
+
+    await sendAndWait(ask.session.id, 'Second question');
+
+    expect(existsSync(path.join(askDir, 'NEW.md'))).toBe(true);
+  });
+
+  it('lets one question read several repositories', async () => {
+    const acme = await addRepo();
+    chosenDirectory = await initRepo('api');
+    const api = await addRepo();
+
+    await askAndWait([acme.id, api.id], 'How do these talk?');
+
+    const root = path.join(home, 'korev', 'workspaces');
+    expect(
+      await readFile(
+        path.join(root, 'acme', '.ask', '.context', 'claude-args'),
+        'utf8',
+      ),
+    ).toContain(`--add-dir ${path.join(root, 'api', '.ask')}`);
   });
 
   it('archives a workspace and restores its uncommitted work', async () => {

@@ -1,5 +1,6 @@
 import type {
   AgentKind,
+  AskChat,
   AppState,
   EditorId,
   SendOptions,
@@ -35,6 +36,29 @@ export function selectWorkspace(workspaceId: string) {
 export function openNewWorkspace(repoId: string | null) {
   setUi({ page: { kind: 'new-workspace', repoId } });
   void api.focusWorkspace(null);
+}
+
+export function openAsk(askChatId: string | null, repoIds: string[] = []) {
+  setUi({ page: { kind: 'ask', askChatId, repoIds } });
+  void api.focusWorkspace(null);
+}
+
+export async function startAsk(repoIds: string[], question: SendOptions) {
+  const ask = await api.createAskChat(repoIds);
+  openAsk(ask.id);
+  return reportFailure(
+    await api.send(ask.session.id, {
+      ...question,
+      model: question.model || ask.session.model,
+    }),
+  );
+}
+
+export async function deleteAsk(ask: AskChat) {
+  await api.deleteAskChat(ask.id);
+  const page = getUi().page;
+  if (page.kind === 'ask' && page.askChatId === ask.id)
+    openAsk(null, ask.repoIds);
 }
 
 export function openSettings(section = 'general') {

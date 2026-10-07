@@ -1,13 +1,16 @@
 import type {
+  AskChat,
   ChatItem,
   ChatSession,
+  Checkpoint,
   Repo,
   Result,
   SendOptions,
   Workspace,
 } from '../shared/model';
 import { AGENTS, codexPrompt, type TurnRequest } from './agents';
-import { parseJsonLine } from './agent-events';
+import { parseJsonLine, type TurnParser } from './agent-events';
+import { prepareAskWorktree } from './ask-worktrees';
 import { CommandAbortedError } from './command-runner';
 import { errorMessage, NotFoundError, type Context } from './context';
 import {
@@ -26,6 +29,7 @@ const SAVE_EVERY_ITEMS = 20;
 const STDERR_TAIL_CHARS = 2_000;
 const REPLAY_ITEM_CHARS = 2_000;
 const REPLAY_TOTAL_CHARS = 24_000;
+
 export function replayPrompt(history: ChatItem[], text: string): string {
   const lines = history.flatMap((item) => {
     if (item.kind === 'user')
@@ -50,12 +54,36 @@ export function systemPrompt(repo: Repo, workspace: Workspace): string {
   ].join('\n');
 }
 
+export function askSystemPrompt(repos: Repo[], checkouts: string[]): string {
+  return [
+    `You are answering questions inside Korev, a Mac app that lets the user run many coding agents in parallel.`,
+    `The user is asking about these repositories. Each one is checked out read-only at its latest default branch:`,
+    ...repos.map(
+      (repo, index) =>
+        `- ${repo.name}: ${checkouts[index]} (origin/${repo.defaultBranch})`,
+    ),
+    `Read the code to answer. Do not edit files, create branches or commit. When the user asks for a plan, write the whole plan in your reply.`,
+  ].join('\n');
+}
+
 function titleFrom(text: string): string {
   const line = text.trim().split('\n')[0];
   return line.length > TITLE_MAX_CHARS
     ? `${line.slice(0, TITLE_MAX_CHARS - 1).trimEnd()}…`
     : line;
 }
+
+interface TurnTarget {
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  systemPrompt: string;
+  readOnly: boolean;
+  addDirs: string[];
+}
+
+type Owner =
+  | { kind: 'workspace'; workspace: Workspace }
+  | { kind: 'ask'; ask: AskChat };
 
 export interface Chats {
   transcript(sessionId: string): Promise<ChatItem[]>;
@@ -71,16 +99,17 @@ export function createChats(ctx: Context): Chats {
   const transcripts = new Map<string, ChatItem[]>();
   const controllers = new Map<string, AbortController>();
 
-  function locate(sessionId: string): {
-    workspace: Workspace;
-    session: ChatSession;
-  } {
+  function locate(sessionId: string): { owner: Owner; session: ChatSession } {
     for (const workspace of ctx.store.state.workspaces) {
       const session = workspace.sessions.find(
         (entry) => entry.id === sessionId,
       );
-      if (session) return { workspace, session };
+      if (session) return { owner: { kind: 'workspace', workspace }, session };
     }
+    const ask = ctx.store.state.askChats.find(
+      (entry) => entry.session.id === sessionId,
+    );
+    if (ask) return { owner: { kind: 'ask', ask }, session: ask.session };
     throw new NotFoundError('Session', sessionId);
   }
 
@@ -103,14 +132,11 @@ export function createChats(ctx: Context): Chats {
     void ctx.store.saveTranscript(sessionId, items).catch(() => undefined);
   }
 
-  function finishTurn(
+  function finishWorkspaceTurn(
     workspace: Workspace,
     session: ChatSession,
     items: ChatItem[],
   ) {
-    controllers.delete(session.id);
-    ctx.runningSessions.delete(session.id);
-    persist(session.id, items);
     const stillWorking = workspace.sessions.some((entry) =>
       ctx.runningSessions.has(entry.id),
     );
@@ -120,8 +146,6 @@ export function createChats(ctx: Context): Chats {
     const watching =
       ctx.deps.isWindowFocused() && ctx.focusedWorkspaceId === workspace.id;
     if (!watching) runtime.unread = true;
-    ctx.store.save();
-    ctx.emitState();
     void refreshStats(ctx, workspace);
     if (!ctx.deps.isWindowFocused()) {
       const last = items.findLast((item) => item.kind === 'result');
@@ -133,29 +157,69 @@ export function createChats(ctx: Context): Chats {
     }
   }
 
+  function finishTurn(owner: Owner, session: ChatSession, items: ChatItem[]) {
+    controllers.delete(session.id);
+    ctx.runningSessions.delete(session.id);
+    persist(session.id, items);
+    if (owner.kind === 'workspace')
+      finishWorkspaceTurn(owner.workspace, session, items);
+    ctx.store.save();
+    ctx.emitState();
+  }
+
+  function askWorktreeInUse(repoId: string, ask: AskChat) {
+    return ctx.store.state.askChats.some(
+      (other) =>
+        other !== ask &&
+        other.repoIds.includes(repoId) &&
+        controllers.has(other.session.id),
+    );
+  }
+
+  async function askTarget(ask: AskChat): Promise<TurnTarget> {
+    const root = ctx.store.state.settings.workspacesRoot;
+    const repos = ask.repoIds.map((repoId) => ctx.repo(repoId));
+    const checkouts = await Promise.all(
+      repos.map((repo) =>
+        prepareAskWorktree(ctx.git, root, repo, askWorktreeInUse(repo.id, ask)),
+      ),
+    );
+    return {
+      cwd: checkouts[0],
+      env: ctx.deps.env,
+      systemPrompt: askSystemPrompt(repos, checkouts),
+      readOnly: true,
+      addDirs: checkouts.slice(1),
+    };
+  }
+
+  async function turnTarget(owner: Owner): Promise<TurnTarget> {
+    if (owner.kind === 'ask') return askTarget(owner.ask);
+    const { workspace } = owner;
+    const repo = ctx.repo(workspace.repoId);
+    return {
+      cwd: workspace.path,
+      env: scriptEnv(ctx, repo, workspace),
+      systemPrompt: systemPrompt(repo, workspace),
+      readOnly: false,
+      addDirs: [],
+    };
+  }
+
   async function runTurn(
-    workspace: Workspace,
+    owner: Owner,
     session: ChatSession,
     options: SendOptions,
     items: ChatItem[],
     signal: AbortSignal,
   ) {
-    const repo = ctx.repo(workspace.repoId);
     const agent = AGENTS[session.agent];
-    const request: TurnRequest = {
-      model: options.model,
-      planMode: options.planMode,
-      effort: options.effort,
-      resumeId: session.agentSessionId,
-      newSessionId: ctx.deps.newId(),
-      systemPrompt: systemPrompt(repo, workspace),
-    };
-    const parser = agent.parser(workspace.path);
     const prompt = session.agentSessionId
       ? options.text
       : replayPrompt(items.slice(0, -1), options.text);
     const turnId = ctx.deps.newId().slice(0, 8);
     let sinceSave = 0;
+    let parser: TurnParser | null = null;
     const notice = (text: string) =>
       upsert(session.id, items, {
         id: `${turnId}:notice`,
@@ -163,9 +227,21 @@ export function createChats(ctx: Context): Chats {
         text,
       });
     try {
+      const target = await turnTarget(owner);
+      const turnParser = agent.parser(target.cwd);
+      parser = turnParser;
+      const request: TurnRequest = {
+        model: options.model,
+        planMode: options.planMode || target.readOnly,
+        effort: options.effort,
+        resumeId: session.agentSessionId,
+        newSessionId: ctx.deps.newId(),
+        systemPrompt: target.systemPrompt,
+        addDirs: target.addDirs,
+      };
       const result = await ctx.deps.run(agent.binary, agent.args(request), {
-        cwd: workspace.path,
-        env: scriptEnv(ctx, repo, workspace),
+        cwd: target.cwd,
+        env: target.env,
         stdin:
           session.agent === 'codex' ? codexPrompt(request, prompt) : prompt,
         signal,
@@ -173,7 +249,7 @@ export function createChats(ctx: Context): Chats {
         onStdoutLine: (line) => {
           const event = parseJsonLine(line);
           if (!event) return;
-          for (const item of parser.feed(event)) {
+          for (const item of turnParser.feed(event)) {
             upsert(session.id, items, { ...item, id: `${turnId}:${item.id}` });
             sinceSave += 1;
           }
@@ -197,8 +273,8 @@ export function createChats(ctx: Context): Chats {
         error instanceof CommandAbortedError ? 'Stopped' : errorMessage(error),
       );
     } finally {
-      session.agentSessionId = parser.sessionId() ?? session.agentSessionId;
-      finishTurn(workspace, session, items);
+      session.agentSessionId = parser?.sessionId() ?? session.agentSessionId;
+      finishTurn(owner, session, items);
     }
   }
 
@@ -206,16 +282,17 @@ export function createChats(ctx: Context): Chats {
     sessionId: string,
     options: SendOptions,
   ): Promise<Result> {
-    const { workspace, session } = locate(sessionId);
-    if (workspace.archivedAt)
+    const { owner, session } = locate(sessionId);
+    const workspace = owner.kind === 'workspace' ? owner.workspace : null;
+    if (workspace?.archivedAt)
       return { ok: false, message: 'Workspace is archived' };
     if (controllers.has(sessionId))
       return { ok: false, message: 'Agent is still working' };
     const items = await transcript(sessionId);
     const firstMessage = !items.some((item) => item.kind === 'user');
-    const checkpoint = await createCheckpoint(ctx.git, workspace.path).catch(
-      () => null,
-    );
+    const checkpoint = workspace
+      ? await createCheckpoint(ctx.git, workspace.path).catch(() => null)
+      : null;
     upsert(sessionId, items, {
       id: ctx.deps.newId(),
       kind: 'user',
@@ -229,11 +306,11 @@ export function createChats(ctx: Context): Chats {
     const controller = new AbortController();
     controllers.set(sessionId, controller);
     ctx.runningSessions.add(sessionId);
-    ctx.setStatus(workspace.id, 'working');
+    if (workspace) ctx.setStatus(workspace.id, 'working');
     ctx.store.save();
     ctx.emitState();
-    void runTurn(workspace, session, options, items, controller.signal);
-    if (firstMessage && session === workspace.sessions[0]) {
+    void runTurn(owner, session, options, items, controller.signal);
+    if (workspace && firstMessage && session === workspace.sessions[0]) {
       void autoRenameBranch(workspace, options.text);
     }
     return { ok: true, value: undefined };
@@ -273,29 +350,39 @@ export function createChats(ctx: Context): Chats {
     controllers.get(sessionId)?.abort();
   }
 
+  async function restoreFiles(
+    owner: Owner,
+    checkpoint: Checkpoint | null,
+  ): Promise<string | null> {
+    if (owner.kind === 'ask') return null;
+    if (!checkpoint) return 'No checkpoint for this message';
+    try {
+      await restoreCheckpoint(ctx.git, owner.workspace.path, checkpoint);
+      return null;
+    } catch (error) {
+      return errorMessage(error);
+    }
+  }
+
   async function revert(
     sessionId: string,
     itemId: string,
   ): Promise<Result<string>> {
-    const { workspace, session } = locate(sessionId);
+    const { owner, session } = locate(sessionId);
     if (controllers.has(sessionId))
       return { ok: false, message: 'Stop the agent first' };
     const items = await transcript(sessionId);
     const target = items.find((item) => item.id === itemId);
-    if (target?.kind !== 'user' || !target.checkpoint) {
-      return { ok: false, message: 'No checkpoint for this message' };
-    }
-    try {
-      await restoreCheckpoint(ctx.git, workspace.path, target.checkpoint);
-    } catch (error) {
-      return { ok: false, message: errorMessage(error) };
-    }
+    if (target?.kind !== 'user')
+      return { ok: false, message: 'Message not found' };
+    const problem = await restoreFiles(owner, target.checkpoint);
+    if (problem) return { ok: false, message: problem };
     items.splice(items.indexOf(target));
     session.agentSessionId = null;
     persist(sessionId, items);
     ctx.store.save();
     ctx.emitState();
-    void refreshStats(ctx, workspace);
+    if (owner.kind === 'workspace') void refreshStats(ctx, owner.workspace);
     return { ok: true, value: target.text };
   }
 

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { AppState } from '../shared/model';
 import { activeWorkspaces, openNewWorkspace, selectWorkspace } from './actions';
+import { AskPage } from './AskPage';
 import { api } from './bridge';
 import { CommandPalette } from './CommandPalette';
 import { useAppState, useMediaQuery } from './hooks';
@@ -54,6 +55,14 @@ function Shell({ state }: { state: AppState }) {
           key={page.repoId ?? 'any'}
           state={state}
           repoId={page.repoId}
+        />
+      ) : null}
+      {page.kind === 'ask' ? (
+        <AskPage
+          key={page.askChatId ?? `new:${page.repoIds.join(',')}`}
+          state={state}
+          askChatId={page.askChatId}
+          repoIds={page.repoIds}
         />
       ) : null}
       {page.kind === 'workspace' && workspace ? (
