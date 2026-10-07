@@ -1,6 +1,7 @@
 import { Marked } from 'marked';
 import { useMemo, type MouseEvent } from 'react';
 import { cn } from '../../design-system';
+import { imageType } from '../../shared/format';
 import { api } from '../bridge';
 
 const HTML_ESCAPES: Record<string, string> = {
@@ -21,6 +22,7 @@ interface FileRef {
 }
 
 type OpenFile = (file: string, line: number | null) => void;
+type OpenImage = (file: string) => void;
 
 const LINE_SUFFIX = String.raw`(?::(\d+)(?::\d+)?)?`;
 const PATH_SEGMENT = String.raw`[\w.@+-]+`;
@@ -91,11 +93,19 @@ export function renderMarkdown(text: string, linkFiles = false): string {
   });
 }
 
-function openLinks(event: MouseEvent<HTMLDivElement>, onOpenFile?: OpenFile) {
+function openLinks(
+  event: MouseEvent<HTMLDivElement>,
+  onOpenFile?: OpenFile,
+  onOpenImage?: OpenImage,
+) {
   const anchor = (event.target as HTMLElement).closest('a');
   if (!anchor) return;
   event.preventDefault();
   const file = anchor.dataset.file;
+  if (file && onOpenImage && imageType(file)) {
+    onOpenImage(file);
+    return;
+  }
   if (file && onOpenFile) {
     onOpenFile(file, Number(anchor.dataset.line) || null);
     return;
@@ -108,12 +118,14 @@ export function Markdown({
   text,
   className,
   onOpenFile,
+  onOpenImage,
 }: {
   text: string;
   className?: string;
   onOpenFile?: OpenFile;
+  onOpenImage?: OpenImage;
 }) {
-  const linkFiles = Boolean(onOpenFile);
+  const linkFiles = Boolean(onOpenFile || onOpenImage);
   const html = useMemo(
     () => renderMarkdown(text, linkFiles),
     [text, linkFiles],
@@ -121,7 +133,7 @@ export function Markdown({
   return (
     <div
       className={cn('kv-md', className)}
-      onClick={(event) => openLinks(event, onOpenFile)}
+      onClick={(event) => openLinks(event, onOpenFile, onOpenImage)}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

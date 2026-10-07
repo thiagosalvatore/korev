@@ -1,0 +1,190 @@
+#!/usr/bin/env node
+const { writeFileSync, mkdirSync } = require('node:fs');
+const { dirname } = require('node:path');
+const readline = require('node:readline');
+
+const args = process.argv.slice(2).join(' ');
+
+const NAMES = [
+  ['Where are rate limits', 'rate-limits', 'Where rate limits are set'],
+  ['rate limit', 'rate-limit-headers', 'Rate limit headers'],
+  ['dark mode', 'dark-mode-settings', 'Dark mode setting'],
+  ['flaky', 'fix-flaky-checkout', 'Flaky checkout test'],
+  ['billing', 'billing-page', 'Billing page plan'],
+];
+
+function namesFor(text) {
+  return NAMES.find(([words]) => text.includes(words)) ?? ['', 'task', 'Task'];
+}
+
+function stdinText() {
+  try {
+    return require('node:fs').readFileSync(0, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+if (args.includes('--version')) {
+  console.log('9.9.9 (Claude Code)');
+  process.exit(0);
+}
+if (args.includes('You title chat conversations')) {
+  console.log(namesFor(args + stdinText())[2]);
+  process.exit(0);
+}
+if (` ${args} `.includes(' text ')) {
+  console.log(namesFor(args + stdinText())[1]);
+  process.exit(0);
+}
+
+const RATE_LIMIT_FILE = 'src/middleware/rateLimit.ts';
+const RATE_LIMIT_SOURCE = `import type { Request, Response, NextFunction } from 'express';
+import { bucket } from '../lib/bucket';
+
+export function rateLimit(opts: { limit: number; windowMs: number }) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const key = req.tenantKey;
+    const { ok, remaining, resetAt } = await bucket.take(key, opts);
+    res.setHeader('X-RateLimit-Limit', opts.limit);
+    res.setHeader('X-RateLimit-Remaining', remaining);
+    res.setHeader('X-RateLimit-Reset', Math.ceil(resetAt / 1000));
+    if (!ok) {
+      res.setHeader('Retry-After', Math.ceil((resetAt - Date.now()) / 1000));
+      return res.status(429).json({ error: 'rate_limited' });
+    }
+    next();
+  };
+}
+`;
+const RATE_LIMIT_TEST = `import { describe, expect, it } from 'vitest';
+import { request } from '../test/request';
+
+describe('rateLimit', () => {
+  it('sends the rate limit headers on every response', async () => {
+    const res = await request.get('/api/projects');
+    expect(res.headers['x-ratelimit-limit']).toBe('100');
+    expect(res.headers['x-ratelimit-remaining']).toBe('99');
+  });
+
+  it('sends Retry-After when the limit is hit', async () => {
+    const res = await request.get('/api/projects').times(101);
+    expect(res.status).toBe(429);
+    expect(res.headers['retry-after']).toBeDefined();
+  });
+});
+`;
+
+const BILLING_PLAN = `# Billing page
+
+Add a billing page where an admin sees the current plan, the invoices and the payment method.
+
+1. Add \`GET /api/billing\` that returns the plan, the next invoice date and the last 12 invoices.
+2. Add the \`/settings/billing\` page with the plan card and the invoice table.
+3. Link the page from the settings sidebar for admins only.
+
+## Lanes
+
+### api
+
+Add \`GET /api/billing\` in \`src/routes/billing.ts\`, with tests.
+
+### web
+
+Build the \`/settings/billing\` page and the sidebar link against the API shape above.
+`;
+
+const ASK_ANSWER = `Rate limits are set in **\`src/middleware/rateLimit.ts\`**. The middleware takes a token from a per-tenant bucket in \`src/lib/bucket.ts\`, and answers **429** when the bucket is empty.
+
+The limits come from \`config/limits.json\`:
+
+- \`default\`: 100 requests per minute
+- \`enterprise\`: 1,000 requests per minute
+
+The middleware runs for every route under \`/api\`, in \`src/app.ts\`.`;
+
+let messageCount = 0;
+
+function emit(event) {
+  process.stdout.write(`${JSON.stringify({ session_id: 'docs-session', ...event })}\n`);
+}
+
+function say(text) {
+  const id = `m${++messageCount}`;
+  emit({
+    type: 'stream_event',
+    event: {
+      type: 'message_start',
+      message: { id, usage: { input_tokens: 41000, output_tokens: 1200 } },
+    },
+  });
+  emit({
+    type: 'stream_event',
+    event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
+  });
+}
+
+function useTool(name, input, output) {
+  const id = `tool-${++messageCount}`;
+  emit({ type: 'assistant', message: { id, content: [{ type: 'tool_use', id, name, input }] } });
+  emit({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: output } ] } });
+}
+
+function writeSource(path, content) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, content);
+}
+
+function finish() {
+  emit({
+    type: 'result',
+    subtype: 'success',
+    is_error: false,
+    duration_ms: 48000,
+    total_cost_usd: 0.42,
+    modelUsage: { 'claude-opus-5-5': { contextWindow: 200000 } },
+  });
+}
+
+function rateLimitTurn() {
+  say("I'll add the rate limit headers in the middleware so every API response sends them.");
+  useTool('Read', { file_path: `${process.cwd()}/${RATE_LIMIT_FILE}` }, 'ok');
+  writeSource(RATE_LIMIT_FILE, RATE_LIMIT_SOURCE);
+  useTool('Edit', { file_path: `${process.cwd()}/${RATE_LIMIT_FILE}`, old_string: 'if (!ok)', new_string: "res.setHeader('X-RateLimit-Limit', opts.limit);" }, 'ok');
+  writeSource('src/middleware/rateLimit.test.ts', RATE_LIMIT_TEST);
+  useTool('Write', { file_path: `${process.cwd()}/src/middleware/rateLimit.test.ts`, content: RATE_LIMIT_TEST }, 'ok');
+  useTool('Bash', { command: 'npm test -- rateLimit' }, ' ✓ src/middleware/rateLimit.test.ts (2 tests)\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)');
+  say(
+    'Every response under `/api` now sends `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`. A 429 also sends `Retry-After`.\n\nI added two tests in `rateLimit.test.ts`, and both pass.',
+  );
+}
+
+function smallTurn() {
+  say('Done. The change is in the diff.');
+  writeSource('NOTES.md', 'Work in progress.\n');
+}
+
+async function main() {
+  const lines = readline.createInterface({ input: process.stdin })[Symbol.asyncIterator]();
+  const message = (await lines.next()).value ?? '';
+  emit({ type: 'system', subtype: 'init' });
+
+  if (message.includes('billing')) {
+    say("I read the settings routes and the sidebar. Here's the plan.");
+    const plan = { plan: BILLING_PLAN };
+    emit({ type: 'assistant', message: { id: 'plan', content: [{ type: 'tool_use', id: 'plan-1', name: 'ExitPlanMode', input: plan }] } });
+    emit({ type: 'control_request', request_id: 'req-plan', request: { subtype: 'can_use_tool', tool_name: 'ExitPlanMode', input: plan, requires_user_interaction: true } });
+    await lines.next();
+  } else if (message.includes('rate limits')) {
+    useTool('Grep', { pattern: 'rateLimit', path: process.cwd() }, 'src/app.ts\nsrc/middleware/rateLimit.ts');
+    say(ASK_ANSWER);
+  } else if (message.includes('rate limit')) {
+    rateLimitTurn();
+  } else {
+    smallTurn();
+  }
+  finish();
+  for await (const _ of lines);
+}
+
+main();

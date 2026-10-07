@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   findPrUrls,
   parsePrStack,
+  fetchPrStatus,
   parsePrStatus,
   parseReviewComments,
 } from './pull-requests';
+import type { CommandResult, CommandRunner } from './command-runner';
 
 describe('PR status', () => {
   it('maps check runs and status contexts to check states', () => {
@@ -138,6 +140,54 @@ describe('PR stack', () => {
 
   it('returns null for a PR outside any stack', () => {
     expect(parsePrStack(stackResponse(null, []))).toBeNull();
+  });
+});
+
+describe('required checks', () => {
+  const view = JSON.stringify({
+    number: 7,
+    url: 'https://github.com/acme/web/pull/7',
+    state: 'OPEN',
+    statusCheckRollup: [
+      { __typename: 'CheckRun', name: 'test', status: 'IN_PROGRESS' },
+      { __typename: 'CheckRun', name: 'preview', status: 'IN_PROGRESS' },
+    ],
+  });
+
+  function runner(requiredChecks: CommandResult): CommandRunner {
+    return async (_file, args) => {
+      if (args[0] === 'pr') return { exitCode: 0, stdout: view, stderr: '' };
+      if (args.includes('--paginate')) return requiredChecks;
+      return { exitCode: 1, stdout: '', stderr: '' };
+    };
+  }
+
+  async function requiredFlags(requiredChecks: CommandResult) {
+    const status = await fetchPrStatus(
+      runner(requiredChecks),
+      {},
+      '/repo',
+      '7',
+    );
+    return status?.checks.map((check) => [check.name, check.required]);
+  }
+
+  it('marks only the checks GitHub reports as required', async () => {
+    expect(
+      await requiredFlags({ exitCode: 0, stdout: 'test\n', stderr: '' }),
+    ).toEqual([
+      ['test', true],
+      ['preview', false],
+    ]);
+  });
+
+  it('treats every check as required when the lookup fails', async () => {
+    expect(
+      await requiredFlags({ exitCode: 1, stdout: '', stderr: 'offline' }),
+    ).toEqual([
+      ['test', true],
+      ['preview', true],
+    ]);
   });
 });
 

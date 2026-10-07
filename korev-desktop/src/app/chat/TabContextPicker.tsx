@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { IconButton } from '../../design-system';
 
+import { planBlock } from '../../shared/message';
 import { conversationText, planOf, type ChatItem } from '../../shared/model';
 import { api } from '../bridge';
 import { Menu, type MenuItem } from '../ui/Menu';
@@ -42,7 +43,7 @@ function planContext(tab: ContextTab, plan: string): TabContext {
     key: `plan:${tab.id}`,
     kind: 'plan',
     tabTitle: tab.title,
-    prompt: `<plan from="${tab.title}">\n${plan}\n</plan>`,
+    prompt: planBlock(plan, tab.title),
   };
 }
 

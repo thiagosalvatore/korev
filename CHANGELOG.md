@@ -1,0 +1,13 @@
+# Changelog
+
+Korev shows the section of each version in its "What's new" window, so write for the people who use Korev.
+
+## [Unreleased]
+
+The first release of Korev.
+
+- Run Claude Code and Codex in parallel. Each task gets its own workspace: a git worktree on a new branch, with its own chats, terminal, diff and pull request.
+- Ask about a repository without changing it, then start a workspace from the conversation.
+- Review the diff, leave line comments for the agent, and go from **Create PR** to **Merge** and **Archive** from the workspace header.
+- Configure setup and run scripts, preview URLs and environment variables per repository in `.korev/settings.toml`.
+- Use Korev from your phone over Tailscale.

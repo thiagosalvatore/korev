@@ -1024,6 +1024,15 @@ export function Sidebar({ state }: { state: AppState }) {
             </button>
           )}
         />
+        {state.update ? (
+          <IconButton
+            icon="download"
+            label={`Update to ${state.update.version}`}
+            size="sm"
+            className="text-accent-text"
+            onClick={() => setUi({ updateOpen: true })}
+          />
+        ) : null}
         <RemoteDevices
           remote={state.remote}
           onOpen={() => openSettings('remote')}

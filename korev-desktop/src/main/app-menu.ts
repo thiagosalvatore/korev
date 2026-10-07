@@ -25,6 +25,7 @@ function items(
 function appSubmenu(options: AppMenuOptions): MenuItemConstructorOptions[] {
   return [
     { role: 'about' },
+    { label: 'Check for Updates…', click: () => options.send('check-updates') },
     SEPARATOR,
     ...items([['Settings…', 'CmdOrCtrl+,', 'show-settings']], options.send),
     SEPARATOR,

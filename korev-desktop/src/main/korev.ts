@@ -2,6 +2,8 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { KorevApi } from '../shared/api';
+import { imageType } from '../shared/format';
+import { planBlock } from '../shared/message';
 import {
   EMPTY_SCRIPTS,
   hasWorktree,
@@ -18,6 +20,7 @@ import {
   type PrStatus,
   type Repo,
   type RepoFolder,
+  type ReleaseInfo,
   type RepoScripts,
   type TerminalPreset,
   type Result,
@@ -77,6 +80,7 @@ import {
   type PersistedState,
 } from './store';
 import { createTerminals, type SpawnPty } from './terminals';
+import { isNewer, type Release } from './updates';
 import {
   archiveWorkspace,
   createLaneWorkspaces,
@@ -84,7 +88,6 @@ import {
   forkChatSession,
   strayWorktrees,
   deleteWorkspace,
-  firstPrompt,
   newChatSession,
   onScriptExit,
   refreshStats,
@@ -100,6 +103,7 @@ import {
 export const PR_POLL_MS = 30_000;
 const PR_CLOCK_SKEW_MS = 60_000;
 const FILE_MAX_BYTES = 1_000_000;
+const IMAGE_MAX_BYTES = 10_000_000;
 const CONTEXT_DIR = '.context';
 const COMMAND_EXTENSION = '.md';
 const BUILTIN_COMMANDS = ['compact', 'review', 'init'];
@@ -189,6 +193,9 @@ export interface KorevDeps extends CoreDeps {
   openExternal(url: string): Promise<void>;
   applyTheme(theme: Settings['theme']): void;
   remote: Pick<RemoteAccess, 'status' | 'pairing' | 'apply' | 'revoke'>;
+  appVersion: string;
+  fetchRelease(which: 'latest' | string): Promise<Release | null>;
+  installUpdate(release: Release): Promise<Result>;
 }
 
 export interface Korev {
@@ -196,6 +203,7 @@ export interface Korev {
   runningAgents(): number;
   settings(): Settings;
   updateSettings(patch: Partial<Settings>): Promise<void>;
+  showWhatsNew(): Promise<void>;
   emitState(): void;
   shutdown(): Promise<void>;
 }
@@ -291,6 +299,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   const git = createGit(deps.run, deps.env);
   const runtimes = new Map<string, WorkspaceRuntime>();
   let agents: AgentAvailability[] = [];
+  let update: Release | null = null;
+  let whatsNew: ReleaseInfo | null = null;
   const editors = installedEditors(deps.home);
 
   const ctx: Context = {
@@ -396,6 +406,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       agents,
       editors,
       remote: deps.remote.status(),
+      update,
+      whatsNew,
     };
   }
 
@@ -556,6 +568,19 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     return workspace && session ? { workspace, session } : null;
   }
 
+  function sessionRoot(sessionId: string): string {
+    const chat = workspaceChat(sessionId);
+    if (chat) return chat.workspace.path;
+    const ask = store.state.askChats.find(
+      (entry) => entry.session.id === sessionId,
+    );
+    if (!ask) throw new NotFoundError('Session', sessionId);
+    return askWorktreePath(
+      store.state.settings.workspacesRoot,
+      ctx.repo(ask.repoIds[0]),
+    );
+  }
+
   function implementOptions(session: ChatSession, text: string): SendOptions {
     return {
       text,
@@ -639,19 +664,36 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       : await finishedPlan(sessionId);
     if (!plan.ok) return plan;
     chat.session.planMode = false;
-    const session = addSession(chat.workspace, chat.session.agent);
-    const text = firstPrompt(
-      HANDOFF_TASK,
-      plan.value,
-      ctx.repo(chat.workspace.repoId),
-      false,
-    );
-    const sent = await chats.send(
-      session.id,
-      implementOptions(chat.session, text),
-    );
-    if (!sent.ok) return sent;
+    const { agent, model, effort, fast, title } = chat.session;
+    const session = addSession(chat.workspace, agent);
+    Object.assign(session, {
+      model,
+      effort,
+      fast,
+      planMode: false,
+      pendingPlan: { plan: plan.value, from: title },
+    });
+    store.save();
+    ctx.emitState();
     return { ok: true, value: session.id };
+  }
+
+  function withPendingPlan(session: ChatSession, text: string): string {
+    if (!session.pendingPlan) return text;
+    const { plan, from } = session.pendingPlan;
+    return `${text.trim() || HANDOFF_TASK}\n\n${planBlock(plan, from)}`;
+  }
+
+  async function send(sessionId: string, options: SendOptions) {
+    const session = allSessions().find((entry) => entry.id === sessionId);
+    if (!session?.pendingPlan) return chats.send(sessionId, options);
+    const text = withPendingPlan(session, options.text);
+    const sent = await chats.send(sessionId, { ...options, text });
+    if (!sent.ok) return sent;
+    delete session.pendingPlan;
+    store.save();
+    ctx.emitState();
+    return sent;
   }
 
   async function moveChat(from: ChatSession | null, to: Workspace) {
@@ -761,6 +803,26 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     ctx.emitState();
   }
 
+  async function checkForUpdates() {
+    const latest = await deps.fetchRelease('latest');
+    if (latest) {
+      update = isNewer(latest.version, deps.appVersion) ? latest : null;
+      ctx.emitState();
+    }
+    return update !== null;
+  }
+
+  async function showWhatsNew() {
+    if (store.state.settings.lastSeenVersion === deps.appVersion) return;
+    whatsNew = await deps.fetchRelease(deps.appVersion);
+    ctx.emitState();
+  }
+
+  async function dismissWhatsNew() {
+    whatsNew = null;
+    await updateSettings({ lastSeenVersion: deps.appVersion });
+  }
+
   async function importFromConductor() {
     const repoCountBefore = store.state.repos.length;
     for (const repo of await readConductorRepos(deps.run, deps.env, deps.home))
@@ -834,6 +896,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       if (patch.spotlightTesting !== undefined)
         repo.spotlightTesting = patch.spotlightTesting;
       if (patch.prompts) repo.prompts = patch.prompts;
+      if (patch.fileIncludeGlobs !== undefined)
+        repo.fileIncludeGlobs = patch.fileIncludeGlobs.trim();
       store.save();
       ctx.emitState();
     },
@@ -1041,11 +1105,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       if (patch.fast !== undefined) session.fast = patch.fast;
       if (patch.planMode !== undefined) session.planMode = patch.planMode;
       if (patch.title?.trim()) session.title = patch.title.trim();
+      if (patch.pendingPlan === null) delete session.pendingPlan;
       store.save();
       ctx.emitState();
     },
     transcript: (sessionId) => chats.transcript(sessionId),
-    send: (sessionId, options) => chats.send(sessionId, options),
+    send,
     stop: async (sessionId) => chats.stop(sessionId),
     async respondPermission(sessionId, itemId, response) {
       const answered = chats.respondPermission(sessionId, itemId, response);
@@ -1101,6 +1166,14 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       const contents = await readFile(target).catch(() => null);
       if (!contents || contents.length > FILE_MAX_BYTES) return null;
       return contents.toString('utf8');
+    },
+    async readImage(sessionId, file) {
+      const type = imageType(file);
+      if (!type) return null;
+      const target = readablePath(sessionRoot(sessionId), deps.home, file);
+      const contents = await readFile(target).catch(() => null);
+      if (!contents || contents.length > IMAGE_MAX_BYTES) return null;
+      return `data:${type};base64,${contents.toString('base64')}`;
     },
     prStatuses: (workspaceId) => refreshPrs(workspaceId),
     async mergePr(workspaceId, prNumber) {
@@ -1204,6 +1277,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     updateSettings,
     remotePairing: () => deps.remote.pairing(),
     revokeRemoteDevices: () => deps.remote.revoke(),
+    checkForUpdates,
+    installUpdate: async () =>
+      update ? deps.installUpdate(update) : fail('No update is available'),
+    dismissWhatsNew,
     async openTerminal(ref, workspaceId, kind, size, preset = 'shell') {
       assertOwnRef(ref, workspaceId);
       if (kind === 'shell' && !ctx.terminals.isRunning(ref)) {
@@ -1240,6 +1317,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     runningAgents: () => ctx.runningSessions.size,
     settings: () => store.state.settings,
     updateSettings,
+    showWhatsNew,
     emitState: () => ctx.emitState(),
     async shutdown() {
       clearInterval(prWatch);

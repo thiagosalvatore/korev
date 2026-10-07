@@ -21,11 +21,13 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vite.renderer.config.mts",
     "test:e2e": "electron-forge package && playwright test",
+    "docs:screenshots": "electron-forge package && playwright test --config docs-screenshots/playwright.config.ts",
     "icons": "./scripts/build-icons.sh"
   },
   "devDependencies": {
     "@electron-forge/cli": "^8.0.1",
     "@electron-forge/maker-deb": "^8.0.1",
+    "@electron-forge/maker-dmg": "^8.0.1",
     "@electron-forge/maker-rpm": "^8.0.1",
     "@electron-forge/maker-squirrel": "^8.0.1",
     "@electron-forge/maker-zip": "^8.0.1",

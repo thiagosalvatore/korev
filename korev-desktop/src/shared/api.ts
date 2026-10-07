@@ -48,6 +48,7 @@ export interface KorevApi {
       defaultBranch?: string;
       spotlightTesting?: boolean;
       prompts?: RepoPrompts;
+      fileIncludeGlobs?: string;
     },
   ): Promise<void>;
   toggleSpotlight(workspaceId: string): Promise<Result>;
@@ -96,6 +97,7 @@ export interface KorevApi {
       fast?: boolean;
       planMode?: boolean;
       title?: string;
+      pendingPlan?: null;
     },
   ): Promise<void>;
   transcript(sessionId: string): Promise<ChatItem[]>;
@@ -150,6 +152,7 @@ export interface KorevApi {
   ): Promise<ReviewComment[]>;
   listFiles(workspaceId: string): Promise<string[]>;
   readFile(workspaceId: string, path: string): Promise<string | null>;
+  readImage(sessionId: string, path: string): Promise<string | null>;
   prStatuses(workspaceId: string): Promise<PrStatus[]>;
   mergePr(workspaceId: string, prNumber: number): Promise<Result>;
   openIn(workspaceId: string, editor: EditorId): Promise<Result>;
@@ -157,6 +160,9 @@ export interface KorevApi {
   updateSettings(patch: Partial<Settings>): Promise<void>;
   remotePairing(): Promise<RemotePairing | null>;
   revokeRemoteDevices(): Promise<void>;
+  checkForUpdates(): Promise<boolean>;
+  installUpdate(): Promise<Result>;
+  dismissWhatsNew(): Promise<void>;
   openTerminal(
     ref: string,
     workspaceId: string,

@@ -64,6 +64,7 @@ export interface UiState {
   workspaces: Record<string, WorkspaceUi>;
   palette: PaletteMode;
   diffLayout: DiffLayout;
+  updateOpen: boolean;
   quit: QuitPrompt;
 }
 
@@ -83,6 +84,7 @@ const INITIAL: UiState = {
   workspaces: {},
   palette: false,
   diffLayout: 'unified',
+  updateOpen: false,
   quit: 'closed',
 };
 
@@ -98,7 +100,13 @@ function load(): UiState {
     const saved = JSON.parse(
       localStorage.getItem(STORAGE_KEY) ?? 'null',
     ) as Partial<UiState> | null;
-    return { ...INITIAL, ...saved, palette: false, quit: 'closed' };
+    return {
+      ...INITIAL,
+      ...saved,
+      palette: false,
+      updateOpen: false,
+      quit: 'closed',
+    };
   } catch {
     return INITIAL;
   }

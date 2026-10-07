@@ -41,6 +41,31 @@ const STACK_QUERY = `query($url: URI!) {
   }
 }`;
 
+const CHECKS_PAGE_SIZE = 100;
+const REQUIRED_CHECKS_QUERY = `query($url: URI!, $number: Int!, $endCursor: String) {
+  resource(url: $url) {
+    ... on PullRequest {
+      commits(last: 1) {
+        nodes {
+          commit {
+            statusCheckRollup {
+              contexts(first: ${CHECKS_PAGE_SIZE}, after: $endCursor) {
+                pageInfo { hasNextPage endCursor }
+                nodes {
+                  ... on CheckRun { name isRequired(pullRequestNumber: $number) }
+                  ... on StatusContext { context isRequired(pullRequestNumber: $number) }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`;
+const REQUIRED_CHECK_NAMES =
+  '.data.resource.commits.nodes[0].commit.statusCheckRollup.contexts.nodes[]? | select(.isRequired) | .name // .context';
+
 type JsonRecord = Record<string, unknown>;
 
 interface StackPullRequest {
@@ -94,6 +119,7 @@ function toCheck(check: JsonRecord): PrCheck {
     name: str(isStatusContext ? check.context : check.name),
     state: isStatusContext ? statusContextState(check) : checkRunState(check),
     url: str(isStatusContext ? check.targetUrl : check.detailsUrl) || null,
+    required: true,
   };
 }
 
@@ -178,6 +204,49 @@ async function fetchPrStack(
   }
 }
 
+async function fetchRequiredChecks(
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  pr: PrStatus,
+): Promise<Set<string> | null> {
+  try {
+    const result = await run(
+      'gh',
+      [
+        'api',
+        'graphql',
+        '--paginate',
+        '-f',
+        `query=${REQUIRED_CHECKS_QUERY}`,
+        '-f',
+        `url=${pr.url}`,
+        '-F',
+        `number=${pr.number}`,
+        '--jq',
+        REQUIRED_CHECK_NAMES,
+      ],
+      { cwd, env, timeoutMs: GH_TIMEOUT_MS },
+    );
+    return result.exitCode === 0
+      ? new Set(result.stdout.split('\n').filter(Boolean))
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function withRequiredChecks(
+  checks: PrCheck[],
+  required: Set<string> | null,
+): PrCheck[] {
+  if (!required) return checks;
+  return checks.map((check) => ({
+    ...check,
+    required: required.has(check.name),
+  }));
+}
+
 export function findPrUrls(text: string): string[] {
   return [...new Set(text.match(PR_URL))];
 }
@@ -197,7 +266,15 @@ export async function fetchPrStatus(
     if (result.exitCode !== 0) return null;
     const status = parsePrStatus(result.stdout);
     if (status?.state !== 'OPEN') return status;
-    return { ...status, stack: await fetchPrStack(run, env, cwd, status.url) };
+    const [stack, required] = await Promise.all([
+      fetchPrStack(run, env, cwd, status.url),
+      fetchRequiredChecks(run, env, cwd, status),
+    ]);
+    return {
+      ...status,
+      checks: withRequiredChecks(status.checks, required),
+      stack,
+    };
   } catch {
     return null;
   }

@@ -1,0 +1,69 @@
+---
+title: Workspaces and branches
+description: 'What a workspace is, where it lives, and how Korev names its branch.'
+---
+
+A workspace is a [git worktree](https://git-scm.com/docs/git-worktree) on its own branch. Each workspace has its own files, chats, terminal, ports, diff and pull request. Agents in two workspaces never edit the same files, so you can run many tasks at once.
+
+## Where workspaces live
+
+Korev puts each worktree at `<workspaces location>/<repo>/<workspace name>`. The default location is `~/korev/workspaces`. Change it in **Settings → Storage → Workspaces location**.
+
+All worktrees share the main checkout's `.git` folder, so they share commits, branches and remotes.
+
+## Names
+
+Korev names a workspace from the first five words of the task, up to 40 characters. A name that is already taken gets `-2`, `-3` and so on.
+
+When **Settings → Git → Name workspaces from the task** is on (the default), Claude Haiku suggests a short name of two to four words. A workspace created without a task is named `workspace`. Korev renames its branch after your first message, if the branch was not pushed yet.
+
+## Branches
+
+The branch is `<prefix>/<name>`. Korev takes the prefix from the first of these that is set:
+
+1. `[git] branch_prefix_type` and `branch_prefix` in the [repository config](../reference/repository-config.mdx). `branch_prefix_type = "none"` means no prefix.
+2. **Settings → Git → Branch prefix**.
+3. Your GitHub login, from `gh`.
+4. Your `git config user.name`, or `korev` if that is empty.
+
+## Target branch
+
+Every workspace has a target branch: the branch its pull request merges into. It starts as the repository's default branch. To change it, click **→ origin/&lt;branch&gt;** in the workspace header.
+
+The target branch decides the `+N −M` counts in the sidebar, the Changes tab, and the base of the pull request.
+
+## The `.context` folder
+
+Every workspace has a `.context/` folder. Korev adds it to the repository's `.git/info/exclude`, so git ignores it and nobody needs to change `.gitignore`.
+
+- Agents are told they can save files there to share notes with other agents.
+- Attachments you add to a chat are saved in `.context/attachments/`.
+- The Create PR prompt tells the agent not to commit it.
+
+## Ports
+
+Each active workspace gets ten ports. `KOREV_PORT` is the first one: 55000 for the first workspace, 55010 for the next, and so on. The agent is told to use `$KOREV_PORT` to `$KOREV_PORT+9` for dev servers. Use the same variable in your run scripts so two workspaces never fight for a port. See [Environment variables](../reference/environment-variables.mdx).
+
+## The sidebar row
+
+- **Line 1** is the branch name. It is bold when the workspace has agent output you have not read.
+- **Line 2** is the workspace name, a link icon for [linked workspaces](./linked-workspaces.mdx), and the error if setup failed.
+- **The icon** is a spinner while an agent or the setup script runs. Otherwise it shows the pull request state: open, draft, checks running, checks failing, conflicts, merged or closed.
+- **On the right** are `+N −M` against the target branch and the unread dot.
+
+Switch workspaces with ⌘1 to ⌘9, ⌘⌥↑ and ⌘⌥↓, or the command palette (⌘K).
+
+## Archive, restore and delete
+
+**Archive** (⌘⇧A, or the ⋯ menu on the row):
+
+1. Stops the agents and terminals.
+2. Runs the archive script, for up to five minutes.
+3. Saves a snapshot of the files.
+4. Removes the worktree.
+
+The branch stays unless **Settings → Git → Delete branch on archive** is on.
+
+**Archive on merge** (Settings → Git, or `[git] archive_on_merge`) archives a workspace when its pull request merges. Korev checks every 30 seconds and waits while an agent is running.
+
+Archived workspaces are listed under **History**. **Unarchive** adds the worktree back, restores the snapshot, gives it new ports and runs setup again. **Delete** removes an archived workspace and its chat transcripts. It does not delete the branch.
