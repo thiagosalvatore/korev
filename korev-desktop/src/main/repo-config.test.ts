@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { EMPTY_SCRIPTS } from '../shared/model';
 import { expandPort, resolveRepoConfig } from './repo-config';
 
-const APP = { ...EMPTY_SCRIPTS, setup: 'app-setup', run: 'app-run' };
+const APP = {
+  scripts: { ...EMPTY_SCRIPTS, setup: 'app-setup', run: 'app-run' },
+  prompts: {},
+};
 const NO_FILES = { sharedToml: null, localToml: null, jsonConfig: null };
 
 const SHARED = `
@@ -105,6 +108,20 @@ describe('repo config', () => {
       source: 'app',
       setup: 'app-setup',
       runScripts: [{ id: 'run', command: 'app-run' }],
+    });
+  });
+
+  it('uses the prompts saved in the app unless the repository sets its own', () => {
+    const app = {
+      ...APP,
+      prompts: { code_review: 'Use the pr-review skill.', create_pr: 'Short.' },
+    };
+    expect(resolveRepoConfig(app, NO_FILES).prompts).toEqual(app.prompts);
+    expect(
+      resolveRepoConfig(app, { ...NO_FILES, sharedToml: SHARED }).prompts,
+    ).toEqual({
+      code_review: 'Use the pr-review skill.',
+      create_pr: 'Use the PR template.',
     });
   });
 

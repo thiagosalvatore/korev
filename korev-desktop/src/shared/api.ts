@@ -19,10 +19,12 @@ import type {
   WorkspaceSource,
   PrStatus,
   Repo,
+  RepoPrompts,
   RepoScripts,
   Result,
   SendOptions,
   Settings,
+  Skill,
   TerminalExit,
   TerminalKind,
   TerminalPreset,
@@ -38,7 +40,11 @@ export interface KorevApi {
   removeRepo(repoId: string): Promise<void>;
   updateRepo(
     repoId: string,
-    patch: { defaultBranch?: string; spotlightTesting?: boolean },
+    patch: {
+      defaultBranch?: string;
+      spotlightTesting?: boolean;
+      prompts?: RepoPrompts;
+    },
   ): Promise<void>;
   toggleSpotlight(workspaceId: string): Promise<Result>;
   updateRepoScripts(repoId: string, scripts: RepoScripts): Promise<void>;
@@ -53,6 +59,7 @@ export interface KorevApi {
   setBaseBranch(workspaceId: string, branch: string): Promise<void>;
   workspaceConfig(workspaceId: string): Promise<RepoConfig>;
   repoConfig(repoId: string): Promise<RepoConfig>;
+  listSkills(repoId: string): Promise<Skill[]>;
   startReview(workspaceId: string): Promise<Result<string>>;
   archiveWorkspace(workspaceId: string): Promise<Result>;
   restoreWorkspace(workspaceId: string): Promise<Result>;

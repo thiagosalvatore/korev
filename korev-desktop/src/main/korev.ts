@@ -48,6 +48,7 @@ import {
   REVIEW_PROMPT,
 } from './pull-requests';
 import { expandPort, loadRepoConfig, withPrompt } from './repo-config';
+import { listSkills } from './skills';
 import { listIssues, listPullRequests } from './sources';
 import { rangeFileDiff, rangeFiles, searchFiles } from './git-review';
 import { findLocalUrl } from './workspace-setup';
@@ -442,6 +443,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         repo.defaultBranch = patch.defaultBranch.trim();
       if (patch.spotlightTesting !== undefined)
         repo.spotlightTesting = patch.spotlightTesting;
+      if (patch.prompts) repo.prompts = patch.prompts;
       store.save();
       ctx.emitState();
     },
@@ -499,10 +501,15 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       };
     },
     repoConfig: (repoId) =>
-      loadRepoConfig(ctx.repo(repoId).scripts, ctx.repo(repoId).path),
+      loadRepoConfig(ctx.repo(repoId), ctx.repo(repoId).path),
+    listSkills: (repoId) => listSkills(deps.home, ctx.repo(repoId).path),
     async startReview(workspaceId) {
       const workspace = workspacePath(workspaceId);
-      const session = newChatSession(ctx, store.state.settings.defaultAgent);
+      const { reviewModel, defaultAgent } = store.state.settings;
+      const session = {
+        ...newChatSession(ctx, reviewModel?.agent ?? defaultAgent),
+        ...reviewModel,
+      };
       workspace.sessions.push(session);
       store.save();
       ctx.emitState();

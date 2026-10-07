@@ -34,6 +34,7 @@ export function defaultSettings(home: string): Settings {
     workspacesRoot: path.join(home, 'korev', 'workspaces'),
     defaultEffort: DEFAULT_EFFORT,
     defaultPlanMode: false,
+    reviewModel: null,
     autoRenameBranches: true,
     deleteBranchOnArchive: false,
     archiveOnMerge: false,

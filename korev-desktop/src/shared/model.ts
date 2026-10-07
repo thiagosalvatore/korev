@@ -75,6 +75,13 @@ export type PromptKind =
   | 'resolve_merge_conflicts'
   | 'rename_branch';
 
+export type RepoPrompts = Partial<Record<PromptKind, string>>;
+
+export interface Skill {
+  name: string;
+  agents: AgentKind[];
+}
+
 export interface RunScript {
   id: string;
   command: string;
@@ -100,7 +107,7 @@ export interface RepoConfig {
   previewUrls: PreviewUrl[];
   fileIncludeGlobs: string | null;
   environment: Record<string, string>;
-  prompts: Partial<Record<PromptKind, string>>;
+  prompts: RepoPrompts;
   archiveOnMerge: boolean | null;
   deleteBranchOnArchive: boolean | null;
   branchPrefix: string | null;
@@ -114,6 +121,7 @@ export interface Repo {
   defaultBranch: string;
   scripts: RepoScripts;
   spotlightTesting?: boolean;
+  prompts?: RepoPrompts;
 }
 
 export type WorkspaceSource =
@@ -179,6 +187,7 @@ export interface Settings {
   workspacesRoot: string;
   defaultEffort: Record<AgentKind, string>;
   defaultPlanMode: boolean;
+  reviewModel: ReviewModel | null;
   autoRenameBranches: boolean;
   deleteBranchOnArchive: boolean;
   archiveOnMerge: boolean;
@@ -188,6 +197,12 @@ export interface Settings {
   editor: EditorId;
   notifications: boolean;
   windowBounds: WindowBounds | null;
+}
+
+export interface ReviewModel {
+  agent: AgentKind;
+  model: string;
+  effort: string;
 }
 
 export interface Snippet {

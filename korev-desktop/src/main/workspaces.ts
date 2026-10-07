@@ -101,7 +101,7 @@ export function workspaceConfig(
   ctx: Context,
   workspace: Workspace,
 ): Promise<RepoConfig> {
-  return loadRepoConfig(ctx.repo(workspace.repoId).scripts, workspace.path);
+  return loadRepoConfig(ctx.repo(workspace.repoId), workspace.path);
 }
 
 export async function scriptEnv(
@@ -109,7 +109,7 @@ export async function scriptEnv(
   repo: Repo,
   workspace: Workspace,
 ): Promise<NodeJS.ProcessEnv> {
-  const config = await loadRepoConfig(repo.scripts, workspace.path);
+  const config = await loadRepoConfig(repo, workspace.path);
   return {
     ...ctx.deps.env,
     ...config.environment,
@@ -137,7 +137,7 @@ function fetchGithubLogin(ctx: Context): Promise<string | null> {
 }
 
 async function branchPrefix(ctx: Context, repo: Repo): Promise<string> {
-  const config = await loadRepoConfig(repo.scripts, repo.path);
+  const config = await loadRepoConfig(repo, repo.path);
   if (config.branchPrefix !== null) return config.branchPrefix;
   const custom = ctx.store.state.settings.branchPrefix.trim();
   if (custom) return custom;
@@ -151,7 +151,7 @@ export function placeholderBranch(prefix: string, name: string): string {
 export async function renameBranchPrompt(
   repo: Repo,
 ): Promise<string | undefined> {
-  return (await loadRepoConfig(repo.scripts, repo.path)).prompts.rename_branch;
+  return (await loadRepoConfig(repo, repo.path)).prompts.rename_branch;
 }
 
 export async function suggestName(
@@ -352,7 +352,7 @@ function failCreation(ctx: Context, workspace: Workspace, error: unknown) {
 }
 
 async function copyLocalFiles(ctx: Context, repo: Repo, workspace: Workspace) {
-  const config = await loadRepoConfig(repo.scripts, repo.path);
+  const config = await loadRepoConfig(repo, repo.path);
   const patterns = await includePatterns(repo.path, config.fileIncludeGlobs);
   await copyIncludedFiles(ctx.git, repo.path, workspace.path, patterns).catch(
     () => [],

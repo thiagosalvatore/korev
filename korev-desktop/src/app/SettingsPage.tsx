@@ -16,14 +16,18 @@ import {
   loadoutKey,
   type AgentKind,
   type AppState,
+  type PromptKind,
   type Repo,
   type RepoConfig,
   type RepoConfigSource,
+  type RepoPrompts,
   type RepoScripts,
   type Settings,
+  type Skill,
   type ThemePreference,
 } from '../shared/model';
 import { api } from './bridge';
+import { modelChoices } from './format';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { toast } from './ui/toast';
 import { setUi, useUi } from './ui-store';
@@ -186,6 +190,7 @@ function Models({ state }: { state: AppState }) {
           </Row>
         );
       })}
+      <ReviewModel state={state} />
       <Loadout state={state} />
       <Row
         title="Start chats in plan mode"
@@ -197,6 +202,64 @@ function Models({ state }: { state: AppState }) {
         />
       </Row>
     </>
+  );
+}
+
+const SAME_AS_CHATS = '';
+
+function ReviewModel({ state }: { state: AppState }) {
+  const { reviewModel, defaultAgent, defaultEffort } = state.settings;
+  const choices = modelChoices(state, reviewModel?.agent ?? defaultAgent);
+  const choose = (key: string) => {
+    const choice = choices.find(
+      (entry) => loadoutKey(entry.agent, entry.id) === key,
+    );
+    update({
+      reviewModel: choice
+        ? {
+            agent: choice.agent,
+            model: choice.id,
+            effort: defaultEffort[choice.agent],
+          }
+        : null,
+    });
+  };
+  return (
+    <Row
+      title="Review model"
+      description="Runs the Review button. Same as chats uses the default agent and its model."
+    >
+      <div className="flex gap-2">
+        <Select
+          ariaLabel="Review model"
+          className="w-56"
+          options={[
+            { value: SAME_AS_CHATS, label: 'Same as chats' },
+            ...choices.map((choice) => ({
+              value: loadoutKey(choice.agent, choice.id),
+              label: `${AGENT_LABELS[choice.agent]} · ${choice.label}`,
+            })),
+          ]}
+          value={
+            reviewModel
+              ? loadoutKey(reviewModel.agent, reviewModel.model)
+              : SAME_AS_CHATS
+          }
+          onChange={choose}
+        />
+        {reviewModel ? (
+          <Select
+            ariaLabel="Review effort"
+            className="w-28"
+            options={[...EFFORT_LEVELS[reviewModel.agent]]}
+            value={reviewModel.effort}
+            onChange={(effort) =>
+              update({ reviewModel: { ...reviewModel, effort } })
+            }
+          />
+        ) : null}
+      </div>
+    </Row>
   );
 }
 
@@ -494,6 +557,154 @@ const SCRIPT_FIELDS: {
   },
 ];
 
+const PROMPT_FIELDS: { kind: PromptKind; label: string; hint: string }[] = [
+  {
+    kind: 'general',
+    label: 'General',
+    hint: 'Added to every chat in this repository.',
+  },
+  {
+    kind: 'code_review',
+    label: 'Code review',
+    hint: 'Added when you press Review.',
+  },
+  {
+    kind: 'create_pr',
+    label: 'Create pull request',
+    hint: 'Added when the agent is asked to open a pull request.',
+  },
+];
+
+const PICK_SKILL = '';
+
+function reviewSkillPrompt(skill: string): string {
+  return `Use the ${skill} skill to review these changes.`;
+}
+
+function skillLabel(skill: Skill): string {
+  const agents = skill.agents.map((agent) => AGENT_LABELS[agent]).join(' · ');
+  return `${skill.name} (${agents})`;
+}
+
+function filledPrompts(prompts: RepoPrompts): RepoPrompts {
+  return Object.fromEntries(
+    Object.entries(prompts).filter(([, text]) => text?.trim()),
+  );
+}
+
+function ReviewSkillPicker({
+  state,
+  repo,
+  onPick,
+}: {
+  state: AppState;
+  repo: Repo;
+  onPick: (skill: string) => void;
+}) {
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [picked, setPicked] = useState<Skill | null>(null);
+  useEffect(() => {
+    void api.listSkills(repo.id).then(setSkills);
+  }, [repo.id]);
+  const { reviewModel, defaultAgent } = state.settings;
+  const reviewAgent = reviewModel?.agent ?? defaultAgent;
+  if (!skills.length) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      <Select
+        ariaLabel="Review skill"
+        className="w-72"
+        options={[
+          { value: PICK_SKILL, label: 'Use a skill…' },
+          ...skills.map((skill) => ({
+            value: skill.name,
+            label: skillLabel(skill),
+          })),
+        ]}
+        value={picked?.name ?? PICK_SKILL}
+        onChange={(name) => {
+          const skill = skills.find((entry) => entry.name === name) ?? null;
+          setPicked(skill);
+          if (skill) onPick(skill.name);
+        }}
+      />
+      {picked && !picked.agents.includes(reviewAgent) ? (
+        <span className="text-xs text-warning-text">
+          Reviews run on {AGENT_LABELS[reviewAgent]}, which doesn't have the{' '}
+          {picked.name} skill.
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function RepoPromptSettings({ state, repo }: { state: AppState; repo: Repo }) {
+  const saved = repo.prompts ?? {};
+  const [prompts, setPrompts] = useState<RepoPrompts>(saved);
+  useEffect(() => setPrompts(repo.prompts ?? {}), [repo.id, repo.prompts]);
+  const dirty =
+    JSON.stringify(filledPrompts(prompts)) !==
+    JSON.stringify(filledPrompts(saved));
+  return (
+    <div className="border-b border-border-1 py-4">
+      <div className="text-sm font-medium text-fg-1">Prompts</div>
+      <p className="mt-0.5 mb-3 text-xs text-fg-3">
+        Extra instructions for the agent. A{' '}
+        <span className="font-mono">[prompts]</span> entry in the repository's
+        settings file replaces the matching one here.
+      </p>
+      <div className="flex flex-col gap-3">
+        {PROMPT_FIELDS.map((field) => (
+          <div key={field.kind} className="flex flex-col gap-1">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-fg-2">
+                {field.label}
+              </span>
+              <textarea
+                aria-label={`${field.label} prompt`}
+                value={prompts[field.kind] ?? ''}
+                rows={2}
+                placeholder={field.hint}
+                className="resize-y rounded-sm border border-border-2 bg-inset px-2.5 py-2 text-xs text-fg-1 outline-none focus:border-accent-border"
+                onChange={(event) =>
+                  setPrompts({ ...prompts, [field.kind]: event.target.value })
+                }
+              />
+            </label>
+            {field.kind === 'code_review' ? (
+              <ReviewSkillPicker
+                state={state}
+                repo={repo}
+                onPick={(skill) =>
+                  setPrompts({
+                    ...prompts,
+                    code_review: reviewSkillPrompt(skill),
+                  })
+                }
+              />
+            ) : null}
+          </div>
+        ))}
+        <div>
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={!dirty}
+            onClick={async () => {
+              await api.updateRepo(repo.id, {
+                prompts: filledPrompts(prompts),
+              });
+              toast('Prompts saved', 'success');
+            }}
+          >
+            Save prompts
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const SOURCE_NOTICE: Record<RepoConfigSource, string | null> = {
   app: null,
   'korev.json':
@@ -630,6 +841,7 @@ function RepoSettings({ state, repo }: { state: AppState; repo: Repo }) {
           </div>
         </div>
       </div>
+      <RepoPromptSettings state={state} repo={repo} />
       <Row
         title="Remove repository"
         description={`This deletes its ${workspaceCount} workspace${workspaceCount === 1 ? '' : 's'} and their chats. The repository folder itself stays.`}

@@ -4,8 +4,9 @@ import { parse as parseToml } from 'smol-toml';
 import type {
   PreviewUrl,
   PromptKind,
+  Repo,
   RepoConfig,
-  RepoScripts,
+  RepoPrompts,
   RunScript,
 } from '../shared/model';
 
@@ -26,6 +27,8 @@ const PORT_OFFSET = /\$\(\(\s*KOREV_PORT\s*\+\s*(\d)\s*\)\)/g;
 const PORT_VARIABLE = /\$\{?KOREV_PORT\}?/g;
 
 type Table = Record<string, unknown>;
+
+export type AppRepoSettings = Pick<Repo, 'scripts' | 'prompts'>;
 
 export interface RepoConfigFiles {
   sharedToml: string | null;
@@ -145,7 +148,7 @@ function environmentFrom(value: unknown): Record<string, string> {
   return { ...stringsFrom(variables), ...stringsFrom(variables.local) };
 }
 
-function promptsFrom(value: unknown): Partial<Record<PromptKind, string>> {
+function promptsFrom(value: unknown): RepoPrompts {
   const prompts = stringsFrom(value);
   return Object.fromEntries(
     PROMPT_KINDS.flatMap((kind) =>
@@ -160,20 +163,22 @@ function branchPrefixFrom(git: Table): string | null {
   return null;
 }
 
-function fromSettings(settings: Table, app: RepoScripts): RepoConfig {
+function fromSettings(settings: Table, app: AppRepoSettings): RepoConfig {
   const scripts = table(settings.scripts);
   return {
     source: 'settings.toml',
     setup: text(scripts.setup) ?? '',
     archive: text(scripts.archive) ?? '',
     runMode:
-      scripts.run_mode === 'nonconcurrent' ? 'nonconcurrent' : app.runMode,
+      scripts.run_mode === 'nonconcurrent'
+        ? 'nonconcurrent'
+        : app.scripts.runMode,
     runScripts: runScriptsFrom(scripts.run),
     autoRunAfterSetup: scripts.auto_run_after_setup === true,
     previewUrls: previewUrlsFrom(settings.preview_urls),
     fileIncludeGlobs: text(settings.file_include_globs) ?? null,
     environment: environmentFrom(settings.environment_variables),
-    prompts: promptsFrom(settings.prompts),
+    prompts: { ...app.prompts, ...promptsFrom(settings.prompts) },
     archiveOnMerge: flag(table(settings.git).archive_on_merge) ?? null,
     deleteBranchOnArchive:
       flag(table(settings.git).delete_branch_on_archive) ?? null,
@@ -182,18 +187,18 @@ function fromSettings(settings: Table, app: RepoScripts): RepoConfig {
   };
 }
 
-function fromApp(app: RepoScripts): RepoConfig {
+function fromApp({ scripts, prompts }: AppRepoSettings): RepoConfig {
   return {
     source: 'app',
-    setup: app.setup,
-    archive: app.archive,
-    runMode: app.runMode,
-    runScripts: runScriptsFrom(app.run),
+    setup: scripts.setup,
+    archive: scripts.archive,
+    runMode: scripts.runMode,
+    runScripts: runScriptsFrom(scripts.run),
     autoRunAfterSetup: false,
     previewUrls: [],
     fileIncludeGlobs: null,
     environment: {},
-    prompts: {},
+    prompts: prompts ?? {},
     archiveOnMerge: null,
     deleteBranchOnArchive: null,
     branchPrefix: null,
@@ -201,7 +206,7 @@ function fromApp(app: RepoScripts): RepoConfig {
   };
 }
 
-function fromJsonConfig(json: string, app: RepoScripts): RepoConfig | null {
+function fromJsonConfig(json: string, app: AppRepoSettings): RepoConfig | null {
   let raw: Table;
   try {
     raw = table(JSON.parse(json));
@@ -225,7 +230,7 @@ function fromJsonConfig(json: string, app: RepoScripts): RepoConfig | null {
 }
 
 export function resolveRepoConfig(
-  app: RepoScripts,
+  app: AppRepoSettings,
   files: RepoConfigFiles,
 ): RepoConfig {
   const shared = parseTomlSafely(files.sharedToml);
@@ -242,7 +247,7 @@ async function readOptional(dir: string, file: string): Promise<string | null> {
 }
 
 export async function loadRepoConfig(
-  app: RepoScripts,
+  app: AppRepoSettings,
   dir: string,
 ): Promise<RepoConfig> {
   const [sharedToml, localToml, jsonConfig] = await Promise.all([

@@ -239,6 +239,25 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     });
   });
 
+  it('starts reviews on the review model when one is set', async () => {
+    await korev.api.updateSettings({
+      reviewModel: {
+        agent: 'claude',
+        model: 'claude-haiku-4-5',
+        effort: 'low',
+      },
+    });
+    const workspace = await createWorkspace();
+
+    const review = await korev.api.startReview(workspace.id);
+
+    if (!review.ok) throw new Error(review.message);
+    const state = await korev.api.getState();
+    expect(
+      state.workspaces[0].sessions.find((entry) => entry.id === review.value),
+    ).toMatchObject({ model: 'claude-haiku-4-5', effort: 'low' });
+  });
+
   it('renames the placeholder branch after the first message', async () => {
     await korev.api.updateSettings({ autoRenameBranches: true });
     const workspace = await createWorkspace();
