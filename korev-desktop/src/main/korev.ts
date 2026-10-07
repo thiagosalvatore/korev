@@ -240,7 +240,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       return found;
     },
   };
-  const chats = createChats(ctx);
+  const chats = createChats(
+    ctx,
+    (workspaceId) => void refreshPr(workspaceId).catch(() => null),
+  );
   const spotlight = createSpotlight(
     git,
     () => ctx.emitState(),

@@ -187,7 +187,10 @@ export interface Chats {
   settled(): Promise<void>;
 }
 
-export function createChats(ctx: Context): Chats {
+export function createChats(
+  ctx: Context,
+  onWorkspaceTurnFinished: (workspaceId: string) => void,
+): Chats {
   const transcripts = new Map<string, ChatItem[]>();
   const turns = new Map<string, ActiveTurn>();
   const running = new Set<Promise<void>>();
@@ -279,6 +282,7 @@ export function createChats(ctx: Context): Chats {
     const runtime = ctx.runtime(workspace.id);
     if (!isWatching(workspace)) runtime.unread = true;
     void refreshStats(ctx, workspace);
+    onWorkspaceTurnFinished(workspace.id);
     const last = items.findLast((item) => item.kind === 'result');
     alertUser(
       { kind: 'workspace', workspace },

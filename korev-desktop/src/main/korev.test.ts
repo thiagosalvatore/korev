@@ -55,11 +55,23 @@ default_thinking_level = "high"
 `;
 
 let conductorRepos: Record<string, string | null>[] = [];
+let openPr: Record<string, unknown> | null = null;
 
-const runWithFakeSqlite: CommandRunner = async (file, args, options) =>
-  file === 'sqlite3'
-    ? { exitCode: 0, stdout: JSON.stringify(conductorRepos), stderr: '' }
-    : runProcess(file, args, options);
+const NO_PR = { exitCode: 1, stdout: '', stderr: 'no pull requests found' };
+
+function fakePrView() {
+  return openPr
+    ? { exitCode: 0, stdout: JSON.stringify(openPr), stderr: '' }
+    : NO_PR;
+}
+
+const runWithFakeSqlite: CommandRunner = async (file, args, options) => {
+  if (file === 'sqlite3')
+    return { exitCode: 0, stdout: JSON.stringify(conductorRepos), stderr: '' };
+  if (file === 'gh' && args[0] === 'pr' && args[1] === 'view')
+    return fakePrView();
+  return runProcess(file, args, options);
+};
 
 const noPty = (_file: string, args: string[], options: { cwd: string }) => {
   spawned.push({ args, cwd: options.cwd });
@@ -127,6 +139,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   });
 
   afterEach(async () => {
+    openPr = null;
     await korev.shutdown();
     await rm(home, { recursive: true, force: true });
   });
@@ -212,6 +225,22 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       'SECRET=1\n',
     );
     expect(await korev.api.changes(workspace.id)).toEqual([]);
+  });
+
+  it('picks up the PR an agent opened as soon as its turn finishes', async () => {
+    const workspace = await createWorkspace();
+    expect((await workspaceState(workspace.id)).runtime.pr).toBeNull();
+    openPr = {
+      number: 7,
+      state: 'OPEN',
+      url: 'https://github.com/acme/pull/7',
+    };
+
+    await sendAndWait(workspace.sessions[0].id, 'Open a PR');
+
+    await waitFor(
+      async () => (await workspaceState(workspace.id)).runtime.pr?.number === 7,
+    );
   });
 
   it('runs an agent turn, shows its changes and reverts them from a checkpoint', async () => {
