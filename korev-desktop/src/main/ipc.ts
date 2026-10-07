@@ -34,8 +34,16 @@ export function registerIpcHandlers(
     if (!isTrustedSender(event.senderFrame?.url)) {
       throw new UntrustedSenderError(name);
     }
-    if (!Object.hasOwn(handlers, name)) throw new UnknownMethodError(name);
-    const values = Array.isArray(args) ? args : [];
-    return (handlers[name] as (...values: unknown[]) => unknown)(...values);
+    return callHandler(handlers, name, args);
   });
+}
+
+export function callHandler(
+  handlers: IpcHandlers,
+  method: string,
+  args: unknown,
+): unknown {
+  if (!Object.hasOwn(handlers, method)) throw new UnknownMethodError(method);
+  const values = Array.isArray(args) ? args : [];
+  return (handlers[method] as (...values: unknown[]) => unknown)(...values);
 }

@@ -14,6 +14,7 @@ import {
   type Workspace,
 } from '../shared/model';
 import type { FileSystem } from './file-system';
+import { DEFAULT_REMOTE_PORT } from './remote-server';
 
 const STATE_FILE = 'korev-state.json';
 const TRANSCRIPTS_DIR = 'transcripts';
@@ -48,6 +49,8 @@ export function defaultSettings(home: string): Settings {
     notifications: true,
     notificationSound: true,
     keepAwake: true,
+    remoteAccess: false,
+    remotePort: DEFAULT_REMOTE_PORT,
     windowBounds: null,
   };
 }

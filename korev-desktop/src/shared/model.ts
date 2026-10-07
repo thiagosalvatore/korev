@@ -219,6 +219,8 @@ export interface Settings {
   notifications: boolean;
   notificationSound: boolean;
   keepAwake: boolean;
+  remoteAccess: boolean;
+  remotePort: number;
   windowBounds: WindowBounds | null;
 }
 

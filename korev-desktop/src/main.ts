@@ -13,7 +13,7 @@ import {
 } from 'electron';
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { homedir } from 'node:os';
+import { homedir, networkInterfaces } from 'node:os';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { spawn as spawnPty } from 'node-pty';
@@ -27,6 +27,13 @@ import { nodeFileSystem } from './main/file-system';
 import { registerIpcHandlers } from './main/ipc';
 import { createKorev, type Korev } from './main/korev';
 import { childEnv, resolveLoginPath } from './main/login-path';
+import {
+  loadRemoteToken,
+  LOOPBACK_HOST,
+  startRemoteServer,
+  tailnetAddress,
+  type RemoteServer,
+} from './main/remote-server';
 import { restorableBounds } from './main/window-bounds';
 
 const DEFAULT_WINDOW_SIZE = { width: 1440, height: 900 };
@@ -36,6 +43,7 @@ const DEV_ICON_PATH = '../../assets/icon.png';
 const DEV_USER_DATA_DIR = 'Korev Dev';
 const COMMAND_EVENT = 'command';
 const FINISHED_SOUND = '/System/Library/Sounds/Glass.aiff';
+const REMOTE_TOKEN_FILE = 'remote-token';
 
 const appOrigin: AppOrigin = {
   devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
@@ -57,9 +65,31 @@ function useSeparateDevData() {
 
 useSeparateDevData();
 
+let remote: RemoteServer | null = null;
+
 function emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]) {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send(eventChannel(event), payload);
+  }
+  remote?.broadcast(event, payload);
+}
+
+async function startRemoteAccess(korev: Korev) {
+  const { remoteAccess, remotePort } = korev.settings();
+  if (!remoteAccess) return;
+  const token = await loadRemoteToken(
+    path.join(app.getPath('userData'), REMOTE_TOKEN_FILE),
+  );
+  const host = tailnetAddress(networkInterfaces()) ?? LOOPBACK_HOST;
+  try {
+    remote = await startRemoteServer({
+      api: korev.api,
+      token,
+      host,
+      port: remotePort,
+    });
+  } catch (error) {
+    console.warn(`Remote access did not start: ${String(error)}`);
   }
 }
 
@@ -284,9 +314,12 @@ app.whenReady().then(async () => {
     }
     shuttingDown = true;
     event.preventDefault();
-    void korev.shutdown().finally(() => app.quit());
+    void Promise.all([korev.shutdown(), remote?.close()]).finally(() =>
+      app.quit(),
+    );
   });
   createWindow(korev);
+  void startRemoteAccess(korev);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
