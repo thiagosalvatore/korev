@@ -182,6 +182,12 @@ export interface Workspace {
   restoredAt: string | null;
   archiveSnapshot: Checkpoint | null;
   sessions: ChatSession[];
+  prs: TrackedPr[];
+}
+
+export interface TrackedPr {
+  url: string;
+  sessionId: string | null;
 }
 
 export interface AskChat {
@@ -276,6 +282,8 @@ export interface PrStatus {
   mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
   reviewDecision: ReviewDecision | null;
   mergedAt: string | null;
+  headRefName: string;
+  createdAt: string;
   checks: PrCheck[];
 }
 
@@ -283,10 +291,24 @@ export interface WorkspaceRuntime {
   status: WorkspaceStatus;
   unread: boolean;
   stats: DiffStats | null;
-  pr: PrStatus | null;
+  prs: PrStatus[];
   message: string | null;
   pendingPrompt: string | null;
   runUrl: string | null;
+}
+
+export function primaryPr(
+  workspace: Workspace,
+  runtime: WorkspaceRuntime | undefined,
+): PrStatus | null {
+  const prs = runtime?.prs ?? [];
+  const open = prs.filter((pr) => pr.state === 'OPEN');
+  return (
+    open.find((pr) => pr.headRefName === workspace.branch) ??
+    open[0] ??
+    prs[0] ??
+    null
+  );
 }
 
 export function hasWorktree(runtime: WorkspaceRuntime): boolean {

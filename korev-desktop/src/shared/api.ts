@@ -109,8 +109,16 @@ export interface KorevApi {
   slashCommands(workspaceId: string): Promise<string[]>;
   repoSlashCommands(repoId: string): Promise<string[]>;
   createPr(workspaceId: string, sessionId: string): Promise<Result>;
-  fixChecks(workspaceId: string, sessionId: string): Promise<Result>;
-  resolveConflicts(workspaceId: string, sessionId: string): Promise<Result>;
+  fixChecks(
+    workspaceId: string,
+    sessionId: string,
+    prNumber: number,
+  ): Promise<Result>;
+  resolveConflicts(
+    workspaceId: string,
+    sessionId: string,
+    prNumber: number,
+  ): Promise<Result>;
   changes(workspaceId: string): Promise<FileChange[]>;
   fileDiff(
     workspaceId: string,
@@ -128,11 +136,14 @@ export interface KorevApi {
     path: string,
     contents: string,
   ): Promise<Result>;
-  reviewComments(workspaceId: string): Promise<ReviewComment[]>;
+  reviewComments(
+    workspaceId: string,
+    prNumber: number,
+  ): Promise<ReviewComment[]>;
   listFiles(workspaceId: string): Promise<string[]>;
   readFile(workspaceId: string, path: string): Promise<string | null>;
-  prStatus(workspaceId: string): Promise<PrStatus | null>;
-  mergePr(workspaceId: string): Promise<Result>;
+  prStatuses(workspaceId: string): Promise<PrStatus[]>;
+  mergePr(workspaceId: string, prNumber: number): Promise<Result>;
   openIn(workspaceId: string, editor: EditorId): Promise<Result>;
   openExternal(url: string): Promise<void>;
   updateSettings(patch: Partial<Settings>): Promise<void>;

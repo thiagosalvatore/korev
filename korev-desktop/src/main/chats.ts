@@ -41,6 +41,7 @@ import {
   restoreCheckpoint,
 } from './git';
 import { rangeFiles } from './git-review';
+import { findPrUrls } from './pull-requests';
 import { withPrompt } from './repo-config';
 import { isUntitledName } from './workspace-setup';
 import {
@@ -126,6 +127,7 @@ export function systemPrompt(
     `It is a git worktree of ${repo.name} on branch ${workspace.branch}. The target branch for this workspace is origin/${workspace.baseBranch}. Use this for actions like diffing (\`git diff origin/${workspace.baseBranch}...\`) or creating PRs (\`gh pr create --base ${workspace.baseBranch}\`).`,
     `The workspace has a .context directory (gitignored) where you can save files to collaborate with other agents.`,
     `Do not rename the current branch unless the user explicitly tells you to do so.`,
+    `If the work needs more than one PR, create the extra branches in this worktree (for example as a stack). Do not create new git worktrees.`,
     `If you start a dev server, use port $KOREV_PORT (ports $KOREV_PORT to $KOREV_PORT+9 are reserved for this workspace).`,
     ...linkedLines(linked),
   ].join('\n');
@@ -183,6 +185,25 @@ interface ActiveTurn {
   backgroundTasks: number;
   permissions: Map<string, ControlRequest>;
   start: Checkpoint | null;
+  startedAt: string;
+}
+
+export interface TurnPrLinks {
+  sessionId: string;
+  startedAt: string;
+  urls: string[];
+}
+
+function turnPrUrls(items: ChatItem[], turn: ActiveTurn): string[] {
+  return [
+    ...new Set(
+      items.flatMap((item) =>
+        item.kind === 'tool' && item.output && item.id.startsWith(`${turn.id}:`)
+          ? findPrUrls(item.output)
+          : [],
+      ),
+    ),
+  ];
 }
 
 function turnResult(items: ChatItem[], turn: ActiveTurn): ResultItem | null {
@@ -211,7 +232,7 @@ export interface Chats {
 
 export function createChats(
   ctx: Context,
-  onWorkspaceTurnFinished: (workspaceId: string) => void,
+  onWorkspaceTurnFinished: (workspaceId: string, links: TurnPrLinks) => void,
 ): Chats {
   const transcripts = new Map<string, ChatItem[]>();
   const turns = new Map<string, ActiveTurn>();
@@ -300,11 +321,16 @@ export function createChats(
     workspace: Workspace,
     session: ChatSession,
     items: ChatItem[],
+    turn: ActiveTurn,
   ) {
     const runtime = ctx.runtime(workspace.id);
     if (!isWatching(workspace)) runtime.unread = true;
     void refreshStats(ctx, workspace);
-    onWorkspaceTurnFinished(workspace.id);
+    onWorkspaceTurnFinished(workspace.id, {
+      sessionId: session.id,
+      startedAt: turn.startedAt,
+      urls: turnPrUrls(items, turn),
+    });
     const last = items.findLast((item) => item.kind === 'result');
     alertUser(
       { kind: 'workspace', workspace },
@@ -318,13 +344,18 @@ export function createChats(
     owner.ask.lastMessageAt = ctx.deps.now().toISOString();
   }
 
-  function finishTurn(owner: Owner, session: ChatSession, items: ChatItem[]) {
+  function finishTurn(
+    owner: Owner,
+    session: ChatSession,
+    items: ChatItem[],
+    turn: ActiveTurn,
+  ) {
     ctx.runningSessions.delete(session.id);
     persist(session.id, items);
     refreshStatus(owner);
     touch(owner);
     if (owner.kind === 'workspace')
-      finishWorkspaceTurn(owner.workspace, session, items);
+      finishWorkspaceTurn(owner.workspace, session, items, turn);
     ctx.store.save();
     ctx.emitState();
   }
@@ -528,7 +559,7 @@ export function createChats(
       if (parser) await recordUsage(session, items, turn, parser);
       await recordTurnChanges(session.id, items, turn);
       turns.delete(session.id);
-      finishTurn(turn.owner, session, items);
+      finishTurn(turn.owner, session, items, turn);
       void sendQueued(session.id, options);
     }
   }
@@ -610,6 +641,7 @@ export function createChats(
       backgroundTasks: 0,
       permissions: new Map(),
       start,
+      startedAt: ctx.deps.now().toISOString(),
     };
     turns.set(sessionId, turn);
     ctx.runningSessions.add(sessionId);

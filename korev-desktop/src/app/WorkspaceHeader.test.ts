@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { AppState, PrStatus, Workspace } from '../shared/model';
+import {
+  primaryPr,
+  type AppState,
+  type PrStatus,
+  type Workspace,
+  type WorkspaceRuntime,
+} from '../shared/model';
 import { nextAction } from './WorkspaceHeader';
 
 const READY_PR: PrStatus = {
@@ -11,6 +17,8 @@ const READY_PR: PrStatus = {
   mergeable: 'MERGEABLE',
   reviewDecision: 'APPROVED',
   mergedAt: null,
+  headRefName: 'dev/login',
+  createdAt: '2026-01-01T00:00:00Z',
   checks: [{ name: 'lint', state: 'success', url: null }],
 };
 
@@ -41,5 +49,18 @@ describe('next PR action', () => {
         checks: [{ name: 'lint', state: 'pending', url: null }],
       }),
     ).toBe('Checks running');
+  });
+
+  it('acts on the PR still open when another one already merged', () => {
+    const workspace = { branch: 'dev/login' } as Workspace;
+    const merged: PrStatus = { ...READY_PR, number: 6, state: 'MERGED' };
+    const stacked: PrStatus = {
+      ...READY_PR,
+      number: 8,
+      headRefName: 'dev/login-part-2',
+    };
+    const runtime = { prs: [merged, stacked] } as WorkspaceRuntime;
+
+    expect(primaryPr(workspace, runtime)?.number).toBe(8);
   });
 });

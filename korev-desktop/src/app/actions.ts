@@ -3,6 +3,7 @@ import type {
   AskChat,
   AppState,
   EditorId,
+  PrStatus,
   Repo,
   RepoFolder,
   Result,
@@ -222,18 +223,24 @@ export async function createPr(workspace: Workspace) {
   reportFailure(await api.createPr(workspace.id, activeSessionId(workspace)));
 }
 
-export async function fixErrors(workspace: Workspace) {
-  reportFailure(await api.fixChecks(workspace.id, activeSessionId(workspace)));
-}
-
-export async function resolveConflicts(workspace: Workspace) {
+export async function fixErrors(workspace: Workspace, pr: PrStatus) {
   reportFailure(
-    await api.resolveConflicts(workspace.id, activeSessionId(workspace)),
+    await api.fixChecks(workspace.id, activeSessionId(workspace), pr.number),
   );
 }
 
-export async function mergePr(workspace: Workspace) {
-  const result = await api.mergePr(workspace.id);
+export async function resolveConflicts(workspace: Workspace, pr: PrStatus) {
+  reportFailure(
+    await api.resolveConflicts(
+      workspace.id,
+      activeSessionId(workspace),
+      pr.number,
+    ),
+  );
+}
+
+export async function mergePr(workspace: Workspace, pr: PrStatus) {
+  const result = await api.mergePr(workspace.id, pr.number);
   if (reportFailure(result)) toast('Pull request merged', 'success');
 }
 

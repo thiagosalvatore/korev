@@ -8,7 +8,8 @@ import type { CommandRunner } from './command-runner';
 
 const GH_TIMEOUT_MS = 60_000;
 const PR_FIELDS =
-  'number,url,title,state,isDraft,mergeable,mergedAt,reviewDecision,statusCheckRollup';
+  'number,url,title,state,isDraft,mergeable,mergedAt,reviewDecision,statusCheckRollup,headRefName,createdAt';
+const PR_URL = /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/g;
 const COMPLETED = 'COMPLETED';
 const PASSING = new Set(['SUCCESS', 'NEUTRAL']);
 const SKIPPED = new Set(['SKIPPED', 'CANCELLED', 'STALE']);
@@ -65,26 +66,28 @@ export function parsePrStatus(json: string): PrStatus | null {
     reviewDecision: (str(raw.reviewDecision) ||
       null) as PrStatus['reviewDecision'],
     mergedAt: str(raw.mergedAt) || null,
+    headRefName: str(raw.headRefName),
+    createdAt: str(raw.createdAt),
     checks: rollup.map(toCheck),
   };
+}
+
+export function findPrUrls(text: string): string[] {
+  return [...new Set(text.match(PR_URL))];
 }
 
 export async function fetchPrStatus(
   run: CommandRunner,
   env: NodeJS.ProcessEnv,
   cwd: string,
-  branch: string,
+  ref: string,
 ): Promise<PrStatus | null> {
   try {
-    const result = await run(
-      'gh',
-      ['pr', 'view', branch, '--json', PR_FIELDS],
-      {
-        cwd,
-        env,
-        timeoutMs: GH_TIMEOUT_MS,
-      },
-    );
+    const result = await run('gh', ['pr', 'view', ref, '--json', PR_FIELDS], {
+      cwd,
+      env,
+      timeoutMs: GH_TIMEOUT_MS,
+    });
     return result.exitCode === 0 ? parsePrStatus(result.stdout) : null;
   } catch {
     return null;
@@ -128,6 +131,11 @@ export function fixChecksPrompt(checks: PrCheck[]): string {
 
 export function resolveConflictsPrompt(baseBranch: string): string {
   return `Resolve any existing merge conflicts with the remote branch (origin/${baseBranch}). Then, commit and push your changes.`;
+}
+
+export function onPrBranch(prompt: string, pr: PrStatus, branch: string) {
+  if (!pr.headRefName || pr.headRefName === branch) return prompt;
+  return `${prompt}\nThis is about pull request #${pr.number} (${pr.url}) on branch ${pr.headRefName}, not the current branch.`;
 }
 
 export const REVIEW_PROMPT =

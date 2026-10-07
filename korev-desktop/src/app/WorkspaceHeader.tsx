@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { Button, cn, Icon, IconButton, type IconName } from '../design-system';
-import type { AppState, PrStatus, Workspace } from '../shared/model';
+import {
+  primaryPr,
+  type AppState,
+  type PrStatus,
+  type Workspace,
+} from '../shared/model';
 import {
   archiveWorkspace,
   createPr,
@@ -62,7 +67,7 @@ export function nextAction(
       label: 'Resolve conflicts',
       icon: 'git-compare-arrows',
       variant: 'danger',
-      run: () => resolveConflicts(workspace),
+      run: () => resolveConflicts(workspace, pr),
     };
   }
   if (pr.checks.some((check) => check.state === 'failure')) {
@@ -70,7 +75,7 @@ export function nextAction(
       label: 'Fix errors',
       icon: 'wrench',
       variant: 'danger',
-      run: () => fixErrors(workspace),
+      run: () => fixErrors(workspace, pr),
     };
   }
   if (pr.checks.some((check) => check.state === 'pending'))
@@ -89,7 +94,7 @@ export function nextAction(
     label: 'Merge',
     icon: 'git-merge',
     variant: 'success',
-    run: () => mergePr(workspace),
+    run: () => mergePr(workspace, pr),
   };
 }
 
@@ -143,7 +148,7 @@ export function WorkspaceHeader({
   const sidebar = useUi((ui) => ui.sidebar);
   const panel = useUi((ui) => ui.panel);
   const runtime = state.runtime[workspace.id];
-  const pr = runtime?.pr ?? null;
+  const pr = primaryPr(workspace, runtime);
   const action = nextAction(state, workspace, pr);
   const editor =
     state.editors.find((entry) => entry.id === state.settings.editor) ??

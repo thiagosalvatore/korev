@@ -84,6 +84,7 @@ function sanitize(raw: unknown, home: string): PersistedState {
         archiveSnapshot: workspace.archiveSnapshot ?? null,
         restoredAt: workspace.restoredAt ?? null,
         groupId: workspace.groupId ?? null,
+        prs: workspace.prs ?? [],
         sessions: workspace.sessions.map((session) => ({
           ...session,
           effort: session.effort ?? defaults.defaultEffort[session.agent],

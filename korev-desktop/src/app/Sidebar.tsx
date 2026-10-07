@@ -16,13 +16,14 @@ import {
   Kbd,
   type IconName,
 } from '../design-system';
-import type {
-  AppState,
-  PrStatus,
-  Repo,
-  RepoFolder,
-  Workspace,
-  WorkspaceRuntime,
+import {
+  primaryPr,
+  type AppState,
+  type PrStatus,
+  type Repo,
+  type RepoFolder,
+  type Workspace,
+  type WorkspaceRuntime,
 } from '../shared/model';
 import {
   activeWorkspaces,
@@ -112,7 +113,17 @@ function prIcon(pr: PrStatus): {
   };
 }
 
-function StatusIcon({ runtime }: { runtime: WorkspaceRuntime }) {
+function prSummary(pr: PrStatus): string {
+  return `PR #${pr.number} · ${prIcon(pr).label}`;
+}
+
+function StatusIcon({
+  workspace,
+  runtime,
+}: {
+  workspace: Workspace;
+  runtime: WorkspaceRuntime;
+}) {
   if (
     runtime.status === 'working' ||
     runtime.status === 'setting-up' ||
@@ -142,10 +153,11 @@ function StatusIcon({ runtime }: { runtime: WorkspaceRuntime }) {
       <Icon name="triangle-alert" size={14} className="text-danger-text" />
     );
   }
-  if (runtime.pr) {
-    const { icon, className, label } = prIcon(runtime.pr);
+  const pr = primaryPr(workspace, runtime);
+  if (pr) {
+    const { icon, className } = prIcon(pr);
     return (
-      <span title={`PR #${runtime.pr.number} · ${label}`}>
+      <span title={runtime.prs.map(prSummary).join('\n')}>
         <Icon name={icon} size={14} className={className} />
       </span>
     );
@@ -210,7 +222,9 @@ function WorkspaceRow({
       )}
     >
       <span className="flex w-4 justify-center self-start pt-0.5">
-        {runtime ? <StatusIcon runtime={runtime} /> : null}
+        {runtime ? (
+          <StatusIcon workspace={workspace} runtime={runtime} />
+        ) : null}
       </span>
       <span className="min-w-0 flex-1">
         <span

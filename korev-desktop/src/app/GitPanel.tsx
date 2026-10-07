@@ -336,7 +336,7 @@ function PrCard({ workspace, pr }: { workspace: Workspace; pr: PrStatus }) {
               size="sm"
               variant="danger"
               icon="git-compare-arrows"
-              onClick={() => resolveConflicts(workspace)}
+              onClick={() => resolveConflicts(workspace, pr)}
             >
               Resolve conflicts
             </Button>
@@ -346,7 +346,7 @@ function PrCard({ workspace, pr }: { workspace: Workspace; pr: PrStatus }) {
               size="sm"
               variant="danger"
               icon="wrench"
-              onClick={() => fixErrors(workspace)}
+              onClick={() => fixErrors(workspace, pr)}
             >
               Fix errors
             </Button>
@@ -356,7 +356,7 @@ function PrCard({ workspace, pr }: { workspace: Workspace; pr: PrStatus }) {
             variant="success"
             icon="git-merge"
             disabled={pr.mergeable === 'CONFLICTING'}
-            onClick={() => mergePr(workspace)}
+            onClick={() => mergePr(workspace, pr)}
           >
             Merge
           </Button>
@@ -375,7 +375,7 @@ function ReviewComments({
 }) {
   const [comments, setComments] = useState<ReviewComment[]>([]);
   usePolling(
-    () => void api.reviewComments(workspace.id).then(setComments),
+    () => void api.reviewComments(workspace.id, prNumber).then(setComments),
     PR_REFRESH_MS,
     [workspace.id, prNumber],
   );
@@ -434,8 +434,8 @@ function Checks({
   state: AppState;
   workspace: Workspace;
 }) {
-  const pr = state.runtime[workspace.id]?.pr ?? null;
-  if (!pr) {
+  const prs = state.runtime[workspace.id]?.prs ?? [];
+  if (!prs.length) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-fg-3">
         <Icon name="git-pull-request" size={20} />
@@ -453,8 +453,26 @@ function Checks({
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+      {openFirst(prs).map((pr) => (
+        <PrSection key={pr.url} workspace={workspace} pr={pr} />
+      ))}
+    </div>
+  );
+}
+
+function openFirst(prs: PrStatus[]): PrStatus[] {
+  return prs
+    .slice()
+    .sort((a, b) => Number(b.state === 'OPEN') - Number(a.state === 'OPEN'));
+}
+
+function PrSection({ workspace, pr }: { workspace: Workspace; pr: PrStatus }) {
+  return (
+    <div className="flex flex-col gap-3">
       <PrCard workspace={workspace} pr={pr} />
-      <ReviewComments workspace={workspace} prNumber={pr.number} />
+      {pr.state === 'OPEN' ? (
+        <ReviewComments workspace={workspace} prNumber={pr.number} />
+      ) : null}
       <div>
         <div className="mb-1 type-overline text-fg-4">Checks</div>
         {pr.checks.length ? (

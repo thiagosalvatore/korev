@@ -7,12 +7,13 @@ import {
   Icon,
   Spinner,
 } from '../../design-system';
-import type {
-  AppState,
-  FileChange,
-  ReviewComment,
-  TurnRange,
-  Workspace,
+import {
+  primaryPr,
+  type AppState,
+  type FileChange,
+  type ReviewComment,
+  type TurnRange,
+  type Workspace,
 } from '../../shared/model';
 import { api } from '../bridge';
 import { usePolling } from '../hooks';
@@ -54,11 +55,11 @@ function useChanges(workspace: Workspace, range: TurnRange | null) {
 }
 
 function useReviewComments(state: AppState, workspace: Workspace) {
-  const pr = state.runtime[workspace.id]?.pr;
+  const pr = primaryPr(workspace, state.runtime[workspace.id]);
   const [comments, setComments] = useState<ReviewComment[]>([]);
   useEffect(() => {
     if (pr?.state !== 'OPEN') return;
-    void api.reviewComments(workspace.id).then(setComments);
+    void api.reviewComments(workspace.id, pr.number).then(setComments);
   }, [workspace.id, pr?.number, pr?.state]);
   return comments;
 }

@@ -23,7 +23,7 @@ import {
 } from '../shared/model';
 import { detectAgents } from './agents';
 import { askWorktreePath } from './ask-worktrees';
-import { createChats, latestPlan } from './chats';
+import { createChats, latestPlan, type TurnPrLinks } from './chats';
 import { readConductorRepos, readConductorSettings } from './conductor-import';
 import {
   errorMessage,
@@ -48,6 +48,7 @@ import {
 import {
   createPrPrompt,
   fetchPrStatus,
+  onPrBranch,
   fetchReviewComments,
   fixChecksPrompt,
   mergePr,
@@ -80,6 +81,7 @@ import {
 } from './workspaces';
 
 export const PR_POLL_MS = 30_000;
+const PR_CLOCK_SKEW_MS = 60_000;
 const FILE_MAX_BYTES = 1_000_000;
 const CONTEXT_DIR = '.context';
 const ATTACHMENTS_DIR = 'attachments';
@@ -194,7 +196,7 @@ const IDLE: WorkspaceRuntime = {
   status: 'idle',
   unread: false,
   stats: null,
-  pr: null,
+  prs: [],
   message: null,
   pendingPrompt: null,
   runUrl: null,
@@ -210,6 +212,22 @@ function mergedSinceRestore(workspace: Workspace, pr: PrStatus): boolean {
   if (pr.state !== 'MERGED') return false;
   if (!workspace.restoredAt) return true;
   return Date.parse(pr.mergedAt ?? '') > Date.parse(workspace.restoredAt);
+}
+
+function mergedNumbers(prs: PrStatus[]): string {
+  const numbers = prs
+    .filter((pr) => pr.state === 'MERGED')
+    .map((pr) => `#${pr.number}`);
+  return `${numbers.length === 1 ? 'PR' : 'PRs'} ${numbers.join(', ')}`;
+}
+
+function readyToArchive(workspace: Workspace, prs: PrStatus[]): boolean {
+  return (
+    prs.length > 0 &&
+    prs.length >= workspace.prs.length &&
+    prs.every((pr) => pr.state !== 'OPEN') &&
+    prs.some((pr) => mergedSinceRestore(workspace, pr))
+  );
 }
 
 function ok<T>(value: T): Result<T> {
@@ -294,7 +312,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   };
   const chats = createChats(
     ctx,
-    (workspaceId) => void refreshPr(workspaceId).catch(() => null),
+    (workspaceId, links) =>
+      void trackOpenedPrs(workspaceId, links)
+        .then(() => refreshPrs(workspaceId))
+        .catch(() => null),
   );
   const spotlight = createSpotlight(
     git,
@@ -363,23 +384,53 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     return ok(repo);
   }
 
-  async function refreshPr(workspaceId: string) {
+  function fetchPr(workspace: Workspace, ref: string) {
+    return fetchPrStatus(deps.run, deps.env, workspace.path, ref);
+  }
+
+  function track(workspace: Workspace, url: string, sessionId: string | null) {
+    if (!url || workspace.prs.some((pr) => pr.url === url)) return;
+    workspace.prs.push({ url, sessionId });
+    store.save();
+  }
+
+  async function trackOpenedPrs(workspaceId: string, links: TurnPrLinks) {
     const workspace = ctx.workspace(workspaceId);
-    if (workspace.archivedAt) return null;
-    const pr = await fetchPrStatus(
-      deps.run,
-      deps.env,
-      workspace.path,
-      workspace.branch,
+    const since = Date.parse(links.startedAt) - PR_CLOCK_SKEW_MS;
+    const statuses = await Promise.all(
+      links.urls
+        .filter((url) => !workspace.prs.some((pr) => pr.url === url))
+        .map((url) => fetchPr(workspace, url)),
     );
+    for (const pr of statuses) {
+      if (pr && Date.parse(pr.createdAt) >= since)
+        track(workspace, pr.url, links.sessionId);
+    }
+  }
+
+  async function refreshPrs(workspaceId: string): Promise<PrStatus[]> {
+    const workspace = ctx.workspace(workspaceId);
+    if (workspace.archivedAt) return [];
+    const branchPr = await fetchPr(workspace, workspace.branch);
+    if (branchPr) track(workspace, branchPr.url, null);
     const runtime = ctx.runtime(workspaceId);
-    if (JSON.stringify(runtime.pr) !== JSON.stringify(pr)) {
-      runtime.pr = pr;
+    const lastKnown = (url: string) =>
+      runtime.prs.find((pr) => pr.url === url) ?? null;
+    const fetched = await Promise.all(
+      workspace.prs.map(async ({ url }) =>
+        url === branchPr?.url
+          ? branchPr
+          : ((await fetchPr(workspace, url)) ?? lastKnown(url)),
+      ),
+    );
+    const prs = fetched.filter((pr): pr is PrStatus => pr !== null);
+    if (JSON.stringify(runtime.prs) !== JSON.stringify(prs)) {
+      runtime.prs = prs;
       ctx.emitState();
     }
-    if (pr && mergedSinceRestore(workspace, pr))
-      await archiveIfConfigured(workspaceId, pr);
-    return pr;
+    if (readyToArchive(workspace, prs))
+      await archiveIfConfigured(workspaceId, prs);
+    return prs;
   }
 
   let checkingPrs = false;
@@ -389,13 +440,13 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     checkingPrs = true;
     try {
       for (const workspace of activeWorkspaces(ctx))
-        await refreshPr(workspace.id).catch(() => null);
+        await refreshPrs(workspace.id).catch(() => null);
     } finally {
       checkingPrs = false;
     }
   }
 
-  async function archiveIfConfigured(workspaceId: string, pr: PrStatus) {
+  async function archiveIfConfigured(workspaceId: string, prs: PrStatus[]) {
     const workspace = ctx.workspace(workspaceId);
     const config = await workspaceConfig(ctx, workspace);
     if (!(config.archiveOnMerge ?? store.state.settings.archiveOnMerge)) return;
@@ -407,7 +458,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     const archived = await archive(workspaceId);
     if (!archived.ok) return;
     deps.emit('toast', {
-      title: `PR #${pr.number} merged. Archived ${workspace.name}`,
+      title: `${mergedNumbers(prs)} merged. Archived ${workspace.name}`,
       tone: 'success',
     });
   }
@@ -419,6 +470,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   ) {
     const config = await workspaceConfig(ctx, ctx.workspace(workspaceId));
     return withPrompt(base, config.prompts[kind]);
+  }
+
+  function trackedPr(workspaceId: string, prNumber: number) {
+    return (
+      ctx.runtime(workspaceId).prs.find((pr) => pr.number === prNumber) ?? null
+    );
   }
 
   function workspacePath(workspaceId: string) {
@@ -819,12 +876,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       void refreshStats(ctx, ctx.workspace(workspaceId));
       return ok(undefined);
     },
-    async reviewComments(workspaceId) {
+    async reviewComments(workspaceId, prNumber) {
       const workspace = workspacePath(workspaceId);
-      const pr = ctx.runtime(workspaceId).pr ?? (await refreshPr(workspaceId));
-      return pr
-        ? fetchReviewComments(deps.run, deps.env, workspace.path, pr.number)
-        : [];
+      return fetchReviewComments(deps.run, deps.env, workspace.path, prNumber);
     },
     async listFiles(workspaceId) {
       return listFiles(git, workspacePath(workspaceId).path);
@@ -839,18 +893,16 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       if (!contents || contents.length > FILE_MAX_BYTES) return null;
       return contents.toString('utf8');
     },
-    prStatus: (workspaceId) => refreshPr(workspaceId),
-    async mergePr(workspaceId) {
+    prStatuses: (workspaceId) => refreshPrs(workspaceId),
+    async mergePr(workspaceId, prNumber) {
       const workspace = workspacePath(workspaceId);
-      const pr = ctx.runtime(workspaceId).pr ?? (await refreshPr(workspaceId));
-      if (!pr) return fail('No pull request for this branch');
       const problem = await mergePr(
         deps.run,
         deps.env,
         workspace.path,
-        pr.number,
+        prNumber,
       );
-      await refreshPr(workspaceId);
+      await refreshPrs(workspaceId);
       return problem ? fail(problem) : ok(undefined);
     },
     async createPr(workspaceId, sessionId) {
@@ -865,15 +917,21 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         ),
       );
     },
-    async resolveConflicts(workspaceId, sessionId) {
+    async resolveConflicts(workspaceId, sessionId, prNumber) {
       const workspace = ctx.workspace(workspaceId);
+      const pr = trackedPr(workspaceId, prNumber);
+      if (!pr) return fail(`Pull request #${prNumber} is not tracked here`);
       return sendToActiveSession(
         workspaceId,
         sessionId,
         await actionPrompt(
           workspaceId,
           'resolve_merge_conflicts',
-          resolveConflictsPrompt(workspace.baseBranch),
+          onPrBranch(
+            resolveConflictsPrompt(workspace.baseBranch),
+            pr,
+            workspace.branch,
+          ),
         ),
       );
     },
@@ -893,16 +951,20 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     slashCommands: (workspaceId) =>
       slashCommandsAt(workspacePath(workspaceId).path),
     repoSlashCommands: (repoId) => slashCommandsAt(ctx.repo(repoId).path),
-    async fixChecks(workspaceId, sessionId) {
-      const pr = ctx.runtime(workspaceId).pr;
-      if (!pr) return fail('No pull request for this branch');
+    async fixChecks(workspaceId, sessionId, prNumber) {
+      const pr = trackedPr(workspaceId, prNumber);
+      if (!pr) return fail(`Pull request #${prNumber} is not tracked here`);
       return sendToActiveSession(
         workspaceId,
         sessionId,
         await actionPrompt(
           workspaceId,
           'fix_errors',
-          fixChecksPrompt(pr.checks),
+          onPrBranch(
+            fixChecksPrompt(pr.checks),
+            pr,
+            ctx.workspace(workspaceId).branch,
+          ),
         ),
       );
     },

@@ -1,5 +1,10 @@
 import { useEffect, useRef } from 'react';
-import type { AppCommand, AppState, Workspace } from '../shared/model';
+import {
+  primaryPr,
+  type AppCommand,
+  type AppState,
+  type Workspace,
+} from '../shared/model';
 import {
   activeSessionId,
   activeWorkspaces,
@@ -91,6 +96,7 @@ export function runCommand(state: AppState, command: AppCommand) {
       break;
   }
   if (!workspace || workspace.archivedAt) return;
+  const pr = primaryPr(workspace, state.runtime[workspace.id]);
   switch (command) {
     case 'new-chat':
       return void newChat(workspace, state.settings.defaultAgent);
@@ -103,9 +109,9 @@ export function runCommand(state: AppState, command: AppCommand) {
     case 'create-pr':
       return void createPr(workspace);
     case 'merge-pr':
-      return void mergePr(workspace);
+      return void (pr && mergePr(workspace, pr));
     case 'fix-errors':
-      return void fixErrors(workspace);
+      return void (pr && fixErrors(workspace, pr));
     case 'open-diff':
       return openDiff(workspace.id);
     case 'search-files':

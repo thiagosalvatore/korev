@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parsePrStatus, parseReviewComments } from './pull-requests';
+import {
+  findPrUrls,
+  parsePrStatus,
+  parseReviewComments,
+} from './pull-requests';
 
 describe('PR status', () => {
   it('maps check runs and status contexts to check states', () => {
@@ -93,6 +97,22 @@ describe('review comments', () => {
     ).toEqual([
       ['src/a.ts', 12, 'sakce'],
       ['src/b.ts', null, 'sakce'],
+    ]);
+  });
+});
+
+describe('PR links in agent output', () => {
+  it('finds each pull request URL once and skips issues', () => {
+    const output = [
+      'Creating pull request for dev/login into main in acme/web',
+      'https://github.com/acme/web/pull/42',
+      'See https://github.com/acme/web/pull/42/files and https://github.com/acme/api/pull/7.',
+      'Related: https://github.com/acme/web/issues/3',
+    ].join('\n');
+
+    expect(findPrUrls(output)).toEqual([
+      'https://github.com/acme/web/pull/42',
+      'https://github.com/acme/api/pull/7',
     ]);
   });
 });

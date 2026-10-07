@@ -591,6 +591,7 @@ function addDraftWorkspace(
     restoredAt: null,
     archiveSnapshot: null,
     sessions: [newChatSession(ctx, ctx.store.state.settings.defaultAgent)],
+    prs: [],
   };
   ctx.store.state.workspaces.push(workspace);
   ctx.setStatus(workspace.id, 'creating');

@@ -56,20 +56,21 @@ default_thinking_level = "high"
 
 let conductorRepos: Record<string, string | null>[] = [];
 let openPr: Record<string, unknown> | null = null;
+let prsByUrl: Record<string, Record<string, unknown>> = {};
 
+const BRANCH_PR_URL = 'https://github.com/acme/web/pull/7';
 const NO_PR = { exitCode: 1, stdout: '', stderr: 'no pull requests found' };
 
-function fakePrView() {
-  return openPr
-    ? { exitCode: 0, stdout: JSON.stringify(openPr), stderr: '' }
-    : NO_PR;
+function fakePrView(ref: string) {
+  const pr = ref.startsWith('https://') ? prsByUrl[ref] : openPr;
+  return pr ? { exitCode: 0, stdout: JSON.stringify(pr), stderr: '' } : NO_PR;
 }
 
 const runWithFakeSqlite: CommandRunner = async (file, args, options) => {
   if (file === 'sqlite3')
     return { exitCode: 0, stdout: JSON.stringify(conductorRepos), stderr: '' };
   if (file === 'gh' && args[0] === 'pr' && args[1] === 'view')
-    return fakePrView();
+    return fakePrView(args[2]);
   return runProcess(file, args, options);
 };
 
@@ -149,6 +150,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
   afterEach(async () => {
     openPr = null;
+    prsByUrl = {};
     await korev.shutdown();
     vi.useRealTimers();
     await rm(home, { recursive: true, force: true });
@@ -240,24 +242,26 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
   it('picks up the PR an agent opened as soon as its turn finishes', async () => {
     const workspace = await createWorkspace();
-    expect((await workspaceState(workspace.id)).runtime.pr).toBeNull();
-    openPr = {
-      number: 7,
-      state: 'OPEN',
-      url: 'https://github.com/acme/pull/7',
-    };
+    expect((await workspaceState(workspace.id)).runtime.prs).toEqual([]);
+    openPr = { number: 7, state: 'OPEN', url: BRANCH_PR_URL };
 
     await sendAndWait(workspace.sessions[0].id, 'Open a PR');
 
     await waitFor(
-      async () => (await workspaceState(workspace.id)).runtime.pr?.number === 7,
+      async () =>
+        (await workspaceState(workspace.id)).runtime.prs[0]?.number === 7,
     );
   });
 
   it('archives a workspace whose PR merged during an agent turn once the turn finishes', async () => {
     await korev.api.updateSettings({ archiveOnMerge: true });
     const workspace = await createWorkspace();
-    openPr = { number: 7, state: 'MERGED', mergedAt: '2020-01-01T00:00:00Z' };
+    openPr = {
+      number: 7,
+      url: BRANCH_PR_URL,
+      state: 'MERGED',
+      mergedAt: '2020-01-01T00:00:00Z',
+    };
 
     await sendAndWait(workspace.sessions[0].id, 'Keep going');
 
@@ -276,30 +280,90 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     korev = await openKorev();
     const workspace = await createWorkspace();
-    openPr = { number: 7, state: 'OPEN' };
+    openPr = { number: 7, url: BRANCH_PR_URL, state: 'OPEN' };
 
     vi.advanceTimersByTime(PR_POLL_MS);
 
     await waitFor(
-      async () => (await workspaceState(workspace.id)).runtime.pr?.number === 7,
+      async () =>
+        (await workspaceState(workspace.id)).runtime.prs[0]?.number === 7,
     );
   });
 
   it('keeps a restored workspace whose PR merged before the restore', async () => {
     await korev.api.updateSettings({ archiveOnMerge: true });
     const workspace = await createWorkspace();
-    openPr = { number: 7, state: 'MERGED', mergedAt: '2020-01-01T00:00:00Z' };
-    await korev.api.prStatus(workspace.id);
+    openPr = {
+      number: 7,
+      url: BRANCH_PR_URL,
+      state: 'MERGED',
+      mergedAt: '2020-01-01T00:00:00Z',
+    };
+    await korev.api.prStatuses(workspace.id);
     expect(
       (await workspaceState(workspace.id)).workspace.archivedAt,
     ).not.toBeNull();
 
     await korev.api.restoreWorkspace(workspace.id);
-    await korev.api.prStatus(workspace.id);
+    await korev.api.prStatuses(workspace.id);
 
     expect(
       (await workspaceState(workspace.id)).workspace.archivedAt,
     ).toBeNull();
+  });
+
+  function fakePr(number: number, state: string, createdAt: string) {
+    const url = `https://github.com/acme/web/pull/${number}`;
+    prsByUrl[url] = { number, url, state, createdAt, mergedAt: null };
+    return url;
+  }
+
+  async function trackedUrls(workspaceId: string) {
+    return (await workspaceState(workspaceId)).workspace.prs.map(
+      (pr) => pr.url,
+    );
+  }
+
+  it('tracks a PR the agent opened during the turn, not one it only looked at', async () => {
+    const workspace = await createWorkspace();
+    const opened = fakePr(8, 'OPEN', new Date().toISOString());
+    const old = fakePr(3, 'MERGED', '2020-01-01T00:00:00Z');
+
+    await sendAndWait(workspace.sessions[0].id, `open-pr ${opened} ${old}`);
+
+    await waitFor(async () => (await trackedUrls(workspace.id)).length > 0);
+    expect(await trackedUrls(workspace.id)).toEqual([opened]);
+    await waitFor(
+      async () => (await workspaceState(workspace.id)).runtime.prs.length > 0,
+    );
+    expect(
+      (await workspaceState(workspace.id)).runtime.prs.map((pr) => pr.number),
+    ).toEqual([8]);
+  });
+
+  it('archives only once every tracked PR has merged', async () => {
+    await korev.api.updateSettings({ archiveOnMerge: true });
+    const workspace = await createWorkspace();
+    const second = fakePr(8, 'OPEN', new Date().toISOString());
+    await sendAndWait(workspace.sessions[0].id, `open-pr ${second}`);
+    await waitFor(async () => (await trackedUrls(workspace.id)).length > 0);
+    openPr = {
+      number: 7,
+      url: BRANCH_PR_URL,
+      state: 'MERGED',
+      mergedAt: '2020-01-01T00:00:00Z',
+    };
+
+    await korev.api.prStatuses(workspace.id);
+    expect(
+      (await workspaceState(workspace.id)).workspace.archivedAt,
+    ).toBeNull();
+
+    prsByUrl[second] = { ...prsByUrl[second], state: 'MERGED' };
+    await korev.api.prStatuses(workspace.id);
+    expect(
+      (await workspaceState(workspace.id)).workspace.archivedAt,
+    ).not.toBeNull();
   });
 
   it('runs an agent turn, shows its changes and reverts them from a checkpoint', async () => {
