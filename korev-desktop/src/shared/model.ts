@@ -137,6 +137,7 @@ export interface RepoFolder {
 export type WorkspaceSource =
   | { kind: 'new'; baseBranch: string | null }
   | { kind: 'branch'; branch: string }
+  | { kind: 'worktree'; path: string; branch: string; baseBranch: string }
   | { kind: 'pr'; number: number; baseBranch: string }
   | { kind: 'issue'; number: number; title: string };
 
@@ -165,6 +166,7 @@ export interface ChatSession {
   fast: boolean;
   planMode: boolean;
   agentSessionId: string | null;
+  forkOnNextTurn: boolean;
   createdAt: string;
 }
 
@@ -283,6 +285,7 @@ export interface PrStatus {
   reviewDecision: ReviewDecision | null;
   mergedAt: string | null;
   headRefName: string;
+  baseRefName: string;
   createdAt: string;
   checks: PrCheck[];
 }

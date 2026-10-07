@@ -239,6 +239,11 @@ export async function resolveConflicts(workspace: Workspace, pr: PrStatus) {
   );
 }
 
+export async function openPrAsWorkspace(workspace: Workspace, pr: PrStatus) {
+  const opened = await api.openPrAsWorkspace(workspace.id, pr.number);
+  if (reportFailure(opened)) selectWorkspace(opened.value.id);
+}
+
 export async function mergePr(workspace: Workspace, pr: PrStatus) {
   const result = await api.mergePr(workspace.id, pr.number);
   if (reportFailure(result)) toast('Pull request merged', 'success');

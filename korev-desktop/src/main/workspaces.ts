@@ -25,6 +25,7 @@ import {
   currentBranch,
   deleteBranch,
   listWorktrees,
+  prepareWorktree,
   removeCleanWorktree,
   removeWorktree,
   restoreCheckpoint,
@@ -92,6 +93,19 @@ export function newChatSession(ctx: Context, agent: AgentKind): ChatSession {
     fast: false,
     planMode: settings.defaultPlanMode,
     agentSessionId: null,
+    forkOnNextTurn: false,
+    createdAt: ctx.deps.now().toISOString(),
+  };
+}
+
+export function forkChatSession(
+  ctx: Context,
+  session: ChatSession,
+): ChatSession {
+  return {
+    ...session,
+    id: ctx.deps.newId(),
+    forkOnNextTurn: session.agentSessionId !== null,
     createdAt: ctx.deps.now().toISOString(),
   };
 }
@@ -521,6 +535,10 @@ async function checkOutSource(
     await addBranchWorktree(ctx.git, repo.path, workspace.path, source.branch);
     return;
   }
+  if (source.kind === 'worktree') {
+    await prepareWorktree(ctx.git, workspace.path);
+    return;
+  }
   if (source.kind === 'pr') {
     workspace.branch = await checkOutPullRequest(
       ctx,
@@ -560,7 +578,7 @@ async function prepareSourceWorkspace(
 }
 
 function sourceName(source: WorkspaceSource, task: SendOptions | null) {
-  if (source.kind === 'branch')
+  if (source.kind === 'branch' || source.kind === 'worktree')
     return truncateName(slugify(source.branch.split('/').at(-1) ?? ''));
   if (source.kind === 'pr') return `pr-${source.number}`;
   if (source.kind === 'issue')
@@ -569,7 +587,8 @@ function sourceName(source: WorkspaceSource, task: SendOptions | null) {
 }
 
 function sourceBaseBranch(source: WorkspaceSource, repo: Repo) {
-  if (source.kind === 'pr') return source.baseBranch;
+  if (source.kind === 'pr' || source.kind === 'worktree')
+    return source.baseBranch;
   if (source.kind === 'new' && source.baseBranch) return source.baseBranch;
   return repo.defaultBranch;
 }
@@ -587,9 +606,13 @@ function addDraftWorkspace(
     repoId: repo.id,
     groupId,
     name,
-    branch: source.kind === 'branch' ? source.branch : name,
+    branch:
+      source.kind === 'branch' || source.kind === 'worktree'
+        ? source.branch
+        : name,
     baseBranch: sourceBaseBranch(source, repo),
-    path: worktreePath(ctx, repo, name),
+    path:
+      source.kind === 'worktree' ? source.path : worktreePath(ctx, repo, name),
     port: allocatePort(activeWorkspaces(ctx).map((ws) => ws.port)),
     createdAt: ctx.deps.now().toISOString(),
     archivedAt: null,

@@ -23,6 +23,7 @@ import {
   createPr,
   fixErrors,
   mergePr,
+  openPrAsWorkspace,
   activateTab,
   openDiff,
   openFile,
@@ -378,6 +379,16 @@ function PrCard({
           >
             Merge
           </Button>
+          {pr.headRefName !== workspace.branch ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="square-arrow-out-up-right"
+              onClick={() => openPrAsWorkspace(workspace, pr)}
+            >
+              Open as workspace
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>

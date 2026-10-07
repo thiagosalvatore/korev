@@ -7,6 +7,7 @@ import {
   hasWorktree,
   type AgentAvailability,
   type AppState,
+  type ChatSession,
   type EditorApp,
   type EditorId,
   type PromptKind,
@@ -19,6 +20,7 @@ import {
   type Settings,
   type Workspace,
   type WorkspaceRuntime,
+  type WorkspaceSource,
   type WorkspaceStatus,
 } from '../shared/model';
 import { detectAgents } from './agents';
@@ -67,6 +69,7 @@ import { createTerminals, type SpawnPty } from './terminals';
 import {
   archiveWorkspace,
   createWorkspaces,
+  forkChatSession,
   strayWorktrees,
   deleteWorkspace,
   newChatSession,
@@ -483,6 +486,38 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     );
   }
 
+  function prSource(workspace: Workspace, pr: PrStatus): WorkspaceSource {
+    const baseBranch = pr.baseRefName || workspace.baseBranch;
+    const worktree = ctx
+      .runtime(workspace.id)
+      .strayWorktrees.find((stray) => stray.branch === pr.headRefName);
+    return worktree
+      ? {
+          kind: 'worktree',
+          path: worktree.path,
+          branch: pr.headRefName,
+          baseBranch,
+        }
+      : { kind: 'pr', number: pr.number, baseBranch };
+  }
+
+  function chatThatOpened(workspace: Workspace, url: string) {
+    const sessionId = workspace.prs.find((pr) => pr.url === url)?.sessionId;
+    return (
+      workspace.sessions.find((session) => session.id === sessionId) ??
+      workspace.sessions.at(-1) ??
+      null
+    );
+  }
+
+  async function moveChat(from: ChatSession | null, to: Workspace) {
+    if (!from) return to.sessions[0].id;
+    const copy = forkChatSession(ctx, from);
+    to.sessions = [copy];
+    await chats.seed(copy.id, await chats.transcript(from.id));
+    return copy.id;
+  }
+
   function workspacePath(workspaceId: string) {
     const workspace = ctx.workspace(workspaceId);
     if (workspace.archivedAt) throw new Error('Workspace is archived');
@@ -721,6 +756,32 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         sendWithHistory,
         plan,
       );
+    },
+    async openPrAsWorkspace(workspaceId, prNumber) {
+      const origin = ctx.workspace(workspaceId);
+      const pr = trackedPr(workspaceId, prNumber);
+      if (!pr) return fail(`Pull request #${prNumber} is not tracked here`);
+      const chat = chatThatOpened(origin, pr.url);
+      if (chat && chats.isRunning(chat.id))
+        return fail('Wait for the agent to finish');
+      const created = createWorkspaces(
+        ctx,
+        [origin.repoId],
+        null,
+        chats.send,
+        null,
+        prSource(origin, pr),
+      );
+      if (!created.ok) return created;
+      const [workspace] = created.value;
+      const sessionId = await moveChat(chat, workspace);
+      origin.prs = origin.prs.filter((tracked) => tracked.url !== pr.url);
+      workspace.prs = [{ url: pr.url, sessionId }];
+      ctx.runtime(workspace.id).prs = [pr];
+      store.save();
+      ctx.emitState();
+      void refreshPrs(origin.id).catch(() => null);
+      return ok(workspace);
     },
     listBranches: (repoId) => listBranches(git, ctx.repo(repoId).path),
     listPullRequests: (repoId) =>

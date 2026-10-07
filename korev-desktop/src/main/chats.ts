@@ -513,6 +513,7 @@ export function createChats(
         fast: options.fast,
         toolApprovals: ctx.store.state.settings.toolApprovals,
         resumeId: session.agentSessionId,
+        fork: session.forkOnNextTurn,
         newSessionId: ctx.deps.newId(),
         systemPrompt: target.systemPrompt,
         addDirs: target.addDirs,
@@ -554,7 +555,11 @@ export function createChats(
     } catch (error) {
       notice(errorMessage(error));
     } finally {
-      session.agentSessionId = parser?.sessionId() ?? session.agentSessionId;
+      const startedSession = parser?.sessionId() ?? null;
+      if (startedSession) {
+        session.agentSessionId = startedSession;
+        session.forkOnNextTurn = false;
+      }
       expirePermissions(session.id, items, turn);
       if (parser) await recordUsage(session, items, turn, parser);
       await recordTurnChanges(session.id, items, turn);

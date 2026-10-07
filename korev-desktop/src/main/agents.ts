@@ -29,6 +29,7 @@ export interface TurnRequest {
   fast: boolean;
   toolApprovals: boolean;
   resumeId: string | null;
+  fork: boolean;
   newSessionId: string;
   systemPrompt: string;
   addDirs: string[];
@@ -53,7 +54,11 @@ function claudePermissionMode(request: TurnRequest): string {
 
 function claudeArgs(request: TurnRequest): string[] {
   const session = request.resumeId
-    ? ['--resume', request.resumeId]
+    ? [
+        '--resume',
+        request.resumeId,
+        ...(request.fork ? ['--fork-session'] : []),
+      ]
     : ['--session-id', request.newSessionId];
   return [
     '-p',
@@ -100,7 +105,8 @@ function codexArgs(request: TurnRequest): string[] {
     ...model,
   ];
   if (request.resumeId) {
-    return ['exec', 'resume', ...options, request.resumeId, STDIN_PROMPT];
+    const mode = request.fork ? 'fork' : 'resume';
+    return ['exec', mode, ...options, request.resumeId, STDIN_PROMPT];
   }
   return ['exec', ...options, STDIN_PROMPT];
 }

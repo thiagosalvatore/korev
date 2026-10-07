@@ -63,6 +63,10 @@ export interface KorevApi {
     task: SendOptions | null,
     source?: WorkspaceSource,
   ): Promise<Result<Workspace[]>>;
+  openPrAsWorkspace(
+    workspaceId: string,
+    prNumber: number,
+  ): Promise<Result<Workspace>>;
   listBranches(repoId: string): Promise<string[]>;
   listPullRequests(repoId: string): Promise<PullRequestSummary[]>;
   listIssues(repoId: string): Promise<IssueSummary[]>;

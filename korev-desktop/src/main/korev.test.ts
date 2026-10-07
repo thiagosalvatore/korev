@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -366,11 +366,11 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).not.toBeNull();
   });
 
-  async function workspaceWithStrayPr(strayPath: string) {
+  async function workspaceWithStrayPr(strayPath: string, state = 'MERGED') {
     await korev.api.updateSettings({ archiveOnMerge: false });
     const workspace = await createWorkspace();
     git(repoPath, 'worktree', 'add', '-q', '-b', 'dev/extra', strayPath);
-    const url = fakePr(8, 'MERGED', new Date().toISOString());
+    const url = fakePr(8, state, new Date().toISOString());
     prsByUrl[url] = { ...prsByUrl[url], headRefName: 'dev/extra' };
     await sendAndWait(workspace.sessions[0].id, `open-pr ${url}`);
     await waitFor(async () => (await trackedUrls(workspace.id)).length > 0);
@@ -415,6 +415,35 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
     expect(archived.ok).toBe(false);
     expect(existsSync(path.join(nested, 'wip.txt'))).toBe(true);
+  });
+
+  it('opens the worktree an agent made for a PR as its own workspace, forking the chat', async () => {
+    const stray = path.join(home, 'stray');
+    const origin = await workspaceWithStrayPr(stray, 'OPEN');
+    const originChat = await korev.api.transcript(origin.sessions[0].id);
+
+    const opened = await korev.api.openPrAsWorkspace(origin.id, 8);
+
+    if (!opened.ok) throw new Error(opened.message);
+    const { workspace, runtime } = await waitUntilCreated(opened.value.id);
+    expect(runtime.prs.map((pr) => pr.number)).toEqual([8]);
+    expect(workspace.path).toBe(realpathSync(stray));
+    expect(workspace.branch).toBe('dev/extra');
+    expect(workspace.prs.map((pr) => pr.url)).toEqual([
+      'https://github.com/acme/web/pull/8',
+    ]);
+    expect((await workspaceState(origin.id)).workspace.prs).toEqual([]);
+    const [chat] = workspace.sessions;
+    expect(chat.id).not.toBe(origin.sessions[0].id);
+    expect(await korev.api.transcript(chat.id)).toEqual(originChat);
+
+    await sendAndWait(chat.id, 'Keep going');
+    const argsFile = path.join(stray, '.context', 'claude-args');
+    expect(await readFile(argsFile, 'utf8')).toContain(
+      '--resume fake-session --fork-session',
+    );
+    await sendAndWait(chat.id, 'And again');
+    expect(await readFile(argsFile, 'utf8')).not.toContain('--fork-session');
   });
 
   it('runs an agent turn, shows its changes and reverts them from a checkpoint', async () => {

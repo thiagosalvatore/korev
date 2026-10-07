@@ -8,7 +8,7 @@ import type { CommandRunner } from './command-runner';
 
 const GH_TIMEOUT_MS = 60_000;
 const PR_FIELDS =
-  'number,url,title,state,isDraft,mergeable,mergedAt,reviewDecision,statusCheckRollup,headRefName,createdAt';
+  'number,url,title,state,isDraft,mergeable,mergedAt,reviewDecision,statusCheckRollup,headRefName,baseRefName,createdAt';
 const PR_URL = /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/g;
 const COMPLETED = 'COMPLETED';
 const PASSING = new Set(['SUCCESS', 'NEUTRAL']);
@@ -67,6 +67,7 @@ export function parsePrStatus(json: string): PrStatus | null {
       null) as PrStatus['reviewDecision'],
     mergedAt: str(raw.mergedAt) || null,
     headRefName: str(raw.headRefName),
+    baseRefName: str(raw.baseRefName),
     createdAt: str(raw.createdAt),
     checks: rollup.map(toCheck),
   };
