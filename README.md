@@ -14,6 +14,8 @@ npm ci
 npm start
 ```
 
+To package the app and open the build, run `make package-run` from the repository root.
+
 Korev uses the `claude` and `codex` CLIs from your PATH and their own sign-in, and `gh` for pull requests, issues and checks.
 
 ## Repository config
