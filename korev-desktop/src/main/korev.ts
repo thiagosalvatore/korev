@@ -10,11 +10,13 @@ import {
   type EditorApp,
   type EditorId,
   type PromptKind,
+  type PrStatus,
   type Repo,
   type RepoScripts,
   type TerminalPreset,
   type Result,
   type Settings,
+  type Workspace,
   type WorkspaceRuntime,
   type WorkspaceStatus,
 } from '../shared/model';
@@ -187,6 +189,12 @@ const TERMINAL_PRESETS: Record<TerminalPreset, string | null> = {
   codex: 'codex',
 };
 
+function mergedSinceRestore(workspace: Workspace, pr: PrStatus): boolean {
+  if (pr.state !== 'MERGED') return false;
+  if (!workspace.restoredAt) return true;
+  return Date.parse(pr.mergedAt ?? '') > Date.parse(workspace.restoredAt);
+}
+
 function ok<T>(value: T): Result<T> {
   return { ok: true, value };
 }
@@ -334,15 +342,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       workspace.branch,
     );
     const runtime = ctx.runtime(workspaceId);
-    const justMerged =
-      pr?.state === 'MERGED' &&
-      runtime.pr?.state !== 'MERGED' &&
-      runtime.pr !== null;
     if (JSON.stringify(runtime.pr) !== JSON.stringify(pr)) {
       runtime.pr = pr;
       ctx.emitState();
     }
-    if (justMerged) await archiveIfConfigured(workspaceId);
+    if (pr && mergedSinceRestore(workspace, pr))
+      await archiveIfConfigured(workspaceId);
     return pr;
   }
 

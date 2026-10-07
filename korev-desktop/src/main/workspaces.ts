@@ -567,6 +567,7 @@ function addDraftWorkspace(
     port: allocatePort(activeWorkspaces(ctx).map((ws) => ws.port)),
     createdAt: ctx.deps.now().toISOString(),
     archivedAt: null,
+    restoredAt: null,
     archiveSnapshot: null,
     sessions: [newChatSession(ctx, ctx.store.state.settings.defaultAgent)],
   };
@@ -686,6 +687,7 @@ export async function restoreWorkspace(
     return { ok: false, message: errorMessage(error) };
   }
   workspace.archivedAt = null;
+  workspace.restoredAt = ctx.deps.now().toISOString();
   workspace.archiveSnapshot = null;
   workspace.port = allocatePort(activeWorkspaces(ctx).map((ws) => ws.port));
   ctx.store.save();

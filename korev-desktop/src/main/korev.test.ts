@@ -248,6 +248,36 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     );
   });
 
+  it('archives a workspace whose PR merged during an agent turn once the turn finishes', async () => {
+    await korev.api.updateSettings({ archiveOnMerge: true });
+    const workspace = await createWorkspace();
+    openPr = { number: 7, state: 'MERGED', mergedAt: '2020-01-01T00:00:00Z' };
+
+    await sendAndWait(workspace.sessions[0].id, 'Keep going');
+
+    await waitFor(
+      async () =>
+        (await workspaceState(workspace.id)).workspace.archivedAt !== null,
+    );
+  });
+
+  it('keeps a restored workspace whose PR merged before the restore', async () => {
+    await korev.api.updateSettings({ archiveOnMerge: true });
+    const workspace = await createWorkspace();
+    openPr = { number: 7, state: 'MERGED', mergedAt: '2020-01-01T00:00:00Z' };
+    await korev.api.prStatus(workspace.id);
+    expect(
+      (await workspaceState(workspace.id)).workspace.archivedAt,
+    ).not.toBeNull();
+
+    await korev.api.restoreWorkspace(workspace.id);
+    await korev.api.prStatus(workspace.id);
+
+    expect(
+      (await workspaceState(workspace.id)).workspace.archivedAt,
+    ).toBeNull();
+  });
+
   it('runs an agent turn, shows its changes and reverts them from a checkpoint', async () => {
     const workspace = await createWorkspace();
     const [session] = workspace.sessions;

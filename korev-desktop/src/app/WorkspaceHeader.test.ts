@@ -10,6 +10,7 @@ const READY_PR: PrStatus = {
   isDraft: false,
   mergeable: 'MERGEABLE',
   reviewDecision: 'APPROVED',
+  mergedAt: null,
   checks: [{ name: 'lint', state: 'success', url: null }],
 };
 

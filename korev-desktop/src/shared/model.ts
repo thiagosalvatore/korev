@@ -179,6 +179,7 @@ export interface Workspace {
   port: number;
   createdAt: string;
   archivedAt: string | null;
+  restoredAt: string | null;
   archiveSnapshot: Checkpoint | null;
   sessions: ChatSession[];
 }
@@ -272,6 +273,7 @@ export interface PrStatus {
   isDraft: boolean;
   mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
   reviewDecision: ReviewDecision | null;
+  mergedAt: string | null;
   checks: PrCheck[];
 }
 
