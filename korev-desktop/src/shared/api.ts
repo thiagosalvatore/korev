@@ -25,6 +25,7 @@ import type {
   Settings,
   TerminalExit,
   TerminalKind,
+  TerminalPreset,
   TerminalOutput,
   TerminalSize,
   Workspace,
@@ -35,7 +36,11 @@ export interface KorevApi {
   addRepo(): Promise<Result<Repo | null>>;
   cloneRepo(url: string): Promise<Result<Repo>>;
   removeRepo(repoId: string): Promise<void>;
-  updateRepo(repoId: string, patch: { defaultBranch?: string }): Promise<void>;
+  updateRepo(
+    repoId: string,
+    patch: { defaultBranch?: string; spotlightTesting?: boolean },
+  ): Promise<void>;
+  toggleSpotlight(workspaceId: string): Promise<Result>;
   updateRepoScripts(repoId: string, scripts: RepoScripts): Promise<void>;
   createWorkspaces(
     repoIds: string[],
@@ -110,6 +115,7 @@ export interface KorevApi {
     workspaceId: string,
     kind: TerminalKind,
     size: TerminalSize,
+    preset?: TerminalPreset,
   ): Promise<Result<string>>;
   startScript(
     workspaceId: string,

@@ -5,6 +5,7 @@ import {
   hasWorktree,
   type AppState,
   type Workspace,
+  type TerminalPreset,
   type WorkspaceRuntime,
 } from '../shared/model';
 import {
@@ -13,16 +14,21 @@ import {
   closeTab,
   focusComposer,
   newChat,
+  openBrowser,
+  openTerminalTab,
+  terminalTabRef,
 } from './actions';
 import { ChatView } from './chat/ChatView';
 import { DiffView } from './diff/DiffView';
 import { FileView } from './FileView';
 import { SearchView } from './SearchView';
+import { BrowserView } from './BrowserView';
+import { XTerm } from './XTerm';
 import { fileName } from './format';
 import { DRAG_REGION } from './layout';
 import { GitPanel } from './GitPanel';
 import { CollapsedTerminalBar, TerminalPanel } from './TerminalPanel';
-import { Menu } from './ui/Menu';
+import { Menu, type MenuItem } from './ui/Menu';
 import { EMPTY_WORKSPACE_UI, tabKey, useUi, type MainTab } from './ui-store';
 import { WorkspaceHeader } from './WorkspaceHeader';
 
@@ -60,13 +66,62 @@ const TAB_ICONS = {
   diff: 'git-compare',
   file: 'file',
   search: 'search',
+  terminal: 'square-terminal',
+  browser: 'globe',
 } as const;
+
+const PRESET_LABELS: Record<TerminalPreset, string> = {
+  shell: 'Terminal',
+  claude: 'Claude Code',
+  codex: 'Codex',
+};
 
 function extraTabLabel(tab: MainTab): string {
   if (tab.kind === 'diff') return tab.range ? 'Turn changes' : 'Changes';
   if (tab.kind === 'file') return fileName(tab.file);
   if (tab.kind === 'search') return 'Search';
+  if (tab.kind === 'terminal') return PRESET_LABELS[tab.preset];
+  if (tab.kind === 'browser') return 'Browser';
   return '';
+}
+
+function newTabItems(state: AppState, workspace: Workspace): MenuItem[] {
+  const runUrl = state.runtime[workspace.id]?.runUrl;
+  return [
+    ...AGENT_KINDS.map(
+      (agent): MenuItem => ({
+        id: agent,
+        label: `New ${AGENT_LABELS[agent]} chat`,
+        icon: agent === 'claude' ? 'sparkle' : 'hexagon',
+        hint: agent === state.settings.defaultAgent ? '⌘T' : undefined,
+        section: 'Chat',
+        onSelect: () => void newChat(workspace, agent),
+      }),
+    ),
+    ...(['shell', 'claude', 'codex'] as const).map(
+      (preset): MenuItem => ({
+        id: `terminal-${preset}`,
+        label:
+          preset === 'shell'
+            ? 'New terminal'
+            : `${PRESET_LABELS[preset]} in a terminal`,
+        icon: 'square-terminal',
+        section: 'Terminal',
+        onSelect: () => openTerminalTab(workspace.id, preset),
+      }),
+    ),
+    {
+      id: 'browser',
+      label: 'New browser tab',
+      icon: 'globe',
+      section: 'Browser',
+      onSelect: () =>
+        openBrowser(
+          workspace.id,
+          runUrl ?? `http://localhost:${workspace.port}`,
+        ),
+    },
+  ];
 }
 
 function TabStrip({
@@ -125,7 +180,7 @@ function TabStrip({
                     ? session.agent === 'claude'
                       ? 'sparkle'
                       : 'hexagon'
-                    : TAB_ICONS[entry.tab.kind as 'diff' | 'file' | 'search']
+                    : TAB_ICONS[entry.tab.kind as keyof typeof TAB_ICONS]
                 }
                 size={13}
               />
@@ -152,13 +207,7 @@ function TabStrip({
       <div className="flex items-center px-1">
         <Menu
           label="New tab"
-          items={AGENT_KINDS.map((agent) => ({
-            id: agent,
-            label: `New ${AGENT_LABELS[agent]} chat`,
-            icon: agent === 'claude' ? 'sparkle' : 'hexagon',
-            hint: agent === state.settings.defaultAgent ? '⌘T' : undefined,
-            onSelect: () => void newChat(workspace, agent),
-          }))}
+          items={newTabItems(state, workspace)}
           trigger={({ toggle }) => (
             <IconButton
               icon="plus"
@@ -266,6 +315,9 @@ function WorkspaceWithWorktree({
     activeTab?.kind === 'chat'
       ? workspace.sessions.find((item) => item.id === activeTab.sessionId)
       : null;
+  const extraBrowsers = ui.extraTabs.flatMap((tab) =>
+    tab.kind === 'browser' ? [tab] : [],
+  );
   const lastChatKey = tabs.findLast((entry) => entry.tab.kind === 'chat')?.key;
 
   return (
@@ -314,6 +366,27 @@ function WorkspaceWithWorktree({
           {activeTab?.kind === 'search' ? (
             <SearchView workspace={workspace} />
           ) : null}
+          {activeTab?.kind === 'terminal' ? (
+            <XTerm
+              key={activeTab.id}
+              workspaceId={workspace.id}
+              terminalRef={terminalTabRef(workspace.id, activeTab.id)}
+              kind="shell"
+              preset={activeTab.preset}
+              interactive
+            />
+          ) : null}
+          {extraBrowsers.map((tab) => (
+            <div
+              key={tab.id}
+              className={cn(
+                'min-h-0 flex-1 flex-col',
+                activeTab === tab ? 'flex' : 'hidden',
+              )}
+            >
+              <BrowserView url={tab.url} />
+            </div>
+          ))}
         </main>
         {panel ? (
           <aside

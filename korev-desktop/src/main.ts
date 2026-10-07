@@ -149,13 +149,39 @@ function confirmQuit(korev: Korev): boolean {
   return choice === QUIT_BUTTON;
 }
 
+const BROWSER_PARTITION = 'persist:korev-browser';
+const BLANK_PAGE = 'about:blank';
+
+function hardenBrowserTab(contents: WebContents) {
+  contents.setWindowOpenHandler(({ url }) => {
+    if (isWebUrl(url)) void contents.loadURL(url);
+    return { action: 'deny' };
+  });
+  contents.on('will-navigate', (event, url) => {
+    if (!isWebUrl(url)) event.preventDefault();
+  });
+}
+
 function hardenWebContents(contents: WebContents) {
+  if (contents.getType() === 'webview') {
+    hardenBrowserTab(contents);
+    return;
+  }
   contents.setWindowOpenHandler(({ url }) => {
     if (isWebUrl(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
   contents.on('will-navigate', (event, url) => {
     if (!isAppUrl(url, appOrigin)) event.preventDefault();
+  });
+  contents.on('will-attach-webview', (event, webPreferences, params) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+    params.partition = BROWSER_PARTITION;
+    if (!isWebUrl(params.src) && params.src !== BLANK_PAGE)
+      event.preventDefault();
   });
 }
 
@@ -183,6 +209,7 @@ const createWindow = (korev: Korev) => {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      webviewTag: true,
     },
   });
   rememberBounds(mainWindow, korev);

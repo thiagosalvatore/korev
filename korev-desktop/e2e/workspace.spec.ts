@@ -6,6 +6,8 @@ import {
 } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { KorevBridge } from '../src/shared/api';
@@ -279,6 +281,65 @@ test('reviews a turn, searches the workspace and edits a file', async () => {
     await snap(window, '08-edited');
   } finally {
     await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('opens a terminal tab and an in-app browser tab', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const server = createServer((_request, response) =>
+    response.end('<h1>hello from the dev server</h1>'),
+  );
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  const app = await electron.launch({
+    args: [
+      APP_ENTRY,
+      '--use-mock-keychain',
+      `--user-data-dir=${path.join(home, 'user-data')}`,
+    ],
+    env: {
+      ...process.env,
+      HOME: home,
+      SHELL: '/bin/sh',
+      PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}`,
+    },
+  });
+  try {
+    await app.evaluate(({ dialog }, repoPath) => {
+      dialog.showOpenDialog = (async () => ({
+        canceled: false,
+        filePaths: [repoPath],
+      })) as typeof dialog.showOpenDialog;
+    }, repo);
+    const window = await app.firstWindow();
+    await window.setViewportSize({ width: 1440, height: 900 });
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window
+      .getByRole('button', { name: 'Create empty workspace' })
+      .click();
+
+    await window.getByRole('button', { name: 'New tab' }).click();
+    await window.getByRole('menuitem', { name: 'New terminal' }).click();
+    const main = window.getByRole('main');
+    await main.locator('.xterm').click();
+    await window.keyboard.type('echo korev-big-terminal');
+    await window.keyboard.press('Enter');
+    await expect(main.locator('.xterm-rows')).toContainText(
+      'korev-big-terminal',
+    );
+
+    await window.getByRole('button', { name: 'New tab' }).click();
+    await window.getByRole('menuitem', { name: 'New browser tab' }).click();
+    const address = window.getByRole('textbox', { name: 'Address' });
+    await address.fill(`127.0.0.1:${port}`);
+    await address.press('Enter');
+    await expect(address).toHaveValue(`http://127.0.0.1:${port}/`);
+    await snap(window, '09-browser');
+  } finally {
+    await app.close();
+    server.close();
     await rm(home, { recursive: true, force: true });
   }
 });

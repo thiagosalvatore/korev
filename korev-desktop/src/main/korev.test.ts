@@ -575,4 +575,44 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       status: 'allowed',
     });
   });
+
+  it('mirrors tracked workspace changes into the root checkout with spotlight, then restores it', async () => {
+    const workspace = await createWorkspace();
+    await writeFile(
+      path.join(workspace.path, 'README.md'),
+      '# changed in the workspace\n',
+    );
+
+    expect(await korev.api.toggleSpotlight(workspace.id)).toEqual({
+      ok: true,
+      value: undefined,
+    });
+    expect(await readFile(path.join(repoPath, 'README.md'), 'utf8')).toBe(
+      '# changed in the workspace\n',
+    );
+    expect((await korev.api.getState()).spotlights).toEqual({
+      [workspace.repoId]: workspace.id,
+    });
+
+    expect(await korev.api.toggleSpotlight(workspace.id)).toEqual({
+      ok: true,
+      value: undefined,
+    });
+    expect(await readFile(path.join(repoPath, 'README.md'), 'utf8')).toBe(
+      '# acme\n',
+    );
+    expect(git(repoPath, 'branch', '--show-current')).toBe('main');
+  });
+
+  it('refuses spotlight while the root checkout has uncommitted changes', async () => {
+    const workspace = await createWorkspace();
+    await writeFile(path.join(repoPath, 'README.md'), '# local edit\n');
+
+    const result = await korev.api.toggleSpotlight(workspace.id);
+
+    expect(result.ok).toBe(false);
+    expect(await readFile(path.join(repoPath, 'README.md'), 'utf8')).toBe(
+      '# local edit\n',
+    );
+  });
 });

@@ -1,11 +1,13 @@
 import { useSyncExternalStore } from 'react';
-import type { TerminalKind, TurnRange } from '../shared/model';
+import type { TerminalKind, TerminalPreset, TurnRange } from '../shared/model';
 
 export type MainTab =
   | { kind: 'chat'; sessionId: string }
   | { kind: 'diff'; file: string | null; range?: TurnRange | null }
   | { kind: 'file'; file: string; line?: number | null; editing?: boolean }
-  | { kind: 'search' };
+  | { kind: 'search' }
+  | { kind: 'terminal'; id: string; preset: TerminalPreset }
+  | { kind: 'browser'; id: string; url: string };
 
 export type DiffLayout = 'unified' | 'split';
 
@@ -40,6 +42,8 @@ export function tabKey(tab: MainTab): string {
   if (tab.kind === 'chat') return `chat:${tab.sessionId}`;
   if (tab.kind === 'file') return `file:${tab.file}`;
   if (tab.kind === 'search') return 'search';
+  if (tab.kind === 'terminal') return `terminal:${tab.id}`;
+  if (tab.kind === 'browser') return `browser:${tab.id}`;
   return tab.range ? `diff:${tab.range.to}` : 'diff';
 }
 

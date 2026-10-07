@@ -10,6 +10,7 @@ import {
   type EditorId,
   type PromptKind,
   type Repo,
+  type TerminalPreset,
   type Result,
   type Settings,
   type WorkspaceRuntime,
@@ -50,6 +51,7 @@ import { expandPort, loadRepoConfig, withPrompt } from './repo-config';
 import { listIssues, listPullRequests } from './sources';
 import { rangeFileDiff, rangeFiles, searchFiles } from './git-review';
 import { findLocalUrl } from './workspace-setup';
+import { createSpotlight } from './spotlight';
 import { openStore } from './store';
 import { createTerminals, type SpawnPty } from './terminals';
 import {
@@ -140,6 +142,11 @@ const IDLE: WorkspaceRuntime = {
   runUrl: null,
 };
 const RUN_REF_SUFFIX = ':run';
+const TERMINAL_PRESETS: Record<TerminalPreset, string | null> = {
+  shell: null,
+  claude: 'claude',
+  codex: 'codex',
+};
 
 function ok<T>(value: T): Result<T> {
   return { ok: true, value };
@@ -210,6 +217,21 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
   };
   const chats = createChats(ctx);
+  const spotlight = createSpotlight(
+    git,
+    () => ctx.emitState(),
+    (message) =>
+      deps.notify({
+        title: 'Spotlight',
+        body: message,
+        workspaceId: ctx.focusedWorkspaceId ?? '',
+      }),
+  );
+
+  async function archive(workspaceId: string) {
+    await spotlight.disableForWorkspace(workspaceId);
+    return archiveWorkspace(ctx, workspaceId, chats.stopWorkspace);
+  }
 
   function detectRunUrl(ref: string, data: string) {
     const runtime = ctx.runtime(ref.slice(0, -RUN_REF_SUFFIX.length));
@@ -232,6 +254,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       ),
       runningSessions: [...ctx.runningSessions],
       runningTerminals: ctx.terminals.running(),
+      spotlights: spotlight.active(),
       agents,
       editors,
     };
@@ -286,7 +309,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       workspace.sessions.some((session) => ctx.runningSessions.has(session.id))
     )
       return;
-    await archiveWorkspace(ctx, workspaceId, chats.stopWorkspace);
+    await archive(workspaceId);
   }
 
   async function actionPrompt(
@@ -306,12 +329,17 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     return workspace;
   }
 
-  async function openShell(ref: string, workspaceId: string) {
+  async function openShell(
+    ref: string,
+    workspaceId: string,
+    preset: TerminalPreset,
+  ) {
     const workspace = workspacePath(workspaceId);
     const repo = ctx.repo(workspace.repoId);
     ctx.terminals.start(ref, {
       cwd: workspace.path,
       env: await scriptEnv(ctx, repo, workspace),
+      command: TERMINAL_PRESETS[preset] ?? undefined,
     });
   }
 
@@ -398,7 +426,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       const { state } = store;
       const workspaces = state.workspaces.filter((ws) => ws.repoId === repoId);
       for (const workspace of workspaces) {
-        await archiveWorkspace(ctx, workspace.id, chats.stopWorkspace);
+        await archive(workspace.id);
         await deleteWorkspace(ctx, workspace.id);
       }
       await removeRepoFromAskChats(ctx.repo(repoId));
@@ -410,6 +438,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       const repo = ctx.repo(repoId);
       if (patch.defaultBranch?.trim())
         repo.defaultBranch = patch.defaultBranch.trim();
+      if (patch.spotlightTesting !== undefined)
+        repo.spotlightTesting = patch.spotlightTesting;
       store.save();
       ctx.emitState();
     },
@@ -482,8 +512,14 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       });
       return sent.ok ? ok(session.id) : sent;
     },
-    archiveWorkspace: (workspaceId) =>
-      archiveWorkspace(ctx, workspaceId, chats.stopWorkspace),
+    archiveWorkspace: (workspaceId) => archive(workspaceId),
+    async toggleSpotlight(workspaceId) {
+      const workspace = workspacePath(workspaceId);
+      const repo = ctx.repo(workspace.repoId);
+      if (spotlight.active()[repo.id] === workspaceId)
+        return spotlight.disable(repo.id);
+      return spotlight.enable(repo, workspace);
+    },
     restoreWorkspace: (workspaceId) => restoreWorkspace(ctx, workspaceId),
     deleteWorkspace: (workspaceId) => deleteWorkspace(ctx, workspaceId),
     async focusWorkspace(workspaceId) {
@@ -682,10 +718,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
     openExternal: (url) => deps.openExternal(url),
     updateSettings,
-    async openTerminal(ref, workspaceId, kind, size) {
+    async openTerminal(ref, workspaceId, kind, size, preset = 'shell') {
       assertOwnRef(ref, workspaceId);
       if (kind === 'shell' && !ctx.terminals.isRunning(ref)) {
-        await openShell(ref, workspaceId);
+        await openShell(ref, workspaceId, preset);
         ctx.emitState();
       }
       return ok(ctx.terminals.attach(ref, size) ?? '');
@@ -720,6 +756,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     settings: () => store.state.settings,
     updateSettings,
     async shutdown() {
+      await spotlight.disableAll();
       for (const session of allSessions()) chats.stop(session.id);
       await chats.settled();
       ctx.terminals.closeAll();

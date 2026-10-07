@@ -553,6 +553,17 @@ function RepoSettings({ state, repo }: { state: AppState; repo: Repo }) {
         </Button>
       </Row>
       <Row
+        title="Use spotlight testing"
+        description="Shows a Spotlight button in each workspace's Run tab. It mirrors that workspace's tracked changes into this repository's own checkout, for apps you can only run from there."
+      >
+        <Switch
+          checked={repo.spotlightTesting ?? false}
+          onChange={(spotlightTesting) =>
+            void api.updateRepo(repo.id, { spotlightTesting })
+          }
+        />
+      </Row>
+      <Row
         title="Default branch"
         description="New workspaces branch from origin/<default branch>."
       >

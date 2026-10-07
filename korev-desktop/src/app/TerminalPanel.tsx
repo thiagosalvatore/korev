@@ -1,6 +1,5 @@
-import { FitAddon } from '@xterm/addon-fit';
-import { Terminal, type ITheme } from '@xterm/xterm';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { XTerm } from './XTerm';
 import { Button, cn, Icon, IconButton, Tabs } from '../design-system';
 import type {
   AppState,
@@ -8,109 +7,21 @@ import type {
   TerminalKind,
   Workspace,
 } from '../shared/model';
-import { openSettings, startRunScript, toggleRunScript } from './actions';
+import {
+  openBrowser,
+  openSettings,
+  startRunScript,
+  toggleRunScript,
+} from './actions';
 import { Menu } from './ui/Menu';
-import { api, on } from './bridge';
-import { reportFailure } from './ui/toast';
+import { api } from './bridge';
+import { reportFailure, toast } from './ui/toast';
 import {
   EMPTY_WORKSPACE_UI,
   setUi,
   updateWorkspaceUi,
   useUi,
 } from './ui-store';
-
-const FONT_SIZE = 12;
-
-function token(styles: CSSStyleDeclaration, name: string): string {
-  return styles.getPropertyValue(name).trim();
-}
-
-function themeFromTokens(): { theme: ITheme; fontFamily: string } {
-  const styles = getComputedStyle(document.documentElement);
-  return {
-    theme: {
-      background: token(styles, '--bg-inset'),
-      foreground: token(styles, '--fg-1'),
-      cursor: token(styles, '--accent'),
-      selectionBackground: token(styles, '--selection-bg'),
-    },
-    fontFamily: token(styles, '--font-mono'),
-  };
-}
-
-function XTerm({
-  workspaceId,
-  kind,
-  interactive,
-}: {
-  workspaceId: string;
-  kind: TerminalKind;
-  interactive: boolean;
-}) {
-  const host = useRef<HTMLDivElement>(null);
-  const ref = `${workspaceId}:${kind}`;
-  useEffect(() => {
-    const element = host.current;
-    if (!element) return undefined;
-    const terminal = new Terminal({
-      ...themeFromTokens(),
-      fontSize: FONT_SIZE,
-      cursorBlink: interactive,
-      disableStdin: !interactive,
-      convertEol: !interactive,
-    });
-    const fit = new FitAddon();
-    terminal.loadAddon(fit);
-    terminal.open(element);
-    fit.fit();
-    let replayed = false;
-    const buffered: string[] = [];
-    const stopOutput = on('terminal-output', (output) => {
-      if (output.ref !== ref) return;
-      if (replayed) terminal.write(output.data);
-      else buffered.push(output.data);
-    });
-    const stopExit = on('terminal-exit', (exit) => {
-      if (exit.ref !== ref) return;
-      const message =
-        exit.exitCode === -1
-          ? 'Stopped'
-          : `Process exited with code ${exit.exitCode}`;
-      terminal.write(`\r\n\x1b[2m[${message}]\x1b[0m\r\n`);
-    });
-    const input = terminal.onData((data) => void api.writeTerminal(ref, data));
-    const resizer = new ResizeObserver(() => {
-      if (!element.clientWidth) return;
-      fit.fit();
-      void api.resizeTerminal(ref, {
-        cols: terminal.cols,
-        rows: terminal.rows,
-      });
-    });
-    resizer.observe(element);
-    let attached = true;
-    void api
-      .openTerminal(ref, workspaceId, kind, {
-        cols: terminal.cols,
-        rows: terminal.rows,
-      })
-      .then((result) => {
-        if (!attached || !reportFailure(result)) return;
-        terminal.write(result.value);
-        buffered.forEach((data) => terminal.write(data));
-        replayed = true;
-      });
-    return () => {
-      attached = false;
-      stopOutput();
-      stopExit();
-      input.dispose();
-      resizer.disconnect();
-      terminal.dispose();
-    };
-  }, [ref, workspaceId, kind, interactive]);
-  return <div ref={host} className="min-h-0 flex-1 bg-inset py-1 pl-2" />;
-}
 
 const TABS: { id: TerminalKind; label: string }[] = [
   { id: 'setup', label: 'Setup' },
@@ -182,22 +93,30 @@ function OpenButton({
         size="sm"
         variant="secondary"
         icon="external-link"
-        className={previews.length > 1 ? 'rounded-r-none' : ''}
+        className="rounded-r-none"
         title={first.url}
         onClick={() => void api.openExternal(first.url)}
       >
         Open
       </Button>
-      {previews.length > 1 ? (
+      {previews.length > 0 ? (
         <Menu
           label="Preview URLs"
           align="right"
-          items={previews.map((preview) => ({
-            id: preview.url,
-            label: `${preview.name} · ${preview.url}`,
-            icon: 'globe',
-            onSelect: () => void api.openExternal(preview.url),
-          }))}
+          items={previews.flatMap((preview) => [
+            {
+              id: preview.url,
+              label: `${preview.name} · ${preview.url}`,
+              icon: 'external-link' as const,
+              onSelect: () => void api.openExternal(preview.url),
+            },
+            {
+              id: `${preview.url}:korev`,
+              label: `Open ${preview.name} in Korev`,
+              icon: 'globe' as const,
+              onSelect: () => openBrowser(workspace.id, preview.url),
+            },
+          ])}
           trigger={({ toggle }) => (
             <Button
               size="sm"
@@ -212,6 +131,40 @@ function OpenButton({
         />
       ) : null}
     </div>
+  );
+}
+
+function SpotlightButton({
+  state,
+  workspace,
+  config,
+}: {
+  state: AppState;
+  workspace: Workspace;
+  config: RepoConfig | null;
+}) {
+  const repo = state.repos.find((entry) => entry.id === workspace.repoId);
+  if (!repo || (!repo.spotlightTesting && !config?.spotlightTesting))
+    return null;
+  const active = state.spotlights[repo.id] === workspace.id;
+  return (
+    <Button
+      size="sm"
+      variant={active ? 'primary' : 'secondary'}
+      icon="scan-eye"
+      title={`Mirror this workspace's tracked changes into ${repo.path} so the app you run from there picks them up`}
+      onClick={async () => {
+        const result = await api.toggleSpotlight(workspace.id);
+        if (reportFailure(result))
+          toast(
+            active
+              ? `Spotlight off, ${repo.name} restored`
+              : `Spotlight on for ${workspace.name}`,
+          );
+      }}
+    >
+      Spotlight
+    </Button>
   );
 }
 
@@ -233,6 +186,7 @@ function RunControls({
     scripts.find((script) => script.isDefault);
   return (
     <div className="flex items-center gap-1.5">
+      <SpotlightButton state={state} workspace={workspace} config={config} />
       <OpenButton state={state} workspace={workspace} config={config} />
       <div className="flex items-center">
         <Button
@@ -372,6 +326,7 @@ export function TerminalPanel({
           <XTerm
             key={`${ref}:${shellKey}:${tab === 'shell' || running}`}
             workspaceId={workspace.id}
+            terminalRef={ref}
             kind={tab}
             interactive={tab === 'shell'}
           />

@@ -22,6 +22,7 @@ Put a `.korev/settings.toml` in a repository to share its setup with everyone wh
 
 ```toml
 file_include_globs = ".env*\nconfig/*.local.json"   # gitignored files copied into new workspaces
+spotlight_testing = true            # shows the Spotlight button in each workspace's Run tab
 
 [scripts]
 setup = "pnpm install"
@@ -54,6 +55,10 @@ branch_prefix = "agent"
 A `.worktreeinclude` file in the repository root replaces `file_include_globs`. Without both, Korev copies gitignored `.env*` files.
 
 Scripts and agents get `KOREV_WORKSPACE_NAME`, `KOREV_WORKSPACE_PATH`, `KOREV_WORKSPACE_ID`, `KOREV_ROOT_PATH`, `KOREV_DEFAULT_BRANCH` and `KOREV_PORT` (the first of 10 ports reserved for the workspace).
+
+## Spotlight
+
+Some apps only run from the repository's own checkout. Turn on Spotlight in a workspace's Run tab and Korev mirrors that workspace's tracked changes into the root checkout every second or so, by checking out a snapshot commit there. Turning it off checks the root out back at its original branch. It needs a clean root checkout and syncs tracked files only.
 
 ## Checks
 

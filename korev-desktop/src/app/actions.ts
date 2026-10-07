@@ -5,6 +5,7 @@ import type {
   EditorId,
   Result,
   SendOptions,
+  TerminalPreset,
   TurnRange,
   Workspace,
   WorkspaceSource,
@@ -103,6 +104,22 @@ export function openSearch(workspaceId: string) {
   openExtraTab(workspaceId, { kind: 'search' });
 }
 
+function tabId(): string {
+  return Date.now().toString(36);
+}
+
+export function terminalTabRef(workspaceId: string, id: string): string {
+  return `${workspaceId}:tab-${id}`;
+}
+
+export function openTerminalTab(workspaceId: string, preset: TerminalPreset) {
+  openExtraTab(workspaceId, { kind: 'terminal', id: tabId(), preset });
+}
+
+export function openBrowser(workspaceId: string, url: string) {
+  openExtraTab(workspaceId, { kind: 'browser', id: tabId(), url });
+}
+
 export async function newChat(workspace: Workspace, agent: AgentKind) {
   const session = await api.newSession(workspace.id, agent);
   activateTab(workspace.id, tabKey({ kind: 'chat', sessionId: session.id }));
@@ -124,6 +141,9 @@ export async function closeTab(workspace: Workspace, key: string) {
     if (workspace.sessions.length <= 1) return;
     await api.closeSession(workspace.id, key.slice('chat:'.length));
   } else {
+    const closing = ui.extraTabs.find((tab) => tabKey(tab) === key);
+    if (closing?.kind === 'terminal')
+      void api.closeTerminal(terminalTabRef(workspace.id, closing.id));
     updateWorkspaceUi(workspace.id, (current) => ({
       extraTabs: current.extraTabs.filter((tab) => tabKey(tab) !== key),
     }));

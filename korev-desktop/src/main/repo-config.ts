@@ -178,6 +178,7 @@ function fromSettings(settings: Table, app: RepoScripts): RepoConfig {
     deleteBranchOnArchive:
       flag(table(settings.git).delete_branch_on_archive) ?? null,
     branchPrefix: branchPrefixFrom(table(settings.git)),
+    spotlightTesting: settings.spotlight_testing === true,
   };
 }
 
@@ -196,6 +197,7 @@ function fromApp(app: RepoScripts): RepoConfig {
     archiveOnMerge: null,
     deleteBranchOnArchive: null,
     branchPrefix: null,
+    spotlightTesting: false,
   };
 }
 

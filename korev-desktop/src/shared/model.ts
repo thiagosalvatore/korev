@@ -100,6 +100,7 @@ export interface RepoConfig {
   archiveOnMerge: boolean | null;
   deleteBranchOnArchive: boolean | null;
   branchPrefix: string | null;
+  spotlightTesting: boolean;
 }
 
 export interface Repo {
@@ -108,6 +109,7 @@ export interface Repo {
   path: string;
   defaultBranch: string;
   scripts: RepoScripts;
+  spotlightTesting?: boolean;
 }
 
 export type WorkspaceSource =
@@ -264,6 +266,7 @@ export interface AppState {
   runtime: Record<string, WorkspaceRuntime>;
   runningSessions: string[];
   runningTerminals: string[];
+  spotlights: Record<string, string>;
   agents: AgentAvailability[];
   editors: EditorApp[];
 }
@@ -379,6 +382,8 @@ export interface TerminalExit {
 }
 
 export type TerminalKind = 'shell' | 'setup' | 'run';
+
+export type TerminalPreset = 'shell' | 'claude' | 'codex';
 
 export type AppCommand =
   | 'new-workspace'
