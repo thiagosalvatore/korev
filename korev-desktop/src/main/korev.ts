@@ -421,6 +421,20 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     return workspace;
   }
 
+  async function slashCommandsAt(projectPath: string) {
+    const dirs = [
+      path.join(projectPath, '.claude', 'commands'),
+      path.join(deps.home, '.claude', 'commands'),
+    ];
+    const names = await Promise.all(dirs.map((dir) => commandNames(dir)));
+    const skills = (await listSkills(deps.home, projectPath))
+      .filter((skill) => skill.agents.includes('claude'))
+      .map((skill) => skill.name);
+    return [
+      ...new Set([...BUILTIN_COMMANDS, ...names.flat(), ...skills]),
+    ].sort();
+  }
+
   async function openShell(
     ref: string,
     workspaceId: string,
@@ -863,20 +877,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       );
       return ok(relative);
     },
-    async slashCommands(workspaceId) {
-      const workspace = workspacePath(workspaceId);
-      const dirs = [
-        path.join(workspace.path, '.claude', 'commands'),
-        path.join(deps.home, '.claude', 'commands'),
-      ];
-      const names = await Promise.all(dirs.map((dir) => commandNames(dir)));
-      const skills = (await listSkills(deps.home, workspace.path))
-        .filter((skill) => skill.agents.includes('claude'))
-        .map((skill) => skill.name);
-      return [
-        ...new Set([...BUILTIN_COMMANDS, ...names.flat(), ...skills]),
-      ].sort();
-    },
+    slashCommands: (workspaceId) =>
+      slashCommandsAt(workspacePath(workspaceId).path),
+    repoSlashCommands: (repoId) => slashCommandsAt(ctx.repo(repoId).path),
     async fixChecks(workspaceId, sessionId) {
       const pr = ctx.runtime(workspaceId).pr;
       if (!pr) return fail('No pull request for this branch');

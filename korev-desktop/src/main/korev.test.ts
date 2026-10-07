@@ -828,6 +828,15 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(await korev.api.slashCommands(workspace.id)).toContain('browse');
   });
 
+  it('offers skills as slash commands for a repo without a workspace', async () => {
+    const repo = await addRepo();
+    const skillDir = path.join(home, '.claude', 'skills', 'pr-review');
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(path.join(skillDir, 'SKILL.md'), '# pr-review\n');
+
+    expect(await korev.api.repoSlashCommands(repo.id)).toContain('pr-review');
+  });
+
   it('mirrors tracked workspace changes into the root checkout with spotlight, then restores it', async () => {
     const workspace = await createWorkspace();
     await writeFile(

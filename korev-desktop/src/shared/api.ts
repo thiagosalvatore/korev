@@ -107,6 +107,7 @@ export interface KorevApi {
     base64: string,
   ): Promise<Result<string>>;
   slashCommands(workspaceId: string): Promise<string[]>;
+  repoSlashCommands(repoId: string): Promise<string[]>;
   createPr(workspaceId: string, sessionId: string): Promise<Result>;
   fixChecks(workspaceId: string, sessionId: string): Promise<Result>;
   resolveConflicts(workspaceId: string, sessionId: string): Promise<Result>;

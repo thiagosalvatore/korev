@@ -24,6 +24,15 @@ export interface SuggestionSource {
   repoId: string | null;
 }
 
+async function slashCommands({
+  workspaceId,
+  repoId,
+}: SuggestionSource): Promise<string[]> {
+  if (workspaceId) return api.slashCommands(workspaceId);
+  if (repoId) return api.repoSlashCommands(repoId);
+  return [];
+}
+
 export function createSuggestionLoader(source: SuggestionSource) {
   const cache = new Map<SuggestionTrigger, SuggestionOption[]>();
 
@@ -35,10 +44,11 @@ export function createSuggestionLoader(source: SuggestionSource) {
         insert: `@${file}`,
       }));
     }
-    if (trigger === '/' && workspaceId) {
-      return (await api.slashCommands(workspaceId).catch(() => [])).map(
-        (name) => ({ label: name, insert: `/${name}` }),
-      );
+    if (trigger === '/') {
+      return (await slashCommands(source).catch(() => [])).map((name) => ({
+        label: name,
+        insert: `/${name}`,
+      }));
     }
     if (trigger === '#' && repoId) {
       return (await api.listPullRequests(repoId).catch(() => [])).map((pr) => ({
