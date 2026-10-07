@@ -6,6 +6,13 @@ To ask about code without starting a task, use **Ask**. The agent reads a shared
 
 A task that spans repositories (say a frontend and a backend) gets one linked workspace per repository, all on the same branch name. Pick several repositories on the New workspace page, or plan the change in an Ask chat and press **Start workspaces**. Each agent changes only its own repository and can read the linked ones.
 
+## Requirements
+
+- macOS.
+- Node 24 and npm, the versions CI uses.
+- The `claude` and `codex` CLIs on your PATH, signed in. Korev uses their own sign-in. You need only the agents you plan to use.
+- `gh`, signed in. Korev uses it for pull requests, issues and checks.
+
 ## Run it
 
 ```sh
@@ -14,9 +21,38 @@ npm ci
 npm start
 ```
 
-To package the app and open the build, run `make package-run` from the repository root.
+`npm start` runs Korev in development mode with Electron Forge and Vite. Changes to the renderer (`src/app`) reload in the window. Changes to the main process (`src/main`) need a restart: type `rs` in the terminal that runs `npm start`.
 
-Korev uses the `claude` and `codex` CLIs from your PATH and their own sign-in, and `gh` for pull requests, issues and checks.
+Korev keeps its state in `~/Library/Application Support/Korev`: `korev-state.json`, chat transcripts in `transcripts/`, and the shared Ask checkouts in `repos/`. The development build and the packaged app use the same directory.
+
+## Package it
+
+From the repository root:
+
+```sh
+make package       # builds korev-desktop/out/Korev-darwin-<arch>/Korev.app
+make run           # quits the packaged Korev if it is running, then opens the build
+make package-run   # both
+```
+
+To make a zip you can give to someone else, run `npm run make` in `korev-desktop`. The zip goes to `korev-desktop/out/make/zip/darwin/<arch>/`.
+
+The build is not signed or notarized (see `TODOS.md`), so Gatekeeper blocks it on other Macs. To open it there, right-click the app and choose Open, or run `xattr -dr com.apple.quarantine Korev.app`.
+
+To change the app icon, edit `korev-desktop/assets/icon.svg` and run `npm run icons`. It needs `rsvg-convert` and ImageMagick (`brew install librsvg imagemagick`).
+
+## Project layout
+
+| Path | What it holds |
+| --- | --- |
+| `korev-desktop/src/main` | Electron main process: git, worktrees, agents, pull requests, the state store |
+| `korev-desktop/src/app` | React renderer: sidebar, workspace view, chat, settings |
+| `korev-desktop/src/shared` | The API between the main process and the renderer, and the types both use |
+| `korev-desktop/src/design-system` | Tokens, styles and shared UI components |
+| `korev-desktop/e2e` | Playwright tests that drive the packaged app |
+| `korev-desktop/test-support/bin/claude` | The fake `claude` CLI that the e2e tests run |
+| `DESIGN.md` | How the app looks and behaves |
+| `TODOS.md` | Features Korev does not have yet |
 
 ## Repository config
 
@@ -64,7 +100,28 @@ Some apps only run from the repository's own checkout. Turn on Spotlight in a wo
 
 ## Checks
 
+Run these in `korev-desktop`:
+
 ```sh
-npm run typecheck && npm run lint && npm test
-npm run test:e2e   # packages the app and drives it with a fake agent
+npm run typecheck   # tsc
+npm run lint        # oxlint and oxfmt; npm run lint:fix applies the fixes
+npm test            # Vitest unit tests
+npm run test:e2e    # packages the app and drives it with a fake agent
 ```
+
+CI runs the same checks, but only when you start it by hand:
+
+```sh
+gh workflow run ci.yml --ref <branch>
+```
+
+## Contributing
+
+1. Make a branch from `main`. Do not commit to `main`.
+2. Keep each pull request to one change. Put dependent work in a second pull request on top of the first.
+3. Put unit tests next to the code they test (`foo.ts` and `foo.test.ts`). Add an e2e test when a flow goes across several screens.
+4. Follow `DESIGN.md` for UI changes: semantic tokens only, one accent colour.
+5. Run the checks above, then start CI on your branch.
+6. Write the commit and pull request title as one sentence that says what the user sees change, for example "Keep the Mac awake while an agent is running". Pull requests are squash-merged.
+
+For things to work on, see `TODOS.md`.
