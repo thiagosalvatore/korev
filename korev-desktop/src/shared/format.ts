@@ -5,6 +5,7 @@ import {
   type AppState,
   type ChatSession,
   type ModelChoice,
+  type Repo,
 } from './model';
 
 const MINUTE_MS = 60_000;
@@ -70,4 +71,13 @@ export function loadoutChoices(
   return state.settings.loadout.flatMap((key) =>
     choices.filter((choice) => loadoutKey(choice.agent, choice.id) === key),
   );
+}
+
+const MAX_NAMED_REPOS = 2;
+
+export function pickerLabel(picked: Repo[]): string {
+  if (!picked.length) return 'Choose repositories';
+  const names = picked.map((repo) => repo.name);
+  if (names.length <= MAX_NAMED_REPOS) return names.join(', ');
+  return `${names[0]} +${names.length - 1}`;
 }

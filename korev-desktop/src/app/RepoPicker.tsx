@@ -1,16 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { cn, Icon, Input } from '../design-system';
+import { pickerLabel } from '../shared/format';
 import type { AppState, Repo } from '../shared/model';
 import { PANEL, useDismiss } from './ui/Menu';
-
-const MAX_NAMED_REPOS = 2;
-
-function pickerLabel(picked: Repo[]): string {
-  if (!picked.length) return 'Choose repositories';
-  const names = picked.map((repo) => repo.name);
-  if (names.length <= MAX_NAMED_REPOS) return names.join(', ');
-  return `${names[0]} +${names.length - 1}`;
-}
 
 function matching(repos: Repo[], query: string): Repo[] {
   const needle = query.trim().toLowerCase();

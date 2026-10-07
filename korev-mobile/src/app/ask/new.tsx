@@ -77,6 +77,7 @@ function NewAskForm({
       <RepoPicker
         repos={repos}
         selected={repoIds}
+        multiple
         onToggle={(repoId) => setRepoIds(toggled(repoIds, repoId))}
       />
       <TextInput
