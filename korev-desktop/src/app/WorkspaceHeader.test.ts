@@ -64,4 +64,24 @@ describe('next PR action', () => {
 
     expect(primaryPr(workspace, runtime)?.number).toBe(8);
   });
+
+  describe('with two open PRs from different branches', () => {
+    const workspace = { branch: 'dev/login' } as Workspace;
+    const other: PrStatus = {
+      ...READY_PR,
+      number: 9,
+      url: 'https://github.com/acme/web/pull/9',
+      headRefName: 'dev/signup',
+    };
+    const runtime = { prs: [READY_PR, other] } as WorkspaceRuntime;
+
+    it('acts on the PR the user picked', () => {
+      expect(primaryPr(workspace, runtime, other.url)?.number).toBe(9);
+    });
+
+    it('falls back to the branch PR when the picked one is gone', () => {
+      const gone = 'https://github.com/acme/web/pull/42';
+      expect(primaryPr(workspace, runtime, gone)?.number).toBe(7);
+    });
+  });
 });

@@ -55,7 +55,8 @@ function useChanges(workspace: Workspace, range: TurnRange | null) {
 }
 
 function useReviewComments(state: AppState, workspace: Workspace) {
-  const pr = primaryPr(workspace, state.runtime[workspace.id]);
+  const prUrl = useUi((ui) => ui.workspaces[workspace.id]?.prUrl);
+  const pr = primaryPr(workspace, state.runtime[workspace.id], prUrl);
   const [comments, setComments] = useState<ReviewComment[]>([]);
   useEffect(() => {
     if (pr?.state !== 'OPEN') return;

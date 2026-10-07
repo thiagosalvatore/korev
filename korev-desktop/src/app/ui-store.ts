@@ -36,6 +36,7 @@ export interface WorkspaceUi {
   comments: DiffComment[];
   runScriptId?: string | null;
   viewed?: Record<string, string>;
+  prUrl?: string | null;
 }
 
 export function tabKey(tab: MainTab): string {

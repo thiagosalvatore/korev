@@ -16,9 +16,10 @@ import {
 } from './actions';
 import { api } from './bridge';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
+import { prIcon } from './Sidebar';
 import { Menu } from './ui/Menu';
 import { toast } from './ui/toast';
-import { setUi, useUi } from './ui-store';
+import { setUi, updateWorkspaceUi, useUi } from './ui-store';
 
 interface NextAction {
   label: string;
@@ -138,6 +139,58 @@ function TargetBranch({ workspace }: { workspace: Workspace }) {
   );
 }
 
+function PrButton({
+  workspace,
+  pr,
+  prs,
+}: {
+  workspace: Workspace;
+  pr: PrStatus;
+  prs: PrStatus[];
+}) {
+  const open = (
+    <Button
+      size="sm"
+      variant="ghost"
+      icon="git-pull-request"
+      title="Open PR on GitHub"
+      className={prs.length > 1 ? 'rounded-r-none' : undefined}
+      onClick={() => void api.openExternal(pr.url)}
+    >
+      #{pr.number}
+    </Button>
+  );
+  if (prs.length < 2) return open;
+  return (
+    <div className="flex items-center">
+      {open}
+      <Menu
+        label="Pull requests"
+        align="right"
+        items={prs.map((entry) => ({
+          id: entry.url,
+          label: `#${entry.number} ${entry.title}`,
+          icon: prIcon(entry).icon,
+          checked: entry.url === pr.url,
+          onSelect: () =>
+            updateWorkspaceUi(workspace.id, () => ({ prUrl: entry.url })),
+        }))}
+        trigger={({ toggle }) => (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="-ml-px rounded-l-none px-1.5"
+            aria-label="Choose pull request"
+            onClick={toggle}
+          >
+            <Icon name="chevron-down" size={13} />
+          </Button>
+        )}
+      />
+    </div>
+  );
+}
+
 export function WorkspaceHeader({
   state,
   workspace,
@@ -147,8 +200,9 @@ export function WorkspaceHeader({
 }) {
   const sidebar = useUi((ui) => ui.sidebar);
   const panel = useUi((ui) => ui.panel);
+  const prUrl = useUi((ui) => ui.workspaces[workspace.id]?.prUrl);
   const runtime = state.runtime[workspace.id];
-  const pr = primaryPr(workspace, runtime);
+  const pr = primaryPr(workspace, runtime, prUrl);
   const action = nextAction(state, workspace, pr);
   const editor =
     state.editors.find((entry) => entry.id === state.settings.editor) ??
@@ -231,15 +285,7 @@ export function WorkspaceHeader({
           </div>
         ) : null}
         {pr ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            icon="git-pull-request"
-            title="Open PR on GitHub"
-            onClick={() => void api.openExternal(pr.url)}
-          >
-            #{pr.number}
-          </Button>
+          <PrButton workspace={workspace} pr={pr} prs={runtime?.prs ?? []} />
         ) : null}
         <Button
           size="sm"

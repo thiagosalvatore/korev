@@ -69,7 +69,7 @@ function NavRow({
   );
 }
 
-function prIcon(pr: PrStatus): {
+export function prIcon(pr: PrStatus): {
   icon: IconName;
   className: string;
   label: string;

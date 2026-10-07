@@ -96,7 +96,11 @@ export function runCommand(state: AppState, command: AppCommand) {
       break;
   }
   if (!workspace || workspace.archivedAt) return;
-  const pr = primaryPr(workspace, state.runtime[workspace.id]);
+  const pr = primaryPr(
+    workspace,
+    state.runtime[workspace.id],
+    getUi().workspaces[workspace.id]?.prUrl,
+  );
   switch (command) {
     case 'new-chat':
       return void newChat(workspace, state.settings.defaultAgent);

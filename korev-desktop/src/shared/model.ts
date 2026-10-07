@@ -309,8 +309,11 @@ export interface WorkspaceRuntime {
 export function primaryPr(
   workspace: Workspace,
   runtime: WorkspaceRuntime | undefined,
+  chosenUrl?: string | null,
 ): PrStatus | null {
   const prs = runtime?.prs ?? [];
+  const chosen = prs.find((pr) => pr.url === chosenUrl);
+  if (chosen) return chosen;
   const open = prs.filter((pr) => pr.state === 'OPEN');
   return (
     open.find((pr) => pr.headRefName === workspace.branch) ??
