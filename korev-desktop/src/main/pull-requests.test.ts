@@ -51,6 +51,16 @@ describe('PR status', () => {
     ]);
   });
 
+  it.each([
+    ['APPROVED', 'APPROVED'],
+    ['', null],
+  ])('reads review decision %j as %j', (reviewDecision, expected) => {
+    const status = parsePrStatus(
+      JSON.stringify({ number: 7, state: 'OPEN', reviewDecision }),
+    );
+    expect(status?.reviewDecision).toBe(expected);
+  });
+
   it('returns null when there is no PR', () => {
     expect(parsePrStatus('no pull requests found')).toBeNull();
   });

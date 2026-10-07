@@ -7,7 +7,8 @@ import type {
 import type { CommandRunner } from './command-runner';
 
 const GH_TIMEOUT_MS = 60_000;
-const PR_FIELDS = 'number,url,title,state,isDraft,mergeable,statusCheckRollup';
+const PR_FIELDS =
+  'number,url,title,state,isDraft,mergeable,reviewDecision,statusCheckRollup';
 const COMPLETED = 'COMPLETED';
 const PASSING = new Set(['SUCCESS', 'NEUTRAL']);
 const SKIPPED = new Set(['SKIPPED', 'CANCELLED', 'STALE']);
@@ -61,6 +62,8 @@ export function parsePrStatus(json: string): PrStatus | null {
     state: str(raw.state) as PrStatus['state'],
     isDraft: raw.isDraft === true,
     mergeable: (str(raw.mergeable) || 'UNKNOWN') as PrStatus['mergeable'],
+    reviewDecision: (str(raw.reviewDecision) ||
+      null) as PrStatus['reviewDecision'],
     checks: rollup.map(toCheck),
   };
 }

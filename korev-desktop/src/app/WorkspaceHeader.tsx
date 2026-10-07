@@ -22,7 +22,21 @@ interface NextAction {
   run: () => unknown;
 }
 
-function nextAction(
+function openPrStatus(
+  pr: PrStatus,
+  label: string,
+  icon: IconName,
+  variant: NextAction['variant'] = 'secondary',
+): NextAction {
+  return {
+    label,
+    icon,
+    variant,
+    run: () => void api.openExternal(pr.url),
+  };
+}
+
+export function nextAction(
   state: AppState,
   workspace: Workspace,
   pr: PrStatus | null,
@@ -59,6 +73,18 @@ function nextAction(
       run: () => fixErrors(workspace),
     };
   }
+  if (pr.checks.some((check) => check.state === 'pending'))
+    return openPrStatus(pr, 'Checks running', 'loader-circle');
+  if (pr.isDraft) return openPrStatus(pr, 'Draft', 'git-pull-request-draft');
+  if (pr.reviewDecision === 'CHANGES_REQUESTED')
+    return openPrStatus(
+      pr,
+      'Changes requested',
+      'message-square-warning',
+      'danger',
+    );
+  if (pr.reviewDecision === 'REVIEW_REQUIRED')
+    return openPrStatus(pr, 'Waiting for review', 'clock');
   return {
     label: 'Merge',
     icon: 'git-merge',

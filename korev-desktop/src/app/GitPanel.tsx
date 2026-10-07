@@ -15,6 +15,7 @@ import type {
   FileChange,
   PrStatus,
   ReviewComment,
+  ReviewDecision,
   Workspace,
 } from '../shared/model';
 import {
@@ -43,6 +44,24 @@ const CHECK_ICONS: Record<CheckState, { icon: IconName; className: string }> = {
     className: 'animate-spin text-warning-text',
   },
   skipped: { icon: 'circle-slash', className: 'text-fg-4' },
+};
+
+const REVIEW_PILLS: Record<
+  ReviewDecision,
+  { label: string; className: string }
+> = {
+  APPROVED: {
+    label: 'Approved',
+    className: 'bg-success-subtle text-success-text',
+  },
+  CHANGES_REQUESTED: {
+    label: 'Changes requested',
+    className: 'bg-danger-subtle text-danger-text',
+  },
+  REVIEW_REQUIRED: {
+    label: 'Review required',
+    className: 'bg-warning-subtle text-warning-text',
+  },
 };
 
 interface TreeNode {
@@ -297,6 +316,16 @@ function PrCard({ workspace, pr }: { workspace: Workspace; pr: PrStatus }) {
         {pending ? (
           <span className="rounded-sm bg-warning-subtle px-1.5 py-0.5 text-warning-text">
             {pending} running
+          </span>
+        ) : null}
+        {pr.reviewDecision ? (
+          <span
+            className={cn(
+              'rounded-sm px-1.5 py-0.5',
+              REVIEW_PILLS[pr.reviewDecision].className,
+            )}
+          >
+            {REVIEW_PILLS[pr.reviewDecision].label}
           </span>
         ) : null}
       </div>

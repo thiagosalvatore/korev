@@ -252,6 +252,11 @@ export interface PrCheck {
   url: string | null;
 }
 
+export type ReviewDecision =
+  | 'APPROVED'
+  | 'CHANGES_REQUESTED'
+  | 'REVIEW_REQUIRED';
+
 export interface PrStatus {
   number: number;
   url: string;
@@ -259,6 +264,7 @@ export interface PrStatus {
   state: PrState;
   isDraft: boolean;
   mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
+  reviewDecision: ReviewDecision | null;
   checks: PrCheck[];
 }
 
