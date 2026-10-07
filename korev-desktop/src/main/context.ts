@@ -22,6 +22,7 @@ export interface CoreDeps {
   env: NodeJS.ProcessEnv;
   shell: string | undefined;
   home: string;
+  userDataPath: string;
   emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]): void;
   notify(notice: Notice): void;
   playSound(): void;

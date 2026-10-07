@@ -64,7 +64,12 @@ import { rangeFileDiff, rangeFiles, searchFiles } from './git-review';
 import { findLocalUrl } from './workspace-setup';
 import { createSpotlight } from './spotlight';
 import { repoFavicon } from './repo-icon';
-import { openStore, type PersistedState } from './store';
+import {
+  ATTACHMENTS_DIR,
+  attachmentsDir,
+  openStore,
+  type PersistedState,
+} from './store';
 import { createTerminals, type SpawnPty } from './terminals';
 import {
   archiveWorkspace,
@@ -88,7 +93,6 @@ export const PR_POLL_MS = 30_000;
 const PR_CLOCK_SKEW_MS = 60_000;
 const FILE_MAX_BYTES = 1_000_000;
 const CONTEXT_DIR = '.context';
-const ATTACHMENTS_DIR = 'attachments';
 const COMMAND_EXTENSION = '.md';
 const BUILTIN_COMMANDS = ['compact', 'review', 'init'];
 const IMPLEMENT_PLAN_TASK = 'Implement your part of the plan below.';
@@ -110,6 +114,19 @@ async function githubAvatar(owner: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+async function writeAttachment(
+  dir: string,
+  name: string,
+  base64: string,
+  savedAt: Date,
+): Promise<string> {
+  const safeName = `${savedAt.getTime()}-${path.basename(name).replace(/[^\w.-]+/g, '_')}`;
+  await mkdir(dir, { recursive: true });
+  const target = path.join(dir, safeName);
+  await writeFile(target, Buffer.from(base64, 'base64'));
+  return target;
 }
 
 async function commandNames(dir: string): Promise<string[]> {
@@ -155,7 +172,6 @@ function installedEditors(home: string): EditorApp[] {
 export interface KorevDeps extends CoreDeps {
   fs: FileSystem;
   spawnPty: SpawnPty;
-  userDataPath: string;
   chooseDirectory(): Promise<string | null>;
   openPath(target: string): Promise<void>;
   openExternal(url: string): Promise<void>;
@@ -1002,17 +1018,23 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       );
     },
     async saveAttachment(workspaceId, name, base64) {
+      if (!workspaceId)
+        return ok(
+          await writeAttachment(
+            attachmentsDir(deps.userDataPath),
+            name,
+            base64,
+            deps.now(),
+          ),
+        );
       const workspace = workspacePath(workspaceId);
-      const safeName = `${deps.now().getTime()}-${path.basename(name).replace(/[^\w.-]+/g, '_')}`;
-      const relative = path.join(CONTEXT_DIR, ATTACHMENTS_DIR, safeName);
-      await mkdir(path.join(workspace.path, CONTEXT_DIR, ATTACHMENTS_DIR), {
-        recursive: true,
-      });
-      await writeFile(
-        path.join(workspace.path, relative),
-        Buffer.from(base64, 'base64'),
+      const saved = await writeAttachment(
+        path.join(workspace.path, CONTEXT_DIR, ATTACHMENTS_DIR),
+        name,
+        base64,
+        deps.now(),
       );
-      return ok(relative);
+      return ok(path.relative(workspace.path, saved));
     },
     slashCommands: (workspaceId) =>
       slashCommandsAt(workspacePath(workspaceId).path),

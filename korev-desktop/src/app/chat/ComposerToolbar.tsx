@@ -17,7 +17,6 @@ export interface ComposerToolbarProps {
   effort: string;
   fast: boolean;
   planMode: boolean;
-  canAttach: boolean;
   hasSnippets: boolean;
   running: boolean;
   canSend: boolean;
@@ -36,17 +35,6 @@ const CHIP =
   'flex h-7 cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent px-2 text-xs text-fg-3 hover:bg-hover hover:text-fg-1';
 
 function optionItems(props: ComposerToolbarProps): MenuItem[] {
-  const attach: MenuItem[] = props.canAttach
-    ? [
-        {
-          id: 'attach',
-          label: 'Add attachment',
-          icon: 'paperclip',
-          hint: '⌘U',
-          onSelect: props.onAttach,
-        },
-      ]
-    : [];
   const snippets: MenuItem[] = props.hasSnippets
     ? [
         {
@@ -59,7 +47,13 @@ function optionItems(props: ComposerToolbarProps): MenuItem[] {
       ]
     : [];
   return [
-    ...attach,
+    {
+      id: 'attach',
+      label: 'Add attachment',
+      icon: 'paperclip',
+      hint: '⌘U',
+      onSelect: props.onAttach,
+    },
     ...snippets,
     {
       id: 'plan',
@@ -121,6 +115,13 @@ export function ComposerToolbar(props: ComposerToolbarProps) {
             onClick={toggle}
           />
         )}
+      />
+      <IconButton
+        icon="paperclip"
+        label="Add attachment"
+        title="Add attachment (⌘U)"
+        size="sm"
+        onClick={props.onAttach}
       />
       <Menu
         label="Model"

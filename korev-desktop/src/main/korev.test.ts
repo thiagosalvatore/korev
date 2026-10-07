@@ -764,6 +764,57 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toContain(`--add-dir ${path.join(root, 'api', '.ask')}`);
   });
 
+  const SCREENSHOT_BASE64 = Buffer.from('png bytes').toString('base64');
+
+  it('saves attachments outside any workspace and lets a question read them', async () => {
+    const repo = await addRepo();
+    const attachments = path.join(home, 'user-data', 'attachments');
+
+    const saved = await korev.api.saveAttachment(
+      null,
+      'my shot.png',
+      SCREENSHOT_BASE64,
+    );
+    await askAndWait([repo.id], 'What is in this screenshot?');
+
+    expect(saved.ok && path.dirname(saved.value)).toBe(attachments);
+    expect(saved.ok && (await readFile(saved.value, 'utf8'))).toBe('png bytes');
+    expect(
+      await readFile(
+        path.join(
+          home,
+          'korev',
+          'workspaces',
+          'acme',
+          '.ask',
+          '.context',
+          'claude-args',
+        ),
+        'utf8',
+      ),
+    ).toContain(`--add-dir ${attachments}`);
+  });
+
+  it('lets a new workspace read attachments picked before it existed', async () => {
+    const workspace = await createWorkspace(task('Fix the screenshot'));
+
+    const saved = await korev.api.saveAttachment(
+      workspace.id,
+      'shot.png',
+      SCREENSHOT_BASE64,
+    );
+
+    expect(saved.ok && path.dirname(saved.value)).toBe(
+      path.join('.context', 'attachments'),
+    );
+    expect(
+      await readFile(
+        path.join(workspace.path, '.context', 'claude-args'),
+        'utf8',
+      ),
+    ).toContain(`--add-dir ${path.join(home, 'user-data', 'attachments')}`);
+  });
+
   async function userMessages(sessionId: string) {
     return (await korev.api.transcript(sessionId)).flatMap((item) =>
       item.kind === 'user' ? [item.text] : [],

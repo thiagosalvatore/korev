@@ -17,6 +17,7 @@ import type { FileSystem } from './file-system';
 
 const STATE_FILE = 'korev-state.json';
 const TRANSCRIPTS_DIR = 'transcripts';
+export const ATTACHMENTS_DIR = 'attachments';
 const SAVE_DELAY_MS = 400;
 
 export interface PersistedState {
@@ -108,6 +109,10 @@ export interface Store {
   loadTranscript(sessionId: string): Promise<ChatItem[]>;
   saveTranscript(sessionId: string, items: ChatItem[]): Promise<void>;
   removeTranscript(sessionId: string): Promise<void>;
+}
+
+export function attachmentsDir(userDataPath: string): string {
+  return path.join(userDataPath, ATTACHMENTS_DIR);
 }
 
 const SESSION_ID_PATTERN = /^[\w-]+$/;

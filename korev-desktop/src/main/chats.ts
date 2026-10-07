@@ -1,3 +1,4 @@
+import { mkdir } from 'node:fs/promises';
 import {
   hasWorktree,
   type AskChat,
@@ -43,6 +44,7 @@ import {
 import { rangeFiles } from './git-review';
 import { findPrUrls } from './pull-requests';
 import { withPrompt } from './repo-config';
+import { attachmentsDir } from './store';
 import { isUntitledName } from './workspace-setup';
 import {
   isUntitled,
@@ -369,6 +371,12 @@ export function createChats(
     );
   }
 
+  async function readableAttachments(): Promise<string> {
+    const dir = attachmentsDir(ctx.deps.userDataPath);
+    await mkdir(dir, { recursive: true });
+    return dir;
+  }
+
   async function askTarget(ask: AskChat): Promise<TurnTarget> {
     const root = ctx.store.state.settings.workspacesRoot;
     const repos = ask.repoIds.map((repoId) => ctx.repo(repoId));
@@ -382,7 +390,7 @@ export function createChats(
       env: ctx.deps.env,
       systemPrompt: askSystemPrompt(repos, checkouts),
       readOnly: true,
-      addDirs: checkouts.slice(1),
+      addDirs: [...checkouts.slice(1), await readableAttachments()],
     };
   }
 
@@ -415,7 +423,10 @@ export function createChats(
         config.prompts.general,
       ),
       readOnly: false,
-      addDirs: linked.map((entry) => entry.workspace.path),
+      addDirs: [
+        ...linked.map((entry) => entry.workspace.path),
+        await readableAttachments(),
+      ],
     };
   }
 

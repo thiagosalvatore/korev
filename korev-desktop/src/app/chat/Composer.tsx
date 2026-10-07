@@ -158,7 +158,6 @@ export function Composer(props: ComposerProps) {
   }
 
   async function addFiles(list: FileList | File[]) {
-    if (!workspaceId) return;
     for (const file of Array.from(list)) {
       const saved = await api.saveAttachment(
         workspaceId,
@@ -227,7 +226,7 @@ export function Composer(props: ComposerProps) {
       props.onFastChange(!props.fast);
     else if (command && event.shiftKey && (key === '/' || key === '?'))
       props.onEffortChange(nextEffort(props.agent, props.effort));
-    else if (command && key === 'u' && workspaceId) picker.current?.click();
+    else if (command && key === 'u') picker.current?.click();
     else if (command && key === ';') openSnippets();
     else if (event.metaKey && event.ctrlKey && /^[1-5]$/.test(event.key)) {
       const entry = props.loadout[Number(event.key) - 1];
@@ -256,13 +255,13 @@ export function Composer(props: ComposerProps) {
   }
 
   function onPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
-    if (!event.clipboardData.files.length || !workspaceId) return;
+    if (!event.clipboardData.files.length) return;
     event.preventDefault();
     void addFiles(event.clipboardData.files);
   }
 
   function onDrop(event: DragEvent<HTMLDivElement>) {
-    if (!event.dataTransfer.files.length || !workspaceId) return;
+    if (!event.dataTransfer.files.length) return;
     event.preventDefault();
     void addFiles(event.dataTransfer.files);
   }
@@ -384,7 +383,6 @@ export function Composer(props: ComposerProps) {
           effort={props.effort}
           fast={props.fast}
           planMode={planMode}
-          canAttach={Boolean(workspaceId)}
           hasSnippets={props.snippets.length > 0}
           running={running}
           canSend={canSend}

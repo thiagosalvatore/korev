@@ -106,7 +106,7 @@ export interface KorevApi {
   ): Promise<Result>;
   revert(sessionId: string, itemId: string): Promise<Result<string>>;
   saveAttachment(
-    workspaceId: string,
+    workspaceId: string | null,
     name: string,
     base64: string,
   ): Promise<Result<string>>;
