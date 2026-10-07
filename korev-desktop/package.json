@@ -5,7 +5,7 @@
   "private": true,
   "description": "Run coding agents in parallel git worktrees",
   "keywords": [],
-  "license": "MIT",
+  "license": "FSL-1.1-MIT",
   "author": {
     "name": "Thiago Salvatore",
     "email": "thiago.s@posthog.com"
