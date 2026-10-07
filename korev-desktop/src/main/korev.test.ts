@@ -143,6 +143,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       model: 'claude-sonnet-5-5',
       effort: 'high',
       planMode: false,
+      fast: false,
     };
   }
 
@@ -152,6 +153,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       model: 'claude-sonnet-5-5',
       effort: 'high',
       planMode: false,
+      fast: false,
     });
     expect(sent.ok).toBe(true);
     await waitFor(
@@ -504,5 +506,65 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
         cwd: path.join(workspace.path, 'apps/web'),
       },
     ]);
+  });
+
+  it('answers a plan in an Ask chat itself, so the chat ends and the plan can start workspaces', async () => {
+    const repo = await addRepo();
+    const askDir = path.join(home, 'korev', 'workspaces', 'acme', '.ask');
+
+    const ask = await askAndWait([repo.id], 'make-plan for the login page');
+
+    const items = await korev.api.transcript(ask.session.id);
+    expect(items.some((item) => item.kind === 'permission')).toBe(false);
+    expect(
+      await readFile(path.join(askDir, '.context', 'plan-answer'), 'utf8'),
+    ).toContain('"behavior":"deny"');
+    const started = await korev.api.startFromAsk(ask.id);
+    expect(started.ok).toBe(true);
+  });
+
+  it('waits for the user to approve a tool call when approvals are on', async () => {
+    await korev.api.updateSettings({ toolApprovals: true });
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await korev.api.send(session.id, {
+      text: 'needs-approval',
+      model: 'claude-sonnet-5-5',
+      effort: 'high',
+      planMode: false,
+      fast: false,
+    });
+    let permissionId = '';
+    await waitFor(async () => {
+      const pending = (await korev.api.transcript(session.id)).find(
+        (item) => item.kind === 'permission',
+      );
+      permissionId = pending?.id ?? '';
+      return Boolean(pending);
+    });
+    expect((await korev.api.getState()).runtime[workspace.id].status).toBe(
+      'waiting',
+    );
+
+    expect(
+      await korev.api.respondPermission(session.id, permissionId, {
+        allow: true,
+      }),
+    ).toEqual({ ok: true, value: undefined });
+    await waitFor(
+      async () => (await korev.api.getState()).runningSessions.length === 0,
+    );
+
+    expect(existsSync(path.join(workspace.path, 'approved.txt'))).toBe(true);
+    expect(
+      (await korev.api.transcript(session.id)).find(
+        (item) => item.id === permissionId,
+      ),
+    ).toMatchObject({
+      kind: 'permission',
+      tool: 'Bash',
+      summary: 'touch approved.txt',
+      status: 'allowed',
+    });
   });
 });

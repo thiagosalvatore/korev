@@ -116,6 +116,17 @@ function StatusIcon({ runtime }: { runtime: WorkspaceRuntime }) {
       />
     );
   }
+  if (runtime.status === 'waiting') {
+    return (
+      <span title="Waiting for your input">
+        <Icon
+          name="message-circle-question"
+          size={14}
+          className="text-warning-text"
+        />
+      </span>
+    );
+  }
   if (runtime.status === 'error' || runtime.status === 'failed') {
     return (
       <Icon name="triangle-alert" size={14} className="text-danger-text" />
@@ -195,7 +206,9 @@ function WorkspaceRow({
         <span
           className={cn(
             'block truncate text-sm',
-            runtime?.unread ? 'font-semibold text-fg-1' : 'font-medium',
+            runtime?.unread || runtime?.status === 'waiting'
+              ? 'font-semibold text-fg-1'
+              : 'font-medium',
           )}
           title={workspace.branch}
         >

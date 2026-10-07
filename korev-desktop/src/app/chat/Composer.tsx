@@ -1,27 +1,44 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ClipboardEvent,
   type DragEvent,
   type KeyboardEvent,
 } from 'react';
-import { cn, Icon, IconButton } from '../../design-system';
+import { cn, Icon } from '../../design-system';
 import {
   EFFORT_LEVELS,
+  LOADOUT_SIZE,
   type AgentKind,
   type AgentModel,
+  type Snippet,
 } from '../../shared/model';
 import { api } from '../bridge';
 import { fileName } from '../format';
-import { Menu } from '../ui/Menu';
 import { reportFailure } from '../ui/toast';
 import type { DiffComment } from '../ui-store';
+import { ComposerToolbar } from './ComposerToolbar';
+import {
+  applySuggestion,
+  createSuggestionLoader,
+  snippetSuggestions,
+  type Suggestions,
+  type SuggestionTrigger,
+} from './suggestions';
 
 const DRAFT_PREFIX = 'korev:draft:';
-const SUGGESTION_LIMIT = 8;
 const MAX_TEXTAREA_PX = 320;
-const TOKEN_BEFORE_CARET = /(^|\s)([@/])([^\s@]*)$/;
+const SUGGESTION_ICONS: Record<
+  SuggestionTrigger,
+  'file' | 'slash' | 'git-pull-request' | 'text-quote'
+> = {
+  '@': 'file',
+  '/': 'slash',
+  '#': 'git-pull-request',
+  snippet: 'text-quote',
+};
 
 export function loadDraft(key: string): string {
   return localStorage.getItem(DRAFT_PREFIX + key) ?? '';
@@ -30,36 +47,6 @@ export function loadDraft(key: string): string {
 export function saveDraft(key: string, text: string) {
   if (text) localStorage.setItem(DRAFT_PREFIX + key, text);
   else localStorage.removeItem(DRAFT_PREFIX + key);
-}
-
-export function fuzzyRank(
-  query: string,
-  candidates: string[],
-  limit = SUGGESTION_LIMIT,
-): string[] {
-  const needle = query.toLowerCase();
-  const scored: [number, string][] = [];
-  for (const candidate of candidates) {
-    const haystack = candidate.toLowerCase();
-    let position = 0;
-    let gaps = 0;
-    for (const char of needle) {
-      const found = haystack.indexOf(char, position);
-      if (found === -1) {
-        position = -1;
-        break;
-      }
-      gaps += found - position;
-      position = found + 1;
-    }
-    if (position === -1) continue;
-    const nameBonus = fileName(haystack).startsWith(needle) ? -1000 : 0;
-    scored.push([nameBonus + gaps * 2 + candidate.length, candidate]);
-  }
-  return scored
-    .sort((a, b) => a[0] - b[0])
-    .slice(0, limit)
-    .map(([, candidate]) => candidate);
 }
 
 export function formatComments(comments: DiffComment[]): string {
@@ -76,13 +63,6 @@ function formatAttachments(paths: string[]): string {
   return `\n\nAttached files (read them):\n${paths.map((file) => `- ${file}`).join('\n')}`;
 }
 
-interface Suggestions {
-  trigger: '@' | '/';
-  start: number;
-  options: string[];
-  selected: number;
-}
-
 function readAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -92,20 +72,30 @@ function readAsBase64(file: File): Promise<string> {
   });
 }
 
+function nextEffort(agent: AgentKind, effort: string): string {
+  const levels = EFFORT_LEVELS[agent];
+  return levels[(levels.indexOf(effort) + 1) % levels.length];
+}
+
 export interface ComposerProps {
   draftKey: string;
   agent: AgentKind;
   models: AgentModel[];
+  loadout: AgentModel[];
+  snippets: Snippet[];
   model: string;
   effort: string;
+  fast: boolean;
   planMode: boolean;
   running: boolean;
   workspaceId: string | null;
+  repoId: string | null;
   comments?: DiffComment[];
   placeholder?: string;
   autoFocus?: boolean;
   onModelChange(model: string): void;
   onEffortChange(effort: string): void;
+  onFastChange(fast: boolean): void;
   onPlanModeChange(planMode: boolean): void;
   onSend(text: string): Promise<boolean>;
   onStop?(): void;
@@ -113,20 +103,28 @@ export interface ComposerProps {
 }
 
 export function Composer(props: ComposerProps) {
-  const { draftKey, workspaceId, running, planMode, comments = [] } = props;
+  const {
+    draftKey,
+    workspaceId,
+    repoId,
+    running,
+    planMode,
+    comments = [],
+  } = props;
   const [text, setText] = useState(() => loadDraft(draftKey));
   const [attachments, setAttachments] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestions | null>(null);
   const [sending, setSending] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
-  const files = useRef<string[] | null>(null);
-  const commands = useRef<string[] | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const loader = useMemo(
+    () => createSuggestionLoader({ workspaceId, repoId }),
+    [workspaceId, repoId],
+  );
 
   useEffect(() => {
     setText(loadDraft(draftKey));
     setAttachments([]);
-    files.current = null;
-    commands.current = null;
   }, [draftKey]);
 
   useEffect(() => {
@@ -145,44 +143,16 @@ export function Composer(props: ComposerProps) {
     saveDraft(draftKey, next);
   }
 
-  async function candidates(trigger: '@' | '/'): Promise<string[]> {
-    if (!workspaceId) return [];
-    if (trigger === '@') {
-      files.current ??= await api.listFiles(workspaceId).catch(() => []);
-      return files.current;
-    }
-    commands.current ??= await api.slashCommands(workspaceId).catch(() => []);
-    return commands.current;
-  }
-
-  async function refreshSuggestions(value: string, caret: number) {
-    const match = TOKEN_BEFORE_CARET.exec(value.slice(0, caret));
-    if (!match) {
-      setSuggestions(null);
-      return;
-    }
-    const trigger = match[2] as '@' | '/';
-    const query = match[3];
-    const options = fuzzyRank(query, await candidates(trigger));
-    setSuggestions(
-      options.length
-        ? { trigger, start: caret - query.length - 1, options, selected: 0 }
-        : null,
-    );
-  }
-
-  function accept(option: string) {
-    if (!suggestions || !input.current) return;
-    const caret = input.current.selectionStart;
-    const inserted = `${suggestions.trigger}${option} `;
-    const next =
-      text.slice(0, suggestions.start) + inserted + text.slice(caret);
-    update(next);
+  function accept(index: number) {
+    const option = suggestions?.options[index];
+    if (!suggestions || !option) return;
+    const applied = applySuggestion(text, suggestions, option);
+    update(applied.text);
     setSuggestions(null);
-    const position = suggestions.start + inserted.length;
-    requestAnimationFrame(() =>
-      input.current?.setSelectionRange(position, position),
-    );
+    requestAnimationFrame(() => {
+      input.current?.focus();
+      input.current?.setSelectionRange(applied.caret, applied.caret);
+    });
   }
 
   async function addFiles(list: FileList | File[]) {
@@ -198,12 +168,13 @@ export function Composer(props: ComposerProps) {
     }
   }
 
+  const canSend = Boolean(text.trim() || comments.length) && !sending;
+
   async function send() {
-    const body = text.trim();
-    if ((!body && !comments.length) || sending || running) return;
+    if (!canSend) return;
     setSending(true);
     const message =
-      body + formatComments(comments) + formatAttachments(attachments);
+      text.trim() + formatComments(comments) + formatAttachments(attachments);
     const sent = await props.onSend(message);
     setSending(false);
     if (!sent) return;
@@ -212,32 +183,64 @@ export function Composer(props: ComposerProps) {
     props.onClearComments?.();
   }
 
-  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (suggestions) {
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        const step = event.key === 'ArrowDown' ? 1 : -1;
-        const count = suggestions.options.length;
-        setSuggestions({
-          ...suggestions,
-          selected: (suggestions.selected + step + count) % count,
-        });
-        return;
-      }
-      if (event.key === 'Enter' || event.key === 'Tab') {
-        event.preventDefault();
-        accept(suggestions.options[suggestions.selected]);
-        return;
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        setSuggestions(null);
-        return;
-      }
+  function openSnippets() {
+    setSuggestions(
+      snippetSuggestions(
+        props.snippets,
+        input.current?.selectionStart ?? text.length,
+      ),
+    );
+  }
+
+  function onSuggestionKey(
+    event: KeyboardEvent<HTMLTextAreaElement>,
+    open: Suggestions,
+  ): boolean {
+    const count = open.options.length;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      setSuggestions({
+        ...open,
+        selected: (open.selected + step + count) % count,
+      });
+      return true;
     }
-    if (event.key === 'Tab' && event.shiftKey) {
-      event.preventDefault();
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      accept(open.selected);
+      return true;
+    }
+    if (event.key === 'Escape') {
+      setSuggestions(null);
+      return true;
+    }
+    return false;
+  }
+
+  function onShortcut(event: KeyboardEvent<HTMLTextAreaElement>): boolean {
+    const command = event.metaKey || event.ctrlKey;
+    const key = event.key.toLowerCase();
+    if (event.key === 'Tab' && event.shiftKey)
       props.onPlanModeChange(!planMode);
+    else if (command && event.shiftKey && key === 'e')
+      props.onFastChange(!props.fast);
+    else if (command && event.shiftKey && (key === '/' || key === '?'))
+      props.onEffortChange(nextEffort(props.agent, props.effort));
+    else if (command && key === 'u' && workspaceId) picker.current?.click();
+    else if (command && key === ';') openSnippets();
+    else if (event.metaKey && event.ctrlKey && /^[1-5]$/.test(event.key)) {
+      const entry = props.loadout[Number(event.key) - 1];
+      if (entry) props.onModelChange(entry.id);
+    } else return false;
+    return true;
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (suggestions && onSuggestionKey(event, suggestions)) {
+      event.preventDefault();
+      return;
+    }
+    if (onShortcut(event)) {
+      event.preventDefault();
       return;
     }
     if (
@@ -262,11 +265,6 @@ export function Composer(props: ComposerProps) {
     void addFiles(event.dataTransfer.files);
   }
 
-  const modelLabel =
-    props.models.find((entry) => entry.id === props.model)?.label ??
-    props.model;
-  const picker = useRef<HTMLInputElement>(null);
-
   return (
     <div
       className="relative"
@@ -281,22 +279,22 @@ export function Composer(props: ComposerProps) {
         >
           {suggestions.options.map((option, index) => (
             <button
-              key={option}
+              key={`${option.label}-${index}`}
               type="button"
               role="option"
               aria-selected={index === suggestions.selected}
               className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-sm border-0 bg-transparent px-2 text-left font-mono text-xs text-fg-2 aria-selected:bg-active aria-selected:text-fg-1"
               onMouseDown={(event) => {
                 event.preventDefault();
-                accept(option);
+                accept(index);
               }}
             >
               <Icon
-                name={suggestions.trigger === '@' ? 'file' : 'slash'}
+                name={SUGGESTION_ICONS[suggestions.trigger]}
                 size={13}
                 className="text-fg-3"
               />
-              <span className="truncate">{option}</span>
+              <span className="truncate">{option.label}</span>
             </button>
           ))}
         </div>
@@ -354,142 +352,49 @@ export function Composer(props: ComposerProps) {
           value={text}
           placeholder={
             props.placeholder ??
-            'Ask to make changes, @mention files, run /commands'
+            'Ask to make changes, @mention files, #PRs, run /commands'
           }
-          className="block max-h-80 min-h-14 w-full resize-none border-0 bg-transparent focus-visible:shadow-none px-3.5 pt-3 pb-1 font-sans text-md text-fg-1 outline-none placeholder:text-fg-4"
+          className="block max-h-80 min-h-14 w-full resize-none border-0 bg-transparent px-3.5 pt-3 pb-1 font-sans text-md text-fg-1 outline-none placeholder:text-fg-4 focus-visible:shadow-none"
           onChange={(event) => {
             update(event.target.value);
-            void refreshSuggestions(
-              event.target.value,
-              event.target.selectionStart,
-            );
+            void loader
+              .suggest(event.target.value, event.target.selectionStart)
+              .then(setSuggestions);
           }}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
           onBlur={() => setTimeout(() => setSuggestions(null), 100)}
         />
-        <div className="flex items-center gap-1 px-2 pb-2">
-          <Menu
-            label="Composer options"
-            side="top"
-            items={[
-              ...(workspaceId
-                ? [
-                    {
-                      id: 'attach',
-                      label: 'Add attachment',
-                      icon: 'paperclip' as const,
-                      hint: '⌘U',
-                      onSelect: () => picker.current?.click(),
-                    },
-                  ]
-                : []),
-              {
-                id: 'plan',
-                label: 'Plan mode',
-                icon: 'list-checks',
-                hint: '⇧Tab',
-                checked: planMode,
-                onSelect: () => props.onPlanModeChange(!planMode),
-              },
-            ]}
-            trigger={({ toggle }) => (
-              <IconButton
-                icon="plus"
-                label="More options"
-                size="sm"
-                onClick={toggle}
-              />
-            )}
-          />
-          <input
-            ref={picker}
-            type="file"
-            multiple
-            hidden
-            onChange={(event) =>
-              event.target.files && void addFiles(event.target.files)
-            }
-          />
-          <Menu
-            label="Model"
-            side="top"
-            items={props.models.map((entry) => ({
-              id: entry.id,
-              label: entry.label,
-              checked: entry.id === props.model,
-              onSelect: () => props.onModelChange(entry.id),
-            }))}
-            trigger={({ toggle }) => (
-              <button
-                type="button"
-                aria-label="Model"
-                className="flex h-7 cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent px-2 text-xs font-medium text-fg-2 hover:bg-hover hover:text-fg-1"
-                onClick={toggle}
-              >
-                <Icon
-                  name={props.agent === 'claude' ? 'sparkle' : 'hexagon'}
-                  size={13}
-                />
-                {modelLabel}
-                <Icon name="chevron-down" size={12} className="text-fg-4" />
-              </button>
-            )}
-          />
-          <Menu
-            label="Effort"
-            side="top"
-            items={EFFORT_LEVELS[props.agent].map((level) => ({
-              id: level,
-              label: level,
-              checked: level === props.effort,
-              onSelect: () => props.onEffortChange(level),
-            }))}
-            trigger={({ toggle }) => (
-              <button
-                type="button"
-                aria-label="Effort"
-                className="flex h-7 cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent px-2 text-xs text-fg-3 hover:bg-hover hover:text-fg-1"
-                onClick={toggle}
-              >
-                <Icon name="brain" size={13} />
-                {props.effort}
-              </button>
-            )}
-          />
-          {planMode ? (
-            <button
-              type="button"
-              className="flex h-6 cursor-pointer items-center gap-1 rounded-sm border-0 bg-accent-subtle px-2 text-xs font-medium text-accent-text"
-              onClick={() => props.onPlanModeChange(false)}
-            >
-              <Icon name="list-checks" size={12} />
-              Plan mode
-            </button>
-          ) : null}
-          <div className="flex-1" />
-          {running ? (
-            <button
-              type="button"
-              aria-label="Stop agent"
-              title="Stop (⌘⇧⌫)"
-              className="flex size-7 cursor-pointer items-center justify-center rounded-full border-0 bg-fg-1 text-app"
-              onClick={props.onStop}
-            >
-              <Icon name="square" size={11} className="fill-current" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              aria-label="Send"
-              disabled={(!text.trim() && !comments.length) || sending}
-              className="flex size-7 cursor-pointer items-center justify-center rounded-full border-0 bg-accent text-fg-on-accent disabled:cursor-default disabled:bg-active disabled:text-fg-4"
-              onClick={() => void send()}
-            >
-              <Icon name="arrow-up" size={15} />
-            </button>
-          )}
-        </div>
+        <input
+          ref={picker}
+          type="file"
+          multiple
+          hidden
+          onChange={(event) =>
+            event.target.files && void addFiles(event.target.files)
+          }
+        />
+        <ComposerToolbar
+          agent={props.agent}
+          models={props.models}
+          loadout={props.loadout.slice(0, LOADOUT_SIZE)}
+          model={props.model}
+          effort={props.effort}
+          fast={props.fast}
+          planMode={planMode}
+          canAttach={Boolean(workspaceId)}
+          hasSnippets={props.snippets.length > 0}
+          running={running}
+          canSend={canSend}
+          onAttach={() => picker.current?.click()}
+          onInsertSnippet={openSnippets}
+          onModelChange={props.onModelChange}
+          onEffortChange={props.onEffortChange}
+          onFastChange={props.onFastChange}
+          onPlanModeChange={props.onPlanModeChange}
+          onSend={() => void send()}
+          onStop={props.onStop}
+        />
       </div>
     </div>
   );

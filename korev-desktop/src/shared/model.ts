@@ -138,6 +138,7 @@ export interface ChatSession {
   agent: AgentKind;
   model: string;
   effort: string;
+  fast: boolean;
   agentSessionId: string | null;
   createdAt: string;
 }
@@ -175,9 +176,23 @@ export interface Settings {
   autoRenameBranches: boolean;
   deleteBranchOnArchive: boolean;
   archiveOnMerge: boolean;
+  toolApprovals: boolean;
+  loadout: string[];
+  snippets: Snippet[];
   editor: EditorId;
   notifications: boolean;
   windowBounds: WindowBounds | null;
+}
+
+export interface Snippet {
+  name: string;
+  text: string;
+}
+
+export const LOADOUT_SIZE = 5;
+
+export function loadoutKey(agent: AgentKind, model: string): string {
+  return `${agent}:${model}`;
 }
 
 export interface WindowBounds {
@@ -193,6 +208,7 @@ export type WorkspaceStatus =
   | 'failed'
   | 'setting-up'
   | 'working'
+  | 'waiting'
   | 'error';
 
 export interface DiffStats {
@@ -271,6 +287,7 @@ export type ChatItem =
       text: string;
       at: string;
       checkpoint: Checkpoint | null;
+      queued?: boolean;
     }
   | { id: string; kind: 'assistant'; text: string }
   | { id: string; kind: 'thinking'; text: string }
@@ -292,7 +309,32 @@ export type ChatItem =
       durationMs: number | null;
       costUsd: number | null;
     }
-  | { id: string; kind: 'notice'; text: string };
+  | { id: string; kind: 'notice'; text: string }
+  | {
+      id: string;
+      kind: 'permission';
+      tool: string;
+      summary: string;
+      detail: string;
+      questions: AgentQuestion[] | null;
+      plan: string | null;
+      status: PermissionStatus;
+    };
+
+export type PermissionStatus = 'pending' | 'allowed' | 'denied' | 'expired';
+
+export interface AgentQuestion {
+  question: string;
+  header: string;
+  options: { label: string; description: string }[];
+  multiSelect: boolean;
+}
+
+export interface PermissionResponse {
+  allow: boolean;
+  answers?: Record<string, string>;
+  message?: string;
+}
 
 export interface ChatUpdate {
   sessionId: string;
@@ -304,6 +346,7 @@ export interface SendOptions {
   model: string;
   effort: string;
   planMode: boolean;
+  fast: boolean;
 }
 
 export type FileStatus = 'A' | 'M' | 'D' | 'R';

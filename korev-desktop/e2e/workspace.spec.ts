@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import type { KorevBridge } from '../src/shared/api';
 
 const APP_ENTRY = '.vite/build/main.cjs';
 const FAKE_AGENT_BIN = path.resolve('test-support/bin');
@@ -154,6 +155,56 @@ test('creates a workspace from an existing branch with the create-from picker', 
 
     const workspaces = window.getByRole('navigation', { name: 'Workspaces' });
     await expect(workspaces.getByText('feature/login')).toBeVisible();
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('asks before a tool call when approvals are on and continues after Allow', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const app = await electron.launch({
+    args: [
+      APP_ENTRY,
+      '--use-mock-keychain',
+      `--user-data-dir=${path.join(home, 'user-data')}`,
+    ],
+    env: {
+      ...process.env,
+      HOME: home,
+      SHELL: '/bin/sh',
+      PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}`,
+    },
+  });
+  try {
+    await app.evaluate(({ dialog }, repoPath) => {
+      dialog.showOpenDialog = (async () => ({
+        canceled: false,
+        filePaths: [repoPath],
+      })) as typeof dialog.showOpenDialog;
+    }, repo);
+    const window = await app.firstWindow();
+    await window.setViewportSize({ width: 1440, height: 900 });
+    await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'updateSettings',
+        [{ toolApprovals: true }],
+      ),
+    );
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window
+      .getByRole('textbox', { name: 'Message' })
+      .fill('needs-approval');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+
+    const card = window.getByRole('group', { name: 'Allow Bash?' });
+    await expect(card.getByText('touch approved.txt')).toBeVisible();
+    await snap(window, '06-approval');
+    await card.getByRole('button', { name: 'Allow' }).click();
+
+    await expect(window.getByText('· Approved')).toBeVisible();
+    await expect(window.getByText('I added agent-note.txt.')).toBeVisible();
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });

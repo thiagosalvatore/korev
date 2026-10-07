@@ -370,6 +370,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       model: session.model,
       effort: session.effort,
       planMode: false,
+      fast: session.fast,
     });
   }
 
@@ -427,7 +428,13 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       return createWorkspaces(
         ctx,
         ask.repoIds,
-        { text: IMPLEMENT_PLAN_TASK, model: '', effort: '', planMode: false },
+        {
+          text: IMPLEMENT_PLAN_TASK,
+          model: '',
+          effort: '',
+          planMode: false,
+          fast: false,
+        },
         chats.send,
         plan,
       );
@@ -469,6 +476,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         model: session.model,
         effort: session.effort,
         planMode: false,
+        fast: session.fast,
       });
       return sent.ok ? ok(session.id) : sent;
     },
@@ -520,6 +528,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       if (!session) return;
       if (patch.model) session.model = patch.model;
       if (patch.effort) session.effort = patch.effort;
+      if (patch.fast !== undefined) session.fast = patch.fast;
       if (patch.title?.trim()) session.title = patch.title.trim();
       store.save();
       ctx.emitState();
@@ -527,6 +536,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     transcript: (sessionId) => chats.transcript(sessionId),
     send: (sessionId, options) => chats.send(sessionId, options),
     stop: async (sessionId) => chats.stop(sessionId),
+    respondPermission: async (sessionId, itemId, response) =>
+      chats.respondPermission(sessionId, itemId, response),
     revert: (sessionId, itemId) => chats.revert(sessionId, itemId),
     async changes(workspaceId) {
       const workspace = workspacePath(workspaceId);

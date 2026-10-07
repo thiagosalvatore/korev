@@ -1,6 +1,11 @@
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
-import type { ChatItem, Todo, TodoStatus } from '../shared/model';
+import type {
+  AgentQuestion,
+  ChatItem,
+  Todo,
+  TodoStatus,
+} from '../shared/model';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -388,4 +393,96 @@ export function createCodexParser(cwd: string): TurnParser {
       }
     },
   };
+}
+
+const QUESTION_TOOL = 'AskUserQuestion';
+const USER_INPUT_TOOLS = new Set([QUESTION_TOOL, PLAN_TOOL]);
+
+export interface ControlRequest {
+  requestId: string;
+  tool: string;
+  input: JsonRecord;
+  needsUser: boolean;
+}
+
+export function parseControlRequest(event: JsonRecord): ControlRequest | null {
+  const request = record(event.request);
+  if (event.type !== 'control_request' || request.subtype !== 'can_use_tool')
+    return null;
+  const tool = str(request.tool_name);
+  return {
+    requestId: str(event.request_id),
+    tool,
+    input: record(request.input),
+    needsUser:
+      request.requires_user_interaction === true || USER_INPUT_TOOLS.has(tool),
+  };
+}
+
+function questionsFrom(input: JsonRecord): AgentQuestion[] {
+  const questions = Array.isArray(input.questions) ? input.questions : [];
+  return questions.map((entry) => {
+    const question = record(entry);
+    const options = Array.isArray(question.options) ? question.options : [];
+    return {
+      question: str(question.question),
+      header: str(question.header),
+      multiSelect: question.multiSelect === true,
+      options: options.map((option) =>
+        typeof option === 'string'
+          ? { label: option, description: '' }
+          : {
+              label: str(record(option).label),
+              description: str(record(option).description),
+            },
+      ),
+    };
+  });
+}
+
+export function permissionItem(
+  id: string,
+  request: ControlRequest,
+  cwd: string,
+): ChatItem {
+  const { tool, input } = request;
+  return {
+    id,
+    kind: 'permission',
+    tool,
+    summary: claudeToolSummary(tool, input, cwd),
+    detail: clip(claudeToolDetail(tool, input), DETAIL_MAX_CHARS),
+    questions: tool === QUESTION_TOOL ? questionsFrom(input) : null,
+    plan: tool === PLAN_TOOL ? str(input.plan) : null,
+    status: 'pending',
+  };
+}
+
+export function controlResponse(
+  requestId: string,
+  response: JsonRecord,
+): string {
+  return JSON.stringify({
+    type: 'control_response',
+    response: { subtype: 'success', request_id: requestId, response },
+  });
+}
+
+export function allowResponse(
+  request: ControlRequest,
+  answers?: Record<string, string>,
+  nextMode?: string,
+): JsonRecord {
+  const updatedInput = answers ? { ...request.input, answers } : request.input;
+  const response: JsonRecord = { behavior: 'allow', updatedInput };
+  if (request.tool === PLAN_TOOL && nextMode) {
+    response.updatedPermissions = [
+      { type: 'setMode', mode: nextMode, destination: 'session' },
+    ];
+  }
+  return response;
+}
+
+export function denyResponse(message: string): JsonRecord {
+  return { behavior: 'deny', message };
 }

@@ -2,10 +2,10 @@
 
 Features Korev does not have yet, roughly in the order they would help.
 
-- **Tool approvals.** Agents run with full permissions (`bypassPermissions` for Claude,
-  `workspace-write` sandbox for Codex). There is no way to ask before each tool call.
-- **Composer extras.** Fast mode, model loadouts, steering a running turn, `#` PR
-  mentions, voice input, snippets.
+- **Tool approvals for Codex.** `codex exec` cannot ask before a tool call. Korev runs Codex in its
+  `workspace-write` sandbox (`read-only` in plan mode) instead.
+- **Voice input.** macOS Dictation (press Fn twice) already works in the composer; there is no
+  built-in speech-to-text.
 - **Diff viewer extras.** Split view, viewed state, GitHub review comments, editing in
   the diff, turn diffs.
 - **Quick open (⌘P) and search in files (⌘⇧F).**

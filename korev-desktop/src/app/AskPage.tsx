@@ -4,6 +4,7 @@ import type { AppState, AskChat } from '../shared/model';
 import { deleteAsk, startAsk, startFromAsk } from './actions';
 import { ChatView } from './chat/ChatView';
 import { Composer } from './chat/Composer';
+import { loadoutFor } from './format';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { RepoPicker } from './RepoPicker';
 import { useUi } from './ui-store';
@@ -26,6 +27,7 @@ function NewAsk({
   const agent = state.settings.defaultAgent;
   const [model, setModel] = useState(state.settings.defaultModels[agent]);
   const [effort, setEffort] = useState(state.settings.defaultEffort[agent]);
+  const [fast, setFast] = useState(false);
   const models =
     state.agents.find((entry) => entry.agent === agent)?.models ?? [];
 
@@ -50,6 +52,11 @@ function NewAsk({
             draftKey={NEW_ASK_DRAFT}
             agent={agent}
             models={models}
+            loadout={loadoutFor(state, agent)}
+            snippets={state.settings.snippets}
+            fast={fast}
+            repoId={repoIds[0] ?? null}
+            onFastChange={setFast}
             model={model}
             effort={effort}
             planMode={false}
@@ -66,7 +73,7 @@ function NewAsk({
             onPlanModeChange={() => undefined}
             onSend={async (text) =>
               repoIds.length > 0 &&
-              startAsk(repoIds, { text, model, effort, planMode: false })
+              startAsk(repoIds, { text, model, effort, planMode: false, fast })
             }
           />
         </div>
@@ -127,6 +134,7 @@ function AskChatView({ state, ask }: { state: AppState; ask: AskChat }) {
         key={ask.session.id}
         state={state}
         workspace={null}
+        repoId={ask.repoIds[0] ?? null}
         session={ask.session}
         placeholder="Ask a follow-up"
       />

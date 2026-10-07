@@ -1,14 +1,33 @@
 #!/bin/sh
-cat > /dev/null
 case " $* " in
   *" --version "*) echo "9.9.9 (Claude Code)"; exit 0 ;;
-  *" text "*) echo "add-agent-note"; exit 0 ;;
+  *" text "*) cat > /dev/null; echo "add-agent-note"; exit 0 ;;
 esac
 [ -d .context ] && echo "$*" > .context/claude-args
+IFS= read -r message
 echo '{"type":"system","subtype":"init","session_id":"fake-session"}'
-echo "written by the fake agent" > agent-note.txt
+echo '{"type":"user","message":{"role":"user","content":"ack"}}'
+case "$message" in
+  *make-plan*)
+    echo '{"type":"assistant","message":{"id":"p1","content":[{"type":"tool_use","id":"plan-1","name":"ExitPlanMode","input":{"plan":"1. Add the login page"}}]}}'
+    echo '{"type":"control_request","request_id":"req-plan","request":{"subtype":"can_use_tool","tool_name":"ExitPlanMode","input":{"plan":"1. Add the login page"},"requires_user_interaction":true}}'
+    IFS= read -r answer
+    [ -d .context ] && echo "$answer" > .context/plan-answer
+    ;;
+  *needs-approval*)
+    echo '{"type":"control_request","request_id":"req-1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"touch approved.txt"}}}'
+    IFS= read -r answer
+    case "$answer" in
+      *'"allow"'*) touch approved.txt ;;
+    esac
+    ;;
+  *)
+    echo "written by the fake agent" > agent-note.txt
+    ;;
+esac
 echo '{"type":"stream_event","event":{"type":"message_start","message":{"id":"m1"}}}'
 echo '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"I added agent-note.txt."}}}'
 echo '{"type":"assistant","message":{"id":"m1","content":[{"type":"tool_use","id":"t1","name":"Write","input":{"file_path":"'"$PWD"'/agent-note.txt","content":"written by the fake agent"}}]}}'
 echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}'
 echo '{"type":"result","subtype":"success","is_error":false,"duration_ms":5,"session_id":"fake-session"}'
+cat > /dev/null

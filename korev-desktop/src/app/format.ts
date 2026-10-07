@@ -1,4 +1,11 @@
-import { AGENT_LABELS, type AppState, type ChatSession } from '../shared/model';
+import {
+  AGENT_LABELS,
+  loadoutKey,
+  type AgentKind,
+  type AgentModel,
+  type AppState,
+  type ChatSession,
+} from '../shared/model';
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -30,4 +37,15 @@ export function fileName(path: string): string {
 
 export function dirName(path: string): string {
   return path.split('/').slice(0, -1).join('/');
+}
+
+export function modelsFor(state: AppState, agent: AgentKind): AgentModel[] {
+  return state.agents.find((entry) => entry.agent === agent)?.models ?? [];
+}
+
+export function loadoutFor(state: AppState, agent: AgentKind): AgentModel[] {
+  const models = modelsFor(state, agent);
+  return state.settings.loadout.flatMap((key) =>
+    models.filter((model) => loadoutKey(agent, model.id) === key),
+  );
 }

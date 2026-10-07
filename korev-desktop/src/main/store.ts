@@ -37,6 +37,9 @@ export function defaultSettings(home: string): Settings {
     autoRenameBranches: true,
     deleteBranchOnArchive: false,
     archiveOnMerge: false,
+    toolApprovals: false,
+    loadout: [],
+    snippets: [],
     editor: 'cursor',
     notifications: true,
     windowBounds: null,
@@ -74,6 +77,7 @@ function sanitize(raw: unknown, home: string): PersistedState {
         sessions: workspace.sessions.map((session) => ({
           ...session,
           effort: session.effort ?? defaults.defaultEffort[session.agent],
+          fast: session.fast ?? false,
         })),
       }),
     ),

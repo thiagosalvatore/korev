@@ -15,7 +15,7 @@ import {
   issuePrompt,
   type CreateFrom,
 } from './CreateFromPicker';
-import { timeAgo } from './format';
+import { loadoutFor, timeAgo } from './format';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { RepoPicker } from './RepoPicker';
 import { AddRepositoryMenu } from './Sidebar';
@@ -114,6 +114,7 @@ export function NewWorkspacePage({
   const [model, setModel] = useState(state.settings.defaultModels[agent]);
   const [effort, setEffort] = useState(state.settings.defaultEffort[agent]);
   const [planMode, setPlanMode] = useState(state.settings.defaultPlanMode);
+  const [fast, setFast] = useState(false);
   const [creating, setCreating] = useState(false);
   const [from, setFrom] = useState<CreateFrom | null>(null);
   const [picking, setPicking] = useState(false);
@@ -140,7 +141,7 @@ export function NewWorkspacePage({
       from?.kind === 'issue' ? issuePrompt(from.issue, text ?? '') : text;
     const created = await createWorkspaces(
       repos.map((entry) => entry.id),
-      prompt ? { text: prompt, model, effort, planMode } : null,
+      prompt ? { text: prompt, model, effort, planMode, fast } : null,
       singleRepo ? workspaceSource(from, baseBranch) : undefined,
     );
     setCreating(false);
@@ -234,6 +235,11 @@ export function NewWorkspacePage({
             draftKey={`new-workspace:${repoIds.join(',') || 'none'}`}
             agent={agent}
             models={models}
+            loadout={loadoutFor(state, agent)}
+            snippets={state.settings.snippets}
+            fast={fast}
+            repoId={singleRepo?.id ?? null}
+            onFastChange={setFast}
             model={model}
             effort={effort}
             planMode={planMode}

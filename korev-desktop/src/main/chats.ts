@@ -4,15 +4,32 @@ import {
   type ChatItem,
   type ChatSession,
   type Checkpoint,
+  type PermissionResponse,
   type Repo,
   type Result,
   type SendOptions,
   type Workspace,
 } from '../shared/model';
-import { AGENTS, codexPrompt, type TurnRequest } from './agents';
-import { parseJsonLine, PLAN_TOOL, type TurnParser } from './agent-events';
+import {
+  allowResponse,
+  controlResponse,
+  denyResponse,
+  parseControlRequest,
+  parseJsonLine,
+  permissionItem,
+  PLAN_TOOL,
+  type ControlRequest,
+  type TurnParser,
+} from './agent-events';
+import { spawnAgent, type AgentProcess } from './agent-process';
+import {
+  AGENTS,
+  claudeUserMessage,
+  codexPrompt,
+  isUserMessageAck,
+  type TurnRequest,
+} from './agents';
 import { prepareAskWorktree } from './ask-worktrees';
-import { CommandAbortedError } from './command-runner';
 import { errorMessage, NotFoundError, type Context } from './context';
 import {
   branchExists,
@@ -32,12 +49,20 @@ import {
   workspaceConfig,
 } from './workspaces';
 
-const TURN_TIMEOUT_MS = 12 * 60 * 60_000;
 const TITLE_MAX_CHARS = 32;
 const SAVE_EVERY_ITEMS = 20;
 const STDERR_TAIL_CHARS = 2_000;
 const REPLAY_ITEM_CHARS = 2_000;
 const REPLAY_TOTAL_CHARS = 24_000;
+const DENIED_MESSAGE = 'The user denied this request.';
+const ASK_PLAN_MESSAGE =
+  'This is a read-only Ask chat, so the plan cannot be carried out here. The user sees your plan in the chat and can start workspaces from it. Finish your reply.';
+const STATUSES_KEPT_BY_TURNS = new Set([
+  'creating',
+  'failed',
+  'setting-up',
+  'error',
+]);
 
 export function replayPrompt(history: ChatItem[], text: string): string {
   const lines = history.flatMap((item) => {
@@ -133,19 +158,34 @@ type Owner =
   | { kind: 'workspace'; workspace: Workspace }
   | { kind: 'ask'; ask: AskChat };
 
+interface ActiveTurn {
+  id: string;
+  owner: Owner;
+  process: AgentProcess | null;
+  stopRequested: boolean;
+  written: number;
+  acknowledged: number;
+  permissions: Map<string, ControlRequest>;
+}
+
 export interface Chats {
   transcript(sessionId: string): Promise<ChatItem[]>;
   isRunning(sessionId: string): boolean;
   send(sessionId: string, options: SendOptions): Promise<Result>;
   stop(sessionId: string): void;
   stopWorkspace(workspace: Workspace): void;
+  respondPermission(
+    sessionId: string,
+    itemId: string,
+    response: PermissionResponse,
+  ): Result;
   revert(sessionId: string, itemId: string): Promise<Result<string>>;
   forget(sessionId: string): Promise<void>;
 }
 
 export function createChats(ctx: Context): Chats {
   const transcripts = new Map<string, ChatItem[]>();
-  const controllers = new Map<string, AbortController>();
+  const turns = new Map<string, ActiveTurn>();
 
   function locate(sessionId: string): { owner: Owner; session: ChatSession } {
     for (const workspace of ctx.store.state.workspaces) {
@@ -180,35 +220,62 @@ export function createChats(ctx: Context): Chats {
     void ctx.store.saveTranscript(sessionId, items).catch(() => undefined);
   }
 
+  function refreshStatus(owner: Owner) {
+    if (owner.kind !== 'workspace') return;
+    const { workspace } = owner;
+    const runtime = ctx.runtime(workspace.id);
+    if (STATUSES_KEPT_BY_TURNS.has(runtime.status)) return;
+    const sessions = workspace.sessions.map((entry) => entry.id);
+    const waiting = sessions.some(
+      (id) => (turns.get(id)?.permissions.size ?? 0) > 0,
+    );
+    const working = sessions.some((id) => ctx.runningSessions.has(id));
+    if (waiting) ctx.setStatus(workspace.id, 'waiting');
+    else if (working) ctx.setStatus(workspace.id, 'working');
+    else ctx.setStatus(workspace.id, 'idle');
+  }
+
+  function notifyInBackground(owner: Owner, title: string, body: string) {
+    if (owner.kind !== 'workspace' || ctx.deps.isWindowFocused()) return;
+    ctx.deps.notify({ title, body, workspaceId: owner.workspace.id });
+  }
+
+  function expirePermissions(
+    sessionId: string,
+    items: ChatItem[],
+    turn: ActiveTurn,
+  ) {
+    for (const itemId of turn.permissions.keys()) {
+      const item = items.find((entry) => entry.id === itemId);
+      if (item?.kind === 'permission' && item.status === 'pending') {
+        upsert(sessionId, items, { ...item, status: 'expired' });
+      }
+    }
+    turn.permissions.clear();
+  }
+
   function finishWorkspaceTurn(
     workspace: Workspace,
     session: ChatSession,
     items: ChatItem[],
   ) {
-    const stillWorking = workspace.sessions.some((entry) =>
-      ctx.runningSessions.has(entry.id),
-    );
     const runtime = ctx.runtime(workspace.id);
-    if (!stillWorking && runtime.status === 'working')
-      ctx.setStatus(workspace.id, 'idle');
     const watching =
       ctx.deps.isWindowFocused() && ctx.focusedWorkspaceId === workspace.id;
     if (!watching) runtime.unread = true;
     void refreshStats(ctx, workspace);
-    if (!ctx.deps.isWindowFocused()) {
-      const last = items.findLast((item) => item.kind === 'result');
-      ctx.deps.notify({
-        title: `${workspace.name} finished`,
-        body: last?.kind === 'result' && !last.ok ? last.text : session.title,
-        workspaceId: workspace.id,
-      });
-    }
+    const last = items.findLast((item) => item.kind === 'result');
+    notifyInBackground(
+      { kind: 'workspace', workspace },
+      `${workspace.name} finished`,
+      last?.kind === 'result' && !last.ok ? last.text : session.title,
+    );
   }
 
   function finishTurn(owner: Owner, session: ChatSession, items: ChatItem[]) {
-    controllers.delete(session.id);
     ctx.runningSessions.delete(session.id);
     persist(session.id, items);
+    refreshStatus(owner);
     if (owner.kind === 'workspace')
       finishWorkspaceTurn(owner.workspace, session, items);
     ctx.store.save();
@@ -220,7 +287,7 @@ export function createChats(ctx: Context): Chats {
       (other) =>
         other !== ask &&
         other.repoIds.includes(repoId) &&
-        controllers.has(other.session.id),
+        turns.has(other.session.id),
     );
   }
 
@@ -274,76 +341,211 @@ export function createChats(ctx: Context): Chats {
     };
   }
 
+  function answerControl(
+    turn: ActiveTurn,
+    request: ControlRequest,
+    body: Record<string, unknown>,
+  ) {
+    turn.process?.write(controlResponse(request.requestId, body));
+  }
+
+  function onControlRequest(
+    session: ChatSession,
+    items: ChatItem[],
+    turn: ActiveTurn,
+    request: ControlRequest,
+    cwd: string,
+  ) {
+    if (turn.owner.kind === 'ask' && request.tool === PLAN_TOOL) {
+      answerControl(turn, request, denyResponse(ASK_PLAN_MESSAGE));
+      return;
+    }
+    if (!request.needsUser && !ctx.store.state.settings.toolApprovals) {
+      answerControl(turn, request, allowResponse(request));
+      return;
+    }
+    const itemId = `${turn.id}:permission:${request.requestId}`;
+    turn.permissions.set(itemId, request);
+    upsert(session.id, items, permissionItem(itemId, request, cwd));
+    refreshStatus(turn.owner);
+    ctx.emitState();
+    const name =
+      turn.owner.kind === 'workspace' ? turn.owner.workspace.name : 'Ask';
+    notifyInBackground(turn.owner, `${name} needs your input`, session.title);
+  }
+
+  function handleLine(
+    session: ChatSession,
+    items: ChatItem[],
+    turn: ActiveTurn,
+    parser: TurnParser,
+    cwd: string,
+    line: string,
+  ): number {
+    const event = parseJsonLine(line);
+    if (!event) return 0;
+    const request = parseControlRequest(event);
+    if (request) {
+      onControlRequest(session, items, turn, request, cwd);
+      return 1;
+    }
+    if (isUserMessageAck(event)) turn.acknowledged += 1;
+    const updates = parser.feed(event);
+    for (const item of updates)
+      upsert(session.id, items, { ...item, id: `${turn.id}:${item.id}` });
+    const allConsumed =
+      turn.acknowledged >= turn.written || turn.acknowledged === 0;
+    if (event.type === 'result' && allConsumed) turn.process?.closeInput();
+    return updates.length;
+  }
+
   async function runTurn(
-    owner: Owner,
     session: ChatSession,
     options: SendOptions,
     items: ChatItem[],
-    signal: AbortSignal,
+    turn: ActiveTurn,
   ) {
     const agent = AGENTS[session.agent];
     const prompt = session.agentSessionId
       ? options.text
       : replayPrompt(items.slice(0, -1), options.text);
-    const turnId = ctx.deps.newId().slice(0, 8);
     let sinceSave = 0;
     let parser: TurnParser | null = null;
     const notice = (text: string) =>
       upsert(session.id, items, {
-        id: `${turnId}:notice`,
+        id: `${turn.id}:notice`,
         kind: 'notice',
         text,
       });
     try {
-      const target = await turnTarget(owner);
+      const target = await turnTarget(turn.owner);
       const turnParser = agent.parser(target.cwd);
       parser = turnParser;
       const request: TurnRequest = {
         model: options.model,
         planMode: options.planMode || target.readOnly,
         effort: options.effort,
+        fast: options.fast,
+        toolApprovals: ctx.store.state.settings.toolApprovals,
         resumeId: session.agentSessionId,
         newSessionId: ctx.deps.newId(),
         systemPrompt: target.systemPrompt,
         addDirs: target.addDirs,
       };
-      const result = await ctx.deps.run(agent.binary, agent.args(request), {
+      const process = spawnAgent(agent.binary, agent.args(request), {
         cwd: target.cwd,
-        env: target.env,
-        stdin:
-          session.agent === 'codex' ? codexPrompt(request, prompt) : prompt,
-        signal,
-        timeoutMs: TURN_TIMEOUT_MS,
-        onStdoutLine: (line) => {
-          const event = parseJsonLine(line);
-          if (!event) return;
-          for (const item of turnParser.feed(event)) {
-            upsert(session.id, items, { ...item, id: `${turnId}:${item.id}` });
-            sinceSave += 1;
-          }
-          if (sinceSave >= SAVE_EVERY_ITEMS) {
-            sinceSave = 0;
-            persist(session.id, items);
-          }
+        env: { ...target.env, KOREV_SESSION_ID: session.id },
+        onLine: (line) => {
+          sinceSave += handleLine(
+            session,
+            items,
+            turn,
+            turnParser,
+            target.cwd,
+            line,
+          );
+          if (sinceSave < SAVE_EVERY_ITEMS) return;
+          sinceSave = 0;
+          persist(session.id, items);
         },
       });
+      turn.process = process;
+      if (turn.stopRequested) process.stop();
+      if (agent.input === 'stream-json') {
+        process.write(claudeUserMessage(prompt));
+        turn.written = 1;
+      } else {
+        process.write(codexPrompt(request, prompt));
+        process.closeInput();
+      }
+      const exit = await process.done;
       const sawResult = items.some(
-        (item) => item.kind === 'result' && item.id.startsWith(`${turnId}:`),
+        (item) => item.kind === 'result' && item.id.startsWith(`${turn.id}:`),
       );
-      if (result.exitCode !== 0 && !sawResult) {
+      if (exit.stopped) notice('Stopped');
+      else if (exit.exitCode !== 0 && !sawResult) {
         notice(
-          result.stderr.trim().slice(-STDERR_TAIL_CHARS) ||
-            `${agent.binary} exited with code ${result.exitCode}`,
+          exit.stderr.trim().slice(-STDERR_TAIL_CHARS) ||
+            `${agent.binary} exited with code ${exit.exitCode}`,
         );
       }
     } catch (error) {
-      notice(
-        error instanceof CommandAbortedError ? 'Stopped' : errorMessage(error),
-      );
+      notice(errorMessage(error));
     } finally {
       session.agentSessionId = parser?.sessionId() ?? session.agentSessionId;
-      finishTurn(owner, session, items);
+      expirePermissions(session.id, items, turn);
+      turns.delete(session.id);
+      finishTurn(turn.owner, session, items);
+      void sendQueued(session.id, options);
     }
+  }
+
+  async function sendQueued(sessionId: string, options: SendOptions) {
+    const items = await transcript(sessionId);
+    const queued = items.flatMap((item) =>
+      item.kind === 'user' && item.queued ? [item] : [],
+    );
+    if (!queued.length || turns.has(sessionId)) return;
+    for (const item of queued)
+      upsert(sessionId, items, { ...item, queued: false });
+    const text = queued.map((item) => item.text).join('\n\n');
+    startTurn(sessionId, items, { ...options, text });
+  }
+
+  function startTurn(
+    sessionId: string,
+    items: ChatItem[],
+    options: SendOptions,
+  ) {
+    const { owner, session } = locate(sessionId);
+    const turn: ActiveTurn = {
+      id: ctx.deps.newId().slice(0, 8),
+      owner,
+      process: null,
+      stopRequested: false,
+      written: 0,
+      acknowledged: 0,
+      permissions: new Map(),
+    };
+    turns.set(sessionId, turn);
+    ctx.runningSessions.add(sessionId);
+    refreshStatus(owner);
+    ctx.store.save();
+    ctx.emitState();
+    void runTurn(session, options, items, turn);
+  }
+
+  function steer(
+    sessionId: string,
+    items: ChatItem[],
+    turn: ActiveTurn,
+    text: string,
+  ): boolean {
+    const { session } = locate(sessionId);
+    const process = turn.process;
+    if (AGENTS[session.agent].input !== 'stream-json' || !process?.inputOpen())
+      return false;
+    process.write(claudeUserMessage(text));
+    turn.written += 1;
+    upsert(sessionId, items, {
+      id: ctx.deps.newId(),
+      kind: 'user',
+      text,
+      at: ctx.deps.now().toISOString(),
+      checkpoint: null,
+    });
+    return true;
+  }
+
+  function queue(sessionId: string, items: ChatItem[], text: string) {
+    upsert(sessionId, items, {
+      id: ctx.deps.newId(),
+      kind: 'user',
+      text,
+      at: ctx.deps.now().toISOString(),
+      checkpoint: null,
+      queued: true,
+    });
   }
 
   async function send(
@@ -354,9 +556,13 @@ export function createChats(ctx: Context): Chats {
     const workspace = owner.kind === 'workspace' ? owner.workspace : null;
     if (workspace?.archivedAt)
       return { ok: false, message: 'Workspace is archived' };
-    if (controllers.has(sessionId))
-      return { ok: false, message: 'Agent is still working' };
     const items = await transcript(sessionId);
+    const active = turns.get(sessionId);
+    if (active) {
+      if (!steer(sessionId, items, active, options.text))
+        queue(sessionId, items, options.text);
+      return { ok: true, value: undefined };
+    }
     const firstMessage = !items.some((item) => item.kind === 'user');
     const checkpoint = workspace
       ? await createCheckpoint(ctx.git, workspace.path).catch(() => null)
@@ -371,13 +577,8 @@ export function createChats(ctx: Context): Chats {
     if (isUntitled(session)) session.title = titleFrom(options.text);
     session.model = options.model;
     session.effort = options.effort;
-    const controller = new AbortController();
-    controllers.set(sessionId, controller);
-    ctx.runningSessions.add(sessionId);
-    if (workspace) ctx.setStatus(workspace.id, 'working');
-    ctx.store.save();
-    ctx.emitState();
-    void runTurn(owner, session, options, items, controller.signal);
+    session.fast = options.fast;
+    startTurn(sessionId, items, options);
     if (workspace && firstMessage && session === workspace.sessions[0]) {
       void autoRenameBranch(workspace, options.text);
     }
@@ -419,7 +620,45 @@ export function createChats(ctx: Context): Chats {
   }
 
   function stop(sessionId: string) {
-    controllers.get(sessionId)?.abort();
+    const turn = turns.get(sessionId);
+    if (!turn) return;
+    turn.stopRequested = true;
+    turn.process?.stop();
+  }
+
+  function nextModeAfterPlan(): string {
+    return ctx.store.state.settings.toolApprovals
+      ? 'default'
+      : 'bypassPermissions';
+  }
+
+  function respondPermission(
+    sessionId: string,
+    itemId: string,
+    response: PermissionResponse,
+  ): Result {
+    const turn = turns.get(sessionId);
+    const request = turn?.permissions.get(itemId);
+    const items = transcripts.get(sessionId);
+    const item = items?.find((entry) => entry.id === itemId);
+    if (!turn?.process || !request || !items || item?.kind !== 'permission') {
+      return {
+        ok: false,
+        message: 'This request is no longer waiting for an answer',
+      };
+    }
+    const body = response.allow
+      ? allowResponse(request, response.answers, nextModeAfterPlan())
+      : denyResponse(response.message?.trim() || DENIED_MESSAGE);
+    answerControl(turn, request, body);
+    turn.permissions.delete(itemId);
+    upsert(sessionId, items, {
+      ...item,
+      status: response.allow ? 'allowed' : 'denied',
+    });
+    refreshStatus(turn.owner);
+    ctx.emitState();
+    return { ok: true, value: undefined };
   }
 
   async function restoreFiles(
@@ -441,7 +680,7 @@ export function createChats(ctx: Context): Chats {
     itemId: string,
   ): Promise<Result<string>> {
     const { owner, session } = locate(sessionId);
-    if (controllers.has(sessionId))
+    if (turns.has(sessionId))
       return { ok: false, message: 'Stop the agent first' };
     const items = await transcript(sessionId);
     const target = items.find((item) => item.id === itemId);
@@ -460,11 +699,12 @@ export function createChats(ctx: Context): Chats {
 
   return {
     transcript,
-    isRunning: (sessionId) => controllers.has(sessionId),
+    isRunning: (sessionId) => turns.has(sessionId),
     send,
     stop,
     stopWorkspace: (workspace) =>
       workspace.sessions.forEach((session) => stop(session.id)),
+    respondPermission,
     revert,
     async forget(sessionId) {
       stop(sessionId);

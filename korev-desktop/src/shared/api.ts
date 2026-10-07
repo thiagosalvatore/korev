@@ -9,6 +9,7 @@ import type {
   EditorId,
   FileChange,
   IssueSummary,
+  PermissionResponse,
   PullRequestSummary,
   RepoConfig,
   WorkspaceSource,
@@ -55,11 +56,16 @@ export interface KorevApi {
   closeSession(workspaceId: string, sessionId: string): Promise<void>;
   updateSession(
     sessionId: string,
-    patch: { model?: string; effort?: string; title?: string },
+    patch: { model?: string; effort?: string; fast?: boolean; title?: string },
   ): Promise<void>;
   transcript(sessionId: string): Promise<ChatItem[]>;
   send(sessionId: string, options: SendOptions): Promise<Result>;
   stop(sessionId: string): Promise<void>;
+  respondPermission(
+    sessionId: string,
+    itemId: string,
+    response: PermissionResponse,
+  ): Promise<Result>;
   revert(sessionId: string, itemId: string): Promise<Result<string>>;
   saveAttachment(
     workspaceId: string,

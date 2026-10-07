@@ -22,16 +22,26 @@ export interface TurnRequest {
   model: string;
   planMode: boolean;
   effort: string;
+  fast: boolean;
+  toolApprovals: boolean;
   resumeId: string | null;
   newSessionId: string;
   systemPrompt: string;
   addDirs: string[];
 }
 
+export type AgentInput = 'stream-json' | 'prompt';
+
 export interface AgentDefinition {
   binary: string;
+  input: AgentInput;
   args(request: TurnRequest): string[];
   parser(cwd: string): TurnParser;
+}
+
+function claudePermissionMode(request: TurnRequest): string {
+  if (request.planMode) return 'plan';
+  return request.toolApprovals ? 'default' : 'bypassPermissions';
 }
 
 function claudeArgs(request: TurnRequest): string[] {
@@ -40,14 +50,21 @@ function claudeArgs(request: TurnRequest): string[] {
     : ['--session-id', request.newSessionId];
   return [
     '-p',
+    '--input-format',
+    'stream-json',
     '--output-format',
     'stream-json',
     '--verbose',
     '--include-partial-messages',
+    '--permission-prompt-tool',
+    'stdio',
+    '--replay-user-messages',
     '--model',
     request.model,
     '--permission-mode',
-    request.planMode ? 'plan' : 'bypassPermissions',
+    claudePermissionMode(request),
+    '--settings',
+    JSON.stringify({ fastMode: request.fast }),
     '--effort',
     request.effort,
     '--append-system-prompt',
@@ -67,6 +84,9 @@ function codexArgs(request: TurnRequest): string[] {
     '--skip-git-repo-check',
     '-c',
     `sandbox_mode="${request.planMode ? 'read-only' : 'workspace-write'}"`,
+    '-c',
+    `model_reasoning_effort="${request.effort}"`,
+    ...(request.fast ? ['-c', 'service_tier="fast"'] : []),
     ...model,
   ];
   if (request.resumeId) {
@@ -78,11 +98,13 @@ function codexArgs(request: TurnRequest): string[] {
 export const AGENTS: Record<AgentKind, AgentDefinition> = {
   claude: {
     binary: 'claude',
+    input: 'stream-json',
     args: claudeArgs,
     parser: createClaudeParser,
   },
   codex: {
     binary: 'codex',
+    input: 'prompt',
     args: codexArgs,
     parser: createCodexParser,
   },
@@ -168,4 +190,16 @@ export async function detectAgents(
       models: codex ? await codexModels(run, env) : CODEX_FALLBACK_MODELS,
     },
   ];
+}
+
+export function claudeUserMessage(text: string): string {
+  return JSON.stringify({
+    type: 'user',
+    message: { role: 'user', content: text },
+  });
+}
+
+export function isUserMessageAck(event: Record<string, unknown>): boolean {
+  const message = event.message as { content?: unknown } | undefined;
+  return event.type === 'user' && typeof message?.content === 'string';
 }

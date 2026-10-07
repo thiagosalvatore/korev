@@ -7,6 +7,7 @@ import {
   type Workspace,
 } from '../../shared/model';
 import { api } from '../bridge';
+import { loadoutFor } from '../format';
 import { useTranscript } from '../hooks';
 import { reportFailure } from '../ui/toast';
 import {
@@ -24,6 +25,7 @@ export interface ChatViewProps {
   session: ChatSession;
   empty?: ReactNode;
   placeholder?: string;
+  repoId?: string | null;
 }
 
 const NO_COMMENTS: DiffComment[] = [];
@@ -59,6 +61,7 @@ export function ChatView({
   session,
   empty,
   placeholder,
+  repoId,
 }: ChatViewProps) {
   const items = useTranscript(session.id);
   const running = state.runningSessions.includes(session.id);
@@ -92,6 +95,31 @@ export function ChatView({
             ) : null)
           }
           onRevert={(itemId) => void revert(itemId)}
+          onRespond={(itemId, response) => {
+            const approvedPlan =
+              response.allow &&
+              items.some(
+                (item) =>
+                  item.id === itemId &&
+                  item.kind === 'permission' &&
+                  item.plan !== null,
+              );
+            if (approvedPlan) setPlanMode(false);
+            void api
+              .respondPermission(session.id, itemId, response)
+              .then(reportFailure);
+          }}
+          onRetry={(text) =>
+            void api
+              .send(session.id, {
+                text,
+                model: session.model,
+                effort: session.effort,
+                planMode,
+                fast: session.fast,
+              })
+              .then(reportFailure)
+          }
         />
       ) : (
         <div className="flex-1" />
@@ -108,6 +136,13 @@ export function ChatView({
             draftKey={session.id}
             agent={session.agent}
             models={agent?.models ?? []}
+            loadout={loadoutFor(state, session.agent)}
+            snippets={state.settings.snippets}
+            fast={session.fast}
+            repoId={workspace?.repoId ?? repoId ?? null}
+            onFastChange={(fast) =>
+              void api.updateSession(session.id, { fast })
+            }
             model={session.model}
             effort={session.effort}
             planMode={planMode}
@@ -135,6 +170,7 @@ export function ChatView({
                   model: session.model,
                   effort: session.effort,
                   planMode,
+                  fast: session.fast,
                 }),
               )
             }

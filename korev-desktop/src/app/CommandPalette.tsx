@@ -11,7 +11,7 @@ import {
   restoreWorkspace,
   selectWorkspace,
 } from './actions';
-import { fuzzyRank } from './chat/Composer';
+import { fuzzyRank } from './fuzzy';
 import { timeAgo } from './format';
 import { openProject } from './Sidebar';
 import { setUi, useUi } from './ui-store';

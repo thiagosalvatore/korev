@@ -13,9 +13,10 @@ import {
   IconButton,
   type IconName,
 } from '../../design-system';
-import type { ChatItem, Todo } from '../../shared/model';
+import type { ChatItem, PermissionResponse, Todo } from '../../shared/model';
 import { duration } from '../format';
 import { Markdown } from './Markdown';
+import { PermissionCard } from './PermissionCard';
 
 type ToolItem = Extract<ChatItem, { kind: 'tool' }>;
 
@@ -234,21 +235,47 @@ function UserMessage({
           />
         ) : null}
       </div>
-      <div className="max-w-[85%] rounded-lg border border-border-1 bg-raised px-3.5 py-2.5 text-md whitespace-pre-wrap text-fg-1">
+      <div
+        className={cn(
+          'max-w-[85%] rounded-lg border border-border-1 bg-raised px-3.5 py-2.5 text-md whitespace-pre-wrap text-fg-1',
+          item.queued && 'border-dashed opacity-60',
+        )}
+      >
+        {item.queued ? (
+          <span className="mb-1 block text-2xs font-medium tracking-wide text-fg-3 uppercase">
+            Queued
+          </span>
+        ) : null}
         {item.text}
       </div>
     </div>
   );
 }
 
-function ResultLine({ item }: { item: Extract<ChatItem, { kind: 'result' }> }) {
+function ResultLine({
+  item,
+  onRetry,
+}: {
+  item: Extract<ChatItem, { kind: 'result' }>;
+  onRetry: (() => void) | null;
+}) {
   if (!item.ok) {
     return (
       <div className="flex items-start gap-2 rounded-md bg-danger-subtle px-3 py-2 text-sm text-danger-text">
         <Icon name="octagon-alert" size={14} className="mt-0.5" />
-        <span className="whitespace-pre-wrap">
+        <span className="flex-1 whitespace-pre-wrap">
           {item.text || 'The agent stopped with an error.'}
         </span>
+        {onRetry ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="rotate-ccw"
+            onClick={onRetry}
+          >
+            Retry
+          </Button>
+        ) : null}
       </div>
     );
   }
@@ -303,6 +330,8 @@ export interface TranscriptProps {
   running: boolean;
   empty: ReactNode;
   onRevert: (itemId: string) => void;
+  onRespond: (itemId: string, response: PermissionResponse) => void;
+  onRetry: (text: string) => void;
 }
 
 const STICK_THRESHOLD_PX = 80;
@@ -312,6 +341,8 @@ export function Transcript({
   running,
   empty,
   onRevert,
+  onRespond,
+  onRetry,
 }: TranscriptProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -319,6 +350,8 @@ export function Transcript({
   const lastUser = items.findLast((item) => item.kind === 'user');
   const startedAt =
     lastUser?.kind === 'user' ? Date.parse(lastUser.at) : Date.now();
+  const lastUserText = lastUser?.kind === 'user' ? lastUser.text : null;
+  const lastResult = items.findLast((item) => item.kind === 'result');
 
   useLayoutEffect(() => {
     const element = scroller.current;
@@ -374,7 +407,25 @@ export function Transcript({
             case 'todos':
               return <TodoCard key={item.id} todos={item.todos} />;
             case 'result':
-              return <ResultLine key={item.id} item={item} />;
+              return (
+                <ResultLine
+                  key={item.id}
+                  item={item}
+                  onRetry={
+                    !running && item === lastResult && lastUserText
+                      ? () => onRetry(lastUserText)
+                      : null
+                  }
+                />
+              );
+            case 'permission':
+              return (
+                <PermissionCard
+                  key={item.id}
+                  item={item}
+                  onRespond={(response) => onRespond(item.id, response)}
+                />
+              );
             case 'notice':
               return (
                 <div

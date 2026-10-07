@@ -12,6 +12,8 @@ import {
   AGENT_KINDS,
   AGENT_LABELS,
   EFFORT_LEVELS,
+  LOADOUT_SIZE,
+  loadoutKey,
   type AgentKind,
   type AppState,
   type Repo,
@@ -38,6 +40,7 @@ const SECTIONS: Section[] = [
   { id: 'agents', label: 'Agents', icon: 'bot' },
   { id: 'git', label: 'Git', icon: 'git-branch' },
   { id: 'storage', label: 'Storage', icon: 'hard-drive' },
+  { id: 'snippets', label: 'Snippets', icon: 'text-quote' },
   { id: 'shortcuts', label: 'Keyboard shortcuts', icon: 'keyboard' },
 ];
 
@@ -183,6 +186,7 @@ function Models({ state }: { state: AppState }) {
           </Row>
         );
       })}
+      <Loadout state={state} />
       <Row
         title="Start chats in plan mode"
         description="The agent plans before it edits. Toggle per message with ⇧Tab."
@@ -192,6 +196,124 @@ function Models({ state }: { state: AppState }) {
           onChange={(defaultPlanMode) => update({ defaultPlanMode })}
         />
       </Row>
+    </>
+  );
+}
+
+function Loadout({ state }: { state: AppState }) {
+  const { loadout } = state.settings;
+  const options = AGENT_KINDS.flatMap((agent) =>
+    (state.agents.find((entry) => entry.agent === agent)?.models ?? []).map(
+      (model) => ({
+        key: loadoutKey(agent, model.id),
+        label: `${AGENT_LABELS[agent]} · ${model.label}`,
+      }),
+    ),
+  );
+  const toggle = (key: string) => {
+    if (loadout.includes(key))
+      return update({ loadout: loadout.filter((entry) => entry !== key) });
+    if (loadout.length >= LOADOUT_SIZE)
+      return toast(`A loadout holds up to ${LOADOUT_SIZE} models`);
+    return update({ loadout: [...loadout, key] });
+  };
+  return (
+    <div className="border-b border-border-1 py-4">
+      <div className="text-sm font-medium text-fg-1">Loadout</div>
+      <div className="mt-0.5 mb-2 text-xs text-fg-3">
+        Up to {LOADOUT_SIZE} favourite models. They sit at the top of the model
+        picker, and ⌃⌘1–{LOADOUT_SIZE} picks them while typing.
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((option) => {
+          const position = loadout.indexOf(option.key);
+          return (
+            <button
+              key={option.key}
+              type="button"
+              aria-pressed={position !== -1}
+              className={cn(
+                'flex h-7 cursor-pointer items-center gap-1.5 rounded-sm border border-border-2 bg-raised px-2 text-xs text-fg-2 hover:border-border-strong',
+                position !== -1 &&
+                  'border-accent-border bg-accent-subtle text-accent-text',
+              )}
+              onClick={() => toggle(option.key)}
+            >
+              {position !== -1 ? (
+                <span className="font-mono">⌃⌘{position + 1}</span>
+              ) : null}
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Snippets({ settings }: { settings: Settings }) {
+  const [name, setName] = useState('');
+  const [text, setText] = useState('');
+  const add = () => {
+    update({ snippets: [...settings.snippets, { name: name.trim(), text }] });
+    setName('');
+    setText('');
+  };
+  return (
+    <>
+      <p className="mt-0 mb-4 text-sm text-fg-3">
+        Press ⌘; in the composer to insert one.
+      </p>
+      {settings.snippets.map((snippet, index) => (
+        <Row
+          key={`${snippet.name}-${index}`}
+          title={snippet.name}
+          description={
+            <span className="line-clamp-2 font-mono">{snippet.text}</span>
+          }
+        >
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="trash-2"
+            onClick={() =>
+              update({
+                snippets: settings.snippets.filter(
+                  (_, position) => position !== index,
+                ),
+              })
+            }
+          >
+            Remove
+          </Button>
+        </Row>
+      ))}
+      <div className="flex flex-col gap-2 py-4">
+        <Input
+          label="Name"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <textarea
+          aria-label="Snippet text"
+          value={text}
+          rows={4}
+          placeholder="Text to insert"
+          className="resize-y rounded-sm border border-border-2 bg-inset px-2.5 py-2 font-mono text-xs text-fg-1 outline-none focus:border-accent-border"
+          onChange={(event) => setText(event.target.value)}
+        />
+        <div>
+          <Button
+            size="sm"
+            variant="primary"
+            icon="plus"
+            disabled={!name.trim() || !text.trim()}
+            onClick={add}
+          >
+            Add snippet
+          </Button>
+        </div>
+      </div>
     </>
   );
 }
@@ -223,9 +345,18 @@ function Agents({ state }: { state: AppState }) {
           </span>
         </Row>
       ))}
+      <Row
+        title="Ask before tool calls"
+        description="Claude Code asks you to allow each edit and command. Plan approvals and questions always ask. Codex runs in its workspace-write sandbox either way."
+      >
+        <Switch
+          checked={state.settings.toolApprovals}
+          onChange={(toolApprovals) => update({ toolApprovals })}
+        />
+      </Row>
       <p className="mt-3 mb-0 text-xs text-fg-3">
-        Agents run with full permissions inside the workspace folder. A
-        workspace is a git worktree, not a sandbox.
+        Without approvals, agents run with full permissions inside the workspace
+        folder. A workspace is a git worktree, not a sandbox.
       </p>
     </>
   );
@@ -308,6 +439,12 @@ const SHORTCUTS: [string, string][] = [
   ['⌘.', 'Zen mode'],
   ['⌘L', 'Focus chat input'],
   ['⇧Tab', 'Toggle plan mode'],
+  ['⌘⇧E', 'Toggle fast mode'],
+  ['⌘⇧/', 'Cycle effort level'],
+  ['⌃⌘1–5', 'Pick a loadout model'],
+  ['⌘;', 'Insert snippet'],
+  ['⌘U', 'Add attachment'],
+  ['⌘I', 'Create from a branch, PR or issue (new workspace)'],
   ['⌘⇧⌫', 'Cancel agent'],
   ['⌘R', 'Start or stop run script'],
   ['⌘O', 'Open in app'],
@@ -587,6 +724,8 @@ export function SettingsPage({
   else if (current?.id === 'storage')
     body = <Storage settings={state.settings} />;
   else if (current?.id === 'shortcuts') body = <Shortcuts />;
+  else if (current?.id === 'snippets')
+    body = <Snippets settings={state.settings} />;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">

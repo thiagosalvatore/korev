@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { cn, Icon, Tabs, type IconName } from '../design-system';
 import type { IssueSummary, PullRequestSummary } from '../shared/model';
 import { api } from './bridge';
-import { fuzzyRank } from './chat/Composer';
+import { fuzzyRank } from './fuzzy';
 
 export type CreateFrom =
   | { kind: 'branch'; branch: string }
