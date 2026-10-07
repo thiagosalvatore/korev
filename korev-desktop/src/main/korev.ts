@@ -729,11 +729,13 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
     async createAskChat(repoIds) {
       for (const repoId of repoIds) ctx.repo(repoId);
+      const createdAt = deps.now().toISOString();
       const ask = {
         id: deps.newId(),
         repoIds,
         session: newChatSession(ctx, store.state.settings.defaultAgent),
-        createdAt: deps.now().toISOString(),
+        createdAt,
+        lastMessageAt: createdAt,
       };
       store.state.askChats.push(ask);
       store.save();

@@ -21,7 +21,7 @@ npm start
 
 `npm start` runs Korev in development mode with Electron Forge and Vite. Changes to the renderer (`src/app`) reload in the window. Changes to the main process (`src/main`) need a restart: type `rs` in the terminal that runs `npm start`.
 
-Korev keeps its state in `~/Library/Application Support/Korev`: `korev-state.json`, chat transcripts in `transcripts/`, and repositories added with **Clone from URL** in `repos/`. The development build and the packaged app use the same directory. Workspaces and the shared Ask checkouts live in `~/korev/workspaces` (Settings → Storage).
+Korev keeps its state in `~/Library/Application Support/Korev`: `korev-state.json`, chat transcripts in `transcripts/`, and repositories added with **Clone from URL** in `repos/`. Workspaces and the shared Ask checkouts live in `~/korev/workspaces` (Settings → Storage). The development build keeps its own state in `~/Library/Application Support/Korev Dev`, so it can run next to the packaged app. It starts empty: add your repositories again in the development build.
 
 ## Package it
 

@@ -189,6 +189,7 @@ export interface AskChat {
   repoIds: string[];
   session: ChatSession;
   createdAt: string;
+  lastMessageAt: string;
 }
 
 export interface Settings {

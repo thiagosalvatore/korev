@@ -92,7 +92,9 @@ function sanitize(raw: unknown, home: string): PersistedState {
         })),
       }),
     ),
-    askChats: Array.isArray(value.askChats) ? value.askChats : [],
+    askChats: (Array.isArray(value.askChats) ? value.askChats : []).map(
+      (ask) => ({ ...ask, lastMessageAt: ask.lastMessageAt ?? ask.createdAt }),
+    ),
     settings,
   };
 }

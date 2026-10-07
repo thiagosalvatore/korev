@@ -311,10 +311,16 @@ export function createChats(
     );
   }
 
+  function touch(owner: Owner) {
+    if (owner.kind !== 'ask') return;
+    owner.ask.lastMessageAt = ctx.deps.now().toISOString();
+  }
+
   function finishTurn(owner: Owner, session: ChatSession, items: ChatItem[]) {
     ctx.runningSessions.delete(session.id);
     persist(session.id, items);
     refreshStatus(owner);
+    touch(owner);
     if (owner.kind === 'workspace')
       finishWorkspaceTurn(owner.workspace, session, items);
     ctx.store.save();
@@ -669,6 +675,7 @@ export function createChats(
       at: ctx.deps.now().toISOString(),
       checkpoint,
     });
+    touch(owner);
     if (isUntitled(session)) session.title = titleFrom(options.text);
     switchAgent(session, options.agent);
     session.model = options.model;

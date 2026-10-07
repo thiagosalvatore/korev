@@ -539,6 +539,27 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     );
   });
 
+  it('stamps an Ask chat with the time of its last message', async () => {
+    const repo = await addRepo();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-01T10:00:00Z'));
+    const older = await korev.api.createAskChat([repo.id]);
+    vi.setSystemTime(new Date('2026-01-01T11:00:00Z'));
+    const newer = await korev.api.createAskChat([repo.id]);
+    vi.setSystemTime(new Date('2026-01-01T12:00:00Z'));
+
+    await sendAndWait(older.session.id, 'Where is the README?');
+
+    const lastMessageAt = new Map(
+      (await korev.api.getState()).askChats.map((ask) => [
+        ask.id,
+        ask.lastMessageAt,
+      ]),
+    );
+    expect(lastMessageAt.get(older.id)).toBe('2026-01-01T12:00:00.000Z');
+    expect(lastMessageAt.get(newer.id)).toBe('2026-01-01T11:00:00.000Z');
+  });
+
   it('asks the user before an Ask chat runs a command, even with tool approvals off', async () => {
     const repo = await addRepo();
     const askDir = path.join(home, 'korev', 'workspaces', 'acme', '.ask');
