@@ -903,6 +903,21 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toContain(`--add-dir ${path.join(home, 'user-data', 'attachments')}`);
   });
 
+  it('reads an image the agent saved as a data URL', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await writeFile(
+      path.join(workspace.path, 'shot.png'),
+      Buffer.from(SCREENSHOT_BASE64, 'base64'),
+    );
+    await writeFile(path.join(workspace.path, 'notes.txt'), 'hello');
+
+    expect(await korev.api.readImage(session.id, 'shot.png')).toBe(
+      `data:image/png;base64,${SCREENSHOT_BASE64}`,
+    );
+    expect(await korev.api.readImage(session.id, 'notes.txt')).toBeNull();
+  });
+
   async function userMessages(sessionId: string) {
     return (await korev.api.transcript(sessionId)).flatMap((item) =>
       item.kind === 'user' ? [item.text] : [],

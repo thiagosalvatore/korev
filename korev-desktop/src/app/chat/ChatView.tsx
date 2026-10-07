@@ -137,6 +137,7 @@ export function ChatView({
     <div className="flex min-h-0 flex-1 flex-col">
       {items ? (
         <Transcript
+          sessionId={session.id}
           items={items}
           running={running}
           empty={

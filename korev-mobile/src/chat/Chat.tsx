@@ -81,7 +81,12 @@ export function Chat({
           data={[...items].reverse()}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <ChatItemView item={item} onRespond={respond} onHandoff={handoff} />
+            <ChatItemView
+              item={item}
+              sessionId={session.id}
+              onRespond={respond}
+              onHandoff={handoff}
+            />
           )}
           ListHeaderComponent={
             codexPlan ? (

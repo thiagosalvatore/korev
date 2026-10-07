@@ -20,8 +20,9 @@ import type {
   TurnChanges,
   TurnRange,
 } from '../../shared/model';
-import { duration, fileName } from '../../shared/format';
+import { duration, fileName, imageType } from '../../shared/format';
 import { messageParts, type MessageParts } from '../../shared/message';
+import { ImagePreview, ImageThumbnail } from './ImagePreview';
 import { Markdown } from './Markdown';
 import { PermissionCard } from './PermissionCard';
 import { PlanChip } from './PlanChip';
@@ -45,9 +46,20 @@ const TOOL_ICONS: Record<string, IconName> = {
 
 const TOOL_GROUP_THRESHOLD = 3;
 
-function ToolRow({ item, running }: { item: ToolItem; running: boolean }) {
+const READ_TOOL = 'Read';
+
+function ToolRow({
+  item,
+  running,
+  sessionId,
+}: {
+  item: ToolItem;
+  running: boolean;
+  sessionId: string;
+}) {
   const [open, setOpen] = useState(false);
   const pending = item.output === null && running;
+  const readsImage = item.name === READ_TOOL && imageType(item.summary);
   return (
     <div className="text-sm">
       <button
@@ -81,6 +93,11 @@ function ToolRow({ item, running }: { item: ToolItem; running: boolean }) {
           className={cn('text-fg-4 transition-transform', open && 'rotate-90')}
         />
       </button>
+      {readsImage && !pending ? (
+        <div className="mt-1 mb-1.5 ml-6">
+          <ImageThumbnail sessionId={sessionId} path={item.summary} />
+        </div>
+      ) : null}
       {open ? (
         <div className="mt-1 mb-2 ml-6 flex flex-col gap-1.5">
           {item.detail ? (
@@ -107,9 +124,11 @@ function ToolRow({ item, running }: { item: ToolItem; running: boolean }) {
 function ToolGroup({
   items,
   running,
+  sessionId,
 }: {
   items: ToolItem[];
   running: boolean;
+  sessionId: string;
 }) {
   const [open, setOpen] = useState(false);
   const last = items.at(-1);
@@ -126,7 +145,12 @@ function ToolGroup({
           </button>
         ) : null}
         {items.map((item) => (
-          <ToolRow key={item.id} item={item} running={running} />
+          <ToolRow
+            key={item.id}
+            item={item}
+            running={running}
+            sessionId={sessionId}
+          />
         ))}
       </div>
     );
@@ -142,7 +166,9 @@ function ToolGroup({
         {items.length - 1} tool calls
         <Icon name="chevron-right" size={12} />
       </button>
-      {last ? <ToolRow item={last} running={running} /> : null}
+      {last ? (
+        <ToolRow item={last} running={running} sessionId={sessionId} />
+      ) : null}
     </div>
   );
 }
@@ -222,7 +248,8 @@ const MESSAGE_CHIP =
 function MessageAttachments({
   plans,
   files,
-}: Pick<MessageParts, 'plans' | 'files'>) {
+  sessionId,
+}: Pick<MessageParts, 'plans' | 'files'> & { sessionId: string }) {
   if (!plans.length && !files.length) return null;
   return (
     <div className="flex flex-wrap gap-1.5 whitespace-normal">
@@ -240,22 +267,40 @@ function MessageAttachments({
           ) : null}
         </PlanChip>
       ))}
-      {files.map((file) => (
-        <span key={file} title={file} className={cn(MESSAGE_CHIP, 'text-fg-2')}>
-          <Icon name="paperclip" size={13} className="text-fg-3" />
-          <span className="truncate font-mono">{fileName(file)}</span>
-        </span>
-      ))}
+      {files.map((file) => {
+        const chip = (
+          <span
+            key={file}
+            title={file}
+            className={cn(MESSAGE_CHIP, 'text-fg-2')}
+          >
+            <Icon name="paperclip" size={13} className="text-fg-3" />
+            <span className="truncate font-mono">{fileName(file)}</span>
+          </span>
+        );
+        return imageType(file) ? (
+          <ImageThumbnail
+            key={file}
+            sessionId={sessionId}
+            path={file}
+            fallback={chip}
+          />
+        ) : (
+          chip
+        );
+      })}
     </div>
   );
 }
 
 function UserMessage({
   item,
+  sessionId,
   canRevert,
   onRevert,
 }: {
   item: Extract<ChatItem, { kind: 'user' }>;
+  sessionId: string;
   canRevert: boolean;
   onRevert: () => void;
 }) {
@@ -290,7 +335,7 @@ function UserMessage({
           </span>
         ) : null}
         {body ? <span>{body}</span> : null}
-        <MessageAttachments plans={plans} files={files} />
+        <MessageAttachments plans={plans} files={files} sessionId={sessionId} />
       </div>
     </div>
   );
@@ -420,6 +465,7 @@ function WorkingIndicator({ since }: { since: number }) {
 }
 
 export interface TranscriptProps {
+  sessionId: string;
   items: ChatItem[];
   running: boolean;
   empty: ReactNode;
@@ -435,6 +481,7 @@ export interface TranscriptProps {
 const STICK_THRESHOLD_PX = 80;
 
 export function Transcript({
+  sessionId,
   items,
   running,
   empty,
@@ -449,6 +496,7 @@ export function Transcript({
   const scroller = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const lastUser = items.findLast((item) => item.kind === 'user');
   const startedAt =
     lastUser?.kind === 'user' ? Date.parse(lastUser.at) : Date.now();
@@ -486,6 +534,7 @@ export function Transcript({
                 key={block.items[0].id}
                 items={block.items}
                 running={running}
+                sessionId={sessionId}
               />
             );
           }
@@ -496,6 +545,7 @@ export function Transcript({
                 <UserMessage
                   key={item.id}
                   item={item}
+                  sessionId={sessionId}
                   canRevert={!running}
                   onRevert={() => setConfirming(item.id)}
                 />
@@ -507,6 +557,7 @@ export function Transcript({
                   text={item.text}
                   className="px-1.5"
                   onOpenFile={onOpenFile}
+                  onOpenImage={setPreviewImage}
                 />
               );
             case 'thinking':
@@ -551,6 +602,11 @@ export function Transcript({
         {footer}
         {running ? <WorkingIndicator since={startedAt} /> : null}
       </div>
+      <ImagePreview
+        sessionId={sessionId}
+        path={previewImage}
+        onClose={() => setPreviewImage(null)}
+      />
       <Dialog
         open={confirming !== null}
         onClose={() => setConfirming(null)}

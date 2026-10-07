@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { KorevApi } from '../shared/api';
+import { imageType } from '../shared/format';
 import { planBlock } from '../shared/message';
 import {
   EMPTY_SCRIPTS,
@@ -100,6 +101,7 @@ import {
 export const PR_POLL_MS = 30_000;
 const PR_CLOCK_SKEW_MS = 60_000;
 const FILE_MAX_BYTES = 1_000_000;
+const IMAGE_MAX_BYTES = 10_000_000;
 const CONTEXT_DIR = '.context';
 const COMMAND_EXTENSION = '.md';
 const BUILTIN_COMMANDS = ['compact', 'review', 'init'];
@@ -554,6 +556,19 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     );
     const session = workspace?.sessions.find((entry) => entry.id === sessionId);
     return workspace && session ? { workspace, session } : null;
+  }
+
+  function sessionRoot(sessionId: string): string {
+    const chat = workspaceChat(sessionId);
+    if (chat) return chat.workspace.path;
+    const ask = store.state.askChats.find(
+      (entry) => entry.session.id === sessionId,
+    );
+    if (!ask) throw new NotFoundError('Session', sessionId);
+    return askWorktreePath(
+      store.state.settings.workspacesRoot,
+      ctx.repo(ask.repoIds[0]),
+    );
   }
 
   function implementOptions(session: ChatSession, text: string): SendOptions {
@@ -1119,6 +1134,14 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       const contents = await readFile(target).catch(() => null);
       if (!contents || contents.length > FILE_MAX_BYTES) return null;
       return contents.toString('utf8');
+    },
+    async readImage(sessionId, file) {
+      const type = imageType(file);
+      if (!type) return null;
+      const target = readablePath(sessionRoot(sessionId), deps.home, file);
+      const contents = await readFile(target).catch(() => null);
+      if (!contents || contents.length > IMAGE_MAX_BYTES) return null;
+      return `data:${type};base64,${contents.toString('base64')}`;
     },
     prStatuses: (workspaceId) => refreshPrs(workspaceId),
     async mergePr(workspaceId, prNumber) {

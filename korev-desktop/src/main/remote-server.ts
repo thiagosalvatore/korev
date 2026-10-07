@@ -30,6 +30,7 @@ export const REMOTE_METHODS = [
   'rangeChanges',
   'listFiles',
   'readFile',
+  'readImage',
   'prStatuses',
   'reviewComments',
   'createPr',
