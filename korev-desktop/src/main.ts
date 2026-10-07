@@ -33,6 +33,7 @@ const DEFAULT_WINDOW_SIZE = { width: 1440, height: 900 };
 const MIN_WINDOW_SIZE = { width: 960, height: 600 };
 const TRAFFIC_LIGHT_POSITION = { x: 16, y: 16 };
 const DEV_ICON_PATH = '../../assets/icon.png';
+const DEV_USER_DATA_DIR = 'Korev Dev';
 const COMMAND_EVENT = 'command';
 const FINISHED_SOUND = '/System/Library/Sounds/Glass.aiff';
 
@@ -48,6 +49,13 @@ const appOrigin: AppOrigin = {
 if (started) {
   app.quit();
 }
+
+function useSeparateDevData() {
+  if (app.isPackaged) return;
+  app.setPath('userData', path.join(app.getPath('appData'), DEV_USER_DATA_DIR));
+}
+
+useSeparateDevData();
 
 function emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]) {
   for (const window of BrowserWindow.getAllWindows()) {
