@@ -51,7 +51,7 @@ if (started) {
 }
 
 function useSeparateDevData() {
-  if (app.isPackaged) return;
+  if (app.isPackaged || app.commandLine.hasSwitch('user-data-dir')) return;
   app.setPath('userData', path.join(app.getPath('appData'), DEV_USER_DATA_DIR));
 }
 
