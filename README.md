@@ -35,6 +35,17 @@ REACT_NATIVE_PACKAGER_HOSTNAME=<tailscale-ip> npx expo start
 
 Open the app with Expo Go on your phone, then pair it from Settings → Remote access. See [Use Korev from your phone](https://thiagosalvatore.github.io/korev/guides/use-korev-from-your-phone.html).
 
+## Run the landing page
+
+`korev-frontend` is the marketing site, built with [Next.js](https://nextjs.org). `next build` writes a static site to `korev-frontend/out/`.
+
+```sh
+cd korev-frontend
+npm ci
+npm run dev        # http://localhost:3000, or $KOREV_PORT inside a Korev workspace
+npm run build
+```
+
 ## Package it
 
 From the repository root:
@@ -60,6 +71,7 @@ To change the app icon, edit `korev-desktop/assets/icon.svg` and run `npm run ic
 | `korev-desktop/src/shared` | The API between the main process and the renderer, and the types both use |
 | `korev-desktop/src/design-system` | Tokens, styles and shared UI components |
 | `korev-mobile` | The phone app (Expo and React Native). It imports the types in `korev-desktop/src/shared` |
+| `korev-frontend` | The landing page (Next.js) |
 | `docs` | The docs site, built by GitHub Pages |
 | `korev-desktop/e2e` | Playwright tests that drive the packaged app |
 | `korev-desktop/test-support/bin/claude` | The fake `claude` CLI that the e2e tests run |
@@ -81,7 +93,7 @@ npm test            # Vitest unit tests
 npm run test:e2e    # packages the app and drives it with a fake agent
 ```
 
-`korev-mobile` has the same `typecheck`, `lint` and `test` scripts.
+`korev-mobile` and `korev-frontend` have the same `typecheck`, `lint` and `test` scripts. `korev-frontend` also has `build`.
 
 CI runs the same checks, but only when you start it by hand:
 
