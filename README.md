@@ -71,8 +71,7 @@ To change the app icon, edit `korev-desktop/assets/icon.svg` and run `npm run ic
 | `korev-desktop/src/shared` | The API between the main process and the renderer, and the types both use |
 | `korev-desktop/src/design-system` | Tokens, styles and shared UI components |
 | `korev-mobile` | The phone app (Expo and React Native). It imports the types in `korev-desktop/src/shared` |
-| `korev-frontend` | The landing page (Next.js) |
-| `docs` | The docs site, built by GitHub Pages |
+| `korev-frontend` | The landing page and the docs site (Next.js and Fumadocs). The docs pages are in `korev-frontend/content/docs` |
 | `korev-desktop/e2e` | Playwright tests that drive the packaged app |
 | `korev-desktop/test-support/bin/claude` | The fake `claude` CLI that the e2e tests run |
 | `DESIGN.md` | How the app looks and behaves |
@@ -134,7 +133,7 @@ git tag -d vX.Y.Z
 4. Follow `DESIGN.md` for UI changes: semantic tokens only, one accent colour.
 5. Add a line under `## [Unreleased]` in `CHANGELOG.md` when you change what the user sees. Korev shows these notes after an update.
 6. Run the checks above, then start CI on your branch.
-7. Update `docs/` when you change what the user sees. GitHub Pages publishes it from `main`. To preview it, run `make docs` and open http://localhost:4000/korev/. It needs Docker.
+7. Update the docs in `korev-frontend/content/docs` when you change what the user sees. To preview them, run `npm run dev` in `korev-frontend` and open `/docs`.
 8. Write the commit and pull request title as one sentence that says what the user sees change, for example "Keep the Mac awake while an agent is running". Pull requests are squash-merged.
 
 For things to work on, see `TODOS.md`.

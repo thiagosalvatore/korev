@@ -1,0 +1,13 @@
+{
+  "title": "Guides",
+  "icon": "Map",
+  "defaultOpen": true,
+  "pages": [
+    "configure-your-repository",
+    "create-from-branch-pr-issue",
+    "review-and-merge",
+    "spotlight",
+    "import-from-conductor",
+    "use-korev-from-your-phone"
+  ]
+}

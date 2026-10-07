@@ -1,0 +1,58 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+@import './tokens.css' layer(base);
+
+:root,
+.dark,
+.dark #nd-sidebar {
+  --color-fd-background: var(--bg-app);
+  --color-fd-foreground: var(--fg-1);
+  --color-fd-card: var(--bg-surface);
+  --color-fd-card-foreground: var(--fg-1);
+  --color-fd-popover: var(--bg-raised);
+  --color-fd-popover-foreground: var(--fg-1);
+  --color-fd-muted: var(--bg-raised);
+  --color-fd-muted-foreground: var(--fg-3);
+  --color-fd-secondary: var(--bg-raised);
+  --color-fd-secondary-foreground: var(--fg-1);
+  --color-fd-accent: var(--accent-subtle);
+  --color-fd-accent-foreground: var(--fg-1);
+  --color-fd-primary: var(--accent);
+  --color-fd-primary-foreground: var(--fg-on-accent);
+  --color-fd-border: var(--border-1);
+  --color-fd-ring: var(--accent-border);
+  --color-fd-overlay: var(--bg-overlay);
+  --color-fd-info: var(--accent);
+  --color-fd-warning: var(--warning);
+  --color-fd-error: var(--danger);
+  --color-fd-success: var(--success);
+}
+
+@layer base {
+  body {
+    font: 400 var(--text-lg) / 1.65 var(--font-sans);
+  }
+  a,
+  a:not(.kv-btn):hover {
+    color: inherit;
+    text-decoration: none;
+  }
+}
+
+.kd-nav-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.kd-nav-title > :last-child {
+  font: 400 var(--text-sm) / 1 var(--font-mono);
+  color: var(--fg-3);
+}
+
+#nd-page > :first-child:not(h1) a {
+  font: 400 var(--text-xs) / 1 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}

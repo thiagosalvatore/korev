@@ -2,13 +2,12 @@ APP_DIR := korev-desktop
 ARCH := $(shell node -p process.arch)
 APP := $(APP_DIR)/out/Korev-darwin-$(ARCH)/Korev.app
 PACKAGED_KOREV := Korev\.app/Contents/MacOS/Korev$$
-DOCS_PORT ?= 4000
 VERSION ?= $(shell node -p "require('./$(APP_DIR)/package.json').version")
 TAG = v$(VERSION)
 DIST_ARCHS := arm64 x64
 RELEASE_NOTES = awk -v heading='\#\# [$(VERSION)]' 'index($$0, "\#\# ") == 1 { printing = index($$0, heading) == 1; next } printing' CHANGELOG.md
 
-.PHONY: package stop run package-run docs dist release-notes bump release
+.PHONY: package stop run package-run dist release-notes bump release
 
 $(APP_DIR)/node_modules: $(APP_DIR)/package-lock.json
 	cd $(APP_DIR) && npm ci
@@ -25,10 +24,6 @@ run: stop
 	open -n $(APP)
 
 package-run: package run
-
-docs:
-	docker run --rm -it -v "$(CURDIR)/docs:/site:ro" -p $(DOCS_PORT):4000 ruby:3.3 bash -c \
-		'gem install --no-document github-pages webrick && cd /tmp && jekyll serve --source /site --host 0.0.0.0 --baseurl /korev --destination /tmp/site'
 
 dist: $(APP_DIR)/node_modules
 	rm -rf $(APP_DIR)/out/make
