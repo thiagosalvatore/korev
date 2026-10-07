@@ -95,7 +95,11 @@ export interface PreviewUrl {
   url: string;
 }
 
-export type RepoConfigSource = 'settings.toml' | 'korev.json' | 'app';
+export type RepoConfigSource =
+  | 'settings.toml'
+  | 'korev.json'
+  | 'conductor'
+  | 'app';
 
 export interface RepoConfig {
   source: RepoConfigSource;

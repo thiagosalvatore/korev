@@ -6,7 +6,13 @@ const APP = {
   scripts: { ...EMPTY_SCRIPTS, setup: 'app-setup', run: 'app-run' },
   prompts: {},
 };
-const NO_FILES = { sharedToml: null, localToml: null, jsonConfig: null };
+const NO_FILES = {
+  sharedToml: null,
+  localToml: null,
+  jsonConfig: null,
+  conductorSharedToml: null,
+  conductorLocalToml: null,
+};
 
 const SHARED = `
 file_include_globs = ".env*\\nconfig/*.local.json"
@@ -123,6 +129,28 @@ describe('repo config', () => {
       code_review: 'Use the pr-review skill.',
       create_pr: 'Use the PR template.',
     });
+  });
+
+  it('falls back to .conductor/settings.toml when .korev has no settings', () => {
+    const conductorLocalToml = '[scripts]\nsetup = "direnv allow"\n';
+    expect(
+      resolveRepoConfig(APP, {
+        ...NO_FILES,
+        conductorSharedToml: SHARED,
+        conductorLocalToml,
+      }),
+    ).toMatchObject({
+      source: 'conductor',
+      setup: 'direnv allow',
+      archive: './archive.sh',
+    });
+    expect(
+      resolveRepoConfig(APP, {
+        ...NO_FILES,
+        sharedToml: SHARED,
+        conductorLocalToml,
+      }),
+    ).toMatchObject({ source: 'settings.toml', setup: 'pnpm install' });
   });
 
   it('expands port placeholders in preview URLs', () => {

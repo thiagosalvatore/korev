@@ -6,6 +6,7 @@ import type {
   PromptKind,
   Repo,
   RepoConfig,
+  RepoConfigSource,
   RepoPrompts,
   RunScript,
 } from '../shared/model';
@@ -13,6 +14,8 @@ import type {
 const SHARED_SETTINGS_FILE = '.korev/settings.toml';
 const LOCAL_SETTINGS_FILE = '.korev/settings.local.toml';
 const JSON_CONFIG_FILE = 'korev.json';
+const CONDUCTOR_SHARED_SETTINGS_FILE = '.conductor/settings.toml';
+const CONDUCTOR_LOCAL_SETTINGS_FILE = '.conductor/settings.local.toml';
 const DEFAULT_RUN_ICON = 'play';
 const SINGLE_RUN_ID = 'run';
 const PROMPT_KINDS: readonly PromptKind[] = [
@@ -26,7 +29,7 @@ const PROMPT_KINDS: readonly PromptKind[] = [
 const PORT_OFFSET = /\$\(\(\s*KOREV_PORT\s*\+\s*(\d)\s*\)\)/g;
 const PORT_VARIABLE = /\$\{?KOREV_PORT\}?/g;
 
-type Table = Record<string, unknown>;
+export type Table = Record<string, unknown>;
 
 export type AppRepoSettings = Pick<Repo, 'scripts' | 'prompts'>;
 
@@ -34,23 +37,25 @@ export interface RepoConfigFiles {
   sharedToml: string | null;
   localToml: string | null;
   jsonConfig: string | null;
+  conductorSharedToml: string | null;
+  conductorLocalToml: string | null;
 }
 
-function table(value: unknown): Table {
+export function table(value: unknown): Table {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Table)
     : {};
 }
 
-function text(value: unknown): string | undefined {
+export function text(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-function flag(value: unknown): boolean | undefined {
+export function flag(value: unknown): boolean | undefined {
   return typeof value === 'boolean' ? value : undefined;
 }
 
-function parseTomlSafely(source: string | null): Table | null {
+export function parseTomlSafely(source: string | null): Table | null {
   if (source === null) return null;
   try {
     return parseToml(source) as Table;
@@ -163,10 +168,14 @@ function branchPrefixFrom(git: Table): string | null {
   return null;
 }
 
-function fromSettings(settings: Table, app: AppRepoSettings): RepoConfig {
+function fromSettings(
+  settings: Table,
+  app: AppRepoSettings,
+  source: RepoConfigSource,
+): RepoConfig {
   const scripts = table(settings.scripts);
   return {
-    source: 'settings.toml',
+    source,
     setup: text(scripts.setup) ?? '',
     archive: text(scripts.archive) ?? '',
     runMode:
@@ -229,17 +238,33 @@ function fromJsonConfig(json: string, app: AppRepoSettings): RepoConfig | null {
   };
 }
 
+function fromToml(
+  sharedToml: string | null,
+  localToml: string | null,
+  app: AppRepoSettings,
+  source: RepoConfigSource,
+): RepoConfig | null {
+  const shared = parseTomlSafely(sharedToml);
+  const local = parseTomlSafely(localToml);
+  if (!shared && !local) return null;
+  return fromSettings(deepMerge(shared ?? {}, local ?? {}), app, source);
+}
+
 export function resolveRepoConfig(
   app: AppRepoSettings,
   files: RepoConfigFiles,
 ): RepoConfig {
-  const shared = parseTomlSafely(files.sharedToml);
-  const local = parseTomlSafely(files.localToml);
-  if (shared || local)
-    return fromSettings(deepMerge(shared ?? {}, local ?? {}), app);
-  if (files.jsonConfig)
-    return fromJsonConfig(files.jsonConfig, app) ?? fromApp(app);
-  return fromApp(app);
+  return (
+    fromToml(files.sharedToml, files.localToml, app, 'settings.toml') ??
+    (files.jsonConfig ? fromJsonConfig(files.jsonConfig, app) : null) ??
+    fromToml(
+      files.conductorSharedToml,
+      files.conductorLocalToml,
+      app,
+      'conductor',
+    ) ??
+    fromApp(app)
+  );
 }
 
 async function readOptional(dir: string, file: string): Promise<string | null> {
@@ -250,12 +275,26 @@ export async function loadRepoConfig(
   app: AppRepoSettings,
   dir: string,
 ): Promise<RepoConfig> {
-  const [sharedToml, localToml, jsonConfig] = await Promise.all([
+  const [
+    sharedToml,
+    localToml,
+    jsonConfig,
+    conductorSharedToml,
+    conductorLocalToml,
+  ] = await Promise.all([
     readOptional(dir, SHARED_SETTINGS_FILE),
     readOptional(dir, LOCAL_SETTINGS_FILE),
     readOptional(dir, JSON_CONFIG_FILE),
+    readOptional(dir, CONDUCTOR_SHARED_SETTINGS_FILE),
+    readOptional(dir, CONDUCTOR_LOCAL_SETTINGS_FILE),
   ]);
-  return resolveRepoConfig(app, { sharedToml, localToml, jsonConfig });
+  return resolveRepoConfig(app, {
+    sharedToml,
+    localToml,
+    jsonConfig,
+    conductorSharedToml,
+    conductorLocalToml,
+  });
 }
 
 export function expandPort(template: string, port: number): string {

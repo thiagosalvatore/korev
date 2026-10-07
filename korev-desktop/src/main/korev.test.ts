@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { runProcess } from './command-runner';
+import { runProcess, type CommandRunner } from './command-runner';
 import { nodeFileSystem } from './file-system';
 import {
   DEFAULT_EFFORT,
@@ -32,6 +32,26 @@ async function waitFor(check: () => Promise<boolean>) {
 }
 
 const spawned: { args: string[]; cwd: string }[] = [];
+
+const CONDUCTOR_SETTINGS = `
+[git]
+archive_on_merge = true
+branch_prefix_type = "custom"
+branch_prefix = "agent"
+delete_branch_on_archive = true
+[models]
+default = "opus-5-1m"
+default_plan_mode = true
+[models.codex]
+default_thinking_level = "high"
+`;
+
+let conductorRepos: Record<string, string | null>[] = [];
+
+const runWithFakeSqlite: CommandRunner = async (file, args, options) =>
+  file === 'sqlite3'
+    ? { exitCode: 0, stdout: JSON.stringify(conductorRepos), stderr: '' }
+    : runProcess(file, args, options);
 
 const noPty = (_file: string, args: string[], options: { cwd: string }) => {
   spawned.push({ args, cwd: options.cwd });
@@ -71,7 +91,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     repoPath = await initRepo('acme');
     chosenDirectory = repoPath;
     korev = await createKorev({
-      run: runProcess,
+      run: runWithFakeSqlite,
       env: { ...process.env, PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}` },
       shell: '/bin/sh',
       home,
@@ -674,5 +694,59 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(await readFile(path.join(repoPath, 'README.md'), 'utf8')).toBe(
       '# local edit\n',
     );
+  });
+
+  it('imports Conductor repositories and preferences', async () => {
+    await addRepo();
+    const widgets = await initRepo('widgets');
+    const conductorRepo = (root_path: string) => ({
+      root_path,
+      setup_script: 'npm ci',
+      run_script: 'npm start',
+      archive_script: null,
+      run_script_mode: 'nonconcurrent',
+    });
+    conductorRepos = [
+      conductorRepo(widgets),
+      conductorRepo(path.join(home, 'deleted')),
+      conductorRepo(repoPath),
+    ];
+    const dbDir = path.join(
+      home,
+      'Library/Application Support/com.conductor.app',
+    );
+    await mkdir(dbDir, { recursive: true });
+    await writeFile(path.join(dbDir, 'conductor.db'), '');
+    await mkdir(path.join(home, '.conductor'));
+    await writeFile(
+      path.join(home, '.conductor', 'settings.toml'),
+      CONDUCTOR_SETTINGS,
+    );
+
+    expect(await korev.api.importFromConductor()).toEqual({
+      repos: 1,
+      settings: 5,
+    });
+
+    const { repos, settings } = await korev.api.getState();
+    expect(repos.map((repo) => [repo.name, repo.scripts])).toEqual([
+      ['acme', { setup: '', run: '', archive: '', runMode: 'concurrent' }],
+      [
+        'widgets',
+        {
+          setup: 'npm ci',
+          run: 'npm start',
+          archive: '',
+          runMode: 'nonconcurrent',
+        },
+      ],
+    ]);
+    expect(settings).toMatchObject({
+      archiveOnMerge: true,
+      deleteBranchOnArchive: true,
+      defaultPlanMode: true,
+      branchPrefix: 'agent',
+      defaultEffort: { claude: 'high', codex: 'high' },
+    });
   });
 });

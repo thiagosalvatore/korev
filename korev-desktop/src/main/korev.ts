@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { KorevApi } from '../shared/api';
 import {
+  EMPTY_SCRIPTS,
   hasWorktree,
   type AgentAvailability,
   type AppState,
@@ -10,6 +11,7 @@ import {
   type EditorId,
   type PromptKind,
   type Repo,
+  type RepoScripts,
   type TerminalPreset,
   type Result,
   type Settings,
@@ -19,6 +21,7 @@ import {
 import { detectAgents } from './agents';
 import { askWorktreePath } from './ask-worktrees';
 import { createChats, latestPlan } from './chats';
+import { readConductorRepos, readConductorSettings } from './conductor-import';
 import {
   errorMessage,
   NotFoundError,
@@ -262,7 +265,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     };
   }
 
-  async function registerRepo(dir: string): Promise<Result<Repo>> {
+  async function registerRepo(
+    dir: string,
+    scripts: RepoScripts = EMPTY_SCRIPTS,
+  ): Promise<Result<Repo>> {
     const root = await repoRoot(git, dir);
     if (!root) return fail(`${dir} is not a git repository`);
     const existing = store.state.repos.find((repo) => repo.path === root);
@@ -272,7 +278,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       name: path.basename(root),
       path: root,
       defaultBranch: await defaultBranch(git, root),
-      scripts: { setup: '', run: '', archive: '', runMode: 'concurrent' },
+      scripts: { ...scripts },
     };
     store.state.repos.push(repo);
     store.save();
@@ -387,6 +393,21 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     ctx.emitState();
   }
 
+  async function importFromConductor() {
+    const repoCountBefore = store.state.repos.length;
+    for (const repo of await readConductorRepos(deps.run, deps.env, deps.home))
+      await registerRepo(repo.path, repo.scripts);
+    const settings = await readConductorSettings(
+      deps.home,
+      store.state.settings,
+    );
+    await updateSettings(settings);
+    return {
+      repos: store.state.repos.length - repoCountBefore,
+      settings: Object.keys(settings).length,
+    };
+  }
+
   async function sendToActiveSession(
     workspaceId: string,
     sessionId: string,
@@ -425,6 +446,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       }
       return registerRepo(destination);
     },
+    importFromConductor,
     async removeRepo(repoId) {
       const { state } = store;
       const workspaces = state.workspaces.filter((ws) => ws.repoId === repoId);

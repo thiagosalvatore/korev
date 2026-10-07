@@ -18,7 +18,7 @@ Korev uses the `claude` and `codex` CLIs from your PATH and their own sign-in, a
 
 ## Repository config
 
-Put a `.korev/settings.toml` in a repository to share its setup with everyone who uses Korev. A `.korev/settings.local.toml` next to it overrides it for you only; add it to `.gitignore`. Without either file Korev reads a simpler `korev.json`, and without that it uses the scripts from Settings → Repositories.
+Put a `.korev/settings.toml` in a repository to share its setup with everyone who uses Korev. A `.korev/settings.local.toml` next to it overrides it for you only; add it to `.gitignore`. Without either file Korev reads a simpler `korev.json`. Without that it reads Conductor's `.conductor/settings.toml` and `.conductor/settings.local.toml`, which use the same format, and without those it uses the scripts from Settings → Repositories.
 
 ```toml
 file_include_globs = ".env*\nconfig/*.local.json"   # gitignored files copied into new workspaces

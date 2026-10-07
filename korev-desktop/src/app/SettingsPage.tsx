@@ -108,6 +108,21 @@ function TextSetting({
   );
 }
 
+function importSummary(imported: { repos: number; settings: number }) {
+  const { repos, settings } = imported;
+  const parts = [
+    repos
+      ? `${repos} ${repos === 1 ? 'repository' : 'repositories'} added`
+      : '',
+    settings ? `${settings} setting${settings === 1 ? '' : 's'} updated` : '',
+  ].filter(Boolean);
+  return parts.length ? parts.join(', ') : 'Nothing to import';
+}
+
+async function importFromConductor() {
+  toast(importSummary(await api.importFromConductor()), 'success');
+}
+
 function General({ settings }: { settings: Settings }) {
   return (
     <>
@@ -128,6 +143,18 @@ function General({ settings }: { settings: Settings }) {
           checked={settings.notifications}
           onChange={(notifications) => update({ notifications })}
         />
+      </Row>
+      <Row
+        title="Import from Conductor"
+        description="Adds Conductor's repositories and copies its git and model preferences. Repositories keep using their .conductor/settings.toml."
+      >
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => void importFromConductor()}
+        >
+          Import
+        </Button>
       </Row>
     </>
   );
@@ -711,6 +738,8 @@ const SOURCE_NOTICE: Record<RepoConfigSource, string | null> = {
     'This repository has a korev.json. Its scripts replace the ones below.',
   'settings.toml':
     'This repository has .korev/settings.toml. Its scripts, run scripts, preview URLs, prompts and git options replace the ones below.',
+  conductor:
+    "This repository has Conductor's .conductor/settings.toml and no .korev/settings.toml. Its scripts, run scripts, preview URLs, prompts and git options replace the ones below.",
 };
 
 function ConfigSourceNotice({ repo }: { repo: Repo }) {
