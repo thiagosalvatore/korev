@@ -288,6 +288,7 @@ export interface PrCheck {
   name: string;
   state: CheckState;
   url: string | null;
+  required: boolean;
 }
 
 export type ReviewDecision =
@@ -389,13 +390,16 @@ export function stackBlocked(pr: PrStatus): boolean {
   return pr.stack?.belowReady === false;
 }
 
+function hasRequiredCheck(pr: PrStatus, state: CheckState): boolean {
+  return pr.checks.some((check) => check.required && check.state === state);
+}
+
 export function nextPrStep(pr: PrStatus | null): PrStep {
   if (!pr || pr.state === 'CLOSED') return 'create';
   if (pr.state === 'MERGED') return 'archive';
   if (pr.mergeable === 'CONFLICTING') return 'resolve-conflicts';
-  if (pr.checks.some((check) => check.state === 'failure')) return 'fix-errors';
-  if (pr.checks.some((check) => check.state === 'pending'))
-    return 'checks-running';
+  if (hasRequiredCheck(pr, 'failure')) return 'fix-errors';
+  if (hasRequiredCheck(pr, 'pending')) return 'checks-running';
   if (pr.isDraft) return 'draft';
   if (pr.reviewDecision === 'CHANGES_REQUESTED') return 'changes-requested';
   if (pr.reviewDecision === 'REVIEW_REQUIRED') return 'waiting-for-review';
@@ -426,10 +430,8 @@ export function prBadge(pr: PrStatus): PrBadge {
   if (pr.state === 'MERGED') return 'merged';
   if (pr.state === 'CLOSED') return 'closed';
   if (pr.mergeable === 'CONFLICTING') return 'conflicts';
-  if (pr.checks.some((check) => check.state === 'failure'))
-    return 'checks-failing';
-  if (pr.checks.some((check) => check.state === 'pending'))
-    return 'checks-running';
+  if (hasRequiredCheck(pr, 'failure')) return 'checks-failing';
+  if (hasRequiredCheck(pr, 'pending')) return 'checks-running';
   if (pr.isDraft) return 'draft';
   return 'open';
 }

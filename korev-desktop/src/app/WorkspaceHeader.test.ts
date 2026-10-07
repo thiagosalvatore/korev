@@ -20,7 +20,7 @@ const READY_PR: PrStatus = {
   headRefName: 'dev/login',
   baseRefName: 'main',
   createdAt: '2026-01-01T00:00:00Z',
-  checks: [{ name: 'lint', state: 'success', url: null }],
+  checks: [{ name: 'lint', state: 'success', url: null, required: true }],
   stack: null,
 };
 
@@ -48,10 +48,22 @@ describe('next PR action', () => {
       actionLabel({
         ...READY_PR,
         reviewDecision: 'REVIEW_REQUIRED',
-        checks: [{ name: 'lint', state: 'pending', url: null }],
+        checks: [{ name: 'lint', state: 'pending', url: null, required: true }],
       }),
     ).toBe('Checks running');
   });
+
+  it.each(['pending', 'failure'] as const)(
+    'offers Merge while a check that is not required is %s',
+    (state) => {
+      expect(
+        actionLabel({
+          ...READY_PR,
+          checks: [{ name: 'preview', state, url: null, required: false }],
+        }),
+      ).toBe('Merge');
+    },
+  );
 
   it.each([
     [{ openBelow: 0, openAbove: 2, belowReady: true }, 'Merge'],

@@ -42,6 +42,8 @@ The button in the workspace header always shows the next step:
 
 While checks run, or while the pull request waits for review, the button shows that state instead.
 
+Only the checks that the repository requires for merge count. If a check that is not required is still running or has failed, the button shows **Merge**. If the repository requires no checks, the button shows **Merge** while checks run. If Korev cannot find out which checks are required, it counts all of them.
+
 ## Checks
 
 The **Checks** tab shows the pull request:
