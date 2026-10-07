@@ -23,6 +23,7 @@ export interface CoreDeps {
   home: string;
   emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]): void;
   notify(notice: Notice): void;
+  playSound(): void;
   isWindowFocused(): boolean;
   setBadge(count: number): void;
   now(): Date;

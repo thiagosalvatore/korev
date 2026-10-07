@@ -10,6 +10,7 @@ import {
   shell,
   type WebContents,
 } from 'electron';
+import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -32,6 +33,7 @@ const MIN_WINDOW_SIZE = { width: 960, height: 600 };
 const TRAFFIC_LIGHT_POSITION = { x: 16, y: 16 };
 const DEV_ICON_PATH = '../../assets/icon.png';
 const COMMAND_EVENT = 'command';
+const FINISHED_SOUND = '/System/Library/Sounds/Glass.aiff';
 
 const appOrigin: AppOrigin = {
   devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
@@ -73,6 +75,7 @@ function showNotice(korev: () => Korev | null, notice: Notice) {
   const notification = new Notification({
     title: notice.title,
     body: notice.body,
+    silent: true,
   });
   notification.on('click', () => {
     const [window] = BrowserWindow.getAllWindows();
@@ -85,6 +88,16 @@ function showNotice(korev: () => Korev | null, notice: Notice) {
     );
   });
   notification.show();
+}
+
+function playSound() {
+  if (process.platform !== 'darwin') {
+    shell.beep();
+    return;
+  }
+  execFile('afplay', [FINISHED_SOUND], (error) => {
+    if (error) console.warn(error.message);
+  });
 }
 
 async function chooseDirectory(): Promise<string | null> {
@@ -113,6 +126,7 @@ async function createKorevApp(): Promise<Korev> {
     spawnPty,
     emit,
     notify: (notice) => showNotice(() => korev, notice),
+    playSound,
     isWindowFocused: () => BrowserWindow.getFocusedWindow() !== null,
     setBadge: (count) => app.setBadgeCount(count),
     now: () => new Date(),

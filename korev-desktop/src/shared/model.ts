@@ -201,6 +201,7 @@ export interface Settings {
   snippets: Snippet[];
   editor: EditorId;
   notifications: boolean;
+  notificationSound: boolean;
   windowBounds: WindowBounds | null;
 }
 

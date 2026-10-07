@@ -145,6 +145,15 @@ function General({ settings }: { settings: Settings }) {
         />
       </Row>
       <Row
+        title="Sound"
+        description="Play a sound when an agent finishes or needs your input in a workspace you are not looking at."
+      >
+        <Switch
+          checked={settings.notificationSound}
+          onChange={(notificationSound) => update({ notificationSound })}
+        />
+      </Row>
+      <Row
         title="Import from Conductor"
         description="Adds Conductor's repositories and copies its git and model preferences. Repositories keep using their .conductor/settings.toml."
       >

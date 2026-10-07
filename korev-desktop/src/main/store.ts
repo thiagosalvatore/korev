@@ -43,6 +43,7 @@ export function defaultSettings(home: string): Settings {
     snippets: [],
     editor: 'cursor',
     notifications: true,
+    notificationSound: true,
     windowBounds: null,
   };
 }

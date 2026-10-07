@@ -242,9 +242,19 @@ export function createChats(ctx: Context): Chats {
     else ctx.setStatus(workspace.id, 'idle');
   }
 
-  function notifyInBackground(owner: Owner, title: string, body: string) {
-    if (owner.kind !== 'workspace' || ctx.deps.isWindowFocused()) return;
-    ctx.deps.notify({ title, body, workspaceId: owner.workspace.id });
+  function isWatching(workspace: Workspace) {
+    return (
+      ctx.deps.isWindowFocused() && ctx.focusedWorkspaceId === workspace.id
+    );
+  }
+
+  function alertUser(owner: Owner, title: string, body: string) {
+    if (owner.kind !== 'workspace') return;
+    const { workspace } = owner;
+    if (!isWatching(workspace) && ctx.store.state.settings.notificationSound)
+      ctx.deps.playSound();
+    if (!ctx.deps.isWindowFocused())
+      ctx.deps.notify({ title, body, workspaceId: workspace.id });
   }
 
   function expirePermissions(
@@ -267,12 +277,10 @@ export function createChats(ctx: Context): Chats {
     items: ChatItem[],
   ) {
     const runtime = ctx.runtime(workspace.id);
-    const watching =
-      ctx.deps.isWindowFocused() && ctx.focusedWorkspaceId === workspace.id;
-    if (!watching) runtime.unread = true;
+    if (!isWatching(workspace)) runtime.unread = true;
     void refreshStats(ctx, workspace);
     const last = items.findLast((item) => item.kind === 'result');
-    notifyInBackground(
+    alertUser(
       { kind: 'workspace', workspace },
       `${workspace.name} finished`,
       last?.kind === 'result' && !last.ok ? last.text : session.title,
@@ -378,7 +386,7 @@ export function createChats(ctx: Context): Chats {
     ctx.emitState();
     const name =
       turn.owner.kind === 'workspace' ? turn.owner.workspace.name : 'Ask';
-    notifyInBackground(turn.owner, `${name} needs your input`, session.title);
+    alertUser(turn.owner, `${name} needs your input`, session.title);
   }
 
   function handleLine(

@@ -4,7 +4,15 @@ import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+} from 'vitest';
 import { runProcess, type CommandRunner } from './command-runner';
 import { nodeFileSystem } from './file-system';
 import {
@@ -71,6 +79,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   let repoPath: string;
   let chosenDirectory: string;
   let korev: Korev;
+  let playSound: Mock<() => void>;
 
   async function initRepo(name: string) {
     const dir = path.join(home, name);
@@ -90,6 +99,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     home = await mkdtemp(path.join(tmpdir(), 'korev-core-'));
     repoPath = await initRepo('acme');
     chosenDirectory = repoPath;
+    playSound = vi.fn();
     korev = await createKorev({
       run: runWithFakeSqlite,
       env: { ...process.env, PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}` },
@@ -100,6 +110,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       spawnPty: noPty,
       emit: () => undefined,
       notify: () => undefined,
+      playSound,
       isWindowFocused: () => true,
       setBadge: () => undefined,
       now: () => new Date(),
@@ -238,6 +249,23 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(reverted).toEqual({ ok: true, value: 'Add a note' });
     expect(existsSync(path.join(workspace.path, 'agent-note.txt'))).toBe(false);
     expect(await korev.api.transcript(session.id)).toEqual([]);
+  });
+
+  it('plays a sound when a turn finishes in a workspace you are not looking at', async () => {
+    const workspace = await createWorkspace();
+
+    await sendAndWait(workspace.sessions[0].id, 'Add a note');
+
+    expect(playSound).toHaveBeenCalledOnce();
+  });
+
+  it('stays quiet when a turn finishes in the workspace you are looking at', async () => {
+    const workspace = await createWorkspace();
+    await korev.api.focusWorkspace(workspace.id);
+
+    await sendAndWait(workspace.sessions[0].id, 'Add a note');
+
+    expect(playSound).not.toHaveBeenCalled();
   });
 
   it('keeps the turn in a chat that is read while its first message is sent', async () => {
