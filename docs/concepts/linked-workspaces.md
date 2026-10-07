@@ -15,6 +15,16 @@ A task that spans repositories, say a frontend and a backend, gets one linked wo
 
 **Create from…** (branch, pull request or issue) works with one repository only.
 
+## Lanes from a plan
+
+A plan can have parts that can be built at the same time. Claude Code ends such a plan with a **Lanes** section. The plan card then lists the lanes:
+
+- The first lane stays in this workspace.
+- Every ticked lane gets its own linked workspace in the same repository, branched from the same target branch. You can rename a lane before you approve.
+- An unticked lane stays in this workspace too.
+
+Press **Approve and split off N lanes**. Each new workspace gets the planning conversation and the plan, and its agent builds only its lane. The agent in this workspace is told which lanes are built elsewhere. **Approve here** builds every lane in this workspace.
+
 ## What each agent can do
 
 - Each agent changes only its own repository.

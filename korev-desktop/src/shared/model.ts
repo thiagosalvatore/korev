@@ -576,6 +576,31 @@ export interface PermissionResponse {
   allow: boolean;
   answers?: Record<string, string>;
   message?: string;
+  lanes?: PlanLane[];
+}
+
+export interface PlanLane {
+  name: string;
+  body: string;
+}
+
+const LANES_HEADING = '## Lanes';
+const LANE_PREFIX = '### ';
+const SECTION_PREFIX = '## ';
+
+export function planLanes(plan: string): PlanLane[] {
+  const lines = plan.split('\n');
+  const start = lines.findIndex((line) => line.trim() === LANES_HEADING);
+  if (start === -1) return [];
+  const lanes: PlanLane[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.startsWith(SECTION_PREFIX)) break;
+    if (line.startsWith(LANE_PREFIX))
+      lanes.push({ name: line.slice(LANE_PREFIX.length).trim(), body: '' });
+    else if (lanes.length) lanes.at(-1)!.body += `${line}\n`;
+  }
+  if (lanes.length < 2) return [];
+  return lanes.map((lane) => ({ ...lane, body: lane.body.trim() }));
 }
 
 export const DISMISS_QUESTION: PermissionResponse = {

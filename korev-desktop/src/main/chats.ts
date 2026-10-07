@@ -6,6 +6,7 @@ import {
   type ChatSession,
   type Checkpoint,
   type PermissionResponse,
+  type PlanLane,
   type PlanLimit,
   type Repo,
   type Result,
@@ -65,6 +66,8 @@ const REPLAY_TOTAL_CHARS = 24_000;
 const DENIED_MESSAGE = 'The user denied this request.';
 const ASK_PLAN_MESSAGE =
   'This is a read-only Ask chat, so the plan cannot be carried out here. The user sees your plan in the chat and can start workspaces from it. Finish your reply.';
+const LANES_ELSEWHERE_NOTE =
+  '## Lanes in other workspaces\nThese lanes are built at the same time in other linked workspaces. Do not build them here: ';
 const STATUSES_KEPT_BY_TURNS = new Set([
   'creating',
   'failed',
@@ -102,6 +105,16 @@ function linkedLines(linked: LinkedWorkspace[]): string[] {
   ];
 }
 
+function withLanesElsewhere(
+  request: ControlRequest,
+  lanes: PlanLane[] = [],
+): ControlRequest {
+  if (request.tool !== PLAN_TOOL || !lanes.length) return request;
+  const names = lanes.map((lane) => lane.name).join(', ');
+  const plan = `${String(request.input.plan ?? '')}\n\n${LANES_ELSEWHERE_NOTE}${names}.`;
+  return { ...request, input: { ...request.input, plan } };
+}
+
 export function latestPlan(items: ChatItem[]): string | null {
   const reply = items.slice(
     items.findLastIndex((item) => item.kind === 'user') + 1,
@@ -130,6 +143,7 @@ export function systemPrompt(
     `The workspace has a .context directory (gitignored) where you can save files to collaborate with other agents.`,
     `Do not rename the current branch unless the user explicitly tells you to do so.`,
     `If the work needs more than one PR, create the extra branches in this worktree (for example as a stack). Do not create new git worktrees.`,
+    `If a plan has parts that can be built at the same time without each other's code, end the plan with a "## Lanes" section: one "### <short-name>" heading per part, followed by what it covers and its PRs. Keep dependent work in the same lane. Write two or more lanes, or no Lanes section. The user can then start each lane in its own linked workspace.`,
     `If you start a dev server, use port $KOREV_PORT (ports $KOREV_PORT to $KOREV_PORT+9 are reserved for this workspace).`,
     ...linkedLines(linked),
   ].join('\n');
@@ -821,7 +835,11 @@ export function createChats(
       };
     }
     const body = response.allow
-      ? allowResponse(request, response.answers, nextModeAfterPlan())
+      ? allowResponse(
+          withLanesElsewhere(request, response.lanes),
+          response.answers,
+          nextModeAfterPlan(),
+        )
       : denyResponse(response.message?.trim() || DENIED_MESSAGE);
     answerControl(turn, request, body);
     turn.permissions.delete(itemId);

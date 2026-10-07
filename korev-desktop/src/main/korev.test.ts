@@ -1215,6 +1215,51 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(approved.workspace.sessions[0].planMode).toBe(false);
   });
 
+  it('splits the approved plan into a linked workspace for each lane', async () => {
+    const origin = await createWorkspace();
+    const [session] = origin.sessions;
+    await korev.api.send(session.id, {
+      ...task('make-plan for the settings page'),
+      planMode: true,
+    });
+    let permissionId = '';
+    await waitFor(async () => {
+      const pending = (await korev.api.transcript(session.id)).find(
+        (item) => item.kind === 'permission',
+      );
+      permissionId = pending?.id ?? '';
+      return Boolean(pending);
+    });
+
+    await korev.api.respondPermission(session.id, permissionId, {
+      allow: true,
+      lanes: [
+        { name: 'Settings API', body: 'Add the endpoint.' },
+        { name: 'ui', body: 'Build the page.' },
+      ],
+    });
+
+    const created = (await korev.api.getState()).workspaces;
+    for (const lane of created.filter((ws) => ws.id !== origin.id)) {
+      await waitFor(
+        async () => (await userMessages(lane.sessions[0].id)).length === 2,
+      );
+    }
+    const { workspaces } = await korev.api.getState();
+    const [api, ui] = workspaces.filter((ws) => ws.id !== origin.id);
+    const groupId = workspaces.find((ws) => ws.id === origin.id)!.groupId;
+    expect(groupId).not.toBeNull();
+    expect([api.groupId, ui.groupId]).toEqual([groupId, groupId]);
+    expect([api.branch, ui.branch]).toEqual(['dev/settings-api', 'dev/ui']);
+    expect([api.repoId, api.baseBranch]).toEqual([origin.repoId, 'main']);
+    const apiPrompt = (await userMessages(api.sessions[0].id)).at(-1);
+    expect(apiPrompt).toContain('Implement the Settings API lane');
+    expect(apiPrompt).toContain('<plan>\n1. Add the login page\n</plan>');
+    expect(
+      await readFile(path.join(origin.path, '.context', 'plan-answer'), 'utf8'),
+    ).toContain('Do not build them here: Settings API, ui');
+  });
+
   it('offers skills as slash commands', async () => {
     const workspace = await createWorkspace();
     const skillDir = path.join(home, '.claude', 'skills', 'browse');

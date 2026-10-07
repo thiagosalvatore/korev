@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Button, cn, Icon } from '../../design-system';
+import { Button, cn, Icon, Input } from '../../design-system';
 import {
   answerQuestions,
   DISMISS_QUESTION,
+  planLanes,
   type AgentQuestion,
   type ChatItem,
   type PermissionResponse,
   type PermissionStatus,
+  type PlanLane,
 } from '../../shared/model';
 import { Markdown } from './Markdown';
 
@@ -95,13 +97,77 @@ function ToolApproval({ item, onRespond }: PermissionCardProps) {
   );
 }
 
+interface LaneDraft extends PlanLane {
+  split: boolean;
+}
+
+function lanesToSplit(drafts: LaneDraft[]): PlanLane[] {
+  return drafts
+    .filter((draft) => draft.split && draft.name.trim())
+    .map(({ name, body }) => ({ name: name.trim(), body }));
+}
+
+function LaneList({
+  here,
+  drafts,
+  onChange,
+}: {
+  here: PlanLane;
+  drafts: LaneDraft[];
+  onChange(drafts: LaneDraft[]): void;
+}) {
+  const update = (index: number, change: Partial<LaneDraft>) =>
+    onChange(
+      drafts.map((draft, at) =>
+        at === index ? { ...draft, ...change } : draft,
+      ),
+    );
+  return (
+    <fieldset className="m-0 mb-3 flex flex-col gap-1.5 border-0 p-0">
+      <legend className="mb-1.5 text-sm font-medium text-fg-1">
+        Lanes: each ticked lane gets its own linked workspace
+      </legend>
+      <div className="flex items-center gap-2 text-sm text-fg-2">
+        <input type="checkbox" checked disabled aria-label={here.name} />
+        <span className="font-medium text-fg-1">{here.name}</span>
+        <span className="text-xs text-fg-3">This workspace</span>
+      </div>
+      {drafts.map((draft, index) => (
+        <div key={index} className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={draft.split}
+            aria-label={`Split off ${draft.name}`}
+            onChange={(event) => update(index, { split: event.target.checked })}
+          />
+          <Input
+            aria-label="Lane name"
+            value={draft.name}
+            disabled={!draft.split}
+            className="flex-1"
+            onChange={(event) => update(index, { name: event.target.value })}
+          />
+        </div>
+      ))}
+    </fieldset>
+  );
+}
+
 function PlanApproval({ item, onRespond }: PermissionCardProps) {
   const [feedback, setFeedback] = useState('');
+  const [here, ...others] = planLanes(item.plan ?? '');
+  const [drafts, setDrafts] = useState<LaneDraft[]>(() =>
+    others.map((lane) => ({ ...lane, split: true })),
+  );
+  const split = lanesToSplit(drafts);
   return (
     <Shell title="Plan ready for review" icon="list-checks">
       <div className="mb-3 max-h-96 overflow-auto rounded-md border border-border-1 bg-raised p-3">
         <Markdown text={item.plan ?? ''} />
       </div>
+      {here ? (
+        <LaneList here={here} drafts={drafts} onChange={setDrafts} />
+      ) : null}
       <textarea
         aria-label="Feedback on the plan"
         value={feedback}
@@ -110,13 +176,23 @@ function PlanApproval({ item, onRespond }: PermissionCardProps) {
         onChange={(event) => setFeedback(event.target.value)}
       />
       <div className="flex gap-2">
+        {split.length ? (
+          <Button
+            size="sm"
+            variant="primary"
+            icon="git-fork"
+            onClick={() => onRespond({ allow: true, lanes: split })}
+          >
+            {`Approve and split off ${split.length} ${split.length === 1 ? 'lane' : 'lanes'}`}
+          </Button>
+        ) : null}
         <Button
           size="sm"
-          variant="primary"
+          variant={split.length ? 'secondary' : 'primary'}
           icon="check"
           onClick={() => onRespond({ allow: true })}
         >
-          Approve plan
+          {here ? 'Approve here' : 'Approve plan'}
         </Button>
         <Button
           size="sm"

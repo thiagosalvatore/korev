@@ -7,9 +7,11 @@ import {
   hasWorktree,
   type AgentAvailability,
   type AppState,
+  type ChatItem,
   type ChatSession,
   type EditorApp,
   type EditorId,
+  type PlanLane,
   type PromptKind,
   type PrStatus,
   type Repo,
@@ -74,6 +76,7 @@ import {
 import { createTerminals, type SpawnPty } from './terminals';
 import {
   archiveWorkspace,
+  createLaneWorkspaces,
   createWorkspaces,
   forkChatSession,
   strayWorktrees,
@@ -532,6 +535,43 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     );
   }
 
+  function sendWithHistory(history: ChatItem[]): SendTask {
+    return async (sessionId, options) => {
+      await chats.seed(sessionId, history);
+      return chats.send(sessionId, options);
+    };
+  }
+
+  async function splitIntoLanes(
+    sessionId: string,
+    itemId: string,
+    lanes: PlanLane[],
+  ): Promise<Result> {
+    const origin = store.state.workspaces.find((workspace) =>
+      workspace.sessions.some((session) => session.id === sessionId),
+    );
+    const session = origin?.sessions.find((entry) => entry.id === sessionId);
+    const history = await chats.transcript(sessionId);
+    const item = history.find((entry) => entry.id === itemId);
+    if (!origin || !session || item?.kind !== 'permission' || !item.plan)
+      return fail('Only a plan in a workspace can be split into lanes');
+    createLaneWorkspaces(
+      ctx,
+      origin,
+      lanes,
+      {
+        agent: session.agent,
+        model: session.model,
+        effort: session.effort,
+        planMode: false,
+        fast: session.fast,
+      },
+      item.plan,
+      sendWithHistory(history),
+    );
+    return ok(undefined);
+  }
+
   async function moveChat(from: ChatSession | null, to: Workspace) {
     if (!from) return to.sessions[0].id;
     const copy = forkChatSession(ctx, from);
@@ -762,10 +802,6 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         return fail('Wait for the answer to finish');
       const history = await chats.transcript(ask.session.id);
       const plan = latestPlan(history);
-      const sendWithHistory: SendTask = async (sessionId, options) => {
-        await chats.seed(sessionId, history);
-        return chats.send(sessionId, options);
-      };
       return createWorkspaces(
         ctx,
         ask.repoIds,
@@ -777,7 +813,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
           planMode: false,
           fast: ask.session.fast,
         },
-        sendWithHistory,
+        sendWithHistory(history),
         plan,
       );
     },
@@ -934,8 +970,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     transcript: (sessionId) => chats.transcript(sessionId),
     send: (sessionId, options) => chats.send(sessionId, options),
     stop: async (sessionId) => chats.stop(sessionId),
-    respondPermission: async (sessionId, itemId, response) =>
-      chats.respondPermission(sessionId, itemId, response),
+    async respondPermission(sessionId, itemId, response) {
+      const answered = chats.respondPermission(sessionId, itemId, response);
+      if (!answered.ok || !response.allow || !response.lanes?.length)
+        return answered;
+      return splitIntoLanes(sessionId, itemId, response.lanes);
+    },
     revert: (sessionId, itemId) => chats.revert(sessionId, itemId),
     async changes(workspaceId) {
       const workspace = workspacePath(workspaceId);

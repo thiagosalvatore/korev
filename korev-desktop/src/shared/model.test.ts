@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   answerQuestions,
+  planLanes,
   prBadge,
   type AgentQuestion,
   type PrStatus,
@@ -58,5 +59,31 @@ describe('prBadge', () => {
 
   it('shows a merged PR as merged whatever its checks say', () => {
     expect(prBadge({ ...pr, state: 'MERGED' })).toBe('merged');
+  });
+});
+
+describe('planLanes', () => {
+  const plan = [
+    '# Settings page',
+    '## Lanes',
+    '### api',
+    'Add the settings endpoint.',
+    '### ui',
+    'Build the page.',
+    'Two PRs, stacked.',
+    '## Verification',
+    'Run the tests.',
+  ].join('\n');
+
+  it('reads each lane under the Lanes heading', () => {
+    expect(planLanes(plan)).toEqual([
+      { name: 'api', body: 'Add the settings endpoint.' },
+      { name: 'ui', body: 'Build the page.\nTwo PRs, stacked.' },
+    ]);
+  });
+
+  it('finds no lanes in a plan without a Lanes section or with one lane', () => {
+    expect(planLanes('# Plan\n### api\nDo it.')).toEqual([]);
+    expect(planLanes('## Lanes\n### api\nDo it.')).toEqual([]);
   });
 });

@@ -6,6 +6,7 @@ import {
   type AgentKind,
   type ChatSession,
   type GitWorktree,
+  type PlanLane,
   type Repo,
   type RepoConfig,
   type Result,
@@ -433,11 +434,12 @@ function firstMessage(
   plan: string | null,
   repo: Repo,
   workspace: Workspace,
+  acrossRepos: boolean,
 ): SendOptions {
   const [session] = workspace.sessions;
   return {
     ...task,
-    text: firstPrompt(task.text, plan, repo, workspace.groupId !== null),
+    text: firstPrompt(task.text, plan, repo, acrossRepos),
     model: task.model || session.model,
     effort: task.effort || session.effort,
   };
@@ -461,7 +463,7 @@ async function startCreated(
       if (task)
         await send(
           workspace.sessions[0].id,
-          firstMessage(task, plan, repos[index], workspace),
+          firstMessage(task, plan, repos[index], workspace, repos.length > 1),
         );
     }),
   );
@@ -475,10 +477,23 @@ async function prepareNewWorkspaces(
   plan: string | null,
   send: SendTask,
 ) {
+  const name = taskName(ctx, repos[0], workspaces[0].name, task?.text ?? null);
+  await prepareNamedWorkspaces(ctx, repos, workspaces, name, task, plan, send);
+}
+
+async function prepareNamedWorkspaces(
+  ctx: Context,
+  repos: Repo[],
+  workspaces: Workspace[],
+  pickedName: Promise<string>,
+  task: SendOptions | null,
+  plan: string | null,
+  send: SendTask,
+) {
   let startPoints: string[];
   try {
     const [name, ...froms] = await Promise.all([
-      taskName(ctx, repos[0], workspaces[0].name, task?.text ?? null),
+      pickedName,
       ...repos.map((repo, index) =>
         startPoint(ctx.git, repo.path, workspaces[index].baseBranch),
       ),
@@ -666,6 +681,54 @@ export function createWorkspaces(
     );
   }
   return { ok: true, value: workspaces };
+}
+
+function laneTask(lane: PlanLane): string {
+  return `Implement the ${lane.name} lane of the plan below. The other lanes are built at the same time in linked workspaces, which your system prompt lists. Build only your lane.`;
+}
+
+export function createLaneWorkspaces(
+  ctx: Context,
+  origin: Workspace,
+  lanes: PlanLane[],
+  options: Omit<SendOptions, 'text'>,
+  plan: string,
+  send: SendTask,
+) {
+  const repo = ctx.repo(origin.repoId);
+  const groupId = (origin.groupId ??= ctx.deps.newId());
+  const source: WorkspaceSource = {
+    kind: 'new',
+    baseBranch: origin.baseBranch,
+  };
+  const taken = workspaceNames(ctx, repo.id);
+  const created = lanes.map((lane) => {
+    const name = uniqueName(nameFromTask(lane.name), taken);
+    taken.add(name);
+    const laneOptions = { ...options, text: laneTask(lane) };
+    const workspace = addDraftWorkspace(
+      ctx,
+      repo,
+      name,
+      groupId,
+      laneOptions,
+      source,
+    );
+    return { workspace, laneOptions };
+  });
+  ctx.store.save();
+  ctx.emitState();
+  for (const { workspace, laneOptions } of created) {
+    void prepareNamedWorkspaces(
+      ctx,
+      [repo],
+      [workspace],
+      Promise.resolve(workspace.name),
+      laneOptions,
+      plan,
+      send,
+    );
+  }
 }
 
 async function runArchiveScript(
