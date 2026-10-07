@@ -84,6 +84,7 @@ export interface ChatSession {
 export interface Workspace {
   id: string;
   repoId: string;
+  groupId: string | null;
   name: string;
   branch: string;
   baseBranch: string;

@@ -132,6 +132,33 @@ function StatusIcon({ runtime }: { runtime: WorkspaceRuntime }) {
   return <Icon name="git-branch" size={14} className="text-fg-4" />;
 }
 
+function LinkedIcon({
+  state,
+  workspace,
+}: {
+  state: AppState;
+  workspace: Workspace;
+}) {
+  if (!workspace.groupId) return null;
+  const linkedRepos = state.workspaces
+    .filter(
+      (other) =>
+        other !== workspace &&
+        other.groupId === workspace.groupId &&
+        !other.archivedAt,
+    )
+    .map((other) => state.repos.find((repo) => repo.id === other.repoId)?.name);
+  if (!linkedRepos.length) return null;
+  return (
+    <span
+      title={`Linked with ${linkedRepos.join(', ')}`}
+      className="flex flex-none"
+    >
+      <Icon name="link" size={11} />
+    </span>
+  );
+}
+
 function WorkspaceRow({
   state,
   workspace,
@@ -175,6 +202,7 @@ function WorkspaceRow({
           {workspace.branch}
         </span>
         <span className="flex items-center gap-1.5 text-xs text-fg-3">
+          <LinkedIcon state={state} workspace={workspace} />
           <span className="truncate">{workspace.name}</span>
           {runtime?.message ? (
             <span className="truncate text-danger-text">

@@ -31,7 +31,8 @@ Three columns, like Conductor:
 ## Workspace row
 
 - Line 1: the branch name, bold when the workspace has unread agent output.
-- Line 2: the workspace name, then the error if setup or worktree creation failed.
+- Line 2: a link icon for linked workspaces, the workspace name, then the error if setup
+  or worktree creation failed.
 - Left icon: spinner while an agent or the setup script runs; otherwise the PR state
   (green open, red failing checks, amber conflicts or running checks, purple merged);
   otherwise a branch icon.

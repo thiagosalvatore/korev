@@ -16,7 +16,7 @@ import {
 } from '../shared/model';
 import { detectAgents } from './agents';
 import { askWorktreePath } from './ask-worktrees';
-import { createChats } from './chats';
+import { createChats, latestPlan } from './chats';
 import {
   errorMessage,
   NotFoundError,
@@ -46,7 +46,7 @@ import { openStore } from './store';
 import { createTerminals, type SpawnPty } from './terminals';
 import {
   archiveWorkspace,
-  createWorkspace,
+  createWorkspaces,
   deleteWorkspace,
   newChatSession,
   onScriptExit,
@@ -61,6 +61,7 @@ const CONTEXT_DIR = '.context';
 const ATTACHMENTS_DIR = 'attachments';
 const COMMAND_EXTENSION = '.md';
 const BUILTIN_COMMANDS = ['compact', 'review', 'init'];
+const IMPLEMENT_PLAN_TASK = 'Implement your part of the plan below.';
 
 async function commandNames(dir: string): Promise<string[]> {
   const entries = await readdir(dir).catch(() => []);
@@ -367,8 +368,23 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       store.save();
       ctx.emitState();
     },
-    createWorkspace: async (repoId, task) =>
-      createWorkspace(ctx, repoId, task, chats.send),
+    createWorkspaces: async (repoIds, task) =>
+      createWorkspaces(ctx, repoIds, task, chats.send),
+    async startFromAsk(askChatId) {
+      const ask = store.state.askChats.find((entry) => entry.id === askChatId);
+      if (!ask) return fail('Ask chat not found');
+      if (chats.isRunning(ask.session.id))
+        return fail('Wait for the answer to finish');
+      const plan = latestPlan(await chats.transcript(ask.session.id));
+      if (!plan) return fail('Ask for a plan first');
+      return createWorkspaces(
+        ctx,
+        ask.repoIds,
+        { text: IMPLEMENT_PLAN_TASK, model: '', effort: '', planMode: false },
+        chats.send,
+        plan,
+      );
+    },
     archiveWorkspace: (workspaceId) =>
       archiveWorkspace(ctx, workspaceId, chats.stopWorkspace),
     restoreWorkspace: (workspaceId) => restoreWorkspace(ctx, workspaceId),

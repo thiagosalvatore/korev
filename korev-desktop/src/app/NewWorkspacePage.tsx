@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Button, Icon } from '../design-system';
 import { AGENT_LABELS, type AppState } from '../shared/model';
-import { createWorkspace, selectWorkspace } from './actions';
+import { createWorkspaces, selectWorkspace } from './actions';
 import { Composer } from './chat/Composer';
 import { timeAgo } from './format';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
+import { RepoPicker } from './RepoPicker';
 import { AddRepositoryMenu } from './Sidebar';
-import { Menu } from './ui/Menu';
 import { useUi } from './ui-store';
 import { cn } from '../design-system';
 
@@ -24,11 +24,9 @@ export function NewWorkspacePage({
     (ui) =>
       state.workspaces.find((ws) => ws.id === ui.workspaceId)?.repoId ?? null,
   );
-  const [selectedRepoId, setSelectedRepoId] = useState(
-    repoId ?? lastRepoId ?? state.repos[0]?.id ?? null,
-  );
-  const repo =
-    state.repos.find((entry) => entry.id === selectedRepoId) ?? state.repos[0];
+  const initialRepoId = repoId ?? lastRepoId ?? state.repos[0]?.id;
+  const [repoIds, setRepoIds] = useState(initialRepoId ? [initialRepoId] : []);
+  const repos = state.repos.filter((entry) => repoIds.includes(entry.id));
   const agent = state.settings.defaultAgent;
   const [model, setModel] = useState(state.settings.defaultModels[agent]);
   const [effort, setEffort] = useState(state.settings.defaultEffort[agent]);
@@ -42,14 +40,14 @@ export function NewWorkspacePage({
     .slice(0, RECENT_LIMIT);
 
   async function create(text: string | null) {
-    if (!repo) return false;
+    if (!repos.length) return false;
     setCreating(true);
-    const workspace = await createWorkspace(
-      repo.id,
+    const created = await createWorkspaces(
+      repos.map((entry) => entry.id),
       text ? { text, model, effort, planMode } : null,
     );
     setCreating(false);
-    return workspace !== null;
+    return created;
   }
 
   return (
@@ -64,34 +62,12 @@ export function NewWorkspacePage({
       <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 pt-[12vh]">
         <div className="flex w-full max-w-[720px] flex-col gap-4">
           <h1 className="m-0 type-h2 text-fg-1">New workspace</h1>
-          <div className="flex items-center gap-2 text-sm text-fg-3">
-            <Menu
-              label="Repository"
-              items={state.repos.map((entry) => ({
-                id: entry.id,
-                label: entry.name,
-                checked: entry.id === repo?.id,
-                onSelect: () => setSelectedRepoId(entry.id),
-              }))}
-              trigger={({ toggle }) => (
-                <button
-                  type="button"
-                  aria-label="Repository"
-                  className="flex h-7 cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent px-1.5 text-sm font-semibold text-fg-1 hover:bg-hover"
-                  onClick={toggle}
-                >
-                  <Icon name="folder-git-2" size={14} className="text-fg-3" />
-                  {repo?.name ?? 'Choose a repository'}
-                  <Icon name="chevron-down" size={13} className="text-fg-4" />
-                </button>
-              )}
+          <div className="flex items-start gap-2 text-sm text-fg-3">
+            <RepoPicker
+              state={state}
+              selected={repoIds}
+              onChange={setRepoIds}
             />
-            {repo ? (
-              <span className="flex items-center gap-1 font-mono text-xs">
-                <Icon name="git-branch" size={12} />
-                from origin/{repo.defaultBranch}
-              </span>
-            ) : null}
             <span className="flex-1" />
             <AddRepositoryMenu
               trigger={(toggle) => (
@@ -106,8 +82,15 @@ export function NewWorkspacePage({
               )}
             />
           </div>
+          {repos.length > 1 ? (
+            <p className="m-0 text-xs text-fg-3">
+              Creates one linked workspace per repository with the same branch
+              name. Each agent works in its own repository and can read the
+              others.
+            </p>
+          ) : null}
           <Composer
-            draftKey={`new-workspace:${repo?.id ?? 'none'}`}
+            draftKey={`new-workspace:${repoIds.join(',') || 'none'}`}
             agent={agent}
             models={models}
             model={model}
@@ -128,7 +111,7 @@ export function NewWorkspacePage({
               variant="ghost"
               icon="plus"
               loading={creating}
-              disabled={!repo}
+              disabled={!repos.length}
               onClick={() => void create(null)}
             >
               Create empty workspace

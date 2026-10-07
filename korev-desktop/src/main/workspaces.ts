@@ -156,31 +156,38 @@ function worktreePath(ctx: Context, repo: Repo, name: string) {
 
 async function claimName(
   ctx: Context,
-  repo: Repo,
-  workspace: Workspace,
+  repos: Repo[],
+  workspaces: Workspace[],
   base: string,
 ) {
-  const prefix = await branchPrefix(ctx, repo);
+  const prefixes = await Promise.all(
+    repos.map((repo) => branchPrefix(ctx, repo)),
+  );
   for (let suffix = 1; ; suffix += 1) {
     const name = suffix === 1 ? base : `${base}-${suffix}`;
-    const branch = placeholderBranch(prefix, name);
-    if (await branchExists(ctx.git, repo.path, branch)) continue;
-    if (workspaceNames(ctx, repo.id, workspace).has(name)) continue;
-    workspace.name = name;
-    workspace.branch = branch;
-    workspace.path = worktreePath(ctx, repo, name);
+    const branches = prefixes.map((prefix) => placeholderBranch(prefix, name));
+    const existing = await Promise.all(
+      repos.map((repo, index) =>
+        branchExists(ctx.git, repo.path, branches[index]),
+      ),
+    );
+    if (existing.some(Boolean)) continue;
+    const taken = repos.some((repo, index) =>
+      workspaceNames(ctx, repo.id, workspaces[index]).has(name),
+    );
+    if (taken) continue;
+    workspaces.forEach((workspace, index) => {
+      workspace.name = name;
+      workspace.branch = branches[index];
+      workspace.path = worktreePath(ctx, repos[index], name);
+    });
     return;
   }
 }
 
-async function taskName(
-  ctx: Context,
-  workspace: Workspace,
-  task: string | null,
-) {
-  if (!task || !ctx.store.state.settings.autoRenameBranches)
-    return workspace.name;
-  return (await suggestName(ctx, task)) ?? workspace.name;
+async function taskName(ctx: Context, fallback: string, task: string | null) {
+  if (!task || !ctx.store.state.settings.autoRenameBranches) return fallback;
+  return (await suggestName(ctx, task)) ?? fallback;
 }
 
 export async function startScript(
@@ -243,69 +250,127 @@ export async function refreshStats(ctx: Context, workspace: Workspace) {
   }
 }
 
+export function firstPrompt(
+  task: string,
+  plan: string | null,
+  repo: Repo,
+  linked: boolean,
+): string {
+  return [
+    task,
+    plan ? `<plan>\n${plan}\n</plan>` : null,
+    linked
+      ? `This task spans several repositories. Each one has its own linked workspace and agent. You own the ${repo.name} part: change files in this workspace only. Your system prompt lists the linked workspaces, which you can read.`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
 async function addWorkspaceWorktree(
   ctx: Context,
   repo: Repo,
   workspace: Workspace,
-  task: SendOptions | null,
-) {
-  const [from, name] = await Promise.all([
-    startPoint(ctx.git, repo.path, repo.defaultBranch),
-    taskName(ctx, workspace, task?.text ?? null),
-  ]);
-  await claimName(ctx, repo, workspace, name);
-  await addWorktree(ctx.git, repo.path, workspace.path, workspace.branch, from);
-  await copyLocalFiles(repo.path, workspace.path, (file) =>
-    isIgnored(ctx.git, repo.path, file),
-  ).catch(() => []);
-}
-
-async function prepareWorkspace(
-  ctx: Context,
-  repo: Repo,
-  workspace: Workspace,
-  task: SendOptions | null,
-  send: SendTask,
-) {
-  const runtime = ctx.runtime(workspace.id);
+  from: string,
+): Promise<boolean> {
   try {
-    await addWorkspaceWorktree(ctx, repo, workspace, task);
+    await addWorktree(
+      ctx.git,
+      repo.path,
+      workspace.path,
+      workspace.branch,
+      from,
+    );
   } catch (error) {
     ctx.setStatus(
       workspace.id,
       'failed',
       `Could not create the worktree: ${errorMessage(error)}`,
     );
-    ctx.store.save();
+    return false;
+  }
+  await copyLocalFiles(repo.path, workspace.path, (file) =>
+    isIgnored(ctx.git, repo.path, file),
+  ).catch(() => []);
+  ctx.setStatus(workspace.id, 'idle');
+  ctx.runtime(workspace.id).pendingPrompt = null;
+  return true;
+}
+
+function firstMessage(
+  task: SendOptions,
+  plan: string | null,
+  repo: Repo,
+  workspace: Workspace,
+): SendOptions {
+  const [session] = workspace.sessions;
+  return {
+    ...task,
+    text: firstPrompt(task.text, plan, repo, workspace.groupId !== null),
+    model: task.model || session.model,
+    effort: task.effort || session.effort,
+  };
+}
+
+async function prepareWorkspaces(
+  ctx: Context,
+  repos: Repo[],
+  workspaces: Workspace[],
+  task: SendOptions | null,
+  plan: string | null,
+  send: SendTask,
+) {
+  let startPoints: string[];
+  try {
+    const [name, ...froms] = await Promise.all([
+      taskName(ctx, workspaces[0].name, task?.text ?? null),
+      ...repos.map((repo) =>
+        startPoint(ctx.git, repo.path, repo.defaultBranch),
+      ),
+    ]);
+    await claimName(ctx, repos, workspaces, name);
+    startPoints = froms;
+  } catch (error) {
+    for (const workspace of workspaces)
+      ctx.setStatus(
+        workspace.id,
+        'failed',
+        `Could not create the worktree: ${errorMessage(error)}`,
+      );
     ctx.emitState();
     return;
   }
-  ctx.setStatus(workspace.id, 'idle');
-  runtime.pendingPrompt = null;
+  const created = await Promise.all(
+    workspaces.map((workspace, index) =>
+      addWorkspaceWorktree(ctx, repos[index], workspace, startPoints[index]),
+    ),
+  );
   ctx.store.save();
   ctx.emitState();
-  void startScript(ctx, workspace, 'setup');
-  const [session] = workspace.sessions;
-  if (task)
-    await send(session.id, { ...task, model: task.model || session.model });
+  await Promise.all(
+    workspaces.map(async (workspace, index) => {
+      if (!created[index]) return;
+      void startScript(ctx, workspace, 'setup');
+      if (task)
+        await send(
+          workspace.sessions[0].id,
+          firstMessage(task, plan, repos[index], workspace),
+        );
+    }),
+  );
 }
 
-export function createWorkspace(
+function addDraftWorkspace(
   ctx: Context,
-  repoId: string,
+  repo: Repo,
+  name: string,
+  groupId: string | null,
   task: SendOptions | null,
-  send: SendTask,
-): Result<Workspace> {
-  const repo = ctx.repo(repoId);
-  const { state } = ctx.store;
-  const id = ctx.deps.newId();
-  const name = uniqueName(
-    nameFromTask(task?.text ?? null),
-    workspaceNames(ctx, repoId),
-  );
+): Workspace {
   const workspace: Workspace = {
-    id,
-    repoId,
+    id: ctx.deps.newId(),
+    repoId: repo.id,
+    groupId,
     name,
     branch: name,
     baseBranch: repo.defaultBranch,
@@ -314,15 +379,35 @@ export function createWorkspace(
     createdAt: ctx.deps.now().toISOString(),
     archivedAt: null,
     archiveSnapshot: null,
-    sessions: [newChatSession(ctx, state.settings.defaultAgent)],
+    sessions: [newChatSession(ctx, ctx.store.state.settings.defaultAgent)],
   };
-  state.workspaces.push(workspace);
-  ctx.setStatus(id, 'creating');
-  ctx.runtime(id).pendingPrompt = task?.text ?? null;
+  ctx.store.state.workspaces.push(workspace);
+  ctx.setStatus(workspace.id, 'creating');
+  ctx.runtime(workspace.id).pendingPrompt = task?.text ?? null;
+  return workspace;
+}
+
+export function createWorkspaces(
+  ctx: Context,
+  repoIds: string[],
+  task: SendOptions | null,
+  send: SendTask,
+  plan: string | null = null,
+): Result<Workspace[]> {
+  if (!repoIds.length) return { ok: false, message: 'Pick a repository' };
+  const repos = repoIds.map((repoId) => ctx.repo(repoId));
+  const groupId = repos.length > 1 ? ctx.deps.newId() : null;
+  const taken = new Set(
+    repos.flatMap((repo) => [...workspaceNames(ctx, repo.id)]),
+  );
+  const name = uniqueName(nameFromTask(task?.text ?? null), taken);
+  const workspaces = repos.map((repo) =>
+    addDraftWorkspace(ctx, repo, name, groupId, task),
+  );
   ctx.store.save();
   ctx.emitState();
-  void prepareWorkspace(ctx, repo, workspace, task, send);
-  return { ok: true, value: workspace };
+  void prepareWorkspaces(ctx, repos, workspaces, task, plan, send);
+  return { ok: true, value: workspaces };
 }
 
 async function runArchiveScript(ctx: Context, workspace: Workspace) {

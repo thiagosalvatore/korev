@@ -1,15 +1,16 @@
-import type {
-  AskChat,
-  ChatItem,
-  ChatSession,
-  Checkpoint,
-  Repo,
-  Result,
-  SendOptions,
-  Workspace,
+import {
+  hasWorktree,
+  type AskChat,
+  type ChatItem,
+  type ChatSession,
+  type Checkpoint,
+  type Repo,
+  type Result,
+  type SendOptions,
+  type Workspace,
 } from '../shared/model';
 import { AGENTS, codexPrompt, type TurnRequest } from './agents';
-import { parseJsonLine, type TurnParser } from './agent-events';
+import { parseJsonLine, PLAN_TOOL, type TurnParser } from './agent-events';
 import { prepareAskWorktree } from './ask-worktrees';
 import { CommandAbortedError } from './command-runner';
 import { errorMessage, NotFoundError, type Context } from './context';
@@ -43,7 +44,43 @@ export function replayPrompt(history: ChatItem[], text: string): string {
   return `<previous-conversation>\nThis chat was reset to an earlier point. Here is the conversation so far, for context:\n\n${transcript}\n</previous-conversation>\n\n${text}`;
 }
 
-export function systemPrompt(repo: Repo, workspace: Workspace): string {
+export interface LinkedWorkspace {
+  repo: Repo;
+  workspace: Workspace;
+}
+
+function linkedLines(linked: LinkedWorkspace[]): string[] {
+  if (!linked.length) return [];
+  return [
+    `This workspace is linked with workspaces in other repositories that work on the same task:`,
+    ...linked.map(
+      ({ repo, workspace }) =>
+        `- ${repo.name}: ${workspace.path} (branch ${workspace.branch})`,
+    ),
+    `You can read their files to keep every side consistent. Do not edit them: each has its own agent. Use their .context directories to leave notes for the other agents.`,
+  ];
+}
+
+export function latestPlan(items: ChatItem[]): string | null {
+  const reply = items.slice(
+    items.findLastIndex((item) => item.kind === 'user') + 1,
+  );
+  const planTool = reply.findLast(
+    (item) => item.kind === 'tool' && item.name === PLAN_TOOL,
+  );
+  if (planTool?.kind === 'tool' && planTool.detail) return planTool.detail;
+  const text = reply
+    .flatMap((item) => (item.kind === 'assistant' ? [item.text] : []))
+    .join('\n\n')
+    .trim();
+  return text || null;
+}
+
+export function systemPrompt(
+  repo: Repo,
+  workspace: Workspace,
+  linked: LinkedWorkspace[] = [],
+): string {
   return [
     `You are working inside Korev, a Mac app that lets the user run many coding agents in parallel.`,
     `Your work should take place in the ${workspace.path} directory (unless otherwise directed), which has been set up for you to work in.`,
@@ -51,6 +88,7 @@ export function systemPrompt(repo: Repo, workspace: Workspace): string {
     `The workspace has a .context directory (gitignored) where you can save files to collaborate with other agents.`,
     `Do not rename the current branch unless the user explicitly tells you to do so.`,
     `If you start a dev server, use port $CONDUCTOR_PORT (ports $CONDUCTOR_PORT to $CONDUCTOR_PORT+9 are reserved for this workspace).`,
+    ...linkedLines(linked),
   ].join('\n');
 }
 
@@ -193,16 +231,30 @@ export function createChats(ctx: Context): Chats {
     };
   }
 
+  function linkedWorkspaces(workspace: Workspace): LinkedWorkspace[] {
+    if (!workspace.groupId) return [];
+    return ctx.store.state.workspaces
+      .filter(
+        (other) =>
+          other !== workspace &&
+          other.groupId === workspace.groupId &&
+          !other.archivedAt &&
+          hasWorktree(ctx.runtime(other.id)),
+      )
+      .map((other) => ({ repo: ctx.repo(other.repoId), workspace: other }));
+  }
+
   async function turnTarget(owner: Owner): Promise<TurnTarget> {
     if (owner.kind === 'ask') return askTarget(owner.ask);
     const { workspace } = owner;
     const repo = ctx.repo(workspace.repoId);
+    const linked = linkedWorkspaces(workspace);
     return {
       cwd: workspace.path,
       env: scriptEnv(ctx, repo, workspace),
-      systemPrompt: systemPrompt(repo, workspace),
+      systemPrompt: systemPrompt(repo, workspace, linked),
       readOnly: false,
-      addDirs: [],
+      addDirs: linked.map((entry) => entry.workspace.path),
     };
   }
 

@@ -6,6 +6,7 @@ type JsonRecord = Record<string, unknown>;
 
 const DETAIL_MAX_CHARS = 20_000;
 const OUTPUT_MAX_CHARS = 20_000;
+export const PLAN_TOOL = 'ExitPlanMode';
 
 export interface TurnParser {
   feed(event: JsonRecord): ChatItem[];
@@ -93,6 +94,7 @@ function claudeToolDetail(name: string, input: JsonRecord): string {
   if (name === 'Bash') return str(input.command);
   if (name === 'Write') return str(input.content);
   if (name === 'Edit') return editDetail(input) ?? '';
+  if (name === PLAN_TOOL) return str(input.plan);
   return JSON.stringify(input, null, 2);
 }
 

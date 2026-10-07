@@ -3,6 +3,7 @@ import type {
   AskChat,
   AppState,
   EditorId,
+  Result,
   SendOptions,
   Workspace,
 } from '../shared/model';
@@ -117,14 +118,21 @@ export async function closeTab(workspace: Workspace, key: string) {
     updateWorkspaceUi(workspace.id, () => ({ activeKey: null }));
 }
 
-export async function createWorkspace(
-  repoId: string,
+function openCreated(created: Result<Workspace[]>) {
+  if (!reportFailure(created)) return false;
+  selectWorkspace(created.value[0].id);
+  return true;
+}
+
+export async function createWorkspaces(
+  repoIds: string[],
   task: SendOptions | null,
 ) {
-  const created = await api.createWorkspace(repoId, task);
-  if (!reportFailure(created)) return null;
-  selectWorkspace(created.value.id);
-  return created.value;
+  return openCreated(await api.createWorkspaces(repoIds, task));
+}
+
+export async function startFromAsk(ask: AskChat) {
+  return openCreated(await api.startFromAsk(ask.id));
 }
 
 export async function archiveWorkspace(state: AppState, workspace: Workspace) {

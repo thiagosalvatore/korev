@@ -7,7 +7,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runProcess } from './command-runner';
 import { nodeFileSystem } from './file-system';
-import type { SendOptions } from '../shared/model';
+import type { SendOptions, Workspace } from '../shared/model';
 import { createKorev, type Korev } from './korev';
 
 const FAKE_AGENT_BIN = path.resolve(__dirname, '../../test-support/bin');
@@ -120,9 +120,9 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
   async function createWorkspace(task: SendOptions | null = null) {
     const repo = await addRepo();
-    const created = await korev.api.createWorkspace(repo.id, task);
+    const created = await korev.api.createWorkspaces([repo.id], task);
     if (!created.ok) throw new Error(created.message);
-    const { workspace } = await waitUntilCreated(created.value.id);
+    const { workspace } = await waitUntilCreated(created.value[0].id);
     if (task) await waitForTurn(workspace.sessions[0].id);
     return workspace;
   }
@@ -213,18 +213,18 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     await korev.api.updateSettings({ autoRenameBranches: true });
     const repo = await addRepo();
 
-    const created = await korev.api.createWorkspace(
-      repo.id,
+    const created = await korev.api.createWorkspaces(
+      [repo.id],
       task('Add a note'),
     );
 
     if (!created.ok) throw new Error(created.message);
-    const pending = await workspaceState(created.value.id);
+    const pending = await workspaceState(created.value[0].id);
     expect(pending.runtime).toMatchObject({
       status: 'creating',
       pendingPrompt: 'Add a note',
     });
-    const { workspace, runtime } = await waitUntilCreated(created.value.id);
+    const { workspace, runtime } = await waitUntilCreated(created.value[0].id);
     expect(runtime.pendingPrompt).toBeNull();
     expect(workspace).toMatchObject({
       name: 'add-agent-note',
@@ -250,10 +250,10 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     const repo = await addRepo();
     git(repoPath, 'branch', 'dev/workspace');
 
-    const created = await korev.api.createWorkspace(repo.id, null);
+    const created = await korev.api.createWorkspaces([repo.id], null);
 
     if (!created.ok) throw new Error(created.message);
-    const { workspace } = await waitUntilCreated(created.value.id);
+    const { workspace } = await waitUntilCreated(created.value[0].id);
     expect(workspace).toMatchObject({
       name: 'workspace-2',
       branch: 'dev/workspace-2',
@@ -267,10 +267,10 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       recursive: true,
     });
 
-    const created = await korev.api.createWorkspace(repo.id, null);
+    const created = await korev.api.createWorkspaces([repo.id], null);
 
     if (!created.ok) throw new Error(created.message);
-    const { runtime } = await waitUntilCreated(created.value.id);
+    const { runtime } = await waitUntilCreated(created.value[0].id);
     expect(runtime.status).toBe('failed');
     expect(runtime.message).toMatch(/Could not create the worktree/);
   });
@@ -326,6 +326,66 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
         'utf8',
       ),
     ).toContain(`--add-dir ${path.join(root, 'api', '.ask')}`);
+  });
+
+  async function userMessages(sessionId: string) {
+    return (await korev.api.transcript(sessionId)).flatMap((item) =>
+      item.kind === 'user' ? [item.text] : [],
+    );
+  }
+
+  async function waitForLinkedTurns(workspaces: Workspace[]) {
+    for (const workspace of workspaces) {
+      await waitUntilCreated(workspace.id);
+      await waitForTurn(workspace.sessions[0].id);
+    }
+    const state = await korev.api.getState();
+    return workspaces.map(
+      (workspace) => state.workspaces.find((ws) => ws.id === workspace.id)!,
+    );
+  }
+
+  it('creates linked workspaces with one branch name across repositories', async () => {
+    await korev.api.updateSettings({ autoRenameBranches: true });
+    const acme = await addRepo();
+    chosenDirectory = await initRepo('api');
+    const api = await addRepo();
+
+    const created = await korev.api.createWorkspaces(
+      [acme.id, api.id],
+      task('Add a note'),
+    );
+
+    if (!created.ok) throw new Error(created.message);
+    const [front, back] = await waitForLinkedTurns(created.value);
+    expect(front.groupId).not.toBeNull();
+    expect(back.groupId).toBe(front.groupId);
+    expect([front.branch, back.branch]).toEqual([
+      'dev/add-agent-note',
+      'dev/add-agent-note',
+    ]);
+    expect(
+      await readFile(path.join(front.path, '.context', 'claude-args'), 'utf8'),
+    ).toContain(`--add-dir ${back.path}`);
+    expect(await userMessages(front.sessions[0].id)).toEqual([
+      expect.stringContaining('You own the acme part'),
+    ]);
+  });
+
+  it('starts linked workspaces from the plan in an Ask chat', async () => {
+    const acme = await addRepo();
+    chosenDirectory = await initRepo('api');
+    const api = await addRepo();
+    const ask = await askAndWait([acme.id, api.id], 'Plan the change');
+
+    const started = await korev.api.startFromAsk(ask.id);
+
+    if (!started.ok) throw new Error(started.message);
+    const [front, back] = await waitForLinkedTurns(started.value);
+    expect(back.groupId).toBe(front.groupId);
+    expect((await userMessages(back.sessions[0].id))[0]).toContain(
+      '<plan>\nI added agent-note.txt.\n</plan>',
+    );
   });
 
   it('archives a workspace and restores its uncommitted work', async () => {

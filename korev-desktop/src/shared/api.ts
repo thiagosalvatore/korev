@@ -28,16 +28,17 @@ export interface KorevApi {
   removeRepo(repoId: string): Promise<void>;
   updateRepo(repoId: string, patch: { defaultBranch?: string }): Promise<void>;
   updateRepoScripts(repoId: string, scripts: RepoScripts): Promise<void>;
-  createWorkspace(
-    repoId: string,
+  createWorkspaces(
+    repoIds: string[],
     task: SendOptions | null,
-  ): Promise<Result<Workspace>>;
+  ): Promise<Result<Workspace[]>>;
   archiveWorkspace(workspaceId: string): Promise<Result>;
   restoreWorkspace(workspaceId: string): Promise<Result>;
   deleteWorkspace(workspaceId: string): Promise<void>;
   focusWorkspace(workspaceId: string | null): Promise<void>;
   createAskChat(repoIds: string[]): Promise<AskChat>;
   deleteAskChat(askChatId: string): Promise<void>;
+  startFromAsk(askChatId: string): Promise<Result<Workspace[]>>;
   newSession(workspaceId: string, agent: AgentKind): Promise<ChatSession>;
   closeSession(workspaceId: string, sessionId: string): Promise<void>;
   updateSession(

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { cn, Icon, IconButton } from '../design-system';
+import { Button, cn, Icon, IconButton } from '../design-system';
 import type { AppState, AskChat } from '../shared/model';
-import { deleteAsk, startAsk } from './actions';
+import { deleteAsk, startAsk, startFromAsk } from './actions';
 import { ChatView } from './chat/ChatView';
 import { Composer } from './chat/Composer';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
@@ -77,6 +77,8 @@ function NewAsk({
 
 function AskChatView({ state, ask }: { state: AppState; ask: AskChat }) {
   const sidebar = useUi((ui) => ui.sidebar);
+  const running = state.runningSessions.includes(ask.session.id);
+  const [starting, setStarting] = useState(false);
   const repoNames = ask.repoIds
     .map((repoId) => state.repos.find((repo) => repo.id === repoId)?.name)
     .join(', ');
@@ -97,6 +99,22 @@ function AskChatView({ state, ask }: { state: AppState; ask: AskChat }) {
           {repoNames} · read-only
         </span>
         <span className="flex-1" />
+        <Button
+          size="sm"
+          variant="primary"
+          icon="git-branch-plus"
+          className={NO_DRAG}
+          disabled={running}
+          loading={starting}
+          title={`Create a workspace in ${ask.repoIds.length > 1 ? 'each repository' : 'this repository'} and send it the latest plan`}
+          onClick={async () => {
+            setStarting(true);
+            await startFromAsk(ask);
+            setStarting(false);
+          }}
+        >
+          {ask.repoIds.length > 1 ? 'Start workspaces' : 'Start workspace'}
+        </Button>
         <IconButton
           icon="trash-2"
           label="Delete chat"
