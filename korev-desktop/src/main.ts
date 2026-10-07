@@ -34,6 +34,7 @@ const MIN_WINDOW_SIZE = { width: 960, height: 600 };
 const TRAFFIC_LIGHT_POSITION = { x: 16, y: 16 };
 const DEV_ICON_PATH = '../../assets/icon.png';
 const DEV_USER_DATA_DIR = 'Korev Dev';
+const USER_DATA_DIR_SWITCH = 'user-data-dir';
 const COMMAND_EVENT = 'command';
 const FINISHED_SOUND = '/System/Library/Sounds/Glass.aiff';
 
@@ -51,7 +52,7 @@ if (started) {
 }
 
 function useSeparateDevData() {
-  if (app.isPackaged) return;
+  if (app.isPackaged || app.commandLine.hasSwitch(USER_DATA_DIR_SWITCH)) return;
   app.setPath('userData', path.join(app.getPath('appData'), DEV_USER_DATA_DIR));
 }
 

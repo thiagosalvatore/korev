@@ -127,7 +127,7 @@ test('asks a question about a repository without creating a workspace', async ()
 
     await expect(window.getByText('I added agent-note.txt.')).toBeVisible();
     await expect(
-      sidebar.getByRole('button', { name: 'Ask Where is the README?' }),
+      sidebar.getByRole('button', { name: 'Ask Finding the README' }),
     ).toBeVisible();
     await expect(
       sidebar.getByRole('button', { name: /^Workspace / }),
