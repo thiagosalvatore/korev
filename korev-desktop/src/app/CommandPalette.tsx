@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn, Icon, Kbd, type IconName } from '../design-system';
-import { AGENT_KINDS, AGENT_LABELS, type AppState } from '../shared/model';
+import type { AppState } from '../shared/model';
 import {
   archiveWorkspace,
   createPr,
@@ -72,15 +72,14 @@ function paletteItems(
     },
     ...(current
       ? [
-          ...AGENT_KINDS.map(
-            (agent): PaletteItem => ({
-              id: `chat:${agent}`,
-              label: `New ${AGENT_LABELS[agent]} chat`,
-              icon: 'message-square-plus',
-              section: 'Actions',
-              run: () => void newChat(current, agent),
-            }),
-          ),
+          {
+            id: 'chat',
+            label: 'New chat',
+            icon: 'message-square-plus',
+            hint: '⌘T',
+            section: 'Actions',
+            run: () => void newChat(current, state.settings.defaultAgent),
+          } as PaletteItem,
           {
             id: 'diff',
             label: 'Open diff view',

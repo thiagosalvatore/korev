@@ -1,7 +1,5 @@
 import { Button, cn, Icon, IconButton } from '../design-system';
 import {
-  AGENT_KINDS,
-  AGENT_LABELS,
   hasWorktree,
   type AppState,
   type Workspace,
@@ -88,16 +86,14 @@ function extraTabLabel(tab: MainTab): string {
 function newTabItems(state: AppState, workspace: Workspace): MenuItem[] {
   const runUrl = state.runtime[workspace.id]?.runUrl;
   return [
-    ...AGENT_KINDS.map(
-      (agent): MenuItem => ({
-        id: agent,
-        label: `New ${AGENT_LABELS[agent]} chat`,
-        icon: agent === 'claude' ? 'sparkle' : 'hexagon',
-        hint: agent === state.settings.defaultAgent ? '⌘T' : undefined,
-        section: 'Chat',
-        onSelect: () => void newChat(workspace, agent),
-      }),
-    ),
+    {
+      id: 'chat',
+      label: 'New chat',
+      icon: 'message-square-plus',
+      hint: '⌘T',
+      section: 'Chat',
+      onSelect: () => void newChat(workspace, state.settings.defaultAgent),
+    },
     ...(['shell', 'claude', 'codex'] as const).map(
       (preset): MenuItem => ({
         id: `terminal-${preset}`,
