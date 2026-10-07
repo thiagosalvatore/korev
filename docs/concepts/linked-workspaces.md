@@ -17,7 +17,7 @@ A task that spans repositories, say a frontend and a backend, gets one linked wo
 
 ## Lanes from a plan
 
-A plan can have parts that can be built at the same time. Claude Code ends such a plan with a **Lanes** section. The plan card then lists the lanes:
+A plan can have parts that can be built at the same time. The agent, Claude Code or Codex, ends such a plan with a **Lanes** section. The plan card then lists the lanes:
 
 - The first lane stays in this workspace.
 - Every ticked lane gets its own linked workspace in the same repository, branched from the same target branch. You can rename a lane before you approve.

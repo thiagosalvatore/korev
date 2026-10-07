@@ -579,6 +579,23 @@ export interface PermissionResponse {
   lanes?: PlanLane[];
 }
 
+export const PLAN_TOOL = 'ExitPlanMode';
+
+export function latestPlan(items: ChatItem[]): string | null {
+  const reply = items.slice(
+    items.findLastIndex((item) => item.kind === 'user') + 1,
+  );
+  const planTool = reply.findLast(
+    (item) => item.kind === 'tool' && item.name === PLAN_TOOL,
+  );
+  if (planTool?.kind === 'tool' && planTool.detail) return planTool.detail;
+  const text = reply
+    .flatMap((item) => (item.kind === 'assistant' ? [item.text] : []))
+    .join('\n\n')
+    .trim();
+  return text || null;
+}
+
 export interface PlanLane {
   name: string;
   body: string;

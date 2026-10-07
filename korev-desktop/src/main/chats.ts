@@ -1,6 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import {
   hasWorktree,
+  PLAN_TOOL,
   type AskChat,
   type ChatItem,
   type ChatSession,
@@ -20,7 +21,6 @@ import {
   parseControlRequest,
   parseJsonLine,
   permissionItem,
-  PLAN_TOOL,
   type ControlRequest,
   type TurnParser,
 } from './agent-events';
@@ -110,24 +110,13 @@ function withLanesElsewhere(
   lanes: PlanLane[] = [],
 ): ControlRequest {
   if (request.tool !== PLAN_TOOL || !lanes.length) return request;
-  const names = lanes.map((lane) => lane.name).join(', ');
-  const plan = `${String(request.input.plan ?? '')}\n\n${LANES_ELSEWHERE_NOTE}${names}.`;
+  const plan = `${String(request.input.plan ?? '')}\n\n${lanesElsewhereNote(lanes)}`;
   return { ...request, input: { ...request.input, plan } };
 }
 
-export function latestPlan(items: ChatItem[]): string | null {
-  const reply = items.slice(
-    items.findLastIndex((item) => item.kind === 'user') + 1,
-  );
-  const planTool = reply.findLast(
-    (item) => item.kind === 'tool' && item.name === PLAN_TOOL,
-  );
-  if (planTool?.kind === 'tool' && planTool.detail) return planTool.detail;
-  const text = reply
-    .flatMap((item) => (item.kind === 'assistant' ? [item.text] : []))
-    .join('\n\n')
-    .trim();
-  return text || null;
+export function lanesElsewhereNote(lanes: PlanLane[]): string {
+  const names = lanes.map((lane) => lane.name).join(', ');
+  return `${LANES_ELSEWHERE_NOTE}${names}.`;
 }
 
 export function systemPrompt(

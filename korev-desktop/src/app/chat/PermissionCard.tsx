@@ -153,18 +153,32 @@ function LaneList({
   );
 }
 
-function PlanApproval({ item, onRespond }: PermissionCardProps) {
+export interface PlanReviewProps {
+  plan: string;
+  showPlan: boolean;
+  onApprove(lanes: PlanLane[]): void;
+  onKeepPlanning(feedback: string): void;
+}
+
+export function PlanReview({
+  plan,
+  showPlan,
+  onApprove,
+  onKeepPlanning,
+}: PlanReviewProps) {
   const [feedback, setFeedback] = useState('');
-  const [here, ...others] = planLanes(item.plan ?? '');
+  const [here, ...others] = planLanes(plan);
   const [drafts, setDrafts] = useState<LaneDraft[]>(() =>
     others.map((lane) => ({ ...lane, split: true })),
   );
   const split = lanesToSplit(drafts);
   return (
     <Shell title="Plan ready for review" icon="list-checks">
-      <div className="mb-3 max-h-96 overflow-auto rounded-md border border-border-1 bg-raised p-3">
-        <Markdown text={item.plan ?? ''} />
-      </div>
+      {showPlan ? (
+        <div className="mb-3 max-h-96 overflow-auto rounded-md border border-border-1 bg-raised p-3">
+          <Markdown text={plan} />
+        </div>
+      ) : null}
       {here ? (
         <LaneList here={here} drafts={drafts} onChange={setDrafts} />
       ) : null}
@@ -181,7 +195,7 @@ function PlanApproval({ item, onRespond }: PermissionCardProps) {
             size="sm"
             variant="primary"
             icon="git-fork"
-            onClick={() => onRespond({ allow: true, lanes: split })}
+            onClick={() => onApprove(split)}
           >
             {`Approve and split off ${split.length} ${split.length === 1 ? 'lane' : 'lanes'}`}
           </Button>
@@ -190,7 +204,7 @@ function PlanApproval({ item, onRespond }: PermissionCardProps) {
           size="sm"
           variant={split.length ? 'secondary' : 'primary'}
           icon="check"
-          onClick={() => onRespond({ allow: true })}
+          onClick={() => onApprove([])}
         >
           {here ? 'Approve here' : 'Approve plan'}
         </Button>
@@ -198,12 +212,23 @@ function PlanApproval({ item, onRespond }: PermissionCardProps) {
           size="sm"
           variant="secondary"
           disabled={!feedback.trim()}
-          onClick={() => onRespond({ allow: false, message: feedback })}
+          onClick={() => onKeepPlanning(feedback)}
         >
           Keep planning
         </Button>
       </div>
     </Shell>
+  );
+}
+
+function PlanApproval({ item, onRespond }: PermissionCardProps) {
+  return (
+    <PlanReview
+      plan={item.plan ?? ''}
+      showPlan
+      onApprove={(lanes) => onRespond({ allow: true, lanes })}
+      onKeepPlanning={(message) => onRespond({ allow: false, message })}
+    />
   );
 }
 

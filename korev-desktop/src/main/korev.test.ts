@@ -1260,6 +1260,42 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toContain('Do not build them here: Settings API, ui');
   });
 
+  it('approves a Codex plan and splits off its lanes', async () => {
+    const origin = await createWorkspace();
+    const [session] = origin.sessions;
+    const codex = {
+      ...task('make-plan for the settings page'),
+      agent: 'codex' as const,
+      model: 'gpt-6.1-sol',
+      planMode: true,
+    };
+    await korev.api.updateSession(session.id, codex);
+    await korev.api.send(session.id, codex);
+    await waitFor(
+      async () => (await korev.api.getState()).runningSessions.length === 0,
+    );
+
+    const approved = await korev.api.approvePlan(session.id, [
+      { name: 'ui', body: 'Build the page.' },
+    ]);
+
+    expect(approved).toEqual({ ok: true, value: undefined });
+    await waitFor(async () => (await userMessages(session.id)).length === 2);
+    await waitForTurn(session.id);
+    const { workspaces } = await korev.api.getState();
+    const lane = workspaces.find((ws) => ws.id !== origin.id)!;
+    const updated = workspaces.find((ws) => ws.id === origin.id)!;
+    expect(lane.branch).toBe('dev/ui');
+    expect(lane.groupId).toBe(updated.groupId);
+    expect(updated.sessions[0].planMode).toBe(false);
+    const prompt = await readFile(
+      path.join(origin.path, '.context', 'codex-prompt'),
+      'utf8',
+    );
+    expect(prompt).toContain('Implement the plan.');
+    expect(prompt).toContain('Do not build them here: ui.');
+  });
+
   it('offers skills as slash commands', async () => {
     const workspace = await createWorkspace();
     const skillDir = path.join(home, '.claude', 'skills', 'browse');

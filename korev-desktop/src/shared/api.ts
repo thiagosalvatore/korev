@@ -10,6 +10,7 @@ import type {
   FileChange,
   IssueSummary,
   PermissionResponse,
+  PlanLane,
   PullRequestSummary,
   RemotePairing,
   RepoConfig,
@@ -105,6 +106,7 @@ export interface KorevApi {
     itemId: string,
     response: PermissionResponse,
   ): Promise<Result>;
+  approvePlan(sessionId: string, lanes: PlanLane[]): Promise<Result>;
   revert(sessionId: string, itemId: string): Promise<Result<string>>;
   saveAttachment(
     workspaceId: string | null,

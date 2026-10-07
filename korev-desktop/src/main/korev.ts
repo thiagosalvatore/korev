@@ -11,6 +11,7 @@ import {
   type ChatSession,
   type EditorApp,
   type EditorId,
+  latestPlan,
   type PlanLane,
   type PromptKind,
   type PrStatus,
@@ -19,6 +20,7 @@ import {
   type RepoScripts,
   type TerminalPreset,
   type Result,
+  type SendOptions,
   type Settings,
   type Workspace,
   type WorkspaceRuntime,
@@ -28,7 +30,7 @@ import {
 import { detectAgents } from './agents';
 import type { RemoteAccess } from './remote-access';
 import { askWorktreePath } from './ask-worktrees';
-import { createChats, latestPlan, type TurnPrLinks } from './chats';
+import { createChats, lanesElsewhereNote, type TurnPrLinks } from './chats';
 import { readConductorRepos, readConductorSettings } from './conductor-import';
 import {
   errorMessage,
@@ -100,6 +102,7 @@ const CONTEXT_DIR = '.context';
 const COMMAND_EXTENSION = '.md';
 const BUILTIN_COMMANDS = ['compact', 'review', 'init'];
 const IMPLEMENT_PLAN_TASK = 'Implement your part of the plan below.';
+const IMPLEMENT_APPROVED_PLAN = 'Implement the plan.';
 const IMPLEMENT_CONVERSATION_TASK =
   'Implement your part of what we discussed above.';
 const GITHUB_AVATAR_SIZE = 64;
@@ -542,34 +545,72 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     };
   }
 
+  function workspaceChat(sessionId: string) {
+    const workspace = store.state.workspaces.find((entry) =>
+      entry.sessions.some((session) => session.id === sessionId),
+    );
+    const session = workspace?.sessions.find((entry) => entry.id === sessionId);
+    return workspace && session ? { workspace, session } : null;
+  }
+
+  function implementOptions(session: ChatSession, text: string): SendOptions {
+    return {
+      text,
+      agent: session.agent,
+      model: session.model,
+      effort: session.effort,
+      planMode: false,
+      fast: session.fast,
+    };
+  }
+
   async function splitIntoLanes(
     sessionId: string,
     itemId: string,
     lanes: PlanLane[],
   ): Promise<Result> {
-    const origin = store.state.workspaces.find((workspace) =>
-      workspace.sessions.some((session) => session.id === sessionId),
-    );
-    const session = origin?.sessions.find((entry) => entry.id === sessionId);
+    const chat = workspaceChat(sessionId);
     const history = await chats.transcript(sessionId);
     const item = history.find((entry) => entry.id === itemId);
-    if (!origin || !session || item?.kind !== 'permission' || !item.plan)
+    if (!chat || item?.kind !== 'permission' || !item.plan)
       return fail('Only a plan in a workspace can be split into lanes');
+    startLanes(chat.workspace, chat.session, item.plan, history, lanes);
+    return ok(undefined);
+  }
+
+  function startLanes(
+    origin: Workspace,
+    session: ChatSession,
+    plan: string,
+    history: ChatItem[],
+    lanes: PlanLane[],
+  ) {
     createLaneWorkspaces(
       ctx,
       origin,
       lanes,
-      {
-        agent: session.agent,
-        model: session.model,
-        effort: session.effort,
-        planMode: false,
-        fast: session.fast,
-      },
-      item.plan,
+      implementOptions(session, ''),
+      plan,
       sendWithHistory(history),
     );
-    return ok(undefined);
+  }
+
+  async function approvePlan(
+    sessionId: string,
+    lanes: PlanLane[],
+  ): Promise<Result> {
+    const chat = workspaceChat(sessionId);
+    if (!chat) return fail('Only a plan in a workspace can be approved');
+    if (chats.isRunning(sessionId)) return fail('Wait for the agent to finish');
+    const history = await chats.transcript(sessionId);
+    const plan = latestPlan(history);
+    if (!plan) return fail('There is no plan to approve');
+    if (lanes.length)
+      startLanes(chat.workspace, chat.session, plan, history, lanes);
+    const text = lanes.length
+      ? `${IMPLEMENT_APPROVED_PLAN}\n\n${lanesElsewhereNote(lanes)}`
+      : IMPLEMENT_APPROVED_PLAN;
+    return chats.send(sessionId, implementOptions(chat.session, text));
   }
 
   async function moveChat(from: ChatSession | null, to: Workspace) {
@@ -976,6 +1017,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         return answered;
       return splitIntoLanes(sessionId, itemId, response.lanes);
     },
+    approvePlan,
     revert: (sessionId, itemId) => chats.revert(sessionId, itemId),
     async changes(workspaceId) {
       const workspace = workspacePath(workspaceId);

@@ -43,12 +43,12 @@ You can switch a chat to the other agent from the model picker. Stop the agent f
 
 In plan mode the agent reads and plans but does not change files. Turn it on with ⇧Tab, the **Plan mode** chip, or **+ → Plan mode**. The composer border turns dashed.
 
-When Claude Code finishes a plan, the chat shows **Plan ready for review**:
+When the agent finishes a plan, the chat shows **Plan ready for review**. Claude Code asks for the review itself. For Codex, the card appears under its reply when a plan mode turn ends:
 
 - **Approve plan** turns plan mode off and lets the agent build it.
 - **Keep planning** sends your feedback and keeps plan mode on.
 
-Codex runs in its read-only sandbox in plan mode.
+Codex runs in its read-only sandbox in plan mode. When you approve a Codex plan, Korev sends "Implement the plan." with plan mode off.
 
 To start every chat in plan mode, turn on **Settings → Default models → Start chats in plan mode**.
 

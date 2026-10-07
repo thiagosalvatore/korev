@@ -385,6 +385,7 @@ export interface TranscriptProps {
   items: ChatItem[];
   running: boolean;
   empty: ReactNode;
+  footer?: ReactNode;
   onRevert: (itemId: string) => void;
   onRespond: (itemId: string, response: PermissionResponse) => void;
   onRetry: (text: string) => void;
@@ -398,6 +399,7 @@ export function Transcript({
   items,
   running,
   empty,
+  footer,
   onRevert,
   onRespond,
   onRetry,
@@ -505,6 +507,7 @@ export function Transcript({
               return null;
           }
         })}
+        {footer}
         {running ? <WorkingIndicator since={startedAt} /> : null}
       </div>
       <Dialog

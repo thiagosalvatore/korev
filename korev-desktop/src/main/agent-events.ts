@@ -1,12 +1,13 @@
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
-import type {
-  AgentQuestion,
-  ChatItem,
-  PlanLimit,
-  Todo,
-  TodoStatus,
-  TurnUsage,
+import {
+  PLAN_TOOL,
+  type AgentQuestion,
+  type ChatItem,
+  type PlanLimit,
+  type Todo,
+  type TodoStatus,
+  type TurnUsage,
 } from '../shared/model';
 
 export type JsonRecord = Record<string, unknown>;
@@ -15,7 +16,6 @@ const DETAIL_MAX_CHARS = 20_000;
 const OUTPUT_MAX_CHARS = 20_000;
 const MS_PER_SECOND = 1_000;
 const PERCENT = 100;
-export const PLAN_TOOL = 'ExitPlanMode';
 
 export interface TurnParser {
   feed(event: JsonRecord): ChatItem[];

@@ -1,0 +1,17 @@
+#!/bin/sh
+case " $* " in
+  *" --version "*) echo "codex-cli 9.9.9"; exit 0 ;;
+  *" debug "*) exit 1 ;;
+esac
+prompt=$(cat)
+[ -d .context ] && printf '%s' "$prompt" > .context/codex-prompt
+echo '{"type":"thread.started","thread_id":"fake-thread"}'
+case "$prompt" in
+  *make-plan*)
+    printf '%s\n' '{"type":"item.completed","item":{"id":"m1","type":"agent_message","text":"# Settings\n\n## Lanes\n### api\nAdd the endpoint.\n### ui\nBuild the page."}}'
+    ;;
+  *)
+    printf '%s\n' '{"type":"item.completed","item":{"id":"m1","type":"agent_message","text":"Done."}}'
+    ;;
+esac
+echo '{"type":"turn.completed","usage":{}}'

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Icon, Spinner } from '../../design-system';
 import {
   AGENT_LABELS,
+  latestPlan,
   STOP_BEFORE_SWITCHING,
   type AppState,
   type ChatItem,
@@ -22,7 +23,21 @@ import {
   type DiffComment,
 } from '../ui-store';
 import { Composer, saveDraft } from './Composer';
+import { PlanReview } from './PermissionCard';
 import { Transcript } from './Transcript';
+
+function finishedCodexPlan(
+  session: ChatSession,
+  items: ChatItem[] | null,
+  running: boolean,
+): { id: string; plan: string } | null {
+  if (session.agent !== 'codex' || !session.planMode || running || !items)
+    return null;
+  const last = items.at(-1);
+  if (last?.kind !== 'result' || !last.ok) return null;
+  const plan = latestPlan(items);
+  return plan ? { id: last.id, plan } : null;
+}
 
 function toWorkspaceRelative(workspacePath: string, file: string): string {
   const prefix = `${workspacePath}/`;
@@ -104,6 +119,23 @@ export function ChatView({
     });
   }
 
+  function send(text: string, planMode = session.planMode) {
+    return api
+      .send(session.id, {
+        text,
+        agent: session.agent,
+        model: session.model,
+        effort: session.effort,
+        planMode,
+        fast: session.fast,
+      })
+      .then(reportFailure);
+  }
+
+  const codexPlan = workspace
+    ? finishedCodexPlan(session, items, running)
+    : null;
+
   async function revert(itemId: string) {
     const result = await api.revert(session.id, itemId);
     if (!reportFailure(result)) return;
@@ -142,17 +174,19 @@ export function ChatView({
               .respondPermission(session.id, itemId, response)
               .then(reportFailure)
           }
-          onRetry={(text) =>
-            void api
-              .send(session.id, {
-                text,
-                agent: session.agent,
-                model: session.model,
-                effort: session.effort,
-                planMode: session.planMode,
-                fast: session.fast,
-              })
-              .then(reportFailure)
+          onRetry={(text) => void send(text)}
+          footer={
+            codexPlan ? (
+              <PlanReview
+                key={codexPlan.id}
+                plan={codexPlan.plan}
+                showPlan={false}
+                onApprove={(lanes) =>
+                  void api.approvePlan(session.id, lanes).then(reportFailure)
+                }
+                onKeepPlanning={(feedback) => void send(feedback, true)}
+              />
+            ) : null
           }
         />
       ) : (
@@ -201,18 +235,7 @@ export function ChatView({
                 updateWorkspaceUi(workspace.id, () => ({ comments: [] }));
             }}
             onStop={() => void api.stop(session.id)}
-            onSend={async (text) =>
-              reportFailure(
-                await api.send(session.id, {
-                  text,
-                  agent: session.agent,
-                  model: session.model,
-                  effort: session.effort,
-                  planMode: session.planMode,
-                  fast: session.fast,
-                }),
-              )
-            }
+            onSend={send}
           />
         )}
         {agent && !agent.version ? (
