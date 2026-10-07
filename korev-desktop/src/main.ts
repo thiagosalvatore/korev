@@ -17,7 +17,12 @@ import { homedir, networkInterfaces } from 'node:os';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { spawn as spawnPty } from 'node-pty';
-import { eventChannel, type KorevEvents } from './shared/api';
+import {
+  eventChannel,
+  type DesktopApi,
+  type KorevEvents,
+  type QuitChoice,
+} from './shared/api';
 import type { AppCommand, WindowBounds } from './shared/model';
 import { appMenuTemplate } from './main/app-menu';
 import { isAppUrl, isWebUrl, type AppOrigin } from './main/app-origin';
@@ -28,6 +33,7 @@ import { registerIpcHandlers } from './main/ipc';
 import { createKorev, type Korev } from './main/korev';
 import { childEnv, resolveLoginPath } from './main/login-path';
 import { sendPhoneNotification } from './main/phone-notifications';
+import { createQuitGate, type QuitGate } from './main/quit-gate';
 import { createRemoteAccess } from './main/remote-access';
 import { LOOPBACK_HOST, tailnetAddress } from './main/remote-server';
 import { restorableBounds } from './main/window-bounds';
@@ -62,6 +68,7 @@ function useSeparateDevData() {
 useSeparateDevData();
 
 let korevApp: Korev | null = null;
+let quitGate: QuitGate | null = null;
 
 const remote = createRemoteAccess({
   tokenPath: path.join(app.getPath('userData'), REMOTE_TOKEN_FILE),
@@ -75,6 +82,7 @@ function emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]) {
     window.webContents.send(eventChannel(event), payload);
   }
   remote.broadcast(event, payload);
+  if (event === 'state') quitGate?.agentsChanged();
 }
 
 function sendToFocusedWindow(command: AppCommand) {
@@ -190,20 +198,39 @@ async function createKorevApp(): Promise<Korev> {
   return korev;
 }
 
-const QUIT_BUTTON = 0;
+const QUIT_BUTTONS: { label: string; choice: QuitChoice }[] = [
+  { label: 'Quit when done', choice: 'wait' },
+  { label: 'Quit now', choice: 'quit' },
+  { label: 'Cancel', choice: 'cancel' },
+];
+const WAIT_BUTTON = QUIT_BUTTONS.findIndex(({ choice }) => choice === 'wait');
+const CANCEL_BUTTON = QUIT_BUTTONS.findIndex(
+  ({ choice }) => choice === 'cancel',
+);
 
-function confirmQuit(korev: Korev): boolean {
-  const running = korev.runningAgents();
-  if (!running) return true;
-  const choice = dialog.showMessageBoxSync({
+function askQuitNatively(running: number): QuitChoice {
+  const index = dialog.showMessageBoxSync({
     type: 'warning',
     message: `${running} agent${running === 1 ? ' is' : 's are'} still working`,
-    detail: 'Quitting stops them. Their chats keep everything up to now.',
-    buttons: ['Quit', 'Cancel'],
-    defaultId: 1,
-    cancelId: 1,
+    detail:
+      'Quit now to stop them. Their chats keep everything up to now.\n\nOr let Korev quit by itself once they finish.',
+    buttons: QUIT_BUTTONS.map(({ label }) => label),
+    defaultId: WAIT_BUTTON,
+    cancelId: CANCEL_BUTTON,
   });
-  return choice === QUIT_BUTTON;
+  return QUIT_BUTTONS[index]?.choice ?? 'cancel';
+}
+
+function askQuit(running: number, gate: QuitGate) {
+  const [window] = BrowserWindow.getAllWindows();
+  if (!window) {
+    setImmediate(() => gate.choose(askQuitNatively(running)));
+    return;
+  }
+  window.show();
+  window.focus();
+  const command: AppCommand = 'confirm-quit';
+  window.webContents.send(eventChannel(COMMAND_EVENT), command);
 }
 
 const BROWSER_PARTITION = 'persist:korev-browser';
@@ -293,13 +320,20 @@ app.whenReady().then(async () => {
   showDevDockIcon();
   installAppMenu();
   const korev = await createKorevApp();
-  registerIpcHandlers(ipcMain, { ...korev.api }, (url) =>
+  const gate = createQuitGate({
+    runningAgents: korev.runningAgents,
+    ask: (running) => askQuit(running, gate),
+    quit: () => app.quit(),
+  });
+  quitGate = gate;
+  const desktopApi: DesktopApi = { chooseQuit: gate.choose };
+  registerIpcHandlers(ipcMain, { ...korev.api, ...desktopApi }, (url) =>
     isAppUrl(url, appOrigin),
   );
   let shuttingDown = false;
   app.on('before-quit', (event) => {
     if (shuttingDown) return;
-    if (!confirmQuit(korev)) {
+    if (!gate.shouldQuit()) {
       event.preventDefault();
       return;
     }

@@ -1,4 +1,5 @@
 import type {
+  DesktopApi,
   KorevApi,
   KorevBridge,
   KorevEvents,
@@ -11,7 +12,7 @@ declare global {
   }
 }
 
-export const api = new Proxy({} as KorevApi, {
+export const api = new Proxy({} as KorevApi & DesktopApi, {
   get:
     (_target, method: string) =>
     (...args: unknown[]) =>

@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
 import { Toast } from '../../design-system';
 import type { Result } from '../../shared/model';
 
@@ -34,7 +34,7 @@ export function reportFailure<T>(
   return result.ok;
 }
 
-export function Toaster() {
+export function Toaster({ children }: { children?: ReactNode }) {
   const entries = useSyncExternalStore(
     (listener) => {
       listeners.add(listener);
@@ -44,6 +44,7 @@ export function Toaster() {
   );
   return (
     <div className="pointer-events-none fixed right-4 bottom-4 z-200 flex w-96 flex-col gap-2">
+      <div className="pointer-events-auto empty:hidden">{children}</div>
       {entries.map((entry) => (
         <div key={entry.id} className="pointer-events-auto">
           <Toast

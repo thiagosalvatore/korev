@@ -175,6 +175,12 @@ export interface KorevApi {
   closeTerminal(ref: string): Promise<void>;
 }
 
+export type QuitChoice = 'quit' | 'wait' | 'cancel';
+
+export interface DesktopApi {
+  chooseQuit(choice: QuitChoice): void;
+}
+
 export interface Toast {
   title: string;
   tone: 'danger' | 'success' | 'neutral';

@@ -15,6 +15,8 @@ export type PaletteMode = false | 'all' | 'files';
 
 export type GitPanelTab = 'files' | 'changes' | 'checks';
 
+export type QuitPrompt = 'closed' | 'asking' | 'waiting';
+
 export type Page =
   | { kind: 'workspace' }
   | { kind: 'new-workspace'; repoId: string | null }
@@ -62,6 +64,7 @@ export interface UiState {
   workspaces: Record<string, WorkspaceUi>;
   palette: PaletteMode;
   diffLayout: DiffLayout;
+  quit: QuitPrompt;
 }
 
 const STORAGE_KEY = 'korev:ui';
@@ -80,6 +83,7 @@ const INITIAL: UiState = {
   workspaces: {},
   palette: false,
   diffLayout: 'unified',
+  quit: 'closed',
 };
 
 export const EMPTY_WORKSPACE_UI: WorkspaceUi = {
@@ -94,7 +98,7 @@ function load(): UiState {
     const saved = JSON.parse(
       localStorage.getItem(STORAGE_KEY) ?? 'null',
     ) as Partial<UiState> | null;
-    return { ...INITIAL, ...saved, palette: false };
+    return { ...INITIAL, ...saved, palette: false, quit: 'closed' };
   } catch {
     return INITIAL;
   }

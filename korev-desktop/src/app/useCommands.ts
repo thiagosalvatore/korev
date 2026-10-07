@@ -92,6 +92,8 @@ export function runCommand(state: AppState, command: AppCommand) {
       return stepWorkspace(state, 1);
     case 'focus-composer':
       return focusComposer();
+    case 'confirm-quit':
+      return setUi({ quit: 'asking' });
     default:
       break;
   }

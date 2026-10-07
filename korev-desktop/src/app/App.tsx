@@ -9,6 +9,7 @@ import { CommandPalette } from './CommandPalette';
 import { useAppState, useMediaQuery } from './hooks';
 import { DRAG_REGION } from './layout';
 import { NewWorkspacePage } from './NewWorkspacePage';
+import { QuitDialog, QuitPending } from './QuitDialog';
 import { SettingsPage } from './SettingsPage';
 import { Sidebar } from './Sidebar';
 import { Toaster } from './ui/toast';
@@ -98,7 +99,10 @@ export function App() {
   return (
     <>
       {state.repos.length ? <Shell state={state} /> : <Welcome state={state} />}
-      <Toaster />
+      <QuitDialog state={state} />
+      <Toaster>
+        <QuitPending state={state} />
+      </Toaster>
     </>
   );
 }
