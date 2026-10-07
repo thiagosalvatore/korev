@@ -79,6 +79,7 @@ function sanitize(raw: unknown, home: string): PersistedState {
           ...session,
           effort: session.effort ?? defaults.defaultEffort[session.agent],
           fast: session.fast ?? false,
+          planMode: session.planMode ?? settings.defaultPlanMode,
         })),
       }),
     ),

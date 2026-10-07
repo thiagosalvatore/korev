@@ -583,6 +583,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       if (patch.model) session.model = patch.model;
       if (patch.effort) session.effort = patch.effort;
       if (patch.fast !== undefined) session.fast = patch.fast;
+      if (patch.planMode !== undefined) session.planMode = patch.planMode;
       if (patch.title?.trim()) session.title = patch.title.trim();
       store.save();
       ctx.emitState();
@@ -697,7 +698,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         path.join(deps.home, '.claude', 'commands'),
       ];
       const names = await Promise.all(dirs.map((dir) => commandNames(dir)));
-      return [...new Set([...BUILTIN_COMMANDS, ...names.flat()])].sort();
+      const skills = (await listSkills(deps.home, workspace.path))
+        .filter((skill) => skill.agents.includes('claude'))
+        .map((skill) => skill.name);
+      return [
+        ...new Set([...BUILTIN_COMMANDS, ...names.flat(), ...skills]),
+      ].sort();
     },
     async fixChecks(workspaceId, sessionId) {
       const pr = ctx.runtime(workspaceId).pr;

@@ -622,6 +622,45 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     });
   });
 
+  it('leaves plan mode once the user approves the plan', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await korev.api.send(session.id, {
+      text: 'make-plan for the login page',
+      agent: 'claude',
+      model: 'claude-sonnet-5-5',
+      effort: 'high',
+      planMode: true,
+      fast: false,
+    });
+    let permissionId = '';
+    await waitFor(async () => {
+      const pending = (await korev.api.transcript(session.id)).find(
+        (item) => item.kind === 'permission',
+      );
+      permissionId = pending?.id ?? '';
+      return Boolean(pending);
+    });
+    const planning = await workspaceState(workspace.id);
+    expect(planning.workspace.sessions[0].planMode).toBe(true);
+
+    await korev.api.respondPermission(session.id, permissionId, {
+      allow: true,
+    });
+
+    const approved = await workspaceState(workspace.id);
+    expect(approved.workspace.sessions[0].planMode).toBe(false);
+  });
+
+  it('offers skills as slash commands', async () => {
+    const workspace = await createWorkspace();
+    const skillDir = path.join(home, '.claude', 'skills', 'browse');
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(path.join(skillDir, 'SKILL.md'), '# browse\n');
+
+    expect(await korev.api.slashCommands(workspace.id)).toContain('browse');
+  });
+
   it('mirrors tracked workspace changes into the root checkout with spotlight, then restores it', async () => {
     const workspace = await createWorkspace();
     await writeFile(

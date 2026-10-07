@@ -82,6 +82,7 @@ export function newChatSession(ctx: Context, agent: AgentKind): ChatSession {
     model: settings.defaultModels[agent] ?? CODEX_DEFAULT_MODEL,
     effort: settings.defaultEffort[agent],
     fast: false,
+    planMode: settings.defaultPlanMode,
     agentSessionId: null,
     createdAt: ctx.deps.now().toISOString(),
   };

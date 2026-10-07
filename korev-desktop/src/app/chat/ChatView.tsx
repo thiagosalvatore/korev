@@ -75,7 +75,6 @@ export function ChatView({
       ? (ui.workspaces[workspace.id] ?? EMPTY_WORKSPACE_UI).comments
       : NO_COMMENTS,
   );
-  const [planMode, setPlanMode] = useState(state.settings.defaultPlanMode);
   const [draftVersion, setDraftVersion] = useState(0);
   const agent = state.agents.find((entry) => entry.agent === session.agent);
   const archived = Boolean(workspace?.archivedAt);
@@ -114,20 +113,11 @@ export function ChatView({
           onOpenTurnFile={(file, range) => {
             if (workspace) openDiff(workspace.id, file, range);
           }}
-          onRespond={(itemId, response) => {
-            const approvedPlan =
-              response.allow &&
-              items.some(
-                (item) =>
-                  item.id === itemId &&
-                  item.kind === 'permission' &&
-                  item.plan !== null,
-              );
-            if (approvedPlan) setPlanMode(false);
+          onRespond={(itemId, response) =>
             void api
               .respondPermission(session.id, itemId, response)
-              .then(reportFailure);
-          }}
+              .then(reportFailure)
+          }
           onRetry={(text) =>
             void api
               .send(session.id, {
@@ -135,7 +125,7 @@ export function ChatView({
                 agent: session.agent,
                 model: session.model,
                 effort: session.effort,
-                planMode,
+                planMode: session.planMode,
                 fast: session.fast,
               })
               .then(reportFailure)
@@ -165,7 +155,7 @@ export function ChatView({
             }
             model={session.model}
             effort={session.effort}
-            planMode={planMode}
+            planMode={session.planMode}
             running={running}
             workspaceId={workspace?.id ?? null}
             comments={comments}
@@ -175,7 +165,9 @@ export function ChatView({
             onEffortChange={(effort) =>
               void api.updateSession(session.id, { effort })
             }
-            onPlanModeChange={setPlanMode}
+            onPlanModeChange={(planMode) =>
+              void api.updateSession(session.id, { planMode })
+            }
             onClearComments={() => {
               if (workspace)
                 updateWorkspaceUi(workspace.id, () => ({ comments: [] }));
@@ -188,7 +180,7 @@ export function ChatView({
                   agent: session.agent,
                   model: session.model,
                   effort: session.effort,
-                  planMode,
+                  planMode: session.planMode,
                   fast: session.fast,
                 }),
               )

@@ -153,6 +153,7 @@ export interface ChatSession {
   model: string;
   effort: string;
   fast: boolean;
+  planMode: boolean;
   agentSessionId: string | null;
   createdAt: string;
 }

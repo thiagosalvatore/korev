@@ -620,6 +620,7 @@ export function createChats(ctx: Context): Chats {
     session.model = options.model;
     session.effort = options.effort;
     session.fast = options.fast;
+    session.planMode = options.planMode;
     startTurn(sessionId, items, options, checkpoint);
     if (workspace && firstMessage && session === workspace.sessions[0]) {
       void autoRenameBranch(workspace, options.text);
@@ -694,6 +695,10 @@ export function createChats(ctx: Context): Chats {
       : denyResponse(response.message?.trim() || DENIED_MESSAGE);
     answerControl(turn, request, body);
     turn.permissions.delete(itemId);
+    if (response.allow && request.tool === PLAN_TOOL) {
+      locate(sessionId).session.planMode = false;
+      ctx.store.save();
+    }
     upsert(sessionId, items, {
       ...item,
       status: response.allow ? 'allowed' : 'denied',
