@@ -1,0 +1,91 @@
+---
+title: Introduction
+description: 'Korev is a Mac app that runs coding agents (Claude Code and Codex) in parallel.'
+---
+
+import {
+  BookOpen,
+  Boxes,
+  Download,
+  FolderGit2,
+  Map,
+  Settings2,
+} from 'lucide-react';
+
+Each task gets its own **workspace**: a git worktree on a new branch, with its own chats, terminal, diff and pull request. Agents in different workspaces cannot step on each other, so you can start a second task while the first one is still running.
+
+<Screenshot
+  name="main-window"
+  alt="The Korev window: workspaces in the sidebar, a chat in the middle, and the changed files on the right."
+/>
+
+## How a task flows
+
+<Steps>
+  <Step>
+    **Add a repository.** Open a folder on your Mac or clone one from a URL.
+  </Step>
+  <Step>
+    **Start a workspace.** Press ⌘N and describe the task. Korev creates a
+    worktree on a new branch, copies your local `.env` files, runs your setup
+    script and sends the task to the agent.
+  </Step>
+  <Step>
+    **Watch and steer.** The agent works in the chat. Send another message at
+    any time to steer it. Open the Changes tab to see what it changed.
+  </Step>
+  <Step>
+    **Review.** Read the diff, leave line comments for the agent, or start a
+    review chat.
+  </Step>
+  <Step>
+    **Ship.** The header button walks you through **Create PR** → **Fix errors**
+    → **Merge** → **Archive**.
+  </Step>
+</Steps>
+
+To ask about code without starting a task, use **Ask**. The agent reads the repository's default branch and cannot change anything. When you are ready, press **Start workspace** and the new workspace starts with the whole conversation.
+
+## Where to start
+
+<Cards>
+  <Card
+    icon={<Download />}
+    title="Install Korev"
+    href="/docs/getting-started/installation"
+  />
+  <Card
+    icon={<FolderGit2 />}
+    title="Create your first workspace"
+    href="/docs/getting-started/first-workspace"
+  />
+  <Card
+    icon={<Settings2 />}
+    title="Configure your repository"
+    href="/docs/guides/configure-your-repository"
+    description="So new workspaces install dependencies and start your dev server."
+  />
+</Cards>
+
+## Learn more
+
+<Cards>
+  <Card
+    icon={<Boxes />}
+    title="Concepts"
+    href="/docs/concepts"
+    description="Workspaces, Ask, linked workspaces, agents and permissions."
+  />
+  <Card
+    icon={<Map />}
+    title="Guides"
+    href="/docs/guides"
+    description="Step-by-step tasks."
+  />
+  <Card
+    icon={<BookOpen />}
+    title="Reference"
+    href="/docs/reference"
+    description="The config file, environment variables, shortcuts and settings."
+  />
+</Cards>

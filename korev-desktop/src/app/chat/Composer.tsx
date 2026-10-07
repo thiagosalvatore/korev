@@ -11,17 +11,25 @@ import { cn, Icon } from '../../design-system';
 import {
   EFFORT_LEVELS,
   LOADOUT_SIZE,
+  PENDING_PLAN_PLACEHOLDER,
   type AgentKind,
   type ModelChoice,
+  type PendingPlan,
   type Snippet,
   type TurnUsage,
 } from '../../shared/model';
+import {
+  formatAttachments,
+  planFileName,
+  TAB_CONTEXT_HEADER,
+} from '../../shared/message';
 import { api } from '../bridge';
 import { fileName } from '../../shared/format';
 import { reportFailure } from '../ui/toast';
 import type { DiffComment } from '../ui-store';
 import { readAsBase64 } from './attachments';
 import { ComposerToolbar } from './ComposerToolbar';
+import { PlanChip } from './PlanChip';
 import {
   applySuggestion,
   createSuggestionLoader,
@@ -77,14 +85,9 @@ export function formatComments(comments: DiffComment[]): string {
   return `\n\nReview comments on the diff:\n${lines.join('\n')}`;
 }
 
-function formatAttachments(paths: string[]): string {
-  if (!paths.length) return '';
-  return `\n\nAttached files (read them):\n${paths.map((file) => `- ${file}`).join('\n')}`;
-}
-
 function formatTabContext(contexts: TabContext[]): string {
   if (!contexts.length) return '';
-  return `\n\nContext from other tabs:\n\n${contexts.map((context) => context.prompt).join('\n\n')}`;
+  return `\n\n${TAB_CONTEXT_HEADER}\n\n${contexts.map((context) => context.prompt).join('\n\n')}`;
 }
 
 function nextEffort(agent: AgentKind, effort: string): string {
@@ -107,6 +110,7 @@ export interface ComposerProps {
   repoId: string | null;
   comments?: DiffComment[];
   otherTabs?: ContextTab[];
+  pendingPlan?: PendingPlan;
   placeholder?: string;
   autoFocus?: boolean;
   usage?: TurnUsage;
@@ -117,6 +121,7 @@ export interface ComposerProps {
   onSend(text: string): Promise<boolean>;
   onStop?(): void;
   onClearComments?(): void;
+  onDiscardPendingPlan?(): void;
 }
 
 export function Composer(props: ComposerProps) {
@@ -128,6 +133,7 @@ export function Composer(props: ComposerProps) {
     planMode,
     comments = [],
     otherTabs = [],
+    pendingPlan,
   } = props;
   const [text, setText] = useState(() => loadDraft(draftKey));
   const [attachments, setAttachments] = useState<string[]>([]);
@@ -196,7 +202,9 @@ export function Composer(props: ComposerProps) {
   }
 
   const canSend =
-    Boolean(text.trim() || comments.length || tabContext.length) && !sending;
+    Boolean(
+      text.trim() || comments.length || tabContext.length || pendingPlan,
+    ) && !sending;
 
   async function send() {
     if (!canSend) return;
@@ -337,8 +345,31 @@ export function Composer(props: ComposerProps) {
           planMode ? 'border-dashed border-accent-border' : 'border-border-2',
         )}
       >
-        {attachments.length || comments.length || tabContext.length ? (
+        {attachments.length ||
+        comments.length ||
+        tabContext.length ||
+        pendingPlan ? (
           <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
+            {pendingPlan ? (
+              <span className="inline-flex h-6 max-w-72 items-center gap-1.5 rounded-sm bg-accent-subtle px-2 text-xs text-accent-text">
+                <PlanChip
+                  name={planFileName(pendingPlan.plan)}
+                  markdown={pendingPlan.plan}
+                  className="flex min-w-0 items-center gap-1.5 border-0 bg-transparent p-0 text-accent-text"
+                >
+                  <Icon name="list-checks" size={12} />
+                  <span className="truncate">Plan · {pendingPlan.from}</span>
+                </PlanChip>
+                <button
+                  type="button"
+                  aria-label="Remove the handed-off plan"
+                  className="cursor-pointer border-0 bg-transparent p-0 text-accent-text"
+                  onClick={props.onDiscardPendingPlan}
+                >
+                  <Icon name="x" size={12} />
+                </button>
+              </span>
+            ) : null}
             {comments.length ? (
               <span className="inline-flex h-6 items-center gap-1.5 rounded-sm bg-accent-subtle px-2 text-xs text-accent-text">
                 <Icon name="message-square" size={12} />
@@ -407,7 +438,7 @@ export function Composer(props: ComposerProps) {
           rows={2}
           value={text}
           placeholder={
-            props.placeholder ??
+            (pendingPlan ? PENDING_PLAN_PLACEHOLDER : props.placeholder) ??
             'Ask to make changes, @mention files, #PRs, run /commands'
           }
           className="block max-h-80 min-h-14 w-full resize-none border-0 bg-transparent px-3.5 pt-3 pb-1 font-sans text-md text-fg-1 outline-none placeholder:text-fg-4 focus-visible:shadow-none"

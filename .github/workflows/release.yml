@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: macos-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: korev-desktop/package-lock.json
+      - name: Check that the tag matches package.json
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          package_version="$(node -p "require('./korev-desktop/package.json').version")"
+          if [ "$version" != "$package_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match korev-desktop/package.json ($package_version)"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Read the release notes from CHANGELOG.md
+        run: |
+          make release-notes > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md has no notes under [$VERSION]"
+            exit 1
+          fi
+      - run: make dist
+      - name: Publish the release
+        run: |
+          if [[ "$VERSION" == *-* ]]; then prerelease=true; else prerelease=false; fi
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Korev $VERSION" \
+            --notes-file notes.md \
+            --prerelease="$prerelease" \
+            $(find korev-desktop/out/make -name '*.dmg' -o -name '*.zip')

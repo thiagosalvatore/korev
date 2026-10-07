@@ -1,0 +1,146 @@
+---
+title: Repository config
+description: 'Every key in .korev/settings.toml and korev.json, and the order Korev reads them in.'
+---
+
+For a guide with examples, see [Configure your repository](../guides/configure-your-repository.mdx).
+
+## Which file Korev reads
+
+Korev reads the first of these that exists, from the workspace's own checkout:
+
+1. `.korev/settings.toml`, with `.korev/settings.local.toml` merged on top. The local file wins key by key.
+2. `korev.json`.
+3. `.conductor/settings.toml`, with `.conductor/settings.local.toml` merged on top. Same format as `.korev/settings.toml`.
+4. The scripts and prompts in **Settings → Repositories → your repo**.
+
+The branch prefix and the files to copy are read from the main checkout, because Korev needs them before the worktree exists.
+
+## Full example
+
+```toml
+file_include_globs = ".env*\nconfig/*.local.json"
+spotlight_testing = true
+
+[scripts]
+setup = "pnpm install"
+archive = "./scripts/archive.sh"
+run_mode = "nonconcurrent"
+auto_run_after_setup = true
+
+[scripts.run.web]
+command = "pnpm dev --port $KOREV_PORT"
+options = { cwd = "apps/web" }
+default = true
+
+[[preview_urls]]
+name = "Web"
+url = "http://localhost:$KOREV_PORT"
+
+[environment_variables]
+API_URL = "http://localhost:3000"
+
+[prompts]
+general = "Use pnpm, never npm."
+create_pr = "Follow .github/pull_request_template.md."
+
+[git]
+archive_on_merge = true
+delete_branch_on_archive = false
+branch_prefix_type = "custom"
+branch_prefix = "agent"
+```
+
+## Top-level keys
+
+| Key                  | Type   | Meaning                                                                                                                                                                                                                                         |
+| -------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `file_include_globs` | string | Glob patterns, one per line, for gitignored files to copy into new workspaces. A `.worktreeinclude` file in the repository root replaces it. Without either, Korev uses **Files to copy** from the app's repository settings, and then `.env*`. |
+| `spotlight_testing`  | bool   | Shows the **Spotlight** button in each workspace's Run tab. See [Spotlight testing](../guides/spotlight.mdx).                                                                                                                                   |
+
+## `[scripts]`
+
+| Key                    | Type            | Meaning                                                                                                     |
+| ---------------------- | --------------- | ----------------------------------------------------------------------------------------------------------- |
+| `setup`                | string          | Runs in each new or restored workspace.                                                                     |
+| `archive`              | string          | Runs before Korev removes an archived worktree. Five-minute limit.                                          |
+| `run`                  | string or table | One run script as a string, or several as `[scripts.run.<id>]` tables.                                      |
+| `run_mode`             | string          | `"nonconcurrent"`: starting a run script stops the run scripts in your other workspaces of this repository. |
+| `auto_run_after_setup` | bool            | Starts the default run script when setup exits with 0.                                                      |
+
+All scripts run as `$SHELL -lc "<command>"` in the worktree.
+
+## `[scripts.run.<id>]`
+
+| Key            | Type             | Meaning                                                                       |
+| -------------- | ---------------- | ----------------------------------------------------------------------------- |
+| `command`      | string           | The command to run.                                                           |
+| `args`         | array of strings | Arguments, quoted and added after `command`.                                  |
+| `options.cwd`  | string           | Folder to run in, relative to the worktree.                                   |
+| `icon`         | string           | Icon in the Run menu. Default `play`.                                         |
+| `default`      | bool             | Runs when you press ⌘R. Without a default, the first script runs.             |
+| `hide`         | bool             | `true` skips the script.                                                      |
+| `available_in` | string or array  | Korev skips the script when this is `"cloud"`, or an array without `"local"`. |
+
+## `[[preview_urls]]`
+
+| Key    | Type   | Meaning                                                                                            |
+| ------ | ------ | -------------------------------------------------------------------------------------------------- |
+| `name` | string | Label in the Run tab's **Open** menu.                                                              |
+| `url`  | string | The URL. Korev expands `$KOREV_PORT`, `${KOREV_PORT}` and `$((KOREV_PORT + N))` for N from 0 to 9. |
+
+## `[environment_variables]`
+
+String values, added to the environment of scripts, terminals and agents. Values in an `[environment_variables.local]` table are merged on top.
+
+## `[prompts]`
+
+Each key adds instructions to one prompt that Korev sends to the agent.
+
+| Key                       | Added to                         |
+| ------------------------- | -------------------------------- |
+| `general`                 | Every workspace chat             |
+| `code_review`             | The **Review** button            |
+| `create_pr`               | The **Create PR** button         |
+| `fix_errors`              | The **Fix errors** button        |
+| `resolve_merge_conflicts` | The **Resolve conflicts** button |
+| `rename_branch`           | The prompt that names workspaces |
+
+## `[git]`
+
+| Key                        | Type   | Meaning                                                       |
+| -------------------------- | ------ | ------------------------------------------------------------- |
+| `archive_on_merge`         | bool   | Archive the workspace when its pull request merges.           |
+| `delete_branch_on_archive` | bool   | Delete the branch when you archive the workspace.             |
+| `branch_prefix_type`       | string | `"custom"` uses `branch_prefix`. `"none"` uses no prefix.     |
+| `branch_prefix`            | string | The branch prefix, used with `branch_prefix_type = "custom"`. |
+
+Each `[git]` key overrides the matching option in **Settings → Git** for this repository.
+
+## `korev.json`
+
+A simpler format. It supports only these keys:
+
+```json
+{
+  "scripts": {
+    "setup": "npm install",
+    "run": "npm run dev -- --port $KOREV_PORT",
+    "archive": "./scripts/archive.sh"
+  },
+  "runScriptMode": "nonconcurrent"
+}
+```
+
+For several run scripts, make `run` an object. Each entry takes the same keys as a `[scripts.run.<id>]` table:
+
+```json
+{
+  "scripts": {
+    "run": {
+      "web": { "command": "pnpm dev", "options": { "cwd": "apps/web" } },
+      "api": { "command": "pnpm api", "default": true }
+    }
+  }
+}
+```

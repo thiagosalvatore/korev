@@ -2,9 +2,12 @@ APP_DIR := korev-desktop
 ARCH := $(shell node -p process.arch)
 APP := $(APP_DIR)/out/Korev-darwin-$(ARCH)/Korev.app
 PACKAGED_KOREV := Korev\.app/Contents/MacOS/Korev$$
-DOCS_PORT ?= 4000
+VERSION ?= $(shell node -p "require('./$(APP_DIR)/package.json').version")
+TAG = v$(VERSION)
+DIST_ARCHS := arm64 x64
+RELEASE_NOTES = awk -v heading='\#\# [$(VERSION)]' 'index($$0, "\#\# ") == 1 { printing = index($$0, heading) == 1; next } printing' CHANGELOG.md
 
-.PHONY: package stop run package-run docs
+.PHONY: package stop run package-run dist release-notes bump release
 
 $(APP_DIR)/node_modules: $(APP_DIR)/package-lock.json
 	cd $(APP_DIR) && npm ci
@@ -22,6 +25,24 @@ run: stop
 
 package-run: package run
 
-docs:
-	docker run --rm -it -v "$(CURDIR)/docs:/site:ro" -p $(DOCS_PORT):4000 ruby:3.3 bash -c \
-		'gem install --no-document github-pages webrick && cd /tmp && jekyll serve --source /site --host 0.0.0.0 --baseurl /korev --destination /tmp/site'
+dist: $(APP_DIR)/node_modules
+	rm -rf $(APP_DIR)/out/make
+	for arch in $(DIST_ARCHS); do (cd $(APP_DIR) && npm run make -- --arch=$$arch) || exit 1; done
+
+release-notes:
+	@$(RELEASE_NOTES)
+
+bump:
+	@test "$(origin VERSION)" = "command line" || { echo "Usage: make bump VERSION=x.y.z"; exit 1; }
+	cd $(APP_DIR) && npm version $(VERSION) --no-git-tag-version --allow-same-version
+	perl -0pi -e 's/^\#\# \[Unreleased\]$$/\#\# [Unreleased]\n\n\#\# [$(VERSION)] - $(shell date +%F)/m' CHANGELOG.md
+
+release:
+	@test "$$(git branch --show-current)" = main || { echo "Run make release on main."; exit 1; }
+	@test -z "$$(git status --porcelain)" || { echo "Commit or stash your changes first."; exit 1; }
+	git fetch origin main --tags
+	@test "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" || { echo "Your main is not the same as origin/main. Pull or push first."; exit 1; }
+	@! git rev-parse -q --verify "refs/tags/$(TAG)" >/dev/null || { echo "$(TAG) already exists."; exit 1; }
+	@$(RELEASE_NOTES) | grep -q '[^[:space:]]' || { echo "CHANGELOG.md has no notes under [$(VERSION)]. Run make bump VERSION=$(VERSION) first."; exit 1; }
+	git tag -s $(TAG) -m "Korev $(VERSION)"
+	git push origin $(TAG)

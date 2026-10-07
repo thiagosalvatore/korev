@@ -1,3 +1,4 @@
+import { FileText, Paperclip } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   Pressable,
@@ -7,14 +8,25 @@ import {
   type StyleProp,
   type TextStyle,
 } from 'react-native';
-import { duration } from '../../../korev-desktop/src/shared/format';
+import {
+  duration,
+  fileName,
+  imageType,
+} from '../../../korev-desktop/src/shared/format';
+import {
+  messageParts,
+  type MessageParts,
+} from '../../../korev-desktop/src/shared/message';
 import type {
   ChatItem,
   PermissionResponse,
   TodoStatus,
 } from '../../../korev-desktop/src/shared/model';
 import { MONO_FONT, useTheme, type Theme } from '../theme';
+import { ImagePreview, ImageThumbnail } from './ImagePreview';
+import { MarkdownView } from './MarkdownView';
 import { PermissionCard } from './PermissionCard';
+import { PlanChip } from './PlanChip';
 
 type ItemOf<K extends ChatItem['kind']> = Extract<ChatItem, { kind: K }>;
 
@@ -28,13 +40,74 @@ function useStyles() {
   return makeStyles(useTheme());
 }
 
-function UserMessage({ item }: { item: ItemOf<'user'> }) {
+const CHIP_ICON_SIZE = 14;
+
+const READ_TOOL = 'Read';
+
+function MessageAttachments({
+  plans,
+  files,
+  sessionId,
+}: Pick<MessageParts, 'plans' | 'files'> & { sessionId: string }) {
+  const theme = useTheme();
+  const styles = makeStyles(theme);
+  if (!plans.length && !files.length) return null;
+  return (
+    <View style={styles.chips}>
+      {plans.map((plan, index) => (
+        <PlanChip
+          key={index}
+          name={plan.name}
+          markdown={plan.markdown}
+          style={styles.chip}
+        >
+          <FileText size={CHIP_ICON_SIZE} color={theme.fg3} />
+          <Text style={styles.chipName} numberOfLines={1}>
+            {plan.name}
+          </Text>
+        </PlanChip>
+      ))}
+      {files.map((file) => {
+        const chip = (
+          <View key={file} style={styles.chip}>
+            <Paperclip size={CHIP_ICON_SIZE} color={theme.fg3} />
+            <Text style={styles.chipName} numberOfLines={1}>
+              {fileName(file)}
+            </Text>
+          </View>
+        );
+        return imageType(file) ? (
+          <ImageThumbnail
+            key={file}
+            sessionId={sessionId}
+            path={file}
+            fallback={chip}
+          />
+        ) : (
+          chip
+        );
+      })}
+    </View>
+  );
+}
+
+function UserMessage({
+  item,
+  sessionId,
+}: {
+  item: ItemOf<'user'>;
+  sessionId: string;
+}) {
   const styles = useStyles();
+  const { body, plans, files } = messageParts(item.text);
   return (
     <View style={styles.userBubble}>
-      <Text selectable style={styles.text}>
-        {item.text}
-      </Text>
+      {body ? (
+        <Text selectable style={styles.text}>
+          {body}
+        </Text>
+      ) : null}
+      <MessageAttachments plans={plans} files={files} sessionId={sessionId} />
       {item.queued ? <Text style={styles.dim}>Queued</Text> : null}
     </View>
   );
@@ -65,15 +138,47 @@ function Expandable({
   );
 }
 
-function ToolLine({ item }: { item: ItemOf<'tool'> }) {
+function ToolLine({
+  item,
+  sessionId,
+}: {
+  item: ItemOf<'tool'>;
+  sessionId: string;
+}) {
   const styles = useStyles();
   const body = [item.detail, item.output].filter(Boolean).join('\n\n');
+  const readsImage = item.name === READ_TOOL && imageType(item.summary);
   return (
-    <Expandable
-      header={`${item.name}  ${item.summary}`}
-      body={body}
-      headerStyle={item.failed ? styles.failed : undefined}
-    />
+    <View style={styles.tool}>
+      <Expandable
+        header={`${item.name}  ${item.summary}`}
+        body={body}
+        headerStyle={item.failed ? styles.failed : undefined}
+      />
+      {readsImage && item.output !== null ? (
+        <ImageThumbnail sessionId={sessionId} path={item.summary} />
+      ) : null}
+    </View>
+  );
+}
+
+function AssistantMessage({
+  item,
+  sessionId,
+}: {
+  item: ItemOf<'assistant'>;
+  sessionId: string;
+}) {
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  return (
+    <>
+      <MarkdownView value={item.text} onOpenImage={setPreviewImage} />
+      <ImagePreview
+        sessionId={sessionId}
+        path={previewImage}
+        onClose={() => setPreviewImage(null)}
+      />
+    </>
   );
 }
 
@@ -109,25 +214,25 @@ function ResultLine({ item }: { item: ItemOf<'result'> }) {
 
 export function ChatItemView({
   item,
+  sessionId,
   onRespond,
+  onHandoff,
 }: {
   item: ChatItem;
+  sessionId: string;
   onRespond(itemId: string, response: PermissionResponse): void;
+  onHandoff?(): void;
 }) {
   const styles = useStyles();
   switch (item.kind) {
     case 'user':
-      return <UserMessage item={item} />;
+      return <UserMessage item={item} sessionId={sessionId} />;
     case 'assistant':
-      return (
-        <Text selectable style={styles.text}>
-          {item.text}
-        </Text>
-      );
+      return <AssistantMessage item={item} sessionId={sessionId} />;
     case 'thinking':
       return <Expandable header="Thinking…" body={item.text} />;
     case 'tool':
-      return <ToolLine item={item} />;
+      return <ToolLine item={item} sessionId={sessionId} />;
     case 'todos':
       return <TodoList item={item} />;
     case 'result':
@@ -139,6 +244,7 @@ export function ChatItemView({
         <PermissionCard
           item={item}
           onRespond={(response) => onRespond(item.id, response)}
+          onHandoff={onHandoff}
         />
       );
   }
@@ -155,6 +261,26 @@ function makeStyles(theme: Theme) {
       borderRadius: 6,
       backgroundColor: theme.bgRaised,
       color: theme.fg2,
+      fontFamily: MONO_FONT,
+      fontSize: 12,
+    },
+    tool: { gap: 6 },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      maxWidth: '100%',
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: theme.border1,
+      backgroundColor: theme.bgActive,
+    },
+    chipName: {
+      flexShrink: 1,
+      color: theme.fg1,
       fontFamily: MONO_FONT,
       fontSize: 12,
     },

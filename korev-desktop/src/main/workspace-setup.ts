@@ -8,7 +8,11 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { Repo, Workspace } from '../shared/model';
+import {
+  DEFAULT_INCLUDE_GLOBS,
+  type Repo,
+  type Workspace,
+} from '../shared/model';
 import { slugify, type Git } from './git';
 
 export const FIRST_PORT = 55_000;
@@ -64,7 +68,6 @@ export function workspaceEnv(
 }
 
 const WORKTREE_INCLUDE_FILE = '.worktreeinclude';
-const DEFAULT_INCLUDE_GLOBS = '.env*';
 
 export async function includePatterns(
   repoPath: string,

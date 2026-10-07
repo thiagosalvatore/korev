@@ -16,6 +16,7 @@ import {
   type WorkspaceSource,
 } from '../shared/model';
 import { errorMessage, terminalRef, type Context } from './context';
+import { planBlock } from '../shared/message';
 import {
   addBranchWorktree,
   addDetachedWorktree,
@@ -376,7 +377,7 @@ export function firstPrompt(
 ): string {
   return [
     task,
-    plan ? `<plan>\n${plan}\n</plan>` : null,
+    plan ? planBlock(plan) : null,
     linked
       ? `This task spans several repositories. Each one has its own linked workspace and agent. You own the ${repo.name} part: change files in this workspace only. Your system prompt lists the linked workspaces, which you can read.`
       : null,

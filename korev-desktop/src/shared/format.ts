@@ -48,6 +48,19 @@ export function fileName(path: string): string {
   return path.split('/').at(-1) ?? path;
 }
 
+const IMAGE_TYPES = new Map([
+  ['png', 'image/png'],
+  ['jpg', 'image/jpeg'],
+  ['jpeg', 'image/jpeg'],
+  ['gif', 'image/gif'],
+  ['webp', 'image/webp'],
+]);
+
+export function imageType(path: string): string | null {
+  const extension = path.split('.').at(-1)?.toLowerCase() ?? '';
+  return IMAGE_TYPES.get(extension) ?? null;
+}
+
 export function dirName(path: string): string {
   return path.split('/').slice(0, -1).join('/');
 }

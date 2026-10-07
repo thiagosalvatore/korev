@@ -121,6 +121,21 @@ describe('repo config', () => {
     });
   });
 
+  it('uses the app file list unless the settings file sets file_include_globs', () => {
+    const app = { ...APP, fileIncludeGlobs: '.env\nconfig/secrets.json' };
+    expect(resolveRepoConfig(app, NO_FILES).fileIncludeGlobs).toBe(
+      '.env\nconfig/secrets.json',
+    );
+    expect(
+      resolveRepoConfig(app, { ...NO_FILES, sharedToml: '[scripts]\n' })
+        .fileIncludeGlobs,
+    ).toBe('.env\nconfig/secrets.json');
+    expect(
+      resolveRepoConfig(app, { ...NO_FILES, sharedToml: SHARED })
+        .fileIncludeGlobs,
+    ).toBe('.env*\nconfig/*.local.json');
+  });
+
   it('resolves every named app run script, with the first as the default', () => {
     const app = {
       ...APP,
