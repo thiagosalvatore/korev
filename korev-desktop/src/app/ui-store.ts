@@ -27,6 +27,7 @@ export interface WorkspaceUi {
   activeKey: string | null;
   terminalTab: TerminalKind;
   comments: DiffComment[];
+  runScriptId?: string | null;
 }
 
 export function tabKey(tab: MainTab): string {

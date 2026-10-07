@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button, cn, Icon, IconButton, type IconName } from '../design-system';
 import type { AppState, PrStatus, Workspace } from '../shared/model';
 import {
@@ -74,6 +75,38 @@ const EDITOR_ICONS: Record<string, IconName> = {
   warp: 'square-terminal',
 };
 
+function TargetBranch({ workspace }: { workspace: Workspace }) {
+  const [branches, setBranches] = useState<string[]>([]);
+  return (
+    <Menu
+      label="Target branch"
+      items={(branches.length ? branches : [workspace.baseBranch]).map(
+        (branch) => ({
+          id: branch,
+          label: branch,
+          checked: branch === workspace.baseBranch,
+          onSelect: () => void api.setBaseBranch(workspace.id, branch),
+        }),
+      )}
+      trigger={({ toggle }) => (
+        <button
+          type="button"
+          title="Change target branch"
+          className="flex cursor-pointer items-center gap-1 rounded-sm border-0 bg-transparent px-1 py-0.5 font-mono text-xs text-fg-4 hover:bg-hover hover:text-fg-1"
+          onClick={() => {
+            if (!branches.length)
+              void api.listBranches(workspace.repoId).then(setBranches);
+            toggle();
+          }}
+        >
+          <Icon name="arrow-right" size={12} />
+          origin/{workspace.baseBranch}
+        </button>
+      )}
+    />
+  );
+}
+
 export function WorkspaceHeader({
   state,
   workspace,
@@ -123,10 +156,7 @@ export function WorkspaceHeader({
           <Icon name="git-branch" size={13} className="text-fg-3" />
           <span className="truncate">{workspace.branch}</span>
         </button>
-        <span className="flex items-center gap-1 font-mono text-xs text-fg-4">
-          <Icon name="arrow-right" size={12} />
-          origin/{workspace.baseBranch}
-        </span>
+        <TargetBranch workspace={workspace} />
       </div>
       <div className="flex-1" />
       <div className={cn('flex items-center gap-1.5', NO_DRAG)}>

@@ -8,6 +8,10 @@ import type {
   ChatUpdate,
   EditorId,
   FileChange,
+  IssueSummary,
+  PullRequestSummary,
+  RepoConfig,
+  WorkspaceSource,
   PrStatus,
   Repo,
   RepoScripts,
@@ -31,7 +35,15 @@ export interface KorevApi {
   createWorkspaces(
     repoIds: string[],
     task: SendOptions | null,
+    source?: WorkspaceSource,
   ): Promise<Result<Workspace[]>>;
+  listBranches(repoId: string): Promise<string[]>;
+  listPullRequests(repoId: string): Promise<PullRequestSummary[]>;
+  listIssues(repoId: string): Promise<IssueSummary[]>;
+  setBaseBranch(workspaceId: string, branch: string): Promise<void>;
+  workspaceConfig(workspaceId: string): Promise<RepoConfig>;
+  repoConfig(repoId: string): Promise<RepoConfig>;
+  startReview(workspaceId: string): Promise<Result<string>>;
   archiveWorkspace(workspaceId: string): Promise<Result>;
   restoreWorkspace(workspaceId: string): Promise<Result>;
   deleteWorkspace(workspaceId: string): Promise<void>;
@@ -73,7 +85,11 @@ export interface KorevApi {
     kind: TerminalKind,
     size: TerminalSize,
   ): Promise<Result<string>>;
-  startScript(workspaceId: string, kind: TerminalKind): Promise<Result>;
+  startScript(
+    workspaceId: string,
+    kind: TerminalKind,
+    scriptId?: string,
+  ): Promise<Result>;
   stopScript(workspaceId: string, kind: TerminalKind): Promise<void>;
   writeTerminal(ref: string, data: string): Promise<void>;
   resizeTerminal(ref: string, size: TerminalSize): Promise<void>;

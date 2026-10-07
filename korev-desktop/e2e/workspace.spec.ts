@@ -135,3 +135,27 @@ test('asks a question about a repository without creating a workspace', async ()
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test('creates a workspace from an existing branch with the create-from picker', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  git(repo, 'branch', 'feature/login');
+  const { app, window } = await launch(home, repo);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+
+    await window.getByRole('button', { name: /Create from/ }).click();
+    const picker = window.getByRole('dialog', { name: 'Create from' });
+    await picker.getByRole('option', { name: 'feature/login' }).click();
+    await snap(window, '07-create-from');
+    await window
+      .getByRole('button', { name: 'Create empty workspace' })
+      .click();
+
+    const workspaces = window.getByRole('navigation', { name: 'Workspaces' });
+    await expect(workspaces.getByText('feature/login')).toBeVisible();
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});

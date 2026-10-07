@@ -19,7 +19,7 @@ import {
   createPr,
   fixErrors,
   mergePr,
-  newChat,
+  activateTab,
   openDiff,
   openFile,
   resolveConflicts,
@@ -32,8 +32,6 @@ import { setUi, useUi, type GitPanelTab } from './ui-store';
 
 const CHANGES_REFRESH_MS = 4_000;
 const PR_REFRESH_MS = 30_000;
-const REVIEW_PROMPT =
-  'Review the changes on this branch compared to its target branch (committed and uncommitted). Look for bugs, missing tests and unclear code. List concrete findings with file and line, most severe first. Do not edit files.';
 
 const CHECK_ICONS: Record<CheckState, { icon: IconName; className: string }> = {
   success: { icon: 'circle-check', className: 'text-success-text' },
@@ -200,11 +198,9 @@ function AllFiles({ workspace }: { workspace: Workspace }) {
 }
 
 function Changes({
-  state,
   workspace,
   changes,
 }: {
-  state: AppState;
   workspace: Workspace;
   changes: FileChange[] | null;
 }) {
@@ -223,18 +219,9 @@ function Changes({
           icon="scan-search"
           disabled={!changes.length}
           onClick={async () => {
-            const session = await newChat(
-              workspace,
-              state.settings.defaultAgent,
-            );
-            reportFailure(
-              await api.send(session.id, {
-                text: REVIEW_PROMPT,
-                model: session.model,
-                effort: session.effort,
-                planMode: false,
-              }),
-            );
+            const started = await api.startReview(workspace.id);
+            if (reportFailure(started))
+              activateTab(workspace.id, `chat:${started.value}`);
           }}
         >
           Review
@@ -458,7 +445,7 @@ export function GitPanel({
         ) : tab === 'files' ? (
           <AllFiles workspace={workspace} />
         ) : tab === 'changes' ? (
-          <Changes state={state} workspace={workspace} changes={changes} />
+          <Changes workspace={workspace} changes={changes} />
         ) : (
           <Checks state={state} workspace={workspace} />
         )}

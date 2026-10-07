@@ -8,6 +8,7 @@ import {
   type AppState,
   type EditorApp,
   type EditorId,
+  type PromptKind,
   type Repo,
   type Result,
   type Settings,
@@ -33,6 +34,7 @@ import {
   fileDiff,
   listFiles,
   removeWorktree,
+  listBranches,
   repoRoot,
 } from './git';
 import {
@@ -41,7 +43,11 @@ import {
   fixChecksPrompt,
   mergePr,
   resolveConflictsPrompt,
+  REVIEW_PROMPT,
 } from './pull-requests';
+import { expandPort, loadRepoConfig, withPrompt } from './repo-config';
+import { listIssues, listPullRequests } from './sources';
+import { findLocalUrl } from './workspace-setup';
 import { openStore } from './store';
 import { createTerminals, type SpawnPty } from './terminals';
 import {
@@ -54,6 +60,7 @@ import {
   restoreWorkspace,
   scriptEnv,
   startScript,
+  workspaceConfig,
 } from './workspaces';
 
 const FILE_MAX_BYTES = 1_000_000;
@@ -128,7 +135,9 @@ const IDLE: WorkspaceRuntime = {
   pr: null,
   message: null,
   pendingPrompt: null,
+  runUrl: null,
 };
+const RUN_REF_SUFFIX = ':run';
 
 function ok<T>(value: T): Result<T> {
   return { ok: true, value };
@@ -157,10 +166,13 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     terminals: createTerminals({
       spawnPty: deps.spawnPty,
       shell: deps.shell,
-      onOutput: (ref, data) => deps.emit('terminal-output', { ref, data }),
+      onOutput: (ref, data) => {
+        deps.emit('terminal-output', { ref, data });
+        if (ref.endsWith(RUN_REF_SUFFIX)) detectRunUrl(ref, data);
+      },
       onExit: (ref, exitCode) => {
         deps.emit('terminal-exit', { ref, exitCode });
-        onScriptExit(ctx, ref, exitCode);
+        void onScriptExit(ctx, ref, exitCode);
       },
     }),
     runningSessions: new Set(),
@@ -196,6 +208,15 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
   };
   const chats = createChats(ctx);
+
+  function detectRunUrl(ref: string, data: string) {
+    const runtime = ctx.runtime(ref.slice(0, -RUN_REF_SUFFIX.length));
+    if (runtime.runUrl) return;
+    const url = findLocalUrl(data);
+    if (!url) return;
+    runtime.runUrl = url;
+    ctx.emitState();
+  }
 
   function snapshot(): AppState {
     const { repos, workspaces, askChats, settings } = store.state;
@@ -242,11 +263,37 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       workspace.branch,
     );
     const runtime = ctx.runtime(workspaceId);
+    const justMerged =
+      pr?.state === 'MERGED' &&
+      runtime.pr?.state !== 'MERGED' &&
+      runtime.pr !== null;
     if (JSON.stringify(runtime.pr) !== JSON.stringify(pr)) {
       runtime.pr = pr;
       ctx.emitState();
     }
+    if (justMerged) await archiveIfConfigured(workspaceId);
     return pr;
+  }
+
+  async function archiveIfConfigured(workspaceId: string) {
+    const workspace = ctx.workspace(workspaceId);
+    const config = await workspaceConfig(ctx, workspace);
+    if (!(config.archiveOnMerge ?? store.state.settings.archiveOnMerge)) return;
+    if (
+      ctx.runningSessions.size &&
+      workspace.sessions.some((session) => ctx.runningSessions.has(session.id))
+    )
+      return;
+    await archiveWorkspace(ctx, workspaceId, chats.stopWorkspace);
+  }
+
+  async function actionPrompt(
+    workspaceId: string,
+    kind: PromptKind,
+    base: string,
+  ) {
+    const config = await workspaceConfig(ctx, ctx.workspace(workspaceId));
+    return withPrompt(base, config.prompts[kind]);
   }
 
   function workspacePath(workspaceId: string) {
@@ -257,12 +304,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     return workspace;
   }
 
-  function openShell(ref: string, workspaceId: string) {
+  async function openShell(ref: string, workspaceId: string) {
     const workspace = workspacePath(workspaceId);
     const repo = ctx.repo(workspace.repoId);
     ctx.terminals.start(ref, {
       cwd: workspace.path,
-      env: scriptEnv(ctx, repo, workspace),
+      env: await scriptEnv(ctx, repo, workspace),
     });
   }
 
@@ -368,8 +415,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       store.save();
       ctx.emitState();
     },
-    createWorkspaces: async (repoIds, task) =>
-      createWorkspaces(ctx, repoIds, task, chats.send),
+    createWorkspaces: async (repoIds, task, source) =>
+      createWorkspaces(ctx, repoIds, task, chats.send, null, source),
     async startFromAsk(askChatId) {
       const ask = store.state.askChats.find((entry) => entry.id === askChatId);
       if (!ask) return fail('Ask chat not found');
@@ -384,6 +431,46 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         chats.send,
         plan,
       );
+    },
+    listBranches: (repoId) => listBranches(git, ctx.repo(repoId).path),
+    listPullRequests: (repoId) =>
+      listPullRequests(deps.run, deps.env, ctx.repo(repoId).path),
+    listIssues: (repoId) =>
+      listIssues(deps.run, deps.env, ctx.repo(repoId).path),
+    async setBaseBranch(workspaceId, branch) {
+      const workspace = ctx.workspace(workspaceId);
+      if (!branch.trim()) return;
+      workspace.baseBranch = branch.trim();
+      store.save();
+      ctx.emitState();
+      void refreshStats(ctx, workspace);
+    },
+    async workspaceConfig(workspaceId) {
+      const workspace = workspacePath(workspaceId);
+      const config = await workspaceConfig(ctx, workspace);
+      return {
+        ...config,
+        previewUrls: config.previewUrls.map((preview) => ({
+          ...preview,
+          url: expandPort(preview.url, workspace.port),
+        })),
+      };
+    },
+    repoConfig: (repoId) =>
+      loadRepoConfig(ctx.repo(repoId).scripts, ctx.repo(repoId).path),
+    async startReview(workspaceId) {
+      const workspace = workspacePath(workspaceId);
+      const session = newChatSession(ctx, store.state.settings.defaultAgent);
+      workspace.sessions.push(session);
+      store.save();
+      ctx.emitState();
+      const sent = await chats.send(session.id, {
+        text: await actionPrompt(workspaceId, 'code_review', REVIEW_PROMPT),
+        model: session.model,
+        effort: session.effort,
+        planMode: false,
+      });
+      return sent.ok ? ok(session.id) : sent;
     },
     archiveWorkspace: (workspaceId) =>
       archiveWorkspace(ctx, workspaceId, chats.stopWorkspace),
@@ -483,7 +570,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       return sendToActiveSession(
         workspaceId,
         sessionId,
-        createPrPrompt(workspace.baseBranch),
+        await actionPrompt(
+          workspaceId,
+          'create_pr',
+          createPrPrompt(workspace.baseBranch),
+        ),
       );
     },
     async resolveConflicts(workspaceId, sessionId) {
@@ -491,7 +582,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       return sendToActiveSession(
         workspaceId,
         sessionId,
-        resolveConflictsPrompt(workspace.baseBranch),
+        await actionPrompt(
+          workspaceId,
+          'resolve_merge_conflicts',
+          resolveConflictsPrompt(workspace.baseBranch),
+        ),
       );
     },
     async saveAttachment(workspaceId, name, base64) {
@@ -522,7 +617,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       return sendToActiveSession(
         workspaceId,
         sessionId,
-        fixChecksPrompt(pr.checks),
+        await actionPrompt(
+          workspaceId,
+          'fix_errors',
+          fixChecksPrompt(pr.checks),
+        ),
       );
     },
     async openIn(workspaceId, editorId: EditorId) {
@@ -550,13 +649,13 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     async openTerminal(ref, workspaceId, kind, size) {
       assertOwnRef(ref, workspaceId);
       if (kind === 'shell' && !ctx.terminals.isRunning(ref)) {
-        openShell(ref, workspaceId);
+        await openShell(ref, workspaceId);
         ctx.emitState();
       }
       return ok(ctx.terminals.attach(ref, size) ?? '');
     },
-    startScript: (workspaceId, kind) =>
-      startScript(ctx, workspacePath(workspaceId), kind),
+    startScript: (workspaceId, kind, scriptId) =>
+      startScript(ctx, workspacePath(workspaceId), kind, scriptId ?? null),
     async stopScript(workspaceId, kind) {
       ctx.terminals.close(terminalRef(workspaceId, kind));
       ctx.emitState();

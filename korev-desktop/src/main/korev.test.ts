@@ -7,7 +7,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runProcess } from './command-runner';
 import { nodeFileSystem } from './file-system';
-import type { SendOptions, Workspace } from '../shared/model';
+import type { SendOptions, Workspace, WorkspaceSource } from '../shared/model';
 import { createKorev, type Korev } from './korev';
 
 const FAKE_AGENT_BIN = path.resolve(__dirname, '../../test-support/bin');
@@ -26,7 +26,14 @@ async function waitFor(check: () => Promise<boolean>) {
   }
 }
 
-const noPty = () => ({
+const spawned: { args: string[]; cwd: string }[] = [];
+
+const noPty = (_file: string, args: string[], options: { cwd: string }) => {
+  spawned.push({ args, cwd: options.cwd });
+  return fakePty();
+};
+
+const fakePty = () => ({
   onData: () => undefined,
   onExit: () => undefined,
   write: () => undefined,
@@ -118,9 +125,12 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     );
   }
 
-  async function createWorkspace(task: SendOptions | null = null) {
+  async function createWorkspace(
+    task: SendOptions | null = null,
+    source?: WorkspaceSource,
+  ) {
     const repo = await addRepo();
-    const created = await korev.api.createWorkspaces([repo.id], task);
+    const created = await korev.api.createWorkspaces([repo.id], task, source);
     if (!created.ok) throw new Error(created.message);
     const { workspace } = await waitUntilCreated(created.value[0].id);
     if (task) await waitForTurn(workspace.sessions[0].id);
@@ -406,5 +416,93 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(await readFile(path.join(workspace.path, 'draft.txt'), 'utf8')).toBe(
       'wip\n',
     );
+  });
+  it('copies only the gitignored files that .worktreeinclude names', async () => {
+    await mkdir(path.join(repoPath, 'config'));
+    await writeFile(path.join(repoPath, 'config', 'app.local.json'), '{}');
+    await writeFile(
+      path.join(repoPath, '.gitignore'),
+      '.env\nconfig/*.local.json\n',
+    );
+    await writeFile(
+      path.join(repoPath, '.worktreeinclude'),
+      'config/*.local.json\n',
+    );
+
+    const workspace = await createWorkspace();
+
+    expect(
+      existsSync(path.join(workspace.path, 'config', 'app.local.json')),
+    ).toBe(true);
+    expect(existsSync(path.join(workspace.path, '.env'))).toBe(false);
+  });
+
+  it('checks out an existing branch instead of creating one', async () => {
+    git(repoPath, 'branch', 'feature/login');
+
+    const workspace = await createWorkspace(null, {
+      kind: 'branch',
+      branch: 'feature/login',
+    });
+
+    expect(workspace).toMatchObject({ name: 'login', branch: 'feature/login' });
+    expect(git(workspace.path, 'branch', '--show-current')).toBe(
+      'feature/login',
+    );
+  });
+
+  it('names the workspace and branch after the issue it starts from', async () => {
+    const workspace = await createWorkspace(null, {
+      kind: 'issue',
+      number: 12,
+      title: 'Fix the login bug!',
+    });
+
+    expect(workspace).toMatchObject({
+      name: '12-fix-the-login-bug',
+      branch: 'dev/12-fix-the-login-bug',
+    });
+  });
+
+  it('refuses a branch, PR or issue source for several repositories', async () => {
+    const repo = await addRepo();
+    chosenDirectory = await initRepo('web');
+    const other = await addRepo();
+
+    const created = await korev.api.createWorkspaces(
+      [repo.id, other.id],
+      null,
+      {
+        kind: 'branch',
+        branch: 'main',
+      },
+    );
+
+    expect(created.ok).toBe(false);
+  });
+
+  it('starts the default run script from .korev/settings.toml in its cwd', async () => {
+    await mkdir(path.join(repoPath, '.korev'));
+    await writeFile(
+      path.join(repoPath, '.korev', 'settings.toml'),
+      '[scripts.run.web]\ncommand = "pnpm dev"\noptions = { cwd = "apps/web" }\n[scripts.run.api]\ncommand = "pnpm api"\ndefault = true\n',
+    );
+    git(repoPath, 'add', '.korev');
+    git(repoPath, 'commit', '-q', '-m', 'settings');
+    const workspace = await createWorkspace();
+    spawned.length = 0;
+
+    expect((await korev.api.startScript(workspace.id, 'run')).ok).toBe(true);
+    expect((await korev.api.startScript(workspace.id, 'run', 'web')).ok).toBe(
+      true,
+    );
+
+    expect(spawned).toEqual([
+      { args: ['-lc', 'pnpm api'], cwd: workspace.path },
+      {
+        args: ['-lc', 'pnpm dev'],
+        cwd: path.join(workspace.path, 'apps/web'),
+      },
+    ]);
   });
 });

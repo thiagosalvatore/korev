@@ -63,12 +63,73 @@ export const EMPTY_SCRIPTS: RepoScripts = {
   runMode: 'concurrent',
 };
 
+export type PromptKind =
+  | 'general'
+  | 'code_review'
+  | 'create_pr'
+  | 'fix_errors'
+  | 'resolve_merge_conflicts'
+  | 'rename_branch';
+
+export interface RunScript {
+  id: string;
+  command: string;
+  cwd: string | null;
+  icon: string;
+  isDefault: boolean;
+}
+
+export interface PreviewUrl {
+  name: string;
+  url: string;
+}
+
+export type RepoConfigSource = 'settings.toml' | 'korev.json' | 'app';
+
+export interface RepoConfig {
+  source: RepoConfigSource;
+  setup: string;
+  archive: string;
+  runMode: RepoScripts['runMode'];
+  runScripts: RunScript[];
+  autoRunAfterSetup: boolean;
+  previewUrls: PreviewUrl[];
+  fileIncludeGlobs: string | null;
+  environment: Record<string, string>;
+  prompts: Partial<Record<PromptKind, string>>;
+  archiveOnMerge: boolean | null;
+  deleteBranchOnArchive: boolean | null;
+  branchPrefix: string | null;
+}
+
 export interface Repo {
   id: string;
   name: string;
   path: string;
   defaultBranch: string;
   scripts: RepoScripts;
+}
+
+export type WorkspaceSource =
+  | { kind: 'new'; baseBranch: string | null }
+  | { kind: 'branch'; branch: string }
+  | { kind: 'pr'; number: number; baseBranch: string }
+  | { kind: 'issue'; number: number; title: string };
+
+export interface PullRequestSummary {
+  number: number;
+  title: string;
+  headRefName: string;
+  baseRefName: string;
+  author: string;
+  isDraft: boolean;
+}
+
+export interface IssueSummary {
+  number: number;
+  title: string;
+  body: string;
+  url: string;
 }
 
 export interface ChatSession {
@@ -113,6 +174,7 @@ export interface Settings {
   defaultPlanMode: boolean;
   autoRenameBranches: boolean;
   deleteBranchOnArchive: boolean;
+  archiveOnMerge: boolean;
   editor: EditorId;
   notifications: boolean;
   windowBounds: WindowBounds | null;
@@ -165,6 +227,7 @@ export interface WorkspaceRuntime {
   pr: PrStatus | null;
   message: string | null;
   pendingPrompt: string | null;
+  runUrl: string | null;
 }
 
 export function hasWorktree(runtime: WorkspaceRuntime): boolean {

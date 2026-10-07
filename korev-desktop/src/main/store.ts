@@ -36,6 +36,7 @@ export function defaultSettings(home: string): Settings {
     defaultPlanMode: false,
     autoRenameBranches: true,
     deleteBranchOnArchive: false,
+    archiveOnMerge: false,
     editor: 'cursor',
     notifications: true,
     windowBounds: null,

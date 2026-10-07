@@ -6,6 +6,7 @@ import type {
   Result,
   SendOptions,
   Workspace,
+  WorkspaceSource,
 } from '../shared/model';
 import { api } from './bridge';
 import { reportFailure, toast } from './ui/toast';
@@ -127,8 +128,9 @@ function openCreated(created: Result<Workspace[]>) {
 export async function createWorkspaces(
   repoIds: string[],
   task: SendOptions | null,
+  source?: WorkspaceSource,
 ) {
-  return openCreated(await api.createWorkspaces(repoIds, task));
+  return openCreated(await api.createWorkspaces(repoIds, task, source));
 }
 
 export async function startFromAsk(ask: AskChat) {
@@ -185,7 +187,17 @@ export async function toggleRunScript(state: AppState, workspace: Workspace) {
     await api.stopScript(workspace.id, 'run');
     return;
   }
-  reportFailure(await api.startScript(workspace.id, 'run'));
+  const scriptId = getUi().workspaces[workspace.id]?.runScriptId ?? undefined;
+  reportFailure(await api.startScript(workspace.id, 'run', scriptId));
+}
+
+export async function startRunScript(workspace: Workspace, scriptId: string) {
+  updateWorkspaceUi(workspace.id, () => ({
+    terminalTab: 'run',
+    runScriptId: scriptId,
+  }));
+  setUi({ terminal: true, panel: true });
+  reportFailure(await api.startScript(workspace.id, 'run', scriptId));
 }
 
 export function focusComposer() {

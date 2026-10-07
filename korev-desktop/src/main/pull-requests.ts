@@ -120,3 +120,6 @@ export function fixChecksPrompt(checks: PrCheck[]): string {
 export function resolveConflictsPrompt(baseBranch: string): string {
   return `Resolve any existing merge conflicts with the remote branch (origin/${baseBranch}). Then, commit and push your changes.`;
 }
+
+export const REVIEW_PROMPT =
+  'Review the changes on this branch compared to its target branch (committed and uncommitted). Look for bugs, missing tests and unclear code. List concrete findings with file and line, most severe first. Do not edit files.';

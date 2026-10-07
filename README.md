@@ -6,8 +6,6 @@ To ask about code without starting a task, use **Ask**. The agent reads a shared
 
 A task that spans repositories (say a frontend and a backend) gets one linked workspace per repository, all on the same branch name. Pick several repositories on the New workspace page, or plan the change in an Ask chat and press **Start workspaces**. Each agent changes only its own repository and can read the linked ones.
 
-It follows [Conductor](https://www.conductor.build)'s model and UI closely, including `conductor.json` scripts and the `CONDUCTOR_*` environment variables, so a repository set up for Conductor works here unchanged.
-
 ## Run it
 
 ```sh
@@ -16,7 +14,46 @@ npm ci
 npm start
 ```
 
-Korev uses the `claude` and `codex` CLIs from your PATH and their own sign-in, and `gh` for pull requests.
+Korev uses the `claude` and `codex` CLIs from your PATH and their own sign-in, and `gh` for pull requests, issues and checks.
+
+## Repository config
+
+Put a `.korev/settings.toml` in a repository to share its setup with everyone who uses Korev. A `.korev/settings.local.toml` next to it overrides it for you only; add it to `.gitignore`. Without either file Korev reads a simpler `korev.json`, and without that it uses the scripts from Settings → Repositories.
+
+```toml
+file_include_globs = ".env*\nconfig/*.local.json"   # gitignored files copied into new workspaces
+
+[scripts]
+setup = "pnpm install"
+archive = "./scripts/archive.sh"
+run_mode = "nonconcurrent"          # starting a run script stops the others in this repository
+auto_run_after_setup = true
+
+[scripts.run.web]
+command = "pnpm dev --port $KOREV_PORT"
+options = { cwd = "apps/web" }
+default = true
+
+[[preview_urls]]
+name = "Web"
+url = "http://localhost:$KOREV_PORT"
+
+[environment_variables]
+API_URL = "http://localhost:3000"
+
+[prompts]
+general = "Use pnpm, never npm."
+create_pr = "Follow .github/pull_request_template.md."
+
+[git]
+archive_on_merge = true
+branch_prefix_type = "custom"       # or "none"
+branch_prefix = "agent"
+```
+
+A `.worktreeinclude` file in the repository root replaces `file_include_globs`. Without both, Korev copies gitignored `.env*` files.
+
+Scripts and agents get `KOREV_WORKSPACE_NAME`, `KOREV_WORKSPACE_PATH`, `KOREV_WORKSPACE_ID`, `KOREV_ROOT_PATH`, `KOREV_DEFAULT_BRANCH` and `KOREV_PORT` (the first of 10 ports reserved for the workspace).
 
 ## Checks
 

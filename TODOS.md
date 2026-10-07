@@ -1,16 +1,9 @@
 # TODOS
 
-Conductor features Korev does not have yet, roughly in the order they would help.
+Features Korev does not have yet, roughly in the order they would help.
 
-- **`.conductor/settings.toml`.** Korev reads the legacy `conductor.json` and its own
-  per-repo scripts. Conductor's current format is TOML with several run scripts,
-  `preview_urls`, prompts and git options. Needs a TOML parser dependency.
-- **Files to copy.** Korev copies top-level gitignored `.env*` files into new workspaces.
-  Conductor also honours `.worktreeinclude` and `file_include_globs`.
-- **Create from a branch, PR or issue.** The new-workspace page only branches from the
-  default branch.
 - **Tool approvals.** Agents run with full permissions (`bypassPermissions` for Claude,
-  `workspace-write` sandbox for Codex). Conductor can ask before each tool call.
+  `workspace-write` sandbox for Codex). There is no way to ask before each tool call.
 - **Composer extras.** Fast mode, model loadouts, steering a running turn, `#` PR
   mentions, voice input, snippets.
 - **Diff viewer extras.** Split view, viewed state, GitHub review comments, editing in

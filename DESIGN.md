@@ -18,7 +18,7 @@ How the Korev desktop app looks and behaves. The tokens live in
 
 ## Layout
 
-Three columns, like Conductor:
+Three columns:
 
 - **Left sidebar** (`--sidebar-w`): Search (⌘K), New workspace (⌘N), Ask, then the Ask
   chats, then one group per repository with its workspaces, then History (archived

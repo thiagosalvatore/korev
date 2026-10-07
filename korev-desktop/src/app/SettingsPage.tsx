@@ -15,6 +15,8 @@ import {
   type AgentKind,
   type AppState,
   type Repo,
+  type RepoConfig,
+  type RepoConfigSource,
   type RepoScripts,
   type Settings,
   type ThemePreference,
@@ -255,6 +257,15 @@ function Git({ settings }: { settings: Settings }) {
         />
       </Row>
       <Row
+        title="Archive on merge"
+        description="Archive a workspace when its pull request is merged. A repository can override this in .korev/settings.toml."
+      >
+        <Switch
+          checked={settings.archiveOnMerge}
+          onChange={(archiveOnMerge) => update({ archiveOnMerge })}
+        />
+      </Row>
+      <Row
         title="Delete branch on archive"
         description="Remove the local branch when a workspace is archived."
       >
@@ -335,7 +346,7 @@ const SCRIPT_FIELDS: {
   {
     key: 'run',
     label: 'Run script',
-    hint: 'Started with the Run button (⌘R), e.g. npm run dev -- --port $CONDUCTOR_PORT.',
+    hint: 'Started with the Run button (⌘R), e.g. npm run dev -- --port $KOREV_PORT.',
   },
   {
     key: 'archive',
@@ -343,6 +354,38 @@ const SCRIPT_FIELDS: {
     hint: 'Runs before a workspace is archived.',
   },
 ];
+
+const SOURCE_NOTICE: Record<RepoConfigSource, string | null> = {
+  app: null,
+  'korev.json':
+    'This repository has a korev.json. Its scripts replace the ones below.',
+  'settings.toml':
+    'This repository has .korev/settings.toml. Its scripts, run scripts, preview URLs, prompts and git options replace the ones below.',
+};
+
+function ConfigSourceNotice({ repo }: { repo: Repo }) {
+  const [config, setConfig] = useState<RepoConfig | null>(null);
+  useEffect(() => {
+    void api.repoConfig(repo.id).then(setConfig);
+  }, [repo.id, repo.scripts]);
+  const notice = config ? SOURCE_NOTICE[config.source] : null;
+  if (!config || !notice) return null;
+  return (
+    <div className="mb-3 rounded-md bg-accent-subtle px-3 py-2 text-xs text-accent-text">
+      <p className="m-0">{notice}</p>
+      {config.runScripts.length ? (
+        <p className="m-0 mt-1 font-mono">
+          Run scripts:{' '}
+          {config.runScripts
+            .map(
+              (script) => `${script.id}${script.isDefault ? ' (default)' : ''}`,
+            )
+            .join(', ')}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function RepoSettings({ state, repo }: { state: AppState; repo: Repo }) {
   const [scripts, setScripts] = useState<RepoScripts>(repo.scripts);
@@ -385,11 +428,13 @@ function RepoSettings({ state, repo }: { state: AppState; repo: Repo }) {
       <div className="py-4">
         <div className="text-sm font-medium text-fg-1">Scripts</div>
         <p className="mt-0.5 mb-3 text-xs text-fg-3">
-          A <span className="font-mono">conductor.json</span> in the repository
-          overrides these. Scripts get CONDUCTOR_WORKSPACE_NAME,
-          CONDUCTOR_WORKSPACE_PATH, CONDUCTOR_ROOT_PATH,
-          CONDUCTOR_DEFAULT_BRANCH and CONDUCTOR_PORT.
+          A <span className="font-mono">.korev/settings.toml</span> (or{' '}
+          <span className="font-mono">korev.json</span>) in the repository
+          overrides these. Scripts get KOREV_WORKSPACE_NAME,
+          KOREV_WORKSPACE_PATH, KOREV_ROOT_PATH, KOREV_DEFAULT_BRANCH,
+          KOREV_WORKSPACE_ID and KOREV_PORT (the first of 10 ports).
         </p>
+        <ConfigSourceNotice repo={repo} />
         <div className="flex flex-col gap-3">
           {SCRIPT_FIELDS.map((field) => (
             <label key={field.key} className="flex flex-col gap-1">

@@ -22,7 +22,7 @@ export class GitError extends Error {
 export interface Git {
   run(cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string>;
   tryRun(cwd: string, args: string[]): Promise<string | null>;
-  stdout(cwd: string, args: string[]): Promise<string>;
+  stdout(cwd: string, args: string[], stdin?: string): Promise<string>;
 }
 
 export function createGit(run: CommandRunner, env: NodeJS.ProcessEnv): Git {
@@ -30,9 +30,14 @@ export function createGit(run: CommandRunner, env: NodeJS.ProcessEnv): Git {
     cwd: string,
     args: string[],
     extraEnv: NodeJS.ProcessEnv = {},
-    timeoutMs = GIT_TIMEOUT_MS,
+    stdin?: string,
   ) {
-    return run('git', args, { cwd, env: { ...env, ...extraEnv }, timeoutMs });
+    return run('git', args, {
+      cwd,
+      env: { ...env, ...extraEnv },
+      timeoutMs: GIT_TIMEOUT_MS,
+      stdin,
+    });
   }
   return {
     async run(cwd, args, extraEnv) {
@@ -48,8 +53,8 @@ export function createGit(run: CommandRunner, env: NodeJS.ProcessEnv): Git {
         return null;
       }
     },
-    async stdout(cwd, args) {
-      return (await exec(cwd, args)).stdout;
+    async stdout(cwd, args, stdin) {
+      return (await exec(cwd, args, {}, stdin)).stdout;
     },
   };
 }
@@ -108,6 +113,11 @@ async function excludeContextDir(git: Git, worktree: string): Promise<void> {
   await appendFile(excludeFile, `${separator}${entry}\n`);
 }
 
+export async function prepareWorktree(git: Git, worktree: string) {
+  await mkdir(path.join(worktree, CONTEXT_DIR), { recursive: true });
+  await excludeContextDir(git, worktree);
+}
+
 async function createWorktree(
   git: Git,
   repo: string,
@@ -116,8 +126,7 @@ async function createWorktree(
 ): Promise<void> {
   await mkdir(path.dirname(worktree), { recursive: true });
   await git.run(repo, ['worktree', 'add', ...args]);
-  await mkdir(path.join(worktree, CONTEXT_DIR), { recursive: true });
-  await excludeContextDir(git, worktree);
+  await prepareWorktree(git, worktree);
 }
 
 export function addWorktree(
@@ -134,6 +143,19 @@ export function addWorktree(
     worktree,
     from,
   ]);
+}
+
+export async function addBranchWorktree(
+  git: Git,
+  repo: string,
+  worktree: string,
+  branch: string,
+): Promise<void> {
+  await git.tryRun(repo, ['fetch', 'origin', branch]);
+  const args = (await branchExists(git, repo, branch))
+    ? [worktree, branch]
+    : ['--track', '-b', branch, worktree, `origin/${branch}`];
+  await createWorktree(git, repo, worktree, args);
 }
 
 export function addDetachedWorktree(
@@ -153,6 +175,25 @@ export async function checkoutDetached(
   await git.run(worktree, ['checkout', '--detach', '--force', from]);
 }
 
+const REMOTE_PREFIX = 'refs/remotes/origin/';
+const LOCAL_PREFIX = 'refs/heads/';
+
+export async function listBranches(git: Git, repo: string): Promise<string[]> {
+  await git.tryRun(repo, ['fetch', '--prune', 'origin']);
+  const output = await git.tryRun(repo, [
+    'for-each-ref',
+    '--sort=-committerdate',
+    '--format=%(refname)',
+    LOCAL_PREFIX,
+    REMOTE_PREFIX,
+  ]);
+  const names = (output ?? '')
+    .split('\n')
+    .map((ref) => ref.replace(LOCAL_PREFIX, '').replace(REMOTE_PREFIX, ''))
+    .filter((name) => name && name !== 'HEAD');
+  return [...new Set(names)];
+}
+
 export async function restoreWorktree(
   git: Git,
   repo: string,
@@ -161,7 +202,7 @@ export async function restoreWorktree(
 ): Promise<void> {
   await git.tryRun(repo, ['worktree', 'prune']);
   await git.run(repo, ['worktree', 'add', worktree, branch]);
-  await mkdir(path.join(worktree, CONTEXT_DIR), { recursive: true });
+  await prepareWorktree(git, worktree);
 }
 
 export async function removeWorktree(

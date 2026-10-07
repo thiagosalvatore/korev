@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   allocatePort,
+  findLocalUrl,
   FIRST_PORT,
-  parseProjectConfig,
   PORTS_PER_WORKSPACE,
 } from './workspace-setup';
 
@@ -15,23 +15,17 @@ describe('ports', () => {
   });
 });
 
-describe('conductor.json', () => {
-  it('reads the scripts and run mode', () => {
+describe('run output', () => {
+  it('finds the local URL a dev server prints, without colour codes', () => {
+    const esc = String.fromCharCode(27);
     expect(
-      parseProjectConfig(
-        JSON.stringify({
-          scripts: { setup: 'npm ci', run: 'npm run dev', archive: 3 },
-          runScriptMode: 'nonconcurrent',
-        }),
+      findLocalUrl(
+        `  ➜  Local:   ${esc}[36mhttp://localhost:${esc}[1m5173${esc}[22m/${esc}[39m`,
       ),
-    ).toEqual({
-      setup: 'npm ci',
-      run: 'npm run dev',
-      runMode: 'nonconcurrent',
-    });
-  });
-
-  it('ignores a malformed file', () => {
-    expect(parseProjectConfig('{ nope')).toEqual({});
+    ).toBe('http://localhost:5173/');
+    expect(findLocalUrl('listening on http://0.0.0.0:3000')).toBe(
+      'http://localhost:3000',
+    );
+    expect(findLocalUrl('compiled successfully')).toBeNull();
   });
 });

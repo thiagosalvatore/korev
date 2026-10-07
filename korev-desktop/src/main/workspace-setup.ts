@@ -1,16 +1,18 @@
-import { copyFile, readdir, readFile } from 'node:fs/promises';
-import path from 'node:path';
 import {
-  EMPTY_SCRIPTS,
-  type Repo,
-  type RepoScripts,
-  type Workspace,
-} from '../shared/model';
-import { slugify } from './git';
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import type { Repo, Workspace } from '../shared/model';
+import { slugify, type Git } from './git';
 
 export const FIRST_PORT = 55_000;
 export const PORTS_PER_WORKSPACE = 10;
-const PROJECT_CONFIG_FILE = 'conductor.json';
 const EMPTY_WORKSPACE_NAME = 'workspace';
 const UNTITLED_NAME = new RegExp(`^${EMPTY_WORKSPACE_NAME}(-\\d+)?$`);
 const TASK_NAME_WORDS = 5;
@@ -51,73 +53,79 @@ export function workspaceEnv(
   workspace: Workspace,
 ): Record<string, string> {
   return {
-    CONDUCTOR_WORKSPACE_NAME: workspace.name,
-    CONDUCTOR_WORKSPACE_PATH: workspace.path,
-    CONDUCTOR_ROOT_PATH: repo.path,
-    CONDUCTOR_DEFAULT_BRANCH: workspace.baseBranch,
-    CONDUCTOR_PORT: String(workspace.port),
-    CONDUCTOR_IS_LOCAL: '1',
-    CONDUCTOR_WORKSPACE_ID: workspace.id,
+    KOREV_WORKSPACE_NAME: workspace.name,
+    KOREV_WORKSPACE_PATH: workspace.path,
+    KOREV_ROOT_PATH: repo.path,
+    KOREV_DEFAULT_BRANCH: workspace.baseBranch,
+    KOREV_PORT: String(workspace.port),
+    KOREV_IS_LOCAL: '1',
+    KOREV_WORKSPACE_ID: workspace.id,
   };
 }
 
-interface ProjectConfig {
-  scripts?: { setup?: unknown; run?: unknown; archive?: unknown };
-  runScriptMode?: unknown;
-}
+const WORKTREE_INCLUDE_FILE = '.worktreeinclude';
+const DEFAULT_INCLUDE_GLOBS = '.env*';
 
-function text(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-export function parseProjectConfig(json: string): Partial<RepoScripts> {
-  let config: ProjectConfig;
-  try {
-    config = JSON.parse(json) as ProjectConfig;
-  } catch {
-    return {};
-  }
-  const scripts = config.scripts ?? {};
-  const picked: Partial<RepoScripts> = {
-    setup: text(scripts.setup),
-    run: text(scripts.run),
-    archive: text(scripts.archive),
-    runMode:
-      config.runScriptMode === 'nonconcurrent' ? 'nonconcurrent' : undefined,
-  };
-  return Object.fromEntries(
-    Object.entries(picked).filter(([, value]) => value !== undefined),
-  );
-}
-
-export async function effectiveScripts(
-  repo: Repo,
-  workspacePath: string,
-): Promise<RepoScripts> {
-  const json = await readFile(
-    path.join(workspacePath, PROJECT_CONFIG_FILE),
+export async function includePatterns(
+  repoPath: string,
+  configured: string | null,
+): Promise<string> {
+  const fromFile = await readFile(
+    path.join(repoPath, WORKTREE_INCLUDE_FILE),
     'utf8',
   ).catch(() => null);
-  const fromProject = json ? parseProjectConfig(json) : {};
-  return { ...EMPTY_SCRIPTS, ...repo.scripts, ...fromProject };
+  return fromFile ?? configured ?? DEFAULT_INCLUDE_GLOBS;
 }
 
-const COPIED_FILE_PATTERN = /^\.env/;
+async function matchingUntrackedFiles(
+  git: Git,
+  repoPath: string,
+  patterns: string,
+) {
+  const dir = await mkdtemp(path.join(tmpdir(), 'korev-include-'));
+  const patternFile = path.join(dir, 'patterns');
+  try {
+    await writeFile(patternFile, patterns);
+    const output = await git.stdout(repoPath, [
+      'ls-files',
+      '--others',
+      '--ignored',
+      `--exclude-from=${patternFile}`,
+    ]);
+    return output.split('\n').filter(Boolean);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
 
-export async function copyLocalFiles(
+export async function copyIncludedFiles(
+  git: Git,
   repoPath: string,
   workspacePath: string,
-  isIgnored: (file: string) => Promise<boolean>,
+  patterns: string,
 ): Promise<string[]> {
-  const entries = await readdir(repoPath, { withFileTypes: true });
-  const candidates = entries
-    .filter((entry) => entry.isFile() && COPIED_FILE_PATTERN.test(entry.name))
-    .map((entry) => entry.name);
-  const copied: string[] = [];
-  for (const file of candidates) {
-    if (!(await isIgnored(file))) continue;
-    await copyFile(path.join(repoPath, file), path.join(workspacePath, file));
-    copied.push(file);
+  const candidates = await matchingUntrackedFiles(git, repoPath, patterns);
+  if (!candidates.length) return [];
+  const ignored = await git.stdout(
+    repoPath,
+    ['check-ignore', '--stdin'],
+    candidates.join('\n'),
+  );
+  const files = ignored.split('\n').filter(Boolean);
+  for (const file of files) {
+    const target = path.join(workspacePath, file);
+    await mkdir(path.dirname(target), { recursive: true });
+    await copyFile(path.join(repoPath, file), target);
   }
-  return copied;
+  return files;
+}
+
+const LOCAL_URL =
+  /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]):\d+[^\s'"]*/;
+const ESCAPE = String.fromCharCode(27);
+const ANSI_ESCAPE = new RegExp(`${ESCAPE}\\[[0-9;?]*[A-Za-z]`, 'g');
+
+export function findLocalUrl(output: string): string | null {
+  const url = LOCAL_URL.exec(output.replace(ANSI_ESCAPE, ''))?.[0];
+  return url ? url.replace('0.0.0.0', 'localhost') : null;
 }

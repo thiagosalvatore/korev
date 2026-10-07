@@ -21,8 +21,16 @@ import {
   renameBranch,
   restoreCheckpoint,
 } from './git';
+import { withPrompt } from './repo-config';
 import { isUntitledName } from './workspace-setup';
-import { isUntitled, refreshStats, scriptEnv, suggestName } from './workspaces';
+import {
+  isUntitled,
+  refreshStats,
+  renameBranchPrompt,
+  scriptEnv,
+  suggestName,
+  workspaceConfig,
+} from './workspaces';
 
 const TURN_TIMEOUT_MS = 12 * 60 * 60_000;
 const TITLE_MAX_CHARS = 32;
@@ -80,16 +88,18 @@ export function systemPrompt(
   repo: Repo,
   workspace: Workspace,
   linked: LinkedWorkspace[] = [],
+  general?: string,
 ): string {
-  return [
+  const base = [
     `You are working inside Korev, a Mac app that lets the user run many coding agents in parallel.`,
     `Your work should take place in the ${workspace.path} directory (unless otherwise directed), which has been set up for you to work in.`,
     `It is a git worktree of ${repo.name} on branch ${workspace.branch}. The target branch for this workspace is origin/${workspace.baseBranch}. Use this for actions like diffing (\`git diff origin/${workspace.baseBranch}...\`) or creating PRs (\`gh pr create --base ${workspace.baseBranch}\`).`,
     `The workspace has a .context directory (gitignored) where you can save files to collaborate with other agents.`,
     `Do not rename the current branch unless the user explicitly tells you to do so.`,
-    `If you start a dev server, use port $CONDUCTOR_PORT (ports $CONDUCTOR_PORT to $CONDUCTOR_PORT+9 are reserved for this workspace).`,
+    `If you start a dev server, use port $KOREV_PORT (ports $KOREV_PORT to $KOREV_PORT+9 are reserved for this workspace).`,
     ...linkedLines(linked),
   ].join('\n');
+  return withPrompt(base, general);
 }
 
 export function askSystemPrompt(repos: Repo[], checkouts: string[]): string {
@@ -249,10 +259,16 @@ export function createChats(ctx: Context): Chats {
     const { workspace } = owner;
     const repo = ctx.repo(workspace.repoId);
     const linked = linkedWorkspaces(workspace);
+    const config = await workspaceConfig(ctx, workspace);
     return {
       cwd: workspace.path,
-      env: scriptEnv(ctx, repo, workspace),
-      systemPrompt: systemPrompt(repo, workspace, linked),
+      env: await scriptEnv(ctx, repo, workspace),
+      systemPrompt: systemPrompt(
+        repo,
+        workspace,
+        linked,
+        config.prompts.general,
+      ),
       readOnly: false,
       addDirs: linked.map((entry) => entry.workspace.path),
     };
@@ -382,12 +398,16 @@ export function createChats(ctx: Context): Chats {
     )
       return;
     try {
-      const suggestion = await suggestName(ctx, text);
+      const repo = ctx.repo(workspace.repoId);
+      const suggestion = await suggestName(
+        ctx,
+        text,
+        await renameBranchPrompt(repo),
+      );
       if (!suggestion || !isPlaceholderBranch(workspace)) return;
       if (await hasUpstream(ctx.git, workspace.path)) return;
       const prefix = workspace.branch.split('/').slice(0, -1).join('/');
       const next = prefix ? `${prefix}/${suggestion}` : suggestion;
-      const repo = ctx.repo(workspace.repoId);
       if (await branchExists(ctx.git, repo.path, next)) return;
       await renameBranch(ctx.git, workspace.path, workspace.branch, next);
       workspace.branch = next;

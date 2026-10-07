@@ -2,8 +2,14 @@ import { FitAddon } from '@xterm/addon-fit';
 import { Terminal, type ITheme } from '@xterm/xterm';
 import { useEffect, useRef, useState } from 'react';
 import { Button, cn, Icon, IconButton, Tabs } from '../design-system';
-import type { AppState, TerminalKind, Workspace } from '../shared/model';
-import { openSettings, toggleRunScript } from './actions';
+import type {
+  AppState,
+  RepoConfig,
+  TerminalKind,
+  Workspace,
+} from '../shared/model';
+import { openSettings, startRunScript, toggleRunScript } from './actions';
+import { Menu } from './ui/Menu';
 import { api, on } from './bridge';
 import { reportFailure } from './ui/toast';
 import {
@@ -140,6 +146,138 @@ function ScriptEmptyState({
   );
 }
 
+function useWorkspaceConfig(workspace: Workspace) {
+  const [config, setConfig] = useState<RepoConfig | null>(null);
+  useEffect(() => {
+    if (workspace.archivedAt) return;
+    void api
+      .workspaceConfig(workspace.id)
+      .then(setConfig)
+      .catch(() => setConfig(null));
+  }, [workspace.id, workspace.archivedAt]);
+  return config;
+}
+
+function OpenButton({
+  state,
+  workspace,
+  config,
+}: {
+  state: AppState;
+  workspace: Workspace;
+  config: RepoConfig | null;
+}) {
+  const runUrl = state.runtime[workspace.id]?.runUrl ?? null;
+  const previews = [
+    ...(config?.previewUrls ?? []),
+    ...(runUrl && !config?.previewUrls.some((preview) => preview.url === runUrl)
+      ? [{ name: 'Detected', url: runUrl }]
+      : []),
+  ];
+  const [first] = previews;
+  if (!first) return null;
+  return (
+    <div className="flex items-center">
+      <Button
+        size="sm"
+        variant="secondary"
+        icon="external-link"
+        className={previews.length > 1 ? 'rounded-r-none' : ''}
+        title={first.url}
+        onClick={() => void api.openExternal(first.url)}
+      >
+        Open
+      </Button>
+      {previews.length > 1 ? (
+        <Menu
+          label="Preview URLs"
+          align="right"
+          items={previews.map((preview) => ({
+            id: preview.url,
+            label: `${preview.name} · ${preview.url}`,
+            icon: 'globe',
+            onSelect: () => void api.openExternal(preview.url),
+          }))}
+          trigger={({ toggle }) => (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="-ml-px rounded-l-none px-1.5"
+              aria-label="More preview URLs"
+              onClick={toggle}
+            >
+              <Icon name="chevron-down" size={13} />
+            </Button>
+          )}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function RunControls({
+  state,
+  workspace,
+}: {
+  state: AppState;
+  workspace: Workspace;
+}) {
+  const config = useWorkspaceConfig(workspace);
+  const selectedId = useUi(
+    (ui) => ui.workspaces[workspace.id]?.runScriptId ?? null,
+  );
+  const running = state.runningTerminals.includes(`${workspace.id}:run`);
+  const scripts = config?.runScripts ?? [];
+  const selected =
+    scripts.find((script) => script.id === selectedId) ??
+    scripts.find((script) => script.isDefault);
+  return (
+    <div className="flex items-center gap-1.5">
+      <OpenButton state={state} workspace={workspace} config={config} />
+      <div className="flex items-center">
+        <Button
+          size="sm"
+          variant={running ? 'danger' : 'secondary'}
+          icon={running ? 'square' : 'play'}
+          title={selected ? `${selected.command} (⌘R)` : '⌘R'}
+          className={scripts.length > 1 ? 'rounded-r-none' : ''}
+          onClick={() => void toggleRunScript(state, workspace)}
+        >
+          {running
+            ? 'Stop'
+            : scripts.length > 1 && selected
+              ? `Run ${selected.id}`
+              : 'Run'}
+        </Button>
+        {scripts.length > 1 ? (
+          <Menu
+            label="Run scripts"
+            align="right"
+            items={scripts.map((script) => ({
+              id: script.id,
+              label: script.id.replace(/-/g, ' '),
+              hint: script.isDefault ? 'default' : undefined,
+              checked: script.id === selected?.id,
+              onSelect: () => void startRunScript(workspace, script.id),
+            }))}
+            trigger={({ toggle }) => (
+              <Button
+                size="sm"
+                variant={running ? 'danger' : 'secondary'}
+                className="-ml-px rounded-l-none px-1.5"
+                aria-label="Choose run script"
+                onClick={toggle}
+              >
+                <Icon name="chevron-down" size={13} />
+              </Button>
+            )}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function TerminalPanel({
   state,
   workspace,
@@ -189,15 +327,7 @@ export function TerminalPanel({
           }
         />
         {tab === 'run' ? (
-          <Button
-            size="sm"
-            variant={runRunning ? 'danger' : 'secondary'}
-            icon={runRunning ? 'square' : 'play'}
-            title="⌘R"
-            onClick={() => void toggleRunScript(state, workspace)}
-          >
-            {runRunning ? 'Stop' : 'Run'}
-          </Button>
+          <RunControls state={state} workspace={workspace} />
         ) : null}
         {tab === 'setup' ? (
           <Button

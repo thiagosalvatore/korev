@@ -1,16 +1,98 @@
-import { useState } from 'react';
-import { Button, Icon } from '../design-system';
-import { AGENT_LABELS, type AppState } from '../shared/model';
+import { useEffect, useState } from 'react';
+import { Button, cn, Icon, IconButton } from '../design-system';
+import {
+  AGENT_LABELS,
+  type AppState,
+  type Repo,
+  type WorkspaceSource,
+} from '../shared/model';
 import { createWorkspaces, selectWorkspace } from './actions';
+import { api } from './bridge';
 import { Composer } from './chat/Composer';
+import {
+  createFromLabel,
+  CreateFromPicker,
+  issuePrompt,
+  type CreateFrom,
+} from './CreateFromPicker';
 import { timeAgo } from './format';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { RepoPicker } from './RepoPicker';
 import { AddRepositoryMenu } from './Sidebar';
+import { Menu } from './ui/Menu';
 import { useUi } from './ui-store';
-import { cn } from '../design-system';
 
 const RECENT_LIMIT = 5;
+
+function workspaceSource(
+  from: CreateFrom | null,
+  baseBranch: string | null,
+): WorkspaceSource {
+  if (!from) return { kind: 'new', baseBranch };
+  if (from.kind === 'branch') return from;
+  if (from.kind === 'pr') {
+    return {
+      kind: 'pr',
+      number: from.pr.number,
+      baseBranch: from.pr.baseRefName,
+    };
+  }
+  return { kind: 'issue', number: from.issue.number, title: from.issue.title };
+}
+
+function useCreateFromShortcut(enabled: boolean, toggle: () => void) {
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'i')
+        return;
+      event.preventDefault();
+      toggle();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [enabled, toggle]);
+}
+
+function TargetBranchMenu({
+  repo,
+  baseBranch,
+  onChange,
+}: {
+  repo: Repo;
+  baseBranch: string | null;
+  onChange: (branch: string) => void;
+}) {
+  const [branches, setBranches] = useState<string[]>([]);
+  return (
+    <Menu
+      label="Target branch"
+      items={(branches.length ? branches : [repo.defaultBranch]).map(
+        (branch) => ({
+          id: branch,
+          label: branch,
+          checked: branch === (baseBranch ?? repo.defaultBranch),
+          onSelect: () => onChange(branch),
+        }),
+      )}
+      trigger={({ toggle }) => (
+        <button
+          type="button"
+          aria-label="Target branch"
+          className="flex h-7 cursor-pointer items-center gap-1 rounded-sm border-0 bg-transparent px-1.5 font-mono text-xs text-fg-3 hover:bg-hover hover:text-fg-1"
+          onClick={() => {
+            if (!branches.length)
+              void api.listBranches(repo.id).then(setBranches);
+            toggle();
+          }}
+        >
+          <Icon name="git-branch" size={12} />
+          from origin/{baseBranch ?? repo.defaultBranch}
+        </button>
+      )}
+    />
+  );
+}
 
 export function NewWorkspacePage({
   state,
@@ -27,11 +109,23 @@ export function NewWorkspacePage({
   const initialRepoId = repoId ?? lastRepoId ?? state.repos[0]?.id;
   const [repoIds, setRepoIds] = useState(initialRepoId ? [initialRepoId] : []);
   const repos = state.repos.filter((entry) => repoIds.includes(entry.id));
+  const singleRepo = repos.length === 1 ? repos[0] : null;
   const agent = state.settings.defaultAgent;
   const [model, setModel] = useState(state.settings.defaultModels[agent]);
   const [effort, setEffort] = useState(state.settings.defaultEffort[agent]);
   const [planMode, setPlanMode] = useState(state.settings.defaultPlanMode);
   const [creating, setCreating] = useState(false);
+  const [from, setFrom] = useState<CreateFrom | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [baseBranch, setBaseBranch] = useState<string | null>(null);
+  useCreateFromShortcut(Boolean(singleRepo), () =>
+    setPicking((value) => !value),
+  );
+  useEffect(() => {
+    setFrom(null);
+    setPicking(false);
+    setBaseBranch(null);
+  }, [singleRepo?.id]);
   const models =
     state.agents.find((entry) => entry.agent === agent)?.models ?? [];
   const recent = state.workspaces
@@ -42,9 +136,12 @@ export function NewWorkspacePage({
   async function create(text: string | null) {
     if (!repos.length) return false;
     setCreating(true);
+    const prompt =
+      from?.kind === 'issue' ? issuePrompt(from.issue, text ?? '') : text;
     const created = await createWorkspaces(
       repos.map((entry) => entry.id),
-      text ? { text, model, effort, planMode } : null,
+      prompt ? { text: prompt, model, effort, planMode } : null,
+      singleRepo ? workspaceSource(from, baseBranch) : undefined,
     );
     setCreating(false);
     return created;
@@ -68,6 +165,40 @@ export function NewWorkspacePage({
               selected={repoIds}
               onChange={setRepoIds}
             />
+            {singleRepo && !from ? (
+              <TargetBranchMenu
+                repo={singleRepo}
+                baseBranch={baseBranch}
+                onChange={setBaseBranch}
+              />
+            ) : null}
+            {singleRepo ? (
+              <Button
+                size="sm"
+                variant={from ? 'secondary' : 'ghost'}
+                icon={
+                  from?.kind === 'pr'
+                    ? 'git-pull-request'
+                    : from?.kind === 'issue'
+                      ? 'circle-dot'
+                      : 'git-branch-plus'
+                }
+                title="Create from a branch, pull request or issue (⌘I)"
+                onClick={() => setPicking((value) => !value)}
+              >
+                <span className="max-w-64 truncate">
+                  {from ? createFromLabel(from) : 'Create from…'}
+                </span>
+              </Button>
+            ) : null}
+            {singleRepo && from ? (
+              <IconButton
+                icon="x"
+                label="Clear source"
+                size="sm"
+                onClick={() => setFrom(null)}
+              />
+            ) : null}
             <span className="flex-1" />
             <AddRepositoryMenu
               trigger={(toggle) => (
@@ -88,6 +219,16 @@ export function NewWorkspacePage({
               name. Each agent works in its own repository and can read the
               others.
             </p>
+          ) : null}
+          {picking && singleRepo ? (
+            <CreateFromPicker
+              repoId={singleRepo.id}
+              onClose={() => setPicking(false)}
+              onSelect={(source) => {
+                setFrom(source);
+                setPicking(false);
+              }}
+            />
           ) : null}
           <Composer
             draftKey={`new-workspace:${repoIds.join(',') || 'none'}`}
@@ -114,7 +255,9 @@ export function NewWorkspacePage({
               disabled={!repos.length}
               onClick={() => void create(null)}
             >
-              Create empty workspace
+              {from?.kind === 'issue'
+                ? 'Create workspace for this issue'
+                : 'Create empty workspace'}
             </Button>
           </div>
           {recent.length ? (
