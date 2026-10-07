@@ -14,6 +14,7 @@ Open Settings with ⌘, or from the bottom of the sidebar. Esc closes it.
 | --- | --- | --- |
 | Theme | System | System, Light or Dark. ⌘⌥T toggles between light and dark. |
 | Notifications | On | Notifies you when an agent finishes or needs your input, while the Korev window is not in focus. Click a notification to go to the workspace. |
+| Phone notifications | Empty | An [ntfy](https://ntfy.sh) topic URL. Korev also sends each notification to this topic, so the ntfy app on your phone shows it. See [Remote access](remote-access.md#phone-notifications). |
 | Sound | On | Plays a sound with each notification. |
 | Keep Mac awake | On | Keeps the Mac from sleeping while an agent runs. |
 | Import from Conductor | | See [Import from Conductor](../guides/import-from-conductor.md). |

@@ -27,6 +27,7 @@ import { nodeFileSystem } from './main/file-system';
 import { registerIpcHandlers } from './main/ipc';
 import { createKorev, type Korev } from './main/korev';
 import { childEnv, resolveLoginPath } from './main/login-path';
+import { sendPhoneNotification } from './main/phone-notifications';
 import { createRemoteAccess } from './main/remote-access';
 import { LOOPBACK_HOST, tailnetAddress } from './main/remote-server';
 import { restorableBounds } from './main/window-bounds';
@@ -158,7 +159,13 @@ async function createKorevApp(): Promise<Korev> {
     fs: nodeFileSystem,
     spawnPty,
     emit,
-    notify: (notice) => showNotice(() => korevApp, notice),
+    notify: (notice) => {
+      showNotice(() => korevApp, notice);
+      void sendPhoneNotification(
+        korevApp?.settings().phoneNotificationsUrl ?? '',
+        notice,
+      );
+    },
     playSound,
     isWindowFocused: () => BrowserWindow.getFocusedWindow() !== null,
     setBadge: (count) => app.setBadgeCount(count),

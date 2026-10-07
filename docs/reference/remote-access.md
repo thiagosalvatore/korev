@@ -70,3 +70,12 @@ A device counts as connected while its `/events` stream is open. While remote ac
 To give a device a name, send the `X-Korev-Device` header on `/events`, for example `X-Korev-Device: My iPhone`. If a device sends no name, Korev shows its IP address.
 
 An agent waits for an answer to a permission prompt, a question or a plan only while its turn runs. Send `respondPermission` before the turn ends.
+
+## Phone notifications
+
+Korev can send its notifications to your phone through [ntfy](https://ntfy.sh). Korev sends one when an agent finishes or needs your input while the Korev window is not in focus. This is the same rule as for Mac notifications.
+
+1. Install the ntfy app on your phone and subscribe to a topic. Pick a long topic name that nobody can guess.
+2. In **Settings → General → Phone notifications**, enter the topic URL, for example `https://ntfy.sh/<topic>`.
+
+On the public ntfy.sh server, anyone who knows the topic name can read its messages. Each message has the workspace name and the chat title. To keep them private, run your own ntfy server, for example on your Tailscale network.

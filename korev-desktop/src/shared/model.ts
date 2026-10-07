@@ -221,6 +221,7 @@ export interface Settings {
   keepAwake: boolean;
   remoteAccess: boolean;
   remotePort: number;
+  phoneNotificationsUrl: string;
   windowBounds: WindowBounds | null;
 }
 

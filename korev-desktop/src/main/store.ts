@@ -51,6 +51,7 @@ export function defaultSettings(home: string): Settings {
     keepAwake: true,
     remoteAccess: false,
     remotePort: DEFAULT_REMOTE_PORT,
+    phoneNotificationsUrl: '',
     windowBounds: null,
   };
 }

@@ -150,6 +150,19 @@ function General({ settings }: { settings: Settings }) {
         />
       </Row>
       <Row
+        title="Phone notifications"
+        description="Also sends these notifications to an ntfy topic, for example https://ntfy.sh/<topic>. Pick a topic name that nobody can guess. Leave it empty to turn this off."
+      >
+        <TextSetting
+          value={settings.phoneNotificationsUrl}
+          placeholder="https://ntfy.sh/<topic>"
+          mono
+          onSave={(phoneNotificationsUrl) =>
+            update({ phoneNotificationsUrl: phoneNotificationsUrl.trim() })
+          }
+        />
+      </Row>
+      <Row
         title="Sound"
         description="Play a sound when an agent finishes or needs your input in a workspace you are not looking at."
       >
