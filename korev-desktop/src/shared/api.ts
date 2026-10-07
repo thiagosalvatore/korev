@@ -19,6 +19,7 @@ import type {
   WorkspaceSource,
   PrStatus,
   Repo,
+  RepoFolder,
   RepoPrompts,
   RepoScripts,
   Result,
@@ -49,6 +50,14 @@ export interface KorevApi {
   ): Promise<void>;
   toggleSpotlight(workspaceId: string): Promise<Result>;
   updateRepoScripts(repoId: string, scripts: RepoScripts): Promise<void>;
+  createFolder(name: string): Promise<RepoFolder>;
+  renameFolder(folderId: string, name: string): Promise<void>;
+  deleteFolder(folderId: string): Promise<void>;
+  moveRepo(
+    repoId: string,
+    target: { folderId: string | null; beforeRepoId: string | null },
+  ): Promise<void>;
+  moveFolder(folderId: string, beforeFolderId: string | null): Promise<void>;
   createWorkspaces(
     repoIds: string[],
     task: SendOptions | null,

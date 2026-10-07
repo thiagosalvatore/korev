@@ -9,6 +9,7 @@ import {
   type AskChat,
   type ChatItem,
   type Repo,
+  type RepoFolder,
   type Settings,
   type Workspace,
 } from '../shared/model';
@@ -20,6 +21,7 @@ const SAVE_DELAY_MS = 400;
 
 export interface PersistedState {
   repos: Repo[];
+  folders: RepoFolder[];
   workspaces: Workspace[];
   askChats: AskChat[];
   settings: Settings;
@@ -70,7 +72,9 @@ function sanitize(raw: unknown, home: string): PersistedState {
     repos: repos.map((repo) => ({
       ...repo,
       scripts: { ...EMPTY_SCRIPTS, ...repo.scripts },
+      folderId: repo.folderId ?? null,
     })),
+    folders: Array.isArray(value.folders) ? value.folders : [],
     workspaces: (Array.isArray(value.workspaces) ? value.workspaces : []).map(
       (workspace) => ({
         ...workspace,

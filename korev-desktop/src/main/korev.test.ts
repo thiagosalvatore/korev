@@ -95,12 +95,8 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     return dir;
   }
 
-  beforeEach(async () => {
-    home = await mkdtemp(path.join(tmpdir(), 'korev-core-'));
-    repoPath = await initRepo('acme');
-    chosenDirectory = repoPath;
-    playSound = vi.fn();
-    korev = await createKorev({
+  function openKorev() {
+    return createKorev({
       run: runWithFakeSqlite,
       env: { ...process.env, PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}` },
       shell: '/bin/sh',
@@ -120,6 +116,14 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       openExternal: async () => undefined,
       applyTheme: () => undefined,
     });
+  }
+
+  beforeEach(async () => {
+    home = await mkdtemp(path.join(tmpdir(), 'korev-core-'));
+    repoPath = await initRepo('acme');
+    chosenDirectory = repoPath;
+    playSound = vi.fn();
+    korev = await openKorev();
     await korev.api.updateSettings({
       branchPrefix: 'dev',
       autoRenameBranches: false,
@@ -815,5 +819,90 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       branchPrefix: 'agent',
       defaultEffort: { claude: 'high', codex: 'high' },
     });
+  });
+
+  async function addRepos(...names: string[]) {
+    const repos = [await addRepo()];
+    for (const name of names) {
+      chosenDirectory = await initRepo(name);
+      repos.push(await addRepo());
+    }
+    return repos;
+  }
+
+  async function sidebarLayout() {
+    const { repos, folders } = await korev.api.getState();
+    return {
+      folders: folders.map((folder) => folder.name),
+      repos: repos.map((repo) => [
+        repo.name,
+        folders.find((folder) => folder.id === repo.folderId)?.name ?? null,
+      ]),
+    };
+  }
+
+  it('moves a repository into a folder, before another repository', async () => {
+    const [acme, , web] = await addRepos('api', 'web');
+    const work = await korev.api.createFolder(' Work ');
+
+    await korev.api.moveRepo(acme.id, {
+      folderId: work.id,
+      beforeRepoId: null,
+    });
+    await korev.api.moveRepo(web.id, {
+      folderId: work.id,
+      beforeRepoId: acme.id,
+    });
+
+    expect(await sidebarLayout()).toEqual({
+      folders: ['Work'],
+      repos: [
+        ['api', null],
+        ['web', 'Work'],
+        ['acme', 'Work'],
+      ],
+    });
+  });
+
+  it('reorders, renames and deletes folders without removing their repositories', async () => {
+    const [acme, api] = await addRepos('api');
+    const work = await korev.api.createFolder('Work');
+    const personal = await korev.api.createFolder('Personal');
+    await korev.api.moveRepo(acme.id, {
+      folderId: work.id,
+      beforeRepoId: null,
+    });
+    await korev.api.moveRepo(api.id, {
+      folderId: personal.id,
+      beforeRepoId: null,
+    });
+
+    await korev.api.moveFolder(personal.id, work.id);
+    await korev.api.renameFolder(personal.id, 'Side projects');
+    expect((await sidebarLayout()).folders).toEqual(['Side projects', 'Work']);
+    await korev.api.deleteFolder(work.id);
+
+    expect(await sidebarLayout()).toEqual({
+      folders: ['Side projects'],
+      repos: [
+        ['acme', null],
+        ['api', 'Side projects'],
+      ],
+    });
+  });
+
+  it('keeps folders and repository order after a restart', async () => {
+    const [acme] = await addRepos('api');
+    const work = await korev.api.createFolder('Work');
+    await korev.api.moveRepo(acme.id, {
+      folderId: work.id,
+      beforeRepoId: null,
+    });
+    const before = await sidebarLayout();
+
+    await korev.shutdown();
+    korev = await openKorev();
+
+    expect(await sidebarLayout()).toEqual(before);
   });
 });

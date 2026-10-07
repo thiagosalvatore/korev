@@ -55,6 +55,7 @@ export interface UiState {
   terminal: boolean;
   gitTab: GitPanelTab;
   collapsedRepos: string[];
+  collapsedFolders: string[];
   historyOpen: boolean;
   workspaces: Record<string, WorkspaceUi>;
   palette: PaletteMode;
@@ -71,6 +72,7 @@ const INITIAL: UiState = {
   terminal: true,
   gitTab: 'changes',
   collapsedRepos: [],
+  collapsedFolders: [],
   historyOpen: false,
   workspaces: {},
   palette: false,

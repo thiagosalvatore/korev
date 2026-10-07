@@ -126,6 +126,12 @@ export interface Repo {
   scripts: RepoScripts;
   spotlightTesting?: boolean;
   prompts?: RepoPrompts;
+  folderId?: string | null;
+}
+
+export interface RepoFolder {
+  id: string;
+  name: string;
 }
 
 export type WorkspaceSource =
@@ -291,6 +297,7 @@ export interface AgentAvailability {
 
 export interface AppState {
   repos: Repo[];
+  folders: RepoFolder[];
   workspaces: Workspace[];
   askChats: AskChat[];
   settings: Settings;

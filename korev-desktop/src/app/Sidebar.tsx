@@ -1,4 +1,11 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import {
+  Children,
+  Fragment,
+  useEffect,
+  useState,
+  type DragEvent,
+  type ReactNode,
+} from 'react';
 import {
   Button,
   cn,
@@ -13,23 +20,26 @@ import type {
   AppState,
   PrStatus,
   Repo,
+  RepoFolder,
   Workspace,
   WorkspaceRuntime,
 } from '../shared/model';
 import {
+  activeWorkspaces,
   archiveWorkspace,
   deleteAsk,
   openAsk,
   openIn,
   openNewWorkspace,
   openSettings,
+  repoSections,
   restoreWorkspace,
   selectWorkspace,
 } from './actions';
 import { api } from './bridge';
 import { timeAgo } from './format';
 import { DRAG_REGION, NO_DRAG } from './layout';
-import { Menu } from './ui/Menu';
+import { Menu, type MenuItem } from './ui/Menu';
 import { reportFailure } from './ui/toast';
 import { setUi, useUi } from './ui-store';
 
@@ -311,29 +321,187 @@ function RepoAvatar({ repo }: { repo: Repo }) {
   );
 }
 
+const REPO_DRAG_TYPE = 'application/x-korev-repo';
+const FOLDER_DRAG_TYPE = 'application/x-korev-folder';
+const DROP_INDICATOR = 'shadow-[inset_0_2px_0_0_var(--color-accent)]';
+const MOVE_TO_FOLDER = 'Move to folder';
+
+type DropHandlers = Partial<Record<string, (draggedId: string) => void>>;
+
+function draggable(type: string, id: string) {
+  return {
+    draggable: true,
+    onDragStart: (event: DragEvent) => {
+      event.dataTransfer.setData(type, id);
+      event.dataTransfer.effectAllowed = 'move';
+    },
+  };
+}
+
+function useDropTarget(handlers: DropHandlers) {
+  const [over, setOver] = useState(false);
+  const acceptedType = (event: DragEvent) =>
+    event.dataTransfer.types.find((type) => handlers[type]);
+  return {
+    over,
+    props: {
+      onDragOver: (event: DragEvent) => {
+        if (!acceptedType(event)) return;
+        event.preventDefault();
+        setOver(true);
+      },
+      onDragLeave: (event: DragEvent) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node)) return;
+        setOver(false);
+      },
+      onDrop: (event: DragEvent) => {
+        setOver(false);
+        const type = acceptedType(event);
+        if (!type) return;
+        event.preventDefault();
+        handlers[type]?.(event.dataTransfer.getData(type));
+      },
+    },
+  };
+}
+
+function useCollapsed(key: 'collapsedRepos' | 'collapsedFolders', id: string) {
+  const collapsed = useUi((ui) => ui[key].includes(id));
+  const toggle = () =>
+    setUi((ui) => ({
+      [key]: collapsed
+        ? ui[key].filter((entry) => entry !== id)
+        : [...ui[key], id],
+    }));
+  return [collapsed, toggle] as const;
+}
+
+function FolderNameDialog({
+  title,
+  initialName = '',
+  submitLabel,
+  onSubmit,
+  onClose,
+}: {
+  title: string;
+  initialName?: string;
+  submitLabel: string;
+  onSubmit: (name: string) => Promise<unknown>;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(initialName);
+  const [saving, setSaving] = useState(false);
+  async function submit() {
+    if (!name.trim()) return;
+    setSaving(true);
+    await onSubmit(name);
+    onClose();
+  }
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={title}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            loading={saving}
+            disabled={!name.trim()}
+            onClick={() => submit()}
+          >
+            {submitLabel}
+          </Button>
+        </>
+      }
+    >
+      <Input
+        label="Name"
+        autoFocus
+        value={name}
+        placeholder="Work"
+        onChange={(event) => setName(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') void submit();
+        }}
+      />
+    </Dialog>
+  );
+}
+
+function moveToFolderItems(
+  state: AppState,
+  repo: Repo,
+  folderId: string | null,
+  onNewFolder: () => void,
+): MenuItem[] {
+  const moveTo = (target: string | null) =>
+    void api.moveRepo(repo.id, { folderId: target, beforeRepoId: null });
+  return [
+    ...state.folders.map((folder) => ({
+      id: folder.id,
+      label: folder.name,
+      icon: 'folder' as const,
+      checked: folder.id === folderId,
+      section: MOVE_TO_FOLDER,
+      onSelect: () => moveTo(folder.id),
+    })),
+    {
+      id: 'no-folder',
+      label: 'No folder',
+      icon: 'folder-minus',
+      checked: folderId === null,
+      section: MOVE_TO_FOLDER,
+      onSelect: () => moveTo(null),
+    },
+    {
+      id: 'new-folder',
+      label: 'New folder…',
+      icon: 'folder-plus',
+      section: MOVE_TO_FOLDER,
+      onSelect: onNewFolder,
+    },
+  ];
+}
+
 function RepoGroup({
   state,
   repo,
+  folderId,
   workspaces,
   selectedId,
   indexOf,
 }: {
   state: AppState;
   repo: Repo;
+  folderId: string | null;
   workspaces: Workspace[];
   selectedId: string | null;
   indexOf: (workspace: Workspace) => number;
 }) {
-  const collapsed = useUi((ui) => ui.collapsedRepos.includes(repo.id));
-  const toggle = () =>
-    setUi((ui) => ({
-      collapsedRepos: collapsed
-        ? ui.collapsedRepos.filter((id) => id !== repo.id)
-        : [...ui.collapsedRepos, repo.id],
-    }));
+  const [collapsed, toggle] = useCollapsed('collapsedRepos', repo.id);
+  const [naming, setNaming] = useState(false);
+  const drop = useDropTarget({
+    [REPO_DRAG_TYPE]: (draggedId) =>
+      void api.moveRepo(draggedId, { folderId, beforeRepoId: repo.id }),
+  });
+  async function createFolderWithRepo(name: string) {
+    const folder = await api.createFolder(name);
+    await api.moveRepo(repo.id, { folderId: folder.id, beforeRepoId: null });
+  }
   return (
     <section aria-label={repo.name} className="mb-2">
-      <div className="group flex h-8 items-center gap-1.5 rounded-md px-2 hover:bg-hover">
+      <div
+        {...draggable(REPO_DRAG_TYPE, repo.id)}
+        {...drop.props}
+        className={cn(
+          'group flex h-8 items-center gap-1.5 rounded-md px-2 hover:bg-hover',
+          drop.over && DROP_INDICATOR,
+        )}
+      >
         <button
           type="button"
           className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-left"
@@ -353,7 +521,7 @@ function RepoGroup({
             )}
           />
         </button>
-        <span className="hidden gap-0.5 group-hover:flex">
+        <span className="hidden gap-0.5 group-hover:flex has-[[role=menu]]:flex">
           <IconButton
             icon="settings-2"
             label={`${repo.name} settings`}
@@ -372,8 +540,31 @@ function RepoGroup({
             size="sm"
             onClick={() => openNewWorkspace(repo.id)}
           />
+          <Menu
+            label={`${repo.name} actions`}
+            align="right"
+            items={moveToFolderItems(state, repo, folderId, () =>
+              setNaming(true),
+            )}
+            trigger={({ toggle: toggleMenu }) => (
+              <IconButton
+                icon="ellipsis"
+                label={`${repo.name} actions`}
+                size="sm"
+                onClick={toggleMenu}
+              />
+            )}
+          />
         </span>
       </div>
+      {naming ? (
+        <FolderNameDialog
+          title="New folder"
+          submitLabel="Create"
+          onSubmit={createFolderWithRepo}
+          onClose={() => setNaming(false)}
+        />
+      ) : null}
       {collapsed ? null : (
         <div className="mt-0.5 flex flex-col gap-0.5">
           {workspaces.map((workspace) => (
@@ -395,6 +586,99 @@ function RepoGroup({
               New workspace
             </button>
           ) : null}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function FolderSection({
+  folder,
+  children,
+}: {
+  folder: RepoFolder;
+  children: ReactNode;
+}) {
+  const [collapsed, toggle] = useCollapsed('collapsedFolders', folder.id);
+  const [renaming, setRenaming] = useState(false);
+  const drop = useDropTarget({
+    [REPO_DRAG_TYPE]: (draggedId) =>
+      void api.moveRepo(draggedId, { folderId: folder.id, beforeRepoId: null }),
+    [FOLDER_DRAG_TYPE]: (draggedId) =>
+      void api.moveFolder(draggedId, folder.id),
+  });
+  const empty = !Children.count(children);
+  return (
+    <section aria-label={folder.name} className="mb-2">
+      <div
+        {...draggable(FOLDER_DRAG_TYPE, folder.id)}
+        {...drop.props}
+        className={cn(
+          'group flex h-8 items-center gap-1 rounded-md px-2 hover:bg-hover',
+          drop.over && DROP_INDICATOR,
+        )}
+      >
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left type-overline text-fg-4"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+        >
+          <span className="truncate">{folder.name}</span>
+          <Icon
+            name="chevron-down"
+            size={12}
+            className={cn('transition-transform', collapsed && '-rotate-90')}
+          />
+        </button>
+        <span className="hidden group-hover:flex has-[[role=menu]]:flex">
+          <Menu
+            label={`${folder.name} actions`}
+            align="right"
+            items={[
+              {
+                id: 'rename',
+                label: 'Rename',
+                icon: 'pencil',
+                onSelect: () => setRenaming(true),
+              },
+              {
+                id: 'delete',
+                label: 'Delete folder',
+                icon: 'trash-2',
+                danger: true,
+                onSelect: () => void api.deleteFolder(folder.id),
+              },
+            ]}
+            trigger={({ toggle: toggleMenu }) => (
+              <IconButton
+                icon="ellipsis"
+                label={`${folder.name} actions`}
+                size="sm"
+                onClick={toggleMenu}
+              />
+            )}
+          />
+        </span>
+      </div>
+      {renaming ? (
+        <FolderNameDialog
+          title="Rename folder"
+          initialName={folder.name}
+          submitLabel="Rename"
+          onSubmit={(name) => api.renameFolder(folder.id, name)}
+          onClose={() => setRenaming(false)}
+        />
+      ) : null}
+      {collapsed ? null : (
+        <div className="mt-0.5 pl-2">
+          {empty ? (
+            <p className="px-2 py-1 text-xs text-fg-4">
+              Drag repositories here
+            </p>
+          ) : (
+            children
+          )}
         </div>
       )}
     </section>
@@ -621,11 +905,8 @@ export function Sidebar({ state }: { state: AppState }) {
   const selectedId = useUi((ui) =>
     ui.page.kind === 'workspace' ? ui.workspaceId : null,
   );
-  const active = state.workspaces.filter((ws) => !ws.archivedAt);
-  const ordered = state.repos.flatMap((repo) =>
-    active.filter((ws) => ws.repoId === repo.id),
-  );
-  const indexOf = (workspace: Workspace) => ordered.indexOf(workspace);
+  const active = activeWorkspaces(state);
+  const indexOf = (workspace: Workspace) => active.indexOf(workspace);
   return (
     <nav
       aria-label="Workspaces"
@@ -666,16 +947,26 @@ export function Sidebar({ state }: { state: AppState }) {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-1">
         <AskChats state={state} />
-        {state.repos.map((repo) => (
-          <RepoGroup
-            key={repo.id}
-            state={state}
-            repo={repo}
-            workspaces={active.filter((ws) => ws.repoId === repo.id)}
-            selectedId={selectedId}
-            indexOf={indexOf}
-          />
-        ))}
+        {repoSections(state).map(({ folder, repos }) => {
+          const groups = repos.map((repo) => (
+            <RepoGroup
+              key={repo.id}
+              state={state}
+              repo={repo}
+              folderId={folder?.id ?? null}
+              workspaces={active.filter((ws) => ws.repoId === repo.id)}
+              selectedId={selectedId}
+              indexOf={indexOf}
+            />
+          ));
+          return folder ? (
+            <FolderSection key={folder.id} folder={folder}>
+              {groups}
+            </FolderSection>
+          ) : (
+            <Fragment key="no-folder">{groups}</Fragment>
+          );
+        })}
       </div>
       <History state={state} />
       <div className="flex items-center gap-1 border-t border-border-1 p-2">

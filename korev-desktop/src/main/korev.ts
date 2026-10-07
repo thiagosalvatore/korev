@@ -156,6 +156,18 @@ export interface Korev {
   shutdown(): Promise<void>;
 }
 
+function moveBefore<T extends { id: string }>(
+  items: T[],
+  item: T,
+  beforeId: string | null,
+): T[] {
+  if (beforeId === item.id) return items;
+  const rest = items.filter((entry) => entry !== item);
+  const index = rest.findIndex((entry) => entry.id === beforeId);
+  rest.splice(index === -1 ? rest.length : index, 0, item);
+  return rest;
+}
+
 const IDLE: WorkspaceRuntime = {
   status: 'idle',
   unread: false,
@@ -267,9 +279,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   }
 
   function snapshot(): AppState {
-    const { repos, workspaces, askChats, settings } = store.state;
+    const { repos, folders, workspaces, askChats, settings } = store.state;
     return {
       repos,
+      folders,
       workspaces,
       askChats,
       settings,
@@ -393,6 +406,17 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     ctx.emitState();
   }
 
+  function folder(folderId: string) {
+    const found = store.state.folders.find((entry) => entry.id === folderId);
+    if (!found) throw new NotFoundError('Folder', folderId);
+    return found;
+  }
+
+  function saveAndEmit() {
+    store.save();
+    ctx.emitState();
+  }
+
   async function removeRepoFromAskChats(repo: Repo) {
     for (const ask of store.state.askChats) {
       ask.repoIds = ask.repoIds.filter((repoId) => repoId !== repo.id);
@@ -492,6 +516,38 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       ctx.repo(repoId).scripts = scripts;
       store.save();
       ctx.emitState();
+    },
+    async createFolder(name) {
+      const created = { id: deps.newId(), name: name.trim() };
+      store.state.folders.push(created);
+      saveAndEmit();
+      return created;
+    },
+    async renameFolder(folderId, name) {
+      folder(folderId).name = name.trim();
+      saveAndEmit();
+    },
+    async deleteFolder(folderId) {
+      const { state } = store;
+      state.folders = state.folders.filter((entry) => entry.id !== folderId);
+      for (const repo of state.repos) {
+        if (repo.folderId === folderId) repo.folderId = null;
+      }
+      saveAndEmit();
+    },
+    async moveRepo(repoId, { folderId, beforeRepoId }) {
+      const repo = ctx.repo(repoId);
+      repo.folderId = folderId === null ? null : folder(folderId).id;
+      store.state.repos = moveBefore(store.state.repos, repo, beforeRepoId);
+      saveAndEmit();
+    },
+    async moveFolder(folderId, beforeFolderId) {
+      store.state.folders = moveBefore(
+        store.state.folders,
+        folder(folderId),
+        beforeFolderId,
+      );
+      saveAndEmit();
     },
     createWorkspaces: async (repoIds, task, source) =>
       createWorkspaces(ctx, repoIds, task, chats.send, null, source),

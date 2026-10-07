@@ -3,6 +3,8 @@ import type {
   AskChat,
   AppState,
   EditorId,
+  Repo,
+  RepoFolder,
   Result,
   SendOptions,
   TerminalPreset,
@@ -21,8 +23,29 @@ import {
   type MainTab,
 } from './ui-store';
 
+export interface RepoSection {
+  folder: RepoFolder | null;
+  repos: Repo[];
+}
+
+export function repoSections(state: AppState): RepoSection[] {
+  const folderIds = new Set(state.folders.map((folder) => folder.id));
+  const folderOf = (repo: Repo) =>
+    repo.folderId && folderIds.has(repo.folderId) ? repo.folderId : null;
+  const inFolder = (folderId: string | null) =>
+    state.repos.filter((repo) => folderOf(repo) === folderId);
+  return [
+    { folder: null, repos: inFolder(null) },
+    ...state.folders.map((folder) => ({ folder, repos: inFolder(folder.id) })),
+  ];
+}
+
 export function activeWorkspaces(state: AppState): Workspace[] {
-  const repoOrder = new Map(state.repos.map((repo, index) => [repo.id, index]));
+  const repoOrder = new Map(
+    repoSections(state)
+      .flatMap((section) => section.repos)
+      .map((repo, index) => [repo.id, index]),
+  );
   return state.workspaces
     .filter((ws) => !ws.archivedAt)
     .sort(
