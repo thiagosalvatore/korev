@@ -13,6 +13,7 @@ import {
 import {
   AGENT_KINDS,
   AGENT_LABELS,
+  DEFAULT_INCLUDE_GLOBS,
   EFFORT_LEVELS,
   LOADOUT_SIZE,
   loadoutKey,
@@ -876,6 +877,48 @@ function RepoPromptSettings({ state, repo }: { state: AppState; repo: Repo }) {
   );
 }
 
+function IncludeFilesSettings({ repo }: { repo: Repo }) {
+  const saved = repo.fileIncludeGlobs || DEFAULT_INCLUDE_GLOBS;
+  const [globs, setGlobs] = useState(saved);
+  useEffect(() => setGlobs(saved), [repo.id, saved]);
+  return (
+    <div className="border-b border-border-1 py-4">
+      <div className="text-sm font-medium text-fg-1">Files to copy</div>
+      <p className="mt-0.5 mb-3 text-xs text-fg-3">
+        Gitignored files to copy from the repository folder into each new
+        workspace. One per line: a file name like{' '}
+        <span className="font-mono">config/secrets.json</span> or a pattern like{' '}
+        <span className="font-mono">.env*</span>, in .gitignore syntax. A{' '}
+        <span className="font-mono">.worktreeinclude</span> file, or{' '}
+        <span className="font-mono">file_include_globs</span> in the
+        repository's settings file, replaces this list.
+      </p>
+      <div className="flex flex-col gap-3">
+        <textarea
+          aria-label="Files to copy"
+          value={globs}
+          rows={3}
+          className={SCRIPT_TEXTAREA_CLASS}
+          onChange={(event) => setGlobs(event.target.value)}
+        />
+        <div>
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={globs === saved}
+            onClick={async () => {
+              await api.updateRepo(repo.id, { fileIncludeGlobs: globs });
+              toast('Files to copy saved', 'success');
+            }}
+          >
+            Save files
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const SOURCE_NOTICE: Record<RepoConfigSource, string | null> = {
   app: null,
   'korev.json':
@@ -1029,6 +1072,7 @@ function RepoSettings({ state, repo }: { state: AppState; repo: Repo }) {
           }
         />
       </Row>
+      <IncludeFilesSettings repo={repo} />
       <div className="py-4">
         <div className="text-sm font-medium text-fg-1">Scripts</div>
         <p className="mt-0.5 mb-3 text-xs text-fg-3">

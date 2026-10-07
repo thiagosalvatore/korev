@@ -32,7 +32,10 @@ const PORT_VARIABLE = /\$\{?KOREV_PORT\}?/g;
 
 export type Table = Record<string, unknown>;
 
-export type AppRepoSettings = Pick<Repo, 'scripts' | 'prompts'>;
+export type AppRepoSettings = Pick<
+  Repo,
+  'scripts' | 'prompts' | 'fileIncludeGlobs'
+>;
 
 export interface RepoConfigFiles {
   sharedToml: string | null;
@@ -186,7 +189,8 @@ function fromSettings(
     runScripts: runScriptsFrom(scripts.run),
     autoRunAfterSetup: scripts.auto_run_after_setup === true,
     previewUrls: previewUrlsFrom(settings.preview_urls),
-    fileIncludeGlobs: text(settings.file_include_globs) ?? null,
+    fileIncludeGlobs:
+      text(settings.file_include_globs) ?? appFileIncludeGlobs(app),
     environment: environmentFrom(settings.environment_variables),
     prompts: { ...app.prompts, ...promptsFrom(settings.prompts) },
     archiveOnMerge: flag(table(settings.git).archive_on_merge) ?? null,
@@ -209,7 +213,12 @@ function fromAppRunScripts(scripts: AppRunScript[]): RunScript[] {
     }));
 }
 
-function fromApp({ scripts, prompts }: AppRepoSettings): RepoConfig {
+function appFileIncludeGlobs(app: AppRepoSettings): string | null {
+  return app.fileIncludeGlobs || null;
+}
+
+function fromApp(app: AppRepoSettings): RepoConfig {
+  const { scripts, prompts } = app;
   return {
     source: 'app',
     setup: scripts.setup,
@@ -218,7 +227,7 @@ function fromApp({ scripts, prompts }: AppRepoSettings): RepoConfig {
     runScripts: fromAppRunScripts(scripts.run),
     autoRunAfterSetup: false,
     previewUrls: [],
-    fileIncludeGlobs: null,
+    fileIncludeGlobs: appFileIncludeGlobs(app),
     environment: {},
     prompts: prompts ?? {},
     archiveOnMerge: null,

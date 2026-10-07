@@ -1,3 +1,4 @@
+import { ListChecks, X } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   Alert,
@@ -9,16 +10,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  PENDING_PLAN_PLACEHOLDER,
   STOP_BEFORE_SWITCHING,
   type AppState,
   type ChatSession,
   type ModelChoice,
 } from '../../../korev-desktop/src/shared/model';
+import { planFileName } from '../../../korev-desktop/src/shared/message';
 import { attempt } from '../attempt';
 import { useConnection } from '../korev';
 import { ModelPicker } from '../ModelPicker';
 import { useTheme, type Theme } from '../theme';
 import { Button } from '../ui';
+import { PlanChip } from './PlanChip';
 
 export function Composer({
   state,
@@ -33,10 +37,12 @@ export function Composer({
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const running = state.runningSessions.includes(session.id);
+  const { pendingPlan } = session;
+  const canSend = Boolean(text.trim() || pendingPlan);
 
   async function send() {
     const message = text.trim();
-    if (!message) return;
+    if (!canSend) return;
     setText('');
     const sent = await attempt('Korev could not send the message', () =>
       api.send(session.id, {
@@ -64,6 +70,11 @@ export function Composer({
     );
   }
 
+  const discardPendingPlan = () =>
+    void attempt('Korev could not remove the plan', () =>
+      api.updateSession(session.id, { pendingPlan: null }),
+    );
+
   const stop = () =>
     void attempt('Korev could not stop the agent', () => api.stop(session.id));
 
@@ -75,11 +86,33 @@ export function Composer({
         { marginBottom: insets.bottom + 8 },
       ]}
     >
+      {pendingPlan ? (
+        <View style={styles.chip}>
+          <PlanChip
+            name={planFileName(pendingPlan.plan)}
+            markdown={pendingPlan.plan}
+            style={styles.chipPreview}
+          >
+            <ListChecks size={14} color={theme.accentText} />
+            <Text style={styles.chipLabel} numberOfLines={1}>
+              Plan · {pendingPlan.from}
+            </Text>
+          </PlanChip>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Remove the handed-off plan"
+            hitSlop={8}
+            onPress={discardPendingPlan}
+          >
+            <X size={14} color={theme.accentText} />
+          </Pressable>
+        </View>
+      ) : null}
       <TextInput
         style={styles.input}
         value={text}
         onChangeText={setText}
-        placeholder={running ? 'Steer the agent or queue a message' : 'Ask'}
+        placeholder={placeholder(running, Boolean(pendingPlan))}
         placeholderTextColor={theme.fg4}
         multiline
       />
@@ -104,14 +137,15 @@ export function Composer({
         {running ? (
           <Button label="Stop" variant="secondary" onPress={stop} />
         ) : null}
-        <Button
-          label="Send"
-          disabled={!text.trim()}
-          onPress={() => void send()}
-        />
+        <Button label="Send" disabled={!canSend} onPress={() => void send()} />
       </View>
     </View>
   );
+}
+
+function placeholder(running: boolean, hasPendingPlan: boolean): string {
+  if (hasPendingPlan) return PENDING_PLAN_PLACEHOLDER;
+  return running ? 'Steer the agent or queue a message' : 'Ask';
 }
 
 function makeStyles(theme: Theme) {
@@ -126,6 +160,24 @@ function makeStyles(theme: Theme) {
       backgroundColor: theme.bgSurface,
     },
     planMode: { borderColor: theme.accent, borderStyle: 'dashed' },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 6,
+      maxWidth: '100%',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
+      backgroundColor: theme.accentSubtle,
+    },
+    chipPreview: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 1,
+      gap: 6,
+    },
+    chipLabel: { flexShrink: 1, color: theme.accentText, fontSize: 13 },
     input: { maxHeight: 160, color: theme.fg1, fontSize: 15 },
     toolbar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     meta: { color: theme.fg3, fontSize: 13 },

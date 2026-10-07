@@ -1,0 +1,12 @@
+{
+  "title": "Concepts",
+  "icon": "Boxes",
+  "defaultOpen": true,
+  "pages": [
+    "workspaces",
+    "ask",
+    "linked-workspaces",
+    "agents-and-modes",
+    "permissions"
+  ]
+}

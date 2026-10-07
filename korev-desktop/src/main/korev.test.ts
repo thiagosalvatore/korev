@@ -934,6 +934,21 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toContain(`--add-dir ${path.join(home, 'user-data', 'attachments')}`);
   });
 
+  it('reads an image the agent saved as a data URL', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await writeFile(
+      path.join(workspace.path, 'shot.png'),
+      Buffer.from(SCREENSHOT_BASE64, 'base64'),
+    );
+    await writeFile(path.join(workspace.path, 'notes.txt'), 'hello');
+
+    expect(await korev.api.readImage(session.id, 'shot.png')).toBe(
+      `data:image/png;base64,${SCREENSHOT_BASE64}`,
+    );
+    expect(await korev.api.readImage(session.id, 'notes.txt')).toBeNull();
+  });
+
   async function userMessages(sessionId: string) {
     return (await korev.api.transcript(sessionId)).flatMap((item) =>
       item.kind === 'user' ? [item.text] : [],
@@ -1046,6 +1061,25 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       path.join(repoPath, '.worktreeinclude'),
       'config/*.local.json\n',
     );
+
+    const workspace = await createWorkspace();
+
+    expect(
+      existsSync(path.join(workspace.path, 'config', 'app.local.json')),
+    ).toBe(true);
+    expect(existsSync(path.join(workspace.path, '.env'))).toBe(false);
+  });
+
+  it('copies the gitignored files listed in the repository settings', async () => {
+    await mkdir(path.join(repoPath, 'config'));
+    await writeFile(path.join(repoPath, 'config', 'app.local.json'), '{}');
+    await writeFile(
+      path.join(repoPath, '.gitignore'),
+      '.env\nconfig/*.local.json\n',
+    );
+    await korev.api.updateRepo((await addRepo()).id, {
+      fileIncludeGlobs: 'config/*.local.json',
+    });
 
     const workspace = await createWorkspace();
 
@@ -1348,10 +1382,11 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       session.id,
       handoff.value,
     ]);
-    expect(after.sessions[1].planMode).toBe(false);
-    expect((await userMessages(handoff.value))[0]).toContain(
-      'Implement the plan below.\n\n<plan>\n1. Add the login page\n</plan>',
-    );
+    expect(after.sessions[1]).toMatchObject({
+      planMode: false,
+      pendingPlan: { plan: '1. Add the login page', from: session.title },
+    });
+    expect(await userMessages(handoff.value)).toEqual([]);
     const card = (await korev.api.transcript(session.id)).find(
       (item) => item.kind === 'permission',
     );
@@ -1386,9 +1421,31 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       agent: 'codex',
       model: 'gpt-6.1-sol',
     });
-    expect((await userMessages(handoff.value))[0]).toContain(
-      '<plan>\n# Settings',
+    expect(after.sessions[1].pendingPlan?.plan).toContain('# Settings');
+  });
+
+  it('sends a handed-off plan with the first message of the new tab', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await korev.api.send(session.id, {
+      ...task('make-plan for the login page'),
+      planMode: true,
+    });
+    await waitFor(async () =>
+      (await korev.api.transcript(session.id)).some(
+        (item) => item.kind === 'permission',
+      ),
     );
+    const handoff = await korev.api.handoffPlan(session.id);
+    if (!handoff.ok) throw new Error(handoff.message);
+
+    await korev.api.send(handoff.value, task(''));
+
+    expect((await userMessages(handoff.value))[0]).toBe(
+      `Implement the plan below.\n\n<plan from="${session.title}">\n1. Add the login page\n</plan>`,
+    );
+    const { workspace: after } = await workspaceState(workspace.id);
+    expect(after.sessions[1].pendingPlan).toBeUndefined();
   });
 
   it('offers skills as slash commands', async () => {

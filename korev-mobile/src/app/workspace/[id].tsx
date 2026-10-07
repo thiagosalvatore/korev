@@ -106,7 +106,12 @@ export default function WorkspaceScreen() {
         styles={styles}
       />
       {session ? (
-        <Chat key={session.id} state={state} session={session} />
+        <Chat
+          key={session.id}
+          state={state}
+          session={session}
+          onHandoff={setSelectedId}
+        />
       ) : (
         <Text style={styles.empty}>This workspace has no chats.</Text>
       )}

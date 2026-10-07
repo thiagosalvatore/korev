@@ -1,0 +1,16 @@
+{
+  "title": "Reference",
+  "icon": "BookOpen",
+  "defaultOpen": true,
+  "pages": [
+    "repository-config",
+    "environment-variables",
+    "composer",
+    "checkpoints",
+    "keyboard-shortcuts",
+    "settings",
+    "usage",
+    "troubleshooting",
+    "remote-access"
+  ]
+}
