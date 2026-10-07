@@ -299,7 +299,7 @@ function RepoAvatar({ repo }: { repo: Repo }) {
       <img
         src={icon}
         alt=""
-        className="size-5 flex-none rounded-xs"
+        className="size-5 flex-none rounded-xs object-contain"
         onError={() => setIcon(null)}
       />
     );

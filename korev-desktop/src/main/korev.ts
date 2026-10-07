@@ -57,6 +57,7 @@ import { listIssues, listPullRequests } from './sources';
 import { rangeFileDiff, rangeFiles, searchFiles } from './git-review';
 import { findLocalUrl } from './workspace-setup';
 import { createSpotlight } from './spotlight';
+import { repoFavicon } from './repo-icon';
 import { openStore } from './store';
 import { createTerminals, type SpawnPty } from './terminals';
 import {
@@ -544,7 +545,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       loadRepoConfig(ctx.repo(repoId), ctx.repo(repoId).path),
     listSkills: (repoId) => listSkills(deps.home, ctx.repo(repoId).path),
     async repoIcon(repoId) {
-      const owner = await originOwner(git, ctx.repo(repoId).path);
+      const repoPath = ctx.repo(repoId).path;
+      const favicon = await repoFavicon(repoPath);
+      if (favicon) return favicon;
+      const owner = await originOwner(git, repoPath);
       return owner ? githubAvatar(owner) : null;
     },
     async startReview(workspaceId) {
