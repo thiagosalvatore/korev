@@ -92,6 +92,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   let chosenDirectory: string;
   let korev: Korev;
   let playSound: Mock<() => void>;
+  let keepAwake: Mock<(on: boolean) => void>;
   let emit: Mock<(event: string, payload: unknown) => void>;
 
   async function initRepo(name: string) {
@@ -122,6 +123,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       playSound,
       isWindowFocused: () => true,
       setBadge: () => undefined,
+      keepAwake,
       now: () => new Date(),
       newId: () => randomUUID(),
       chooseDirectory: async () => chosenDirectory,
@@ -136,6 +138,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     repoPath = await initRepo('acme');
     chosenDirectory = repoPath;
     playSound = vi.fn();
+    keepAwake = vi.fn();
     emit = vi.fn();
     korev = await openKorev();
     await korev.api.updateSettings({
@@ -342,6 +345,15 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     await sendAndWait(workspace.sessions[0].id, 'Add a note');
 
     expect(playSound).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the Mac awake only while a turn is running', async () => {
+    const workspace = await createWorkspace();
+
+    await sendAndWait(workspace.sessions[0].id, 'Add a note');
+
+    expect(keepAwake).toHaveBeenCalledWith(true);
+    expect(keepAwake).toHaveBeenLastCalledWith(false);
   });
 
   it('stays quiet when a turn finishes in the workspace you are looking at', async () => {

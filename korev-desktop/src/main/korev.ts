@@ -268,6 +268,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       deps.setBadge(
         [...runtimes.values()].filter((runtime) => runtime.unread).length,
       );
+      deps.keepAwake(
+        store.state.settings.keepAwake && ctx.runningSessions.size > 0,
+      );
     },
     workspace(workspaceId) {
       const found = store.state.workspaces.find((ws) => ws.id === workspaceId);

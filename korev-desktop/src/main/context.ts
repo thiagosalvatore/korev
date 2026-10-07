@@ -26,6 +26,7 @@ export interface CoreDeps {
   playSound(): void;
   isWindowFocused(): boolean;
   setBadge(count: number): void;
+  keepAwake(on: boolean): void;
   now(): Date;
   newId(): string;
 }

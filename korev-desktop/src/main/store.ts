@@ -47,6 +47,7 @@ export function defaultSettings(home: string): Settings {
     editor: 'cursor',
     notifications: true,
     notificationSound: true,
+    keepAwake: true,
     windowBounds: null,
   };
 }

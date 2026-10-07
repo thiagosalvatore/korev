@@ -209,6 +209,7 @@ export interface Settings {
   editor: EditorId;
   notifications: boolean;
   notificationSound: boolean;
+  keepAwake: boolean;
   windowBounds: WindowBounds | null;
 }
 

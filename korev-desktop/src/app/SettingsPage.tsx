@@ -154,6 +154,15 @@ function General({ settings }: { settings: Settings }) {
         />
       </Row>
       <Row
+        title="Keep Mac awake"
+        description="Stop your Mac from sleeping while an agent is working. The display can still turn off."
+      >
+        <Switch
+          checked={settings.keepAwake}
+          onChange={(keepAwake) => update({ keepAwake })}
+        />
+      </Row>
+      <Row
         title="Import from Conductor"
         description="Adds Conductor's repositories and copies its git and model preferences. Repositories keep using their .conductor/settings.toml."
       >

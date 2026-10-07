@@ -6,6 +6,7 @@ import {
   Menu,
   nativeTheme,
   Notification,
+  powerSaveBlocker,
   screen,
   shell,
   type WebContents,
@@ -100,6 +101,18 @@ function playSound() {
   });
 }
 
+let sleepBlocker: number | null = null;
+
+function keepAwake(on: boolean) {
+  if (on && sleepBlocker === null) {
+    sleepBlocker = powerSaveBlocker.start('prevent-app-suspension');
+  }
+  if (!on && sleepBlocker !== null) {
+    powerSaveBlocker.stop(sleepBlocker);
+    sleepBlocker = null;
+  }
+}
+
 async function chooseDirectory(): Promise<string | null> {
   const window = BrowserWindow.getFocusedWindow();
   const options: Electron.OpenDialogOptions = {
@@ -129,6 +142,7 @@ async function createKorevApp(): Promise<Korev> {
     playSound,
     isWindowFocused: () => BrowserWindow.getFocusedWindow() !== null,
     setBadge: (count) => app.setBadgeCount(count),
+    keepAwake,
     now: () => new Date(),
     newId: () => randomUUID(),
     chooseDirectory,
