@@ -44,6 +44,19 @@ function confirm(title: string, action: string, onConfirm: () => void) {
   ]);
 }
 
+function confirmThenLeave(
+  title: string,
+  action: string,
+  failure: string,
+  run: () => Promise<unknown>,
+) {
+  confirm(
+    title,
+    action,
+    () => void attempt(failure, run).then((done) => done && router.back()),
+  );
+}
+
 function runStep(
   api: KorevApi,
   step: PrStep,
@@ -64,19 +77,12 @@ function runStep(
       api.resolveConflicts(workspace.id, sessionId, pr.number),
     );
   if (step === 'merge')
-    return confirm(
-      `Merge #${pr.number}?`,
-      label,
-      () => void attempt(failure, () => api.mergePr(workspace.id, pr.number)),
+    return confirmThenLeave(`Merge #${pr.number}?`, label, failure, () =>
+      api.mergePr(workspace.id, pr.number),
     );
   if (step === 'archive')
-    return confirm(
-      `Archive ${workspace.name}?`,
-      label,
-      () =>
-        void attempt(failure, () => api.archiveWorkspace(workspace.id)).then(
-          (archived) => archived && router.back(),
-        ),
+    return confirmThenLeave(`Archive ${workspace.name}?`, label, failure, () =>
+      api.archiveWorkspace(workspace.id),
     );
   void Linking.openURL(pr.url);
 }

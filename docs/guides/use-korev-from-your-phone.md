@@ -74,8 +74,8 @@ The phone app cannot attach files yet, and opening a workspace on the phone does
 The bar at the top of a workspace shows its pull request and the next step, the same as the button in the Korev workspace header:
 
 - **Create PR**, **Fix errors** and **Resolve conflicts** send the prompt to the chat that is open.
-- **Merge** asks you to confirm, then squash-merges the PR.
-- **Archive** asks you to confirm, then archives the workspace.
+- **Merge** asks you to confirm, squash-merges the PR, and goes back to the workspace list.
+- **Archive** asks you to confirm, archives the workspace, and goes back to the workspace list.
 - **Checks running**, **Draft**, **Changes requested** and **Waiting for review** open the PR on GitHub.
 
 Tap the PR title to see its checks. Tap a check to open it.
