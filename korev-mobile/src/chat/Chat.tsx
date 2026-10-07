@@ -5,7 +5,6 @@ import {
   KeyboardAvoidingView,
   StyleSheet,
 } from 'react-native';
-import { modelLabel } from '../../../korev-desktop/src/shared/format';
 import type {
   AppState,
   ChatSession,
@@ -53,11 +52,7 @@ export function Chat({
       ) : (
         <ActivityIndicator style={styles.fill} />
       )}
-      <Composer
-        session={session}
-        running={state.runningSessions.includes(session.id)}
-        modelLabel={modelLabel(state, session)}
-      />
+      <Composer state={state} session={session} />
     </KeyboardAvoidingView>
   );
 }

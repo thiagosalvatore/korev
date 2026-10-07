@@ -15,11 +15,11 @@ import {
   type SendOptions,
   type Workspace,
 } from '../../../korev-desktop/src/shared/model';
-import { modelLabel } from '../../../korev-desktop/src/shared/format';
 import { repoSections } from '../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../attempt';
-import { useAppState } from '../hooks';
+import { useAppState, useModelChoice } from '../hooks';
 import { useConnection } from '../korev';
+import { ModelPicker } from '../ModelPicker';
 import { RepoPicker } from '../RepoPicker';
 import { useTheme, type Theme } from '../theme';
 import { Button } from '../ui';
@@ -28,18 +28,6 @@ const LOADING_STYLE = { marginTop: 40 };
 
 function openWorkspace(workspace: Workspace) {
   router.replace({ pathname: '/workspace/[id]', params: { id: workspace.id } });
-}
-
-function defaultTask(state: AppState, text: string, planMode: boolean) {
-  const { defaultAgent, defaultModels, defaultEffort } = state.settings;
-  return {
-    text,
-    agent: defaultAgent,
-    model: defaultModels[defaultAgent],
-    effort: defaultEffort[defaultAgent],
-    planMode,
-    fast: false,
-  } satisfies SendOptions;
 }
 
 function NewWorkspaceForm({
@@ -57,7 +45,15 @@ function NewWorkspaceForm({
   const [prompt, setPrompt] = useState('');
   const [planMode, setPlanMode] = useState(state.settings.defaultPlanMode);
   const [creating, setCreating] = useState(false);
-  const task = defaultTask(state, prompt.trim(), planMode);
+  const { agent, model, effort, choose } = useModelChoice(state.settings);
+  const task: SendOptions = {
+    text: prompt.trim(),
+    agent,
+    model,
+    effort,
+    planMode,
+    fast: false,
+  };
 
   async function create() {
     if (!repoId) return;
@@ -102,9 +98,14 @@ function NewWorkspaceForm({
         >
           <Text style={planMode ? styles.planOn : styles.meta}>Plan</Text>
         </Pressable>
-        <Text style={[styles.meta, styles.model]} numberOfLines={1}>
-          {modelLabel(state, task)}
-        </Text>
+        <View style={styles.model}>
+          <ModelPicker
+            state={state}
+            agent={agent}
+            model={model}
+            onChange={choose}
+          />
+        </View>
         {creating ? <ActivityIndicator /> : null}
         <Button
           label={task.text ? 'Create and start' : 'Create'}

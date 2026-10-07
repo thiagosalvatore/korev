@@ -13,7 +13,9 @@ import type {
 } from '../../../korev-desktop/src/shared/model';
 import { repoSections } from '../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../attempt';
+import { useModelChoice } from '../hooks';
 import { useConnection } from '../korev';
+import { ModelPicker } from '../ModelPicker';
 import { RepoPicker } from '../RepoPicker';
 import { useTheme, type Theme } from '../theme';
 import { Button } from '../ui';
@@ -41,17 +43,17 @@ export function NewAskForm({
   const [repoIds, setRepoIds] = useState(firstRepoId ? [firstRepoId] : []);
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
+  const { agent, model, effort, choose } = useModelChoice(state.settings);
   const text = question.trim();
 
   async function ask() {
     setAsking(true);
     await attempt('Korev could not ask the question', async () => {
       const created = await api.createAskChat(repoIds);
-      const { agent, model, effort } = created.session;
       const sent = await api.send(created.session.id, {
         text,
         agent,
-        model,
+        model: model || created.session.model,
         effort,
         planMode: false,
         fast: false,
@@ -84,6 +86,14 @@ export function NewAskForm({
         autoFocus
       />
       <View style={styles.toolbar}>
+        <View style={styles.model}>
+          <ModelPicker
+            state={state}
+            agent={agent}
+            model={model}
+            onChange={choose}
+          />
+        </View>
         {asking ? <ActivityIndicator /> : null}
         <Button
           label="Ask"
@@ -110,11 +120,7 @@ function makeStyles(theme: Theme) {
       fontSize: 15,
       textAlignVertical: 'top',
     },
-    toolbar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      gap: 10,
-    },
+    toolbar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    model: { flex: 1 },
   });
 }

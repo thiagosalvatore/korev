@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Icon, Spinner } from '../../design-system';
 import {
   AGENT_LABELS,
+  STOP_BEFORE_SWITCHING,
   type AppState,
   type ChatItem,
   type ChatSession,
@@ -38,7 +39,6 @@ export interface ChatViewProps {
 }
 
 const NO_COMMENTS: DiffComment[] = [];
-const STOP_BEFORE_SWITCHING = 'Stop the agent before switching to another one';
 const SWITCH_REPLAYS_CHAT =
   'Switching agents mid-chat replays the conversation, so the next reply is slower and uses more tokens';
 

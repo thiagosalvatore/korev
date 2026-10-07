@@ -7,6 +7,9 @@ export const AGENT_LABELS: Record<AgentKind, string> = {
   codex: 'Codex',
 };
 
+export const STOP_BEFORE_SWITCHING =
+  'Stop the agent before switching to another one';
+
 export interface AgentModel {
   id: string;
   label: string;

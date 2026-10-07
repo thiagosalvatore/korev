@@ -3,6 +3,8 @@ import {
   upsertChatItem,
   type AppState,
   type ChatItem,
+  type ModelChoice,
+  type Settings,
 } from '../../korev-desktop/src/shared/model';
 import { useConnection } from './korev';
 
@@ -72,4 +74,16 @@ export function useTranscript(sessionId: string): ChatItem[] | null {
     };
   }, [connection, sessionId]);
   return items;
+}
+
+export function useModelChoice(settings: Settings) {
+  const [agent, setAgent] = useState(settings.defaultAgent);
+  const [model, setModel] = useState(settings.defaultModels[agent]);
+  const [effort, setEffort] = useState(settings.defaultEffort[agent]);
+  function choose(choice: ModelChoice) {
+    if (choice.agent !== agent) setEffort(settings.defaultEffort[choice.agent]);
+    setAgent(choice.agent);
+    setModel(choice.id);
+  }
+  return { agent, model, effort, choose };
 }

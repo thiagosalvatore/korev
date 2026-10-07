@@ -1,26 +1,38 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { ChatSession } from '../../../korev-desktop/src/shared/model';
+import {
+  STOP_BEFORE_SWITCHING,
+  type AppState,
+  type ChatSession,
+  type ModelChoice,
+} from '../../../korev-desktop/src/shared/model';
 import { attempt } from '../attempt';
 import { useConnection } from '../korev';
+import { ModelPicker } from '../ModelPicker';
 import { useTheme, type Theme } from '../theme';
 import { Button } from '../ui';
 
 export function Composer({
+  state,
   session,
-  running,
-  modelLabel,
 }: {
+  state: AppState;
   session: ChatSession;
-  running: boolean;
-  modelLabel: string;
 }) {
   const { api } = useConnection();
   const theme = useTheme();
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
+  const running = state.runningSessions.includes(session.id);
 
   async function send() {
     const message = text.trim();
@@ -43,6 +55,14 @@ export function Composer({
     void attempt('Korev could not switch plan mode', () =>
       api.updateSession(session.id, { planMode: !session.planMode }),
     );
+
+  function changeModel(choice: ModelChoice) {
+    if (choice.agent !== session.agent && running)
+      return Alert.alert(STOP_BEFORE_SWITCHING);
+    void attempt('Korev could not switch the model', () =>
+      api.updateSession(session.id, { agent: choice.agent, model: choice.id }),
+    );
+  }
 
   const stop = () =>
     void attempt('Korev could not stop the agent', () => api.stop(session.id));
@@ -73,9 +93,14 @@ export function Composer({
             Plan
           </Text>
         </Pressable>
-        <Text style={[styles.meta, styles.model]} numberOfLines={1}>
-          {modelLabel}
-        </Text>
+        <View style={styles.model}>
+          <ModelPicker
+            state={state}
+            agent={session.agent}
+            model={session.model}
+            onChange={changeModel}
+          />
+        </View>
         {running ? (
           <Button label="Stop" variant="secondary" onPress={stop} />
         ) : null}
