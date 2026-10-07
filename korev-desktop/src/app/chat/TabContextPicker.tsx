@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { IconButton } from '../../design-system';
 
-import { conversationText, planOf, type ChatItem } from '../../shared/model';
+import {
+  conversationText,
+  planBlock,
+  planOf,
+  type ChatItem,
+} from '../../shared/model';
 import { api } from '../bridge';
 import { Menu, type MenuItem } from '../ui/Menu';
 import { reportFailure } from '../ui/toast';
@@ -42,7 +47,7 @@ function planContext(tab: ContextTab, plan: string): TabContext {
     key: `plan:${tab.id}`,
     kind: 'plan',
     tabTitle: tab.title,
-    prompt: `<plan from="${tab.title}">\n${plan}\n</plan>`,
+    prompt: planBlock(plan, tab.title),
   };
 }
 

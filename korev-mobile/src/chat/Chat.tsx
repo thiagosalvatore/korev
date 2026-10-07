@@ -22,9 +22,11 @@ import { PlanReview } from './PermissionCard';
 export function Chat({
   state,
   session,
+  onHandoff,
 }: {
   state: AppState;
   session: ChatSession;
+  onHandoff?(sessionId: string): void;
 }) {
   const { api } = useConnection();
   const items = useTranscript(session.id);
@@ -45,6 +47,15 @@ export function Chat({
     void attempt('Korev could not approve the plan', () =>
       api.approvePlan(session.id, lanes),
     );
+
+  const handoff = onHandoff
+    ? () =>
+        void attempt('Korev could not hand off the plan', async () => {
+          const result = await api.handoffPlan(session.id);
+          if (result.ok) onHandoff(result.value);
+          return result;
+        })
+    : undefined;
 
   const keepPlanning = (feedback: string) =>
     void attempt('Korev could not send your feedback', () =>
@@ -70,7 +81,7 @@ export function Chat({
           data={[...items].reverse()}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <ChatItemView item={item} onRespond={respond} />
+            <ChatItemView item={item} onRespond={respond} onHandoff={handoff} />
           )}
           ListHeaderComponent={
             codexPlan ? (
@@ -80,6 +91,7 @@ export function Chat({
                 showPlan={false}
                 onApprove={approvePlan}
                 onKeepPlanning={keepPlanning}
+                onHandoff={handoff}
               />
             ) : null
           }

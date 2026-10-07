@@ -96,6 +96,7 @@ export interface KorevApi {
       fast?: boolean;
       planMode?: boolean;
       title?: string;
+      pendingPlan?: null;
     },
   ): Promise<void>;
   transcript(sessionId: string): Promise<ChatItem[]>;

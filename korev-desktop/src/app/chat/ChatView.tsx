@@ -213,6 +213,10 @@ export function ChatView({
               workspace?.sessions.filter((entry) => entry.id !== session.id) ??
               []
             }
+            pendingPlan={session.pendingPlan}
+            onDiscardPendingPlan={() =>
+              void api.updateSession(session.id, { pendingPlan: null })
+            }
             placeholder={placeholder}
             autoFocus
             usage={{

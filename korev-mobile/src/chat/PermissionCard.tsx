@@ -29,6 +29,7 @@ type PermissionItem = Extract<ChatItem, { kind: 'permission' }>;
 interface PermissionCardProps {
   item: PermissionItem;
   onRespond(response: PermissionResponse): void;
+  onHandoff?(): void;
 }
 
 const STATUS_LABELS: Record<Exclude<PermissionStatus, 'pending'>, string> = {
@@ -132,6 +133,7 @@ export interface PlanReviewProps {
   showPlan: boolean;
   onApprove(lanes: PlanLane[]): void;
   onKeepPlanning(feedback: string): void;
+  onHandoff?(): void;
 }
 
 export function PlanReview({
@@ -139,6 +141,7 @@ export function PlanReview({
   showPlan,
   onApprove,
   onKeepPlanning,
+  onHandoff,
 }: PlanReviewProps) {
   const styles = useStyles();
   const theme = useTheme();
@@ -177,6 +180,9 @@ export function PlanReview({
           variant={split.length ? 'secondary' : 'primary'}
           onPress={() => onApprove([])}
         />
+        {onHandoff ? (
+          <Button label="Hand off" variant="secondary" onPress={onHandoff} />
+        ) : null}
         <Button
           label="Keep planning"
           variant="secondary"
@@ -188,11 +194,12 @@ export function PlanReview({
   );
 }
 
-function PlanApproval({ item, onRespond }: PermissionCardProps) {
+function PlanApproval({ item, onRespond, onHandoff }: PermissionCardProps) {
   return (
     <PlanReview
       plan={item.plan ?? ''}
       showPlan
+      onHandoff={onHandoff}
       onApprove={(lanes) => onRespond({ allow: true, lanes })}
       onKeepPlanning={(message) => onRespond({ allow: false, message })}
     />
@@ -290,10 +297,16 @@ function QuestionForm({ item, onRespond }: PermissionCardProps) {
   );
 }
 
-export function PermissionCard({ item, onRespond }: PermissionCardProps) {
+export function PermissionCard({
+  item,
+  onRespond,
+  onHandoff,
+}: PermissionCardProps) {
   if (item.status !== 'pending') return <Resolved item={item} />;
   if (item.plan !== null)
-    return <PlanApproval item={item} onRespond={onRespond} />;
+    return (
+      <PlanApproval item={item} onRespond={onRespond} onHandoff={onHandoff} />
+    );
   if (item.questions) return <QuestionForm item={item} onRespond={onRespond} />;
   return <ToolApproval item={item} onRespond={onRespond} />;
 }

@@ -13,6 +13,7 @@ import {
   type EditorApp,
   type EditorId,
   latestPlan,
+  planBlock,
   type PlanLane,
   type PromptKind,
   type PrStatus,
@@ -84,7 +85,6 @@ import {
   forkChatSession,
   strayWorktrees,
   deleteWorkspace,
-  firstPrompt,
   newChatSession,
   onScriptExit,
   refreshStats,
@@ -639,19 +639,36 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       : await finishedPlan(sessionId);
     if (!plan.ok) return plan;
     chat.session.planMode = false;
-    const session = addSession(chat.workspace, chat.session.agent);
-    const text = firstPrompt(
-      HANDOFF_TASK,
-      plan.value,
-      ctx.repo(chat.workspace.repoId),
-      false,
-    );
-    const sent = await chats.send(
-      session.id,
-      implementOptions(chat.session, text),
-    );
-    if (!sent.ok) return sent;
+    const { agent, model, effort, fast, title } = chat.session;
+    const session = addSession(chat.workspace, agent);
+    Object.assign(session, {
+      model,
+      effort,
+      fast,
+      planMode: false,
+      pendingPlan: { plan: plan.value, from: title },
+    });
+    store.save();
+    ctx.emitState();
     return { ok: true, value: session.id };
+  }
+
+  function withPendingPlan(session: ChatSession, text: string): string {
+    if (!session.pendingPlan) return text;
+    const { plan, from } = session.pendingPlan;
+    return `${text.trim() || HANDOFF_TASK}\n\n${planBlock(plan, from)}`;
+  }
+
+  async function send(sessionId: string, options: SendOptions) {
+    const session = allSessions().find((entry) => entry.id === sessionId);
+    if (!session?.pendingPlan) return chats.send(sessionId, options);
+    const text = withPendingPlan(session, options.text);
+    const sent = await chats.send(sessionId, { ...options, text });
+    if (!sent.ok) return sent;
+    delete session.pendingPlan;
+    store.save();
+    ctx.emitState();
+    return sent;
   }
 
   async function moveChat(from: ChatSession | null, to: Workspace) {
@@ -1041,11 +1058,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       if (patch.fast !== undefined) session.fast = patch.fast;
       if (patch.planMode !== undefined) session.planMode = patch.planMode;
       if (patch.title?.trim()) session.title = patch.title.trim();
+      if (patch.pendingPlan === null) delete session.pendingPlan;
       store.save();
       ctx.emitState();
     },
     transcript: (sessionId) => chats.transcript(sessionId),
-    send: (sessionId, options) => chats.send(sessionId, options),
+    send,
     stop: async (sessionId) => chats.stop(sessionId),
     async respondPermission(sessionId, itemId, response) {
       const answered = chats.respondPermission(sessionId, itemId, response);

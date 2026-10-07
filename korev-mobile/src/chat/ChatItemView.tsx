@@ -110,9 +110,11 @@ function ResultLine({ item }: { item: ItemOf<'result'> }) {
 export function ChatItemView({
   item,
   onRespond,
+  onHandoff,
 }: {
   item: ChatItem;
   onRespond(itemId: string, response: PermissionResponse): void;
+  onHandoff?(): void;
 }) {
   const styles = useStyles();
   switch (item.kind) {
@@ -139,6 +141,7 @@ export function ChatItemView({
         <PermissionCard
           item={item}
           onRespond={(response) => onRespond(item.id, response)}
+          onHandoff={onHandoff}
         />
       );
   }
