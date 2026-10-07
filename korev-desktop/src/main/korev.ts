@@ -302,6 +302,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   let update: Release | null = null;
   let whatsNew: ReleaseInfo | null = null;
   const editors = installedEditors(deps.home);
+  const backgroundTasks = new Set<Promise<unknown>>();
 
   const ctx: Context = {
     deps,
@@ -343,6 +344,13 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       deps.keepAwake(
         store.state.settings.keepAwake && ctx.runningSessions.size > 0,
       );
+    },
+    background(task) {
+      backgroundTasks.add(task);
+      void task.finally(() => backgroundTasks.delete(task));
+    },
+    async settled() {
+      while (backgroundTasks.size) await Promise.allSettled(backgroundTasks);
     },
     workspace(workspaceId) {
       const found = store.state.workspaces.find((ws) => ws.id === workspaceId);
@@ -1000,7 +1008,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       workspace.baseBranch = branch.trim();
       store.save();
       ctx.emitState();
-      void refreshStats(ctx, workspace);
+      ctx.background(refreshStats(ctx, workspace));
     },
     async workspaceConfig(workspaceId) {
       const workspace = workspacePath(workspaceId);
@@ -1147,7 +1155,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       } catch (error) {
         return fail(errorMessage(error));
       }
-      void refreshStats(ctx, ctx.workspace(workspaceId));
+      ctx.background(refreshStats(ctx, ctx.workspace(workspaceId)));
       return ok(undefined);
     },
     async reviewComments(workspaceId, prNumber) {
@@ -1308,7 +1316,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     ctx.emitState();
   });
   for (const workspace of activeWorkspaces(ctx))
-    void refreshStats(ctx, workspace);
+    ctx.background(refreshStats(ctx, workspace));
   void refreshAllPrs();
   const prWatch = setInterval(() => void refreshAllPrs(), PR_POLL_MS);
 
@@ -1322,8 +1330,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     async shutdown() {
       clearInterval(prWatch);
       await spotlight.disableAll();
+      await ctx.settled();
       for (const session of allSessions()) chats.stop(session.id);
       await chats.settled();
+      await ctx.settled();
       ctx.terminals.closeAll();
       await store.flush();
     },

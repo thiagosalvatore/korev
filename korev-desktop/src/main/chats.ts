@@ -331,7 +331,7 @@ export function createChats(
   ) {
     const runtime = ctx.runtime(workspace.id);
     if (!isWatching(workspace)) runtime.unread = true;
-    void refreshStats(ctx, workspace);
+    ctx.background(refreshStats(ctx, workspace));
     onWorkspaceTurnFinished(workspace.id, {
       sessionId: session.id,
       startedAt: turn.startedAt,
@@ -741,7 +741,7 @@ export function createChats(
     session.planMode = options.planMode;
     startTurn(sessionId, items, options, checkpoint);
     if (workspace && firstMessage && session === workspace.sessions[0]) {
-      void autoRenameBranch(workspace, options.text);
+      ctx.background(autoRenameBranch(workspace, options.text));
     }
     if (firstMessage && namesWithHaiku(owner)) {
       void autoTitle(session, options.text);
@@ -914,7 +914,8 @@ export function createChats(
     persist(sessionId, items);
     ctx.store.save();
     ctx.emitState();
-    if (owner.kind === 'workspace') void refreshStats(ctx, owner.workspace);
+    if (owner.kind === 'workspace')
+      ctx.background(refreshStats(ctx, owner.workspace));
     return { ok: true, value: target.text };
   }
 

@@ -48,6 +48,8 @@ export interface Context {
     message?: string | null,
   ): void;
   emitState(): void;
+  background(task: Promise<unknown>): void;
+  settled(): Promise<void>;
   workspace(workspaceId: string): Workspace;
   repo(repoId: string): Repo;
 }

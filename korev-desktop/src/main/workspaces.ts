@@ -670,15 +670,12 @@ export function createWorkspaces(
   ctx.store.save();
   ctx.emitState();
   if (source.kind === 'new') {
-    void prepareNewWorkspaces(ctx, repos, workspaces, task, plan, send);
+    ctx.background(
+      prepareNewWorkspaces(ctx, repos, workspaces, task, plan, send),
+    );
   } else {
-    void prepareSourceWorkspace(
-      ctx,
-      repos[0],
-      workspaces[0],
-      source,
-      task,
-      send,
+    ctx.background(
+      prepareSourceWorkspace(ctx, repos[0], workspaces[0], source, task, send),
     );
   }
   return { ok: true, value: workspaces };
@@ -720,14 +717,16 @@ export function createLaneWorkspaces(
   ctx.store.save();
   ctx.emitState();
   for (const { workspace, laneOptions } of created) {
-    void prepareNamedWorkspaces(
-      ctx,
-      [repo],
-      [workspace],
-      Promise.resolve(workspace.name),
-      laneOptions,
-      plan,
-      send,
+    ctx.background(
+      prepareNamedWorkspaces(
+        ctx,
+        [repo],
+        [workspace],
+        Promise.resolve(workspace.name),
+        laneOptions,
+        plan,
+        send,
+      ),
     );
   }
 }
@@ -885,7 +884,7 @@ export async function restoreWorkspace(
   ctx.store.save();
   ctx.emitState();
   void startScript(ctx, workspace, 'setup');
-  void refreshStats(ctx, workspace);
+  ctx.background(refreshStats(ctx, workspace));
   return { ok: true, value: undefined };
 }
 
