@@ -5,7 +5,7 @@ import {
   type Page,
 } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -290,6 +290,33 @@ test('reviews a turn, searches the workspace and edits a file', async () => {
     await window.getByRole('button', { name: 'Save' }).click();
     await expect(window.getByText('Saved agent-note.txt')).toBeVisible();
     await snap(window, '08-edited');
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('opens a file the agent mentions from outside the workspace', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  await mkdir(path.join(home, '.claude', 'plans'), { recursive: true });
+  await writeFile(
+    path.join(home, '.claude', 'plans', 'crab.md'),
+    '# The plan\n\nShip it.\n',
+  );
+  const { app, window } = await launch(home, repo);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window.getByRole('textbox', { name: 'Message' }).fill('share-plan');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+
+    await window.getByRole('link', { name: '~/.claude/plans/crab.md' }).click();
+
+    await expect(
+      window.getByRole('main').getByRole('heading', { name: 'The plan' }),
+    ).toBeVisible();
+    await expect(window.getByRole('button', { name: 'Edit' })).toHaveCount(0);
+    await snap(window, '09-mentioned-file');
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });

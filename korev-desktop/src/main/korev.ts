@@ -225,6 +225,14 @@ function insideWorkspace(root: string, file: string): string | null {
   return resolved.startsWith(`${root}${path.sep}`) ? resolved : null;
 }
 
+const HOME_PREFIX = `~${path.sep}`;
+
+function readablePath(root: string, home: string, file: string): string {
+  if (file.startsWith(HOME_PREFIX))
+    return path.join(home, file.slice(HOME_PREFIX.length));
+  return path.resolve(root, file);
+}
+
 export async function createKorev(deps: KorevDeps): Promise<Korev> {
   const store = await openStore(deps.fs, deps.userDataPath, deps.home);
   const git = createGit(deps.run, deps.env);
@@ -822,8 +830,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       return listFiles(git, workspacePath(workspaceId).path);
     },
     async readFile(workspaceId, file) {
-      const target = insideWorkspace(workspacePath(workspaceId).path, file);
-      if (!target) return null;
+      const target = readablePath(
+        workspacePath(workspaceId).path,
+        deps.home,
+        file,
+      );
       const contents = await readFile(target).catch(() => null);
       if (!contents || contents.length > FILE_MAX_BYTES) return null;
       return contents.toString('utf8');

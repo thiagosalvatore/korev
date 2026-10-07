@@ -389,6 +389,7 @@ export interface TranscriptProps {
   onRespond: (itemId: string, response: PermissionResponse) => void;
   onRetry: (text: string) => void;
   onOpenTurnFile: (file: string, range: TurnRange) => void;
+  onOpenFile?: (file: string, line: number | null) => void;
 }
 
 const STICK_THRESHOLD_PX = 80;
@@ -401,6 +402,7 @@ export function Transcript({
   onRespond,
   onRetry,
   onOpenTurnFile,
+  onOpenFile,
 }: TranscriptProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -458,7 +460,12 @@ export function Transcript({
               );
             case 'assistant':
               return (
-                <Markdown key={item.id} text={item.text} className="px-1.5" />
+                <Markdown
+                  key={item.id}
+                  text={item.text}
+                  className="px-1.5"
+                  onOpenFile={onOpenFile}
+                />
               );
             case 'thinking':
               return <Thinking key={item.id} text={item.text} />;

@@ -707,6 +707,20 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       'wip\n',
     );
   });
+
+  it('reads files outside the workspace but only writes inside it', async () => {
+    const workspace = await createWorkspace();
+    await mkdir(path.join(home, '.claude', 'plans'), { recursive: true });
+    const plan = path.join(home, '.claude', 'plans', 'crab.md');
+    await writeFile(plan, '# Plan\n');
+
+    expect(
+      await korev.api.readFile(workspace.id, '~/.claude/plans/crab.md'),
+    ).toBe('# Plan\n');
+    expect(await korev.api.readFile(workspace.id, plan)).toBe('# Plan\n');
+    expect((await korev.api.writeFile(workspace.id, plan, 'x')).ok).toBe(false);
+  });
+
   it('copies only the gitignored files that .worktreeinclude names', async () => {
     await mkdir(path.join(repoPath, 'config'));
     await writeFile(path.join(repoPath, 'config', 'app.local.json'), '{}');

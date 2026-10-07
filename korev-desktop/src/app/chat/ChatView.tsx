@@ -9,7 +9,7 @@ import {
   type ModelChoice,
   type Workspace,
 } from '../../shared/model';
-import { openDiff } from '../actions';
+import { openDiff, openFile } from '../actions';
 import { api } from '../bridge';
 import { loadoutChoices, modelChoices } from '../format';
 import { useTranscript } from '../hooks';
@@ -22,6 +22,11 @@ import {
 } from '../ui-store';
 import { Composer, saveDraft } from './Composer';
 import { Transcript } from './Transcript';
+
+function toWorkspaceRelative(workspacePath: string, file: string): string {
+  const prefix = `${workspacePath}/`;
+  return file.startsWith(prefix) ? file.slice(prefix.length) : file;
+}
 
 export interface ChatViewProps {
   state: AppState;
@@ -122,6 +127,16 @@ export function ChatView({
           onOpenTurnFile={(file, range) => {
             if (workspace) openDiff(workspace.id, file, range);
           }}
+          onOpenFile={
+            workspace
+              ? (file, line) =>
+                  openFile(
+                    workspace.id,
+                    toWorkspaceRelative(workspace.path, file),
+                    { line },
+                  )
+              : undefined
+          }
           onRespond={(itemId, response) =>
             void api
               .respondPermission(session.id, itemId, response)
