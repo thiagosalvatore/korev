@@ -3,27 +3,40 @@ import path from 'node:path';
 import type {
   AgentQuestion,
   ChatItem,
+  PlanLimit,
   Todo,
   TodoStatus,
+  TurnUsage,
 } from '../shared/model';
 
-type JsonRecord = Record<string, unknown>;
+export type JsonRecord = Record<string, unknown>;
 
 const DETAIL_MAX_CHARS = 20_000;
 const OUTPUT_MAX_CHARS = 20_000;
+const MS_PER_SECOND = 1_000;
+const PERCENT = 100;
 export const PLAN_TOOL = 'ExitPlanMode';
 
 export interface TurnParser {
   feed(event: JsonRecord): ChatItem[];
   sessionId(): string | null;
+  usage(): TurnUsage | null;
 }
 
-function record(value: unknown): JsonRecord {
+export function record(value: unknown): JsonRecord {
   return value && typeof value === 'object' ? (value as JsonRecord) : {};
 }
 
 function str(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+export function num(value: unknown): number {
+  return typeof value === 'number' ? value : 0;
+}
+
+export function epochMs(seconds: unknown): number | null {
+  return typeof seconds === 'number' ? seconds * MS_PER_SECOND : null;
 }
 
 function clip(text: string, max: number): string {
@@ -132,11 +145,69 @@ function toolResultText(content: unknown): string {
 
 const TODO_TOOL = 'TodoWrite';
 
+const CLAUDE_LIMIT_LABELS: Record<string, string> = {
+  five_hour: '5-hour limit',
+  seven_day: 'Weekly limit',
+  seven_day_opus: 'Weekly Opus limit',
+  seven_day_sonnet: 'Weekly Sonnet limit',
+  seven_day_overage_included: 'Weekly limit with extra usage',
+  overage: 'Extra usage',
+};
+
+function contextTokens(usage: JsonRecord): number {
+  return (
+    num(usage.input_tokens) +
+    num(usage.cache_creation_input_tokens) +
+    num(usage.cache_read_input_tokens) +
+    num(usage.output_tokens)
+  );
+}
+
+function claudeLimit(type: string, window: JsonRecord): PlanLimit {
+  return {
+    label: CLAUDE_LIMIT_LABELS[type] ?? type,
+    usedPercent: Math.round(num(window.utilization) * PERCENT),
+    resetsAt: epochMs(window.resetsAt),
+  };
+}
+
+function claudeLimits(info: JsonRecord): PlanLimit[] {
+  const windows = Object.entries(record(info.unifiedWindows));
+  if (windows.length)
+    return windows.map(([type, window]) => claudeLimit(type, record(window)));
+  if (typeof info.utilization !== 'number') return [];
+  return [claudeLimit(str(info.rateLimitType), info)];
+}
+
+function largestContextWindow(modelUsage: unknown): number {
+  return Math.max(
+    0,
+    ...Object.values(record(modelUsage)).map((entry) =>
+      num(record(entry).contextWindow),
+    ),
+  );
+}
+
 export function createClaudeParser(cwd: string): TurnParser {
   let session: string | null = null;
   let messageId = '';
   const streamed = new Map<string, ChatItem>();
   const tools = new Map<string, Extract<ChatItem, { kind: 'tool' }>>();
+  const limits = new Map<string, PlanLimit>();
+  let usedTokens = 0;
+  let windowTokens = 0;
+
+  function usage(): TurnUsage {
+    const context =
+      usedTokens && windowTokens ? { usedTokens, windowTokens } : null;
+    return { context, limits: [...limits.values()] };
+  }
+
+  function onRateLimit(event: JsonRecord): ChatItem[] {
+    for (const limit of claudeLimits(record(event.rate_limit_info)))
+      limits.set(limit.label, limit);
+    return [];
+  }
 
   function streamItem(index: unknown, kind: 'assistant' | 'thinking') {
     const id = `${messageId}:${String(index)}`;
@@ -147,7 +218,13 @@ export function createClaudeParser(cwd: string): TurnParser {
 
   function onStreamEvent(event: JsonRecord): ChatItem[] {
     if (event.type === 'message_start') {
-      messageId = str(record(event.message).id);
+      const message = record(event.message);
+      messageId = str(message.id);
+      usedTokens = contextTokens(record(message.usage));
+      return [];
+    }
+    if (event.type === 'message_delta') {
+      usedTokens = contextTokens(record(event.usage)) || usedTokens;
       return [];
     }
     if (event.type !== 'content_block_delta') return [];
@@ -207,6 +284,7 @@ export function createClaudeParser(cwd: string): TurnParser {
 
   function onResult(event: JsonRecord): ChatItem[] {
     const ok = event.subtype === 'success' && event.is_error !== true;
+    windowTokens = largestContextWindow(event.modelUsage) || windowTokens;
     return [
       {
         id: `result:${str(event.session_id) || messageId}`,
@@ -225,6 +303,7 @@ export function createClaudeParser(cwd: string): TurnParser {
 
   return {
     sessionId: () => session,
+    usage,
     feed(event) {
       if (typeof event.session_id === 'string') session = event.session_id;
       if (event.parent_tool_use_id) return [];
@@ -237,6 +316,8 @@ export function createClaudeParser(cwd: string): TurnParser {
           return onToolResults(event);
         case 'result':
           return onResult(event);
+        case 'rate_limit_event':
+          return onRateLimit(event);
         default:
           return [];
       }
@@ -345,6 +426,7 @@ export function createCodexParser(cwd: string): TurnParser {
   let turn = 0;
   return {
     sessionId: () => session,
+    usage: () => null,
     feed(event) {
       switch (event.type) {
         case 'thread.started':

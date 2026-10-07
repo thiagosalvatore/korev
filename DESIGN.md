@@ -53,3 +53,5 @@ PR, Fix errors and Resolve conflicts send a prompt to the active chat; Merge cal
 - Agent text is markdown. Tool calls are one line each (icon, tool, target) and expand to
   show input and output. More than three in a row collapse into "N tool calls".
 - The composer border turns dashed accent in plan mode (⇧Tab).
+- The ring next to Send shows how full the chat's context window is after the last turn.
+  Hovering it shows the token counts and the agent's plan limits (5-hour and weekly).

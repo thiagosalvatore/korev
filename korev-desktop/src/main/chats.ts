@@ -5,6 +5,7 @@ import {
   type ChatSession,
   type Checkpoint,
   type PermissionResponse,
+  type PlanLimit,
   type Repo,
   type Result,
   type SendOptions,
@@ -129,6 +130,15 @@ export function systemPrompt(
   return withPrompt(base, general);
 }
 
+type ResultItem = Extract<ChatItem, { kind: 'result' }>;
+
+function mergeLimits(current: PlanLimit[], next: PlanLimit[]): PlanLimit[] {
+  const byLabel = new Map(
+    [...current, ...next].map((limit) => [limit.label, limit]),
+  );
+  return [...byLabel.values()];
+}
+
 export function askSystemPrompt(repos: Repo[], checkouts: string[]): string {
   return [
     `You are answering questions inside Korev, a Mac app that lets the user run many coding agents in parallel.`,
@@ -169,6 +179,13 @@ interface ActiveTurn {
   acknowledged: number;
   permissions: Map<string, ControlRequest>;
   start: Checkpoint | null;
+}
+
+function turnResult(items: ChatItem[], turn: ActiveTurn): ResultItem | null {
+  const result = items.findLast(
+    (item) => item.kind === 'result' && item.id.startsWith(`${turn.id}:`),
+  );
+  return result?.kind === 'result' ? result : null;
 }
 
 export interface Chats {
@@ -479,11 +496,8 @@ export function createChats(
         process.closeInput();
       }
       const exit = await process.done;
-      const sawResult = items.some(
-        (item) => item.kind === 'result' && item.id.startsWith(`${turn.id}:`),
-      );
       if (exit.stopped) notice('Stopped');
-      else if (exit.exitCode !== 0 && !sawResult) {
+      else if (exit.exitCode !== 0 && !turnResult(items, turn)) {
         notice(
           exit.stderr.trim().slice(-STDERR_TAIL_CHARS) ||
             `${agent.binary} exited with code ${exit.exitCode}`,
@@ -494,6 +508,7 @@ export function createChats(
     } finally {
       session.agentSessionId = parser?.sessionId() ?? session.agentSessionId;
       expirePermissions(session.id, items, turn);
+      if (parser) await recordUsage(session, items, turn, parser);
       await recordTurnChanges(session.id, items, turn);
       turns.delete(session.id);
       finishTurn(turn.owner, session, items);
@@ -521,6 +536,25 @@ export function createChats(
     startTurn(sessionId, items, { ...options, text }, start);
   }
 
+  async function recordUsage(
+    session: ChatSession,
+    items: ChatItem[],
+    turn: ActiveTurn,
+    parser: TurnParser,
+  ) {
+    const usage = await AGENTS[session.agent]
+      .usage(parser, ctx.deps.env)
+      .catch(() => null);
+    if (!usage) return;
+    const result = turnResult(items, turn);
+    if (result && usage.context)
+      upsert(session.id, items, { ...result, context: usage.context });
+    ctx.planLimits[session.agent] = mergeLimits(
+      ctx.planLimits[session.agent] ?? [],
+      usage.limits,
+    );
+  }
+
   async function recordTurnChanges(
     sessionId: string,
     items: ChatItem[],
@@ -528,10 +562,8 @@ export function createChats(
   ) {
     if (turn.owner.kind !== 'workspace' || !turn.start) return;
     const { workspace } = turn.owner;
-    const result = items.findLast(
-      (item) => item.kind === 'result' && item.id.startsWith(`${turn.id}:`),
-    );
-    if (result?.kind !== 'result') return;
+    const result = turnResult(items, turn);
+    if (!result) return;
     try {
       const end = await createCheckpoint(ctx.git, workspace.path);
       if (!end) return;

@@ -4,6 +4,7 @@ import {
   type AgentAvailability,
   type AgentKind,
   type AgentModel,
+  type TurnUsage,
 } from '../shared/model';
 import type { CommandRunner } from './command-runner';
 import {
@@ -12,6 +13,7 @@ import {
   parseJsonLine,
   type TurnParser,
 } from './agent-events';
+import { readCodexUsage } from './codex-usage';
 
 const VERSION_PATTERN = /\d+\.\d+\.\d+\S*/;
 const PROBE_TIMEOUT_MS = 15_000;
@@ -37,6 +39,7 @@ export interface AgentDefinition {
   input: AgentInput;
   args(request: TurnRequest): string[];
   parser(cwd: string): TurnParser;
+  usage(parser: TurnParser, env: NodeJS.ProcessEnv): Promise<TurnUsage | null>;
 }
 
 function claudePermissionMode(request: TurnRequest): string {
@@ -101,12 +104,14 @@ export const AGENTS: Record<AgentKind, AgentDefinition> = {
     input: 'stream-json',
     args: claudeArgs,
     parser: createClaudeParser,
+    usage: async (parser) => parser.usage(),
   },
   codex: {
     binary: 'codex',
     input: 'prompt',
     args: codexArgs,
     parser: createCodexParser,
+    usage: (parser, env) => readCodexUsage(env, parser.sessionId()),
   },
 };
 

@@ -4,8 +4,10 @@ import {
   EFFORT_LEVELS,
   type AgentKind,
   type ModelChoice,
+  type TurnUsage,
 } from '../../shared/model';
 import { Menu, type MenuItem } from '../ui/Menu';
+import { ContextMeter } from './ContextMeter';
 
 export interface ComposerToolbarProps {
   agent: AgentKind;
@@ -19,6 +21,7 @@ export interface ComposerToolbarProps {
   hasSnippets: boolean;
   running: boolean;
   canSend: boolean;
+  usage?: TurnUsage;
   onAttach(): void;
   onInsertSnippet(): void;
   onModelChange(choice: ModelChoice): void;
@@ -187,6 +190,12 @@ export function ComposerToolbar(props: ComposerToolbarProps) {
         </button>
       ) : null}
       <div className="flex-1" />
+      {props.usage?.context ? (
+        <ContextMeter
+          context={props.usage.context}
+          limits={props.usage.limits}
+        />
+      ) : null}
       {props.running && props.canSend ? (
         <span className="mr-1 text-2xs text-fg-4">
           {props.agent === 'claude'

@@ -1,5 +1,6 @@
 import type { KorevEvents } from '../shared/api';
 import type {
+  PlanLimits,
   Repo,
   Workspace,
   WorkspaceRuntime,
@@ -36,6 +37,7 @@ export interface Context {
   git: Git;
   terminals: Terminals;
   runningSessions: Set<string>;
+  planLimits: PlanLimits;
   focusedWorkspaceId: string | null;
   runtime(workspaceId: string): WorkspaceRuntime;
   setStatus(

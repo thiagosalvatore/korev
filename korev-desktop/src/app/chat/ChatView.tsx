@@ -3,7 +3,9 @@ import { Icon, Spinner } from '../../design-system';
 import {
   AGENT_LABELS,
   type AppState,
+  type ChatItem,
   type ChatSession,
+  type ContextUsage,
   type ModelChoice,
   type Workspace,
 } from '../../shared/model';
@@ -34,6 +36,13 @@ const NO_COMMENTS: DiffComment[] = [];
 const STOP_BEFORE_SWITCHING = 'Stop the agent before switching to another one';
 const SWITCH_REPLAYS_CHAT =
   'Switching agents mid-chat replays the conversation, so the next reply is slower and uses more tokens';
+
+function latestContext(items: ChatItem[] | null): ContextUsage | null {
+  const result = items?.findLast(
+    (item) => item.kind === 'result' && item.context,
+  );
+  return result?.kind === 'result' ? (result.context ?? null) : null;
+}
 
 function EmptyChat({
   session,
@@ -161,6 +170,10 @@ export function ChatView({
             comments={comments}
             placeholder={placeholder}
             autoFocus
+            usage={{
+              context: latestContext(items),
+              limits: state.planLimits[session.agent] ?? [],
+            }}
             onModelChange={changeModel}
             onEffortChange={(effort) =>
               void api.updateSession(session.id, { effort })

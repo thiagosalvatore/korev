@@ -156,6 +156,74 @@ describe('Claude stream parser', () => {
       { kind: 'result', ok: false, text: 'Credit balance too low' },
     ]);
   });
+
+  it('reports the context fill of the last call and the plan limits', () => {
+    const parser = createClaudeParser(CWD);
+    const usage = (input: number, output: number) => ({
+      input_tokens: input,
+      cache_creation_input_tokens: 1_000,
+      cache_read_input_tokens: 10_000,
+      output_tokens: output,
+    });
+    feedAll(parser, [
+      {
+        type: 'stream_event',
+        event: {
+          type: 'message_start',
+          message: { id: 'msg-1', usage: usage(5, 1) },
+        },
+      },
+      {
+        type: 'stream_event',
+        event: { type: 'message_delta', usage: usage(5, 200) },
+      },
+      {
+        type: 'stream_event',
+        event: {
+          type: 'message_start',
+          message: { id: 'msg-2', usage: usage(300, 1) },
+        },
+      },
+      {
+        type: 'stream_event',
+        event: { type: 'message_delta', usage: usage(300, 700) },
+      },
+      {
+        type: 'rate_limit_event',
+        rate_limit_info: {
+          status: 'allowed',
+          rateLimitType: 'five_hour',
+          unifiedWindows: {
+            five_hour: { utilization: 0.28, resetsAt: 1_791_370_800 },
+            seven_day: { utilization: 0.4, resetsAt: 1_791_457_200 },
+          },
+        },
+      },
+      {
+        type: 'result',
+        subtype: 'success',
+        modelUsage: {
+          'claude-haiku-4-5': { contextWindow: 200_000 },
+          'claude-opus-5-5': { contextWindow: 1_000_000 },
+        },
+      },
+    ]);
+
+    expect(parser.usage()).toEqual({
+      context: { usedTokens: 12_000, windowTokens: 1_000_000 },
+      limits: [
+        { label: '5-hour limit', usedPercent: 28, resetsAt: 1_791_370_800_000 },
+        { label: 'Weekly limit', usedPercent: 40, resetsAt: 1_791_457_200_000 },
+      ],
+    });
+  });
+
+  it('has no context fill when the stream carries no usage', () => {
+    const parser = createClaudeParser(CWD);
+    feedAll(parser, [{ type: 'result', subtype: 'success' }]);
+
+    expect(parser.usage()).toEqual({ context: null, limits: [] });
+  });
 });
 
 describe('Codex JSON parser', () => {

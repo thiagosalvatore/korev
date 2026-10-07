@@ -14,6 +14,7 @@ import {
   type AgentKind,
   type ModelChoice,
   type Snippet,
+  type TurnUsage,
 } from '../../shared/model';
 import { api } from '../bridge';
 import { fileName } from '../format';
@@ -93,6 +94,7 @@ export interface ComposerProps {
   comments?: DiffComment[];
   placeholder?: string;
   autoFocus?: boolean;
+  usage?: TurnUsage;
   onModelChange(choice: ModelChoice): void;
   onEffortChange(effort: string): void;
   onFastChange(fast: boolean): void;
@@ -386,6 +388,7 @@ export function Composer(props: ComposerProps) {
           hasSnippets={props.snippets.length > 0}
           running={running}
           canSend={canSend}
+          usage={props.usage}
           onAttach={() => picker.current?.click()}
           onInsertSnippet={openSnippets}
           onModelChange={props.onModelChange}

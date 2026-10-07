@@ -306,6 +306,7 @@ export interface AppState {
   runtime: Record<string, WorkspaceRuntime>;
   runningSessions: string[];
   runningTerminals: string[];
+  planLimits: PlanLimits;
   spotlights: Record<string, string>;
   agents: AgentAvailability[];
   editors: EditorApp[];
@@ -315,6 +316,24 @@ export interface Checkpoint {
   head: string;
   snapshot: string;
 }
+
+export interface ContextUsage {
+  usedTokens: number;
+  windowTokens: number;
+}
+
+export interface PlanLimit {
+  label: string;
+  usedPercent: number;
+  resetsAt: number | null;
+}
+
+export interface TurnUsage {
+  context: ContextUsage | null;
+  limits: PlanLimit[];
+}
+
+export type PlanLimits = Partial<Record<AgentKind, PlanLimit[]>>;
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed';
 
@@ -352,6 +371,7 @@ export type ChatItem =
       durationMs: number | null;
       costUsd: number | null;
       turn?: TurnChanges | null;
+      context?: ContextUsage | null;
     }
   | { id: string; kind: 'notice'; text: string }
   | {

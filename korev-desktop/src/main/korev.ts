@@ -234,6 +234,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       },
     }),
     runningSessions: new Set(),
+    planLimits: {},
     focusedWorkspaceId: null,
     runtime(workspaceId) {
       let runtime = runtimes.get(workspaceId);
@@ -307,6 +308,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       ),
       runningSessions: [...ctx.runningSessions],
       runningTerminals: ctx.terminals.running(),
+      planLimits: ctx.planLimits,
       spotlights: spotlight.active(),
       agents,
       editors,

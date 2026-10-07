@@ -25,6 +25,15 @@ export function duration(ms: number): string {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
+const THOUSAND = 1_000;
+const MILLION = 1_000_000;
+
+export function formatTokens(tokens: number): string {
+  if (tokens >= MILLION) return `${(tokens / MILLION).toFixed(1)}M`;
+  if (tokens >= THOUSAND) return `${Math.round(tokens / THOUSAND)}k`;
+  return String(tokens);
+}
+
 export function modelLabel(state: AppState, session: ChatSession): string {
   const agent = state.agents.find((entry) => entry.agent === session.agent);
   const model = agent?.models.find((entry) => entry.id === session.model);
