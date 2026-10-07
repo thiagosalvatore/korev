@@ -19,10 +19,12 @@ const VERSION_PATTERN = /\d+\.\d+\.\d+\S*/;
 const PROBE_TIMEOUT_MS = 15_000;
 const LISTED_MODEL_VISIBILITY = 'list';
 const STDIN_PROMPT = '-';
+const READ_ONLY_DISALLOWED_TOOLS = ['Edit', 'Write', 'NotebookEdit'];
 
 export interface TurnRequest {
   model: string;
   planMode: boolean;
+  readOnly: boolean;
   effort: string;
   fast: boolean;
   toolApprovals: boolean;
@@ -44,7 +46,9 @@ export interface AgentDefinition {
 
 function claudePermissionMode(request: TurnRequest): string {
   if (request.planMode) return 'plan';
-  return request.toolApprovals ? 'default' : 'bypassPermissions';
+  return request.readOnly || request.toolApprovals
+    ? 'default'
+    : 'bypassPermissions';
 }
 
 function claudeArgs(request: TurnRequest): string[] {
@@ -73,6 +77,9 @@ function claudeArgs(request: TurnRequest): string[] {
     '--append-system-prompt',
     request.systemPrompt,
     ...request.addDirs.flatMap((dir) => ['--add-dir', dir]),
+    ...(request.readOnly
+      ? ['--disallowedTools', ...READ_ONLY_DISALLOWED_TOOLS]
+      : []),
     ...session,
   ];
 }
@@ -86,7 +93,7 @@ function codexArgs(request: TurnRequest): string[] {
     '--json',
     '--skip-git-repo-check',
     '-c',
-    `sandbox_mode="${request.planMode ? 'read-only' : 'workspace-write'}"`,
+    `sandbox_mode="${request.planMode || request.readOnly ? 'read-only' : 'workspace-write'}"`,
     '-c',
     `model_reasoning_effort="${request.effort}"`,
     ...(request.fast ? ['-c', 'service_tier="fast"'] : []),

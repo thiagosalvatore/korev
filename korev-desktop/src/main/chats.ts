@@ -148,6 +148,7 @@ export function askSystemPrompt(repos: Repo[], checkouts: string[]): string {
         `- ${repo.name}: ${checkouts[index]} (origin/${repo.defaultBranch})`,
     ),
     `Read the code to answer. Do not edit files, create branches or commit. When the user asks for a plan, write the whole plan in your reply.`,
+    `You may run commands that act outside these checkouts, like posting a pull request review with gh. The user approves each one.`,
   ].join('\n');
 }
 
@@ -397,7 +398,11 @@ export function createChats(
       answerControl(turn, request, denyResponse(ASK_PLAN_MESSAGE));
       return;
     }
-    if (!request.needsUser && !ctx.store.state.settings.toolApprovals) {
+    if (
+      !request.needsUser &&
+      !ctx.store.state.settings.toolApprovals &&
+      turn.owner.kind !== 'ask'
+    ) {
       answerControl(turn, request, allowResponse(request));
       return;
     }
@@ -460,7 +465,8 @@ export function createChats(
       parser = turnParser;
       const request: TurnRequest = {
         model: options.model,
-        planMode: options.planMode || target.readOnly,
+        planMode: options.planMode && !target.readOnly,
+        readOnly: target.readOnly,
         effort: options.effort,
         fast: options.fast,
         toolApprovals: ctx.store.state.settings.toolApprovals,

@@ -515,12 +515,46 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(state.workspaces).toEqual([]);
     expect(state.askChats.map((entry) => entry.id)).toEqual([ask.id]);
     expect(git(askDir, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('HEAD');
-    expect(
-      await readFile(path.join(askDir, '.context', 'claude-args'), 'utf8'),
-    ).toContain('--permission-mode plan');
+    const args = await readFile(
+      path.join(askDir, '.context', 'claude-args'),
+      'utf8',
+    );
+    expect(args).toContain('--permission-mode default');
+    expect(args).toContain('--disallowedTools Edit Write NotebookEdit');
     expect(
       (await korev.api.transcript(ask.session.id)).map((item) => item.kind),
     ).toEqual(['user', 'assistant', 'tool', 'result']);
+  });
+
+  it('asks the user before an Ask chat runs a command, even with tool approvals off', async () => {
+    const repo = await addRepo();
+    const askDir = path.join(home, 'korev', 'workspaces', 'acme', '.ask');
+    const ask = await korev.api.createAskChat([repo.id]);
+    await korev.api.send(ask.session.id, {
+      text: 'needs-approval',
+      agent: 'claude',
+      model: 'claude-sonnet-5-5',
+      effort: 'high',
+      planMode: false,
+      fast: false,
+    });
+    let permissionId = '';
+    await waitFor(async () => {
+      const pending = (await korev.api.transcript(ask.session.id)).find(
+        (item) => item.kind === 'permission',
+      );
+      permissionId = pending?.id ?? '';
+      return Boolean(pending);
+    });
+
+    await korev.api.respondPermission(ask.session.id, permissionId, {
+      allow: true,
+    });
+    await waitFor(
+      async () => (await korev.api.getState()).runningSessions.length === 0,
+    );
+
+    expect(existsSync(path.join(askDir, 'approved.txt'))).toBe(true);
   });
 
   it('moves the read-only checkout to the latest default branch before each question', async () => {
