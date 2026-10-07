@@ -309,6 +309,44 @@ export interface WorkspaceRuntime {
   runUrl: string | null;
 }
 
+export type PrStep =
+  | 'create'
+  | 'archive'
+  | 'resolve-conflicts'
+  | 'fix-errors'
+  | 'checks-running'
+  | 'draft'
+  | 'changes-requested'
+  | 'waiting-for-review'
+  | 'merge';
+
+export type PrStepTone = 'primary' | 'secondary' | 'success' | 'danger';
+
+export const PR_STEPS: Record<PrStep, { label: string; tone: PrStepTone }> = {
+  create: { label: 'Create PR', tone: 'primary' },
+  archive: { label: 'Archive', tone: 'secondary' },
+  'resolve-conflicts': { label: 'Resolve conflicts', tone: 'danger' },
+  'fix-errors': { label: 'Fix errors', tone: 'danger' },
+  'checks-running': { label: 'Checks running', tone: 'secondary' },
+  draft: { label: 'Draft', tone: 'secondary' },
+  'changes-requested': { label: 'Changes requested', tone: 'danger' },
+  'waiting-for-review': { label: 'Waiting for review', tone: 'secondary' },
+  merge: { label: 'Merge', tone: 'success' },
+};
+
+export function nextPrStep(pr: PrStatus | null): PrStep {
+  if (!pr || pr.state === 'CLOSED') return 'create';
+  if (pr.state === 'MERGED') return 'archive';
+  if (pr.mergeable === 'CONFLICTING') return 'resolve-conflicts';
+  if (pr.checks.some((check) => check.state === 'failure')) return 'fix-errors';
+  if (pr.checks.some((check) => check.state === 'pending'))
+    return 'checks-running';
+  if (pr.isDraft) return 'draft';
+  if (pr.reviewDecision === 'CHANGES_REQUESTED') return 'changes-requested';
+  if (pr.reviewDecision === 'REVIEW_REQUIRED') return 'waiting-for-review';
+  return 'merge';
+}
+
 export function primaryPr(
   workspace: Workspace,
   runtime: WorkspaceRuntime | undefined,

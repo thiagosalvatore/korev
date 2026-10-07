@@ -8,12 +8,15 @@ import {
   Text,
   View,
 } from 'react-native';
-import type {
-  AppState,
-  Repo,
-  Workspace,
-  WorkspaceRuntime,
-  WorkspaceStatus,
+import {
+  nextPrStep,
+  primaryPr,
+  type AppState,
+  type PrStep,
+  type Repo,
+  type Workspace,
+  type WorkspaceRuntime,
+  type WorkspaceStatus,
 } from '../../../korev-desktop/src/shared/model';
 import {
   activeWorkspaces,
@@ -28,6 +31,16 @@ const BUSY_STATUSES: ReadonlySet<WorkspaceStatus> = new Set([
   'setting-up',
   'working',
 ]);
+
+function prColor(theme: Theme, step: PrStep): string {
+  if (step === 'archive') return theme.merged;
+  if (step === 'fix-errors' || step === 'changes-requested')
+    return theme.dangerText;
+  if (step === 'resolve-conflicts' || step === 'checks-running')
+    return theme.warningText;
+  if (step === 'merge') return theme.successText;
+  return theme.fg3;
+}
 
 interface RepoGroup {
   repo: Repo;
@@ -65,7 +78,9 @@ function WorkspaceRow({
   runtime: WorkspaceRuntime | undefined;
   styles: Styles;
 }) {
+  const theme = useTheme();
   const waiting = runtime?.status === 'waiting';
+  const pr = primaryPr(workspace, runtime);
   return (
     <Pressable
       accessibilityRole="button"
@@ -95,6 +110,11 @@ function WorkspaceRow({
         </Text>
       </View>
       {waiting && <Text style={styles.badge}>Needs input</Text>}
+      {pr && (
+        <Text style={[styles.pr, { color: prColor(theme, nextPrStep(pr)) }]}>
+          #{pr.number}
+        </Text>
+      )}
       {(runtime?.unread || waiting) && <View style={styles.dot} />}
     </Pressable>
   );
@@ -178,6 +198,7 @@ function makeStyles(theme: Theme) {
       fontSize: 12,
       fontWeight: '600',
     },
+    pr: { fontSize: 13, fontWeight: '600' },
     dot: {
       width: 8,
       height: 8,

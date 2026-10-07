@@ -53,6 +53,7 @@ The first screen lists the workspaces of each repository, in the same order as t
 - A spinner shows while an agent or the setup script runs.
 - **Needs input** shows when an agent waits for an answer.
 - A dot shows when a workspace has agent output that you did not read.
+- The PR number shows in the colour of its state: green when it is ready to merge, red when checks fail or changes are requested, amber for conflicts or running checks, and purple when it is merged.
 
 ## Chat with an agent
 
@@ -67,6 +68,17 @@ Tap a workspace to open its chats. The tabs at the top are the chats of the work
 When the agent asks before it uses a tool, asks a question or shows a plan, the chat shows a card. Answer it on the phone before the agent's turn ends.
 
 The phone app cannot attach files yet, and opening a workspace on the phone does not mark it as read on the Mac.
+
+## Pull request
+
+The bar at the top of a workspace shows its pull request and the next step, the same as the button in the Korev workspace header:
+
+- **Create PR**, **Fix errors** and **Resolve conflicts** send the prompt to the chat that is open.
+- **Merge** asks you to confirm, then squash-merges the PR.
+- **Archive** asks you to confirm, then archives the workspace.
+- **Checks running**, **Draft**, **Changes requested** and **Waiting for review** open the PR on GitHub.
+
+Tap the PR title to see its checks. Tap a check to open it.
 
 ## Unpair the phone
 

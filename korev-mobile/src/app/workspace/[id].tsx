@@ -22,6 +22,7 @@ import { ChatItemView } from '../../chat/ChatItemView';
 import { Composer } from '../../chat/Composer';
 import { useAppState, useTranscript } from '../../hooks';
 import { useConnection } from '../../korev';
+import { PrBar } from '../../PrBar';
 import { useTheme, type Theme } from '../../theme';
 
 type Styles = ReturnType<typeof makeStyles>;
@@ -145,7 +146,12 @@ export default function WorkspaceScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: workspace.branch }} />
+      <Stack.Screen options={{ title: workspace.name }} />
+      <PrBar
+        workspace={workspace}
+        runtime={state.runtime[workspace.id]}
+        sessionId={session?.id}
+      />
       <SessionTabs
         state={state}
         workspace={workspace}

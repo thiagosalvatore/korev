@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { Button, cn, Icon, IconButton, type IconName } from '../design-system';
 import {
+  nextPrStep,
+  PR_STEPS,
   primaryPr,
   type AppState,
   type PrStatus,
+  type PrStep,
+  type PrStepTone,
   type Workspace,
 } from '../shared/model';
 import {
@@ -24,22 +28,35 @@ import { setUi, updateWorkspaceUi, useUi } from './ui-store';
 interface NextAction {
   label: string;
   icon: IconName;
-  variant: 'primary' | 'secondary' | 'success' | 'danger';
+  variant: PrStepTone;
   run: () => unknown;
 }
 
-function openPrStatus(
-  pr: PrStatus,
-  label: string,
-  icon: IconName,
-  variant: NextAction['variant'] = 'secondary',
-): NextAction {
-  return {
-    label,
-    icon,
-    variant,
-    run: () => void api.openExternal(pr.url),
-  };
+const STEP_ICONS: Record<PrStep, IconName> = {
+  create: 'git-pull-request-arrow',
+  archive: 'archive',
+  'resolve-conflicts': 'git-compare-arrows',
+  'fix-errors': 'wrench',
+  'checks-running': 'loader-circle',
+  draft: 'git-pull-request-draft',
+  'changes-requested': 'message-square-warning',
+  'waiting-for-review': 'clock',
+  merge: 'git-merge',
+};
+
+function stepRun(
+  step: PrStep,
+  state: AppState,
+  workspace: Workspace,
+  pr: PrStatus | null,
+): () => unknown {
+  if (!pr || step === 'create') return () => createPr(workspace);
+  if (step === 'archive') return () => archiveWorkspace(state, workspace);
+  if (step === 'resolve-conflicts')
+    return () => resolveConflicts(workspace, pr);
+  if (step === 'fix-errors') return () => fixErrors(workspace, pr);
+  if (step === 'merge') return () => mergePr(workspace, pr);
+  return () => void api.openExternal(pr.url);
 }
 
 export function nextAction(
@@ -47,55 +64,12 @@ export function nextAction(
   workspace: Workspace,
   pr: PrStatus | null,
 ): NextAction {
-  if (!pr || pr.state === 'CLOSED') {
-    return {
-      label: 'Create PR',
-      icon: 'git-pull-request-arrow',
-      variant: 'primary',
-      run: () => createPr(workspace),
-    };
-  }
-  if (pr.state === 'MERGED') {
-    return {
-      label: 'Archive',
-      icon: 'archive',
-      variant: 'secondary',
-      run: () => archiveWorkspace(state, workspace),
-    };
-  }
-  if (pr.mergeable === 'CONFLICTING') {
-    return {
-      label: 'Resolve conflicts',
-      icon: 'git-compare-arrows',
-      variant: 'danger',
-      run: () => resolveConflicts(workspace, pr),
-    };
-  }
-  if (pr.checks.some((check) => check.state === 'failure')) {
-    return {
-      label: 'Fix errors',
-      icon: 'wrench',
-      variant: 'danger',
-      run: () => fixErrors(workspace, pr),
-    };
-  }
-  if (pr.checks.some((check) => check.state === 'pending'))
-    return openPrStatus(pr, 'Checks running', 'loader-circle');
-  if (pr.isDraft) return openPrStatus(pr, 'Draft', 'git-pull-request-draft');
-  if (pr.reviewDecision === 'CHANGES_REQUESTED')
-    return openPrStatus(
-      pr,
-      'Changes requested',
-      'message-square-warning',
-      'danger',
-    );
-  if (pr.reviewDecision === 'REVIEW_REQUIRED')
-    return openPrStatus(pr, 'Waiting for review', 'clock');
+  const step = nextPrStep(pr);
   return {
-    label: 'Merge',
-    icon: 'git-merge',
-    variant: 'success',
-    run: () => mergePr(workspace, pr),
+    label: PR_STEPS[step].label,
+    icon: STEP_ICONS[step],
+    variant: PR_STEPS[step].tone,
+    run: stepRun(step, state, workspace, pr),
   };
 }
 
