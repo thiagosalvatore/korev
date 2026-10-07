@@ -15,9 +15,15 @@ nav_order: 1
 
 Korev names workspaces and Ask chats with Claude Haiku through the `claude` CLI. If you use only Codex, names come from the first words of the task instead.
 
+## Download
+
+Download the DMG for your Mac from the [latest release](https://github.com/thiagosalvatore/korev/releases/latest): `arm64` for Apple silicon, `x64` for Intel. Open it and drag Korev to Applications.
+
+Korev is not signed or notarized, so macOS blocks it the first time. See [Open an unsigned build](#open-an-unsigned-build-on-another-mac).
+
 ## Build the app
 
-There is no download yet. Build Korev from the repository:
+To run the code on `main`, build Korev from the repository:
 
 ```sh
 git clone https://github.com/thiagosalvatore/korev.git
@@ -27,7 +33,7 @@ make package-run
 
 `make package` builds `korev-desktop/out/Korev-darwin-<arch>/Korev.app`. `make run` quits the packaged Korev if it is running and opens the new build. `make package-run` does both. Move `Korev.app` to `/Applications` if you want to keep it.
 
-To make a zip you can give to someone else, run `npm run make` in `korev-desktop`. The zip goes to `korev-desktop/out/make/zip/darwin/<arch>/`.
+To make the DMGs and zips that a release ships, run `make dist`. They go to `korev-desktop/out/make/`.
 
 ## Open an unsigned build on another Mac
 

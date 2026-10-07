@@ -56,7 +56,7 @@ make run           # quits the packaged Korev if it is running, then opens the b
 make package-run   # both
 ```
 
-To make a zip you can give to someone else, run `npm run make` in `korev-desktop`. The zip goes to `korev-desktop/out/make/zip/darwin/<arch>/`.
+To build what a release ships, run `make dist`. It writes a DMG and a zip for Apple silicon (`arm64`) and Intel (`x64`) under `korev-desktop/out/make/`.
 
 The build is not signed or notarized (see `TODOS.md`), so Gatekeeper blocks it on other Macs. To open it there, right-click the app and choose Open, or run `xattr -dr com.apple.quarantine Korev.app`.
 
@@ -77,6 +77,7 @@ To change the app icon, edit `korev-desktop/assets/icon.svg` and run `npm run ic
 | `korev-desktop/test-support/bin/claude` | The fake `claude` CLI that the e2e tests run |
 | `DESIGN.md` | How the app looks and behaves |
 | `TODOS.md` | Features Korev does not have yet |
+| `CHANGELOG.md` | What changed in each release. The release notes come from it |
 
 ## Repository config
 
@@ -101,14 +102,39 @@ CI runs the same checks, but only when you start it by hand:
 gh workflow run ci.yml --ref <branch>
 ```
 
+## Release a new version
+
+A release is a tag `vX.Y.Z` on `main`. Pushing the tag starts `.github/workflows/release.yml`. It runs CI, builds the DMGs and zips with `make dist`, and publishes a GitHub release. The release notes are the `## [X.Y.Z]` section of `CHANGELOG.md`.
+
+1. On a new branch, run `make bump VERSION=X.Y.Z`. It sets the version in `korev-desktop/package.json` and renames `## [Unreleased]` in `CHANGELOG.md` to `## [X.Y.Z] - <today>`. Read the notes and edit them if you need to.
+2. Open a pull request with the two files and merge it.
+3. On `main`, pull, then run `make release`. It checks that `main` is clean and the same as `origin/main`, that the tag does not exist and that `CHANGELOG.md` has notes for the version. Then it signs the tag and pushes it.
+4. Follow the run with `gh run watch`. The release appears at https://github.com/thiagosalvatore/korev/releases.
+
+`make release-notes` prints the notes for the version in `package.json`. Add `VERSION=X.Y.Z` to print another version.
+
+To try the workflow without a real release, use a version with a suffix, for example `1.2.0-rc.1`. Run `make bump VERSION=1.2.0-rc.1` on a branch, commit, then push a tag from that branch:
+
+```sh
+git tag v1.2.0-rc.1 && git push origin v1.2.0-rc.1
+```
+
+A version with a `-` becomes a pre-release, which Korev does not offer as an update. To remove a release that went wrong, delete it and its tag, then tag again:
+
+```sh
+gh release delete vX.Y.Z --cleanup-tag --yes
+git tag -d vX.Y.Z
+```
+
 ## Contributing
 
 1. Make a branch from `main`. Do not commit to `main`.
 2. Keep each pull request to one change. Put dependent work in a second pull request on top of the first.
 3. Put unit tests next to the code they test (`foo.ts` and `foo.test.ts`). Add an e2e test when a flow goes across several screens.
 4. Follow `DESIGN.md` for UI changes: semantic tokens only, one accent colour.
-5. Run the checks above, then start CI on your branch.
-6. Update `docs/` when you change what the user sees. GitHub Pages publishes it from `main`. To preview it, run `make docs` and open http://localhost:4000/korev/. It needs Docker.
-7. Write the commit and pull request title as one sentence that says what the user sees change, for example "Keep the Mac awake while an agent is running". Pull requests are squash-merged.
+5. Add a line under `## [Unreleased]` in `CHANGELOG.md` when you change what the user sees. Korev shows these notes after an update.
+6. Run the checks above, then start CI on your branch.
+7. Update `docs/` when you change what the user sees. GitHub Pages publishes it from `main`. To preview it, run `make docs` and open http://localhost:4000/korev/. It needs Docker.
+8. Write the commit and pull request title as one sentence that says what the user sees change, for example "Keep the Mac awake while an agent is running". Pull requests are squash-merged.
 
 For things to work on, see `TODOS.md`.
