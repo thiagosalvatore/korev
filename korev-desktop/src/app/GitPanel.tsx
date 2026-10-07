@@ -9,15 +9,18 @@ import {
   Tabs,
   type IconName,
 } from '../design-system';
-import type {
-  AppState,
-  CheckState,
-  FileChange,
-  GitWorktree,
-  PrStatus,
-  ReviewComment,
-  ReviewDecision,
-  Workspace,
+import {
+  mergeStep,
+  PR_STEPS,
+  stackBlocked,
+  type AppState,
+  type CheckState,
+  type FileChange,
+  type GitWorktree,
+  type PrStatus,
+  type ReviewComment,
+  type ReviewDecision,
+  type Workspace,
 } from '../shared/model';
 import {
   createPr,
@@ -374,10 +377,10 @@ function PrCard({
             size="sm"
             variant="success"
             icon="git-merge"
-            disabled={pr.mergeable === 'CONFLICTING'}
+            disabled={pr.mergeable === 'CONFLICTING' || stackBlocked(pr)}
             onClick={() => mergePr(workspace, pr)}
           >
-            Merge
+            {PR_STEPS[mergeStep(pr)].label}
           </Button>
           {pr.headRefName !== workspace.branch ? (
             <Button

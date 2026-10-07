@@ -35,6 +35,7 @@ The button in the workspace header always shows the next step:
 | **Resolve conflicts** | Asks the agent to fix the pull request's merge conflicts |
 | **Fix errors** (⌘⇧X) | Sends the failing checks and their links to the agent |
 | **Merge** (⌘⇧M) | Runs `gh pr merge --squash` |
+| **Merge partial stack** / **Merge stack** | Shown for a pull request in a GitHub stack that has open pull requests below it. Runs `gh stack merge <number> --yes --squash`, which merges that pull request and every open one below it in one step. If any open pull request below isn't ready (conflicts, failing or running checks, draft, or review needed), the button shows **Stack can't be merged** instead |
 | **Archive** | Archives the workspace once the pull request merges |
 
 **Create PR**, **Resolve conflicts** and **Fix errors** send a prompt to the active chat with plan mode off. Add your own instructions to these prompts with [`[prompts]`](configure-your-repository.md#prompts).

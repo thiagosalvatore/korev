@@ -305,6 +305,20 @@ export interface PrStatus {
   baseRefName: string;
   createdAt: string;
   checks: PrCheck[];
+  stack: PrStack | null;
+}
+
+export interface PrStack {
+  openBelow: number;
+  openAbove: number;
+  belowReady: boolean;
+}
+
+export type MergeScope = 'pr' | 'partial-stack' | 'stack';
+
+export function mergeScope(pr: PrStatus): MergeScope {
+  if (!pr.stack || pr.stack.openBelow === 0) return 'pr';
+  return pr.stack.openAbove === 0 ? 'stack' : 'partial-stack';
 }
 
 export interface GitWorktree {
@@ -332,7 +346,10 @@ export type PrStep =
   | 'draft'
   | 'changes-requested'
   | 'waiting-for-review'
-  | 'merge';
+  | 'stack-blocked'
+  | 'merge'
+  | 'merge-partial-stack'
+  | 'merge-stack';
 
 export type PrStepTone = 'primary' | 'secondary' | 'success' | 'danger';
 
@@ -345,8 +362,29 @@ export const PR_STEPS: Record<PrStep, { label: string; tone: PrStepTone }> = {
   draft: { label: 'Draft', tone: 'secondary' },
   'changes-requested': { label: 'Changes requested', tone: 'danger' },
   'waiting-for-review': { label: 'Waiting for review', tone: 'secondary' },
+  'stack-blocked': { label: "Stack can't be merged", tone: 'secondary' },
   merge: { label: 'Merge', tone: 'success' },
+  'merge-partial-stack': { label: 'Merge partial stack', tone: 'success' },
+  'merge-stack': { label: 'Merge stack', tone: 'success' },
 };
+
+const MERGE_STEP_BY_SCOPE: Record<MergeScope, PrStep> = {
+  pr: 'merge',
+  'partial-stack': 'merge-partial-stack',
+  stack: 'merge-stack',
+};
+
+export const MERGE_STEPS: ReadonlySet<PrStep> = new Set(
+  Object.values(MERGE_STEP_BY_SCOPE),
+);
+
+export function mergeStep(pr: PrStatus): PrStep {
+  return MERGE_STEP_BY_SCOPE[mergeScope(pr)];
+}
+
+export function stackBlocked(pr: PrStatus): boolean {
+  return pr.stack?.belowReady === false;
+}
 
 export function nextPrStep(pr: PrStatus | null): PrStep {
   if (!pr || pr.state === 'CLOSED') return 'create';
@@ -358,7 +396,8 @@ export function nextPrStep(pr: PrStatus | null): PrStep {
   if (pr.isDraft) return 'draft';
   if (pr.reviewDecision === 'CHANGES_REQUESTED') return 'changes-requested';
   if (pr.reviewDecision === 'REVIEW_REQUIRED') return 'waiting-for-review';
-  return 'merge';
+  if (stackBlocked(pr)) return 'stack-blocked';
+  return mergeStep(pr);
 }
 
 export type PrBadge =

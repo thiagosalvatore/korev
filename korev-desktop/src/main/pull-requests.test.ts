@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   findPrUrls,
+  parsePrStack,
   parsePrStatus,
   parseReviewComments,
 } from './pull-requests';
@@ -67,6 +68,76 @@ describe('PR status', () => {
 
   it('returns null when there is no PR', () => {
     expect(parsePrStatus('no pull requests found')).toBeNull();
+  });
+});
+
+type StackPr = Record<string, unknown>;
+
+function stackPr(number: number, fields: StackPr = {}): StackPr {
+  return {
+    number,
+    url: `https://github.com/acme/web/pull/${number}`,
+    state: 'OPEN',
+    isDraft: false,
+    mergeable: 'MERGEABLE',
+    reviewDecision: 'APPROVED',
+    commits: {
+      nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS' } } }],
+    },
+    ...fields,
+  };
+}
+
+function stackResponse(position: number | null, prs: StackPr[]) {
+  return JSON.stringify({
+    data: {
+      resource: {
+        stackEntry: position === null ? null : { position },
+        stack:
+          position === null
+            ? null
+            : {
+                entries: {
+                  nodes: prs.map((pullRequest, index) => ({
+                    position: index + 1,
+                    pullRequest,
+                  })),
+                },
+              },
+      },
+    },
+  });
+}
+
+describe('PR stack', () => {
+  it('counts only the open PRs below and above this one', () => {
+    const json = stackResponse(3, [
+      stackPr(5, { state: 'MERGED' }),
+      stackPr(6),
+      stackPr(7),
+      stackPr(8),
+    ]);
+    expect(parsePrStack(json)).toEqual({
+      openBelow: 1,
+      openAbove: 1,
+      belowReady: true,
+    });
+  });
+
+  it('marks the PRs below as not ready when one of them is still running checks', () => {
+    const json = stackResponse(2, [
+      stackPr(5, {
+        commits: {
+          nodes: [{ commit: { statusCheckRollup: { state: 'PENDING' } } }],
+        },
+      }),
+      stackPr(6),
+    ]);
+    expect(parsePrStack(json)?.belowReady).toBe(false);
+  });
+
+  it('returns null for a PR outside any stack', () => {
+    expect(parsePrStack(stackResponse(null, []))).toBeNull();
   });
 });
 

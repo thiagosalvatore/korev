@@ -1,8 +1,10 @@
-import type {
-  CheckState,
-  PrCheck,
-  PrStatus,
-  ReviewComment,
+import {
+  mergeScope,
+  type CheckState,
+  type PrCheck,
+  type PrStack,
+  type PrStatus,
+  type ReviewComment,
 } from '../shared/model';
 import type { CommandRunner } from './command-runner';
 
@@ -14,8 +16,58 @@ const COMPLETED = 'COMPLETED';
 const PASSING = new Set(['SUCCESS', 'NEUTRAL']);
 const SKIPPED = new Set(['SKIPPED', 'CANCELLED', 'STALE']);
 const FAILED_STATUS_STATES = new Set(['FAILURE', 'ERROR']);
+const RUNNING_STATUS_STATES = new Set(['PENDING', 'EXPECTED']);
+const BLOCKING_REVIEW_DECISIONS = new Set([
+  'CHANGES_REQUESTED',
+  'REVIEW_REQUIRED',
+]);
+const MAX_STACK_SIZE = 100;
+const STACK_QUERY = `query($url: URI!) {
+  resource(url: $url) {
+    ... on PullRequest {
+      stackEntry { position }
+      stack {
+        entries(first: ${MAX_STACK_SIZE}) {
+          nodes {
+            position
+            pullRequest {
+              number url state isDraft mergeable reviewDecision
+              commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+            }
+          }
+        }
+      }
+    }
+  }
+}`;
 
 type JsonRecord = Record<string, unknown>;
+
+interface StackPullRequest {
+  number: number;
+  url: string;
+  state: string;
+  isDraft?: boolean;
+  mergeable?: string;
+  reviewDecision?: string | null;
+  commits?: {
+    nodes: { commit: { statusCheckRollup: { state: string } | null } }[];
+  };
+}
+
+interface StackEntry {
+  position: number;
+  pullRequest: StackPullRequest | null;
+}
+
+interface StackResponse {
+  data?: {
+    resource?: {
+      stackEntry?: { position: number } | null;
+      stack?: { entries: { nodes: StackEntry[] } } | null;
+    } | null;
+  };
+}
 
 function str(value: unknown): string {
   return typeof value === 'string' ? value : '';
@@ -70,7 +122,60 @@ export function parsePrStatus(json: string): PrStatus | null {
     baseRefName: str(raw.baseRefName),
     createdAt: str(raw.createdAt),
     checks: rollup.map(toCheck),
+    stack: null,
   };
+}
+
+export function parsePrStack(json: string): PrStack | null {
+  let response: StackResponse;
+  try {
+    response = JSON.parse(json) as StackResponse;
+  } catch {
+    return null;
+  }
+  const resource = response.data?.resource;
+  const position = resource?.stackEntry?.position;
+  if (typeof position !== 'number') return null;
+  const open = (resource?.stack?.entries.nodes ?? []).filter(
+    (entry) => entry.pullRequest?.state === 'OPEN',
+  );
+  const below = open.filter((entry) => entry.position < position);
+  return {
+    openBelow: below.length,
+    openAbove: open.filter((entry) => entry.position > position).length,
+    belowReady: below.every(
+      ({ pullRequest }) => pullRequest && readyToMerge(pullRequest),
+    ),
+  };
+}
+
+function readyToMerge(pr: StackPullRequest): boolean {
+  const checks = pr.commits?.nodes[0]?.commit.statusCheckRollup?.state ?? '';
+  return (
+    pr.mergeable !== 'CONFLICTING' &&
+    !FAILED_STATUS_STATES.has(checks) &&
+    !RUNNING_STATUS_STATES.has(checks) &&
+    !pr.isDraft &&
+    !BLOCKING_REVIEW_DECISIONS.has(pr.reviewDecision ?? '')
+  );
+}
+
+async function fetchPrStack(
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  url: string,
+): Promise<PrStack | null> {
+  try {
+    const result = await run(
+      'gh',
+      ['api', 'graphql', '-f', `query=${STACK_QUERY}`, '-f', `url=${url}`],
+      { cwd, env, timeoutMs: GH_TIMEOUT_MS },
+    );
+    return result.exitCode === 0 ? parsePrStack(result.stdout) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function findPrUrls(text: string): string[] {
@@ -89,19 +194,29 @@ export async function fetchPrStatus(
       env,
       timeoutMs: GH_TIMEOUT_MS,
     });
-    return result.exitCode === 0 ? parsePrStatus(result.stdout) : null;
+    if (result.exitCode !== 0) return null;
+    const status = parsePrStatus(result.stdout);
+    if (status?.state !== 'OPEN') return status;
+    return { ...status, stack: await fetchPrStack(run, env, cwd, status.url) };
   } catch {
     return null;
   }
+}
+
+function mergeArgs(pr: PrStatus): string[] {
+  const number = String(pr.number);
+  return mergeScope(pr) === 'pr'
+    ? ['pr', 'merge', number, '--squash']
+    : ['stack', 'merge', number, '--yes', '--squash'];
 }
 
 export async function mergePr(
   run: CommandRunner,
   env: NodeJS.ProcessEnv,
   cwd: string,
-  number: number,
+  pr: PrStatus,
 ): Promise<string | null> {
-  const result = await run('gh', ['pr', 'merge', String(number), '--squash'], {
+  const result = await run('gh', mergeArgs(pr), {
     cwd,
     env,
     timeoutMs: GH_TIMEOUT_MS,

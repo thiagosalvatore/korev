@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import type { KorevApi } from '../../korev-desktop/src/shared/api';
 import {
+  MERGE_STEPS,
   nextPrStep,
   PR_STEPS,
   primaryPr,
@@ -76,7 +77,7 @@ function runStep(
     return void attempt(failure, () =>
       api.resolveConflicts(workspace.id, sessionId, pr.number),
     );
-  if (step === 'merge')
+  if (MERGE_STEPS.has(step))
     return confirmThenLeave(`Merge #${pr.number}?`, label, failure, () =>
       api.mergePr(workspace.id, pr.number),
     );

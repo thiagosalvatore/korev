@@ -986,12 +986,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     prStatuses: (workspaceId) => refreshPrs(workspaceId),
     async mergePr(workspaceId, prNumber) {
       const workspace = workspacePath(workspaceId);
-      const problem = await mergePr(
-        deps.run,
-        deps.env,
-        workspace.path,
-        prNumber,
-      );
+      const pr = trackedPr(workspaceId, prNumber);
+      if (!pr) return fail(`Pull request #${prNumber} is not tracked here`);
+      const problem = await mergePr(deps.run, deps.env, workspace.path, pr);
       await refreshPrs(workspaceId);
       return problem ? fail(problem) : ok(undefined);
     },

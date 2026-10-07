@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, cn, Icon, IconButton, type IconName } from '../design-system';
 import {
+  MERGE_STEPS,
   nextPrStep,
   PR_STEPS,
   primaryPr,
@@ -41,7 +42,10 @@ const STEP_ICONS: Record<PrStep, IconName> = {
   draft: 'git-pull-request-draft',
   'changes-requested': 'message-square-warning',
   'waiting-for-review': 'clock',
+  'stack-blocked': 'layers',
   merge: 'git-merge',
+  'merge-partial-stack': 'git-merge',
+  'merge-stack': 'git-merge',
 };
 
 function stepRun(
@@ -55,7 +59,7 @@ function stepRun(
   if (step === 'resolve-conflicts')
     return () => resolveConflicts(workspace, pr);
   if (step === 'fix-errors') return () => fixErrors(workspace, pr);
-  if (step === 'merge') return () => mergePr(workspace, pr);
+  if (MERGE_STEPS.has(step)) return () => mergePr(workspace, pr);
   return () => void api.openExternal(pr.url);
 }
 

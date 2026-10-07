@@ -21,6 +21,7 @@ const READY_PR: PrStatus = {
   baseRefName: 'main',
   createdAt: '2026-01-01T00:00:00Z',
   checks: [{ name: 'lint', state: 'success', url: null }],
+  stack: null,
 };
 
 function actionLabel(pr: PrStatus): string {
@@ -50,6 +51,19 @@ describe('next PR action', () => {
         checks: [{ name: 'lint', state: 'pending', url: null }],
       }),
     ).toBe('Checks running');
+  });
+
+  it.each([
+    [{ openBelow: 0, openAbove: 2, belowReady: true }, 'Merge'],
+    [{ openBelow: 1, openAbove: 1, belowReady: true }, 'Merge partial stack'],
+    [{ openBelow: 2, openAbove: 0, belowReady: true }, 'Merge stack'],
+  ])('offers to merge a stacked PR at %j as %s', (stack, label) => {
+    expect(actionLabel({ ...READY_PR, stack })).toBe(label);
+  });
+
+  it('says the stack cannot be merged while a PR below is not ready', () => {
+    const stack = { openBelow: 1, openAbove: 0, belowReady: false };
+    expect(actionLabel({ ...READY_PR, stack })).toBe("Stack can't be merged");
   });
 
   it('acts on the PR still open when another one already merged', () => {

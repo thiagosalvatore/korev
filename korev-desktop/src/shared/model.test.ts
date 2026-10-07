@@ -49,6 +49,7 @@ describe('prBadge', () => {
     baseRefName: 'main',
     createdAt: '2026-01-01T00:00:00Z',
     checks: [{ name: 'lint', state: 'failure', url: null }],
+    stack: null,
   };
 
   it('shows conflicts before failing checks', () => {

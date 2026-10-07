@@ -58,6 +58,8 @@ default_thinking_level = "high"
 let conductorRepos: Record<string, string | null>[] = [];
 let openPr: Record<string, unknown> | null = null;
 let prsByUrl: Record<string, Record<string, unknown>> = {};
+let stacksByUrl: Record<string, Record<string, unknown>> = {};
+let ghMerges: string[][] = [];
 
 const BRANCH_PR_URL = 'https://github.com/acme/web/pull/7';
 const NO_PR = { exitCode: 1, stdout: '', stderr: 'no pull requests found' };
@@ -67,11 +69,34 @@ function fakePrView(ref: string) {
   return pr ? { exitCode: 0, stdout: JSON.stringify(pr), stderr: '' } : NO_PR;
 }
 
+function fakePrStack(args: readonly string[]) {
+  const url = args.find((arg) => arg.startsWith('url='))?.slice('url='.length);
+  const resource = (url && stacksByUrl[url]) ?? {
+    stackEntry: null,
+    stack: null,
+  };
+  return {
+    exitCode: 0,
+    stdout: JSON.stringify({ data: { resource } }),
+    stderr: '',
+  };
+}
+
+function isGhMerge(args: readonly string[]) {
+  return ['pr', 'stack'].includes(args[0]) && args[1] === 'merge';
+}
+
 const runWithFakeSqlite: CommandRunner = async (file, args, options) => {
   if (file === 'sqlite3')
     return { exitCode: 0, stdout: JSON.stringify(conductorRepos), stderr: '' };
   if (file === 'gh' && args[0] === 'pr' && args[1] === 'view')
     return fakePrView(args[2]);
+  if (file === 'gh' && args[0] === 'api' && args[1] === 'graphql')
+    return fakePrStack(args);
+  if (file === 'gh' && isGhMerge(args)) {
+    ghMerges.push([...args]);
+    return { exitCode: 0, stdout: '', stderr: '' };
+  }
   return runProcess(file, args, options);
 };
 
@@ -165,6 +190,8 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   afterEach(async () => {
     openPr = null;
     prsByUrl = {};
+    stacksByUrl = {};
+    ghMerges = [];
     await korev.shutdown();
     vi.useRealTimers();
     await rm(home, { recursive: true, force: true });
@@ -388,6 +415,30 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(
       (await workspaceState(workspace.id)).workspace.archivedAt,
     ).not.toBeNull();
+  });
+
+  it('merges a PR in the middle of a stack together with the PRs below it', async () => {
+    const workspace = await createWorkspace();
+    const middle = fakePr(8, 'OPEN', new Date().toISOString());
+    stacksByUrl[middle] = {
+      stackEntry: { position: 2 },
+      stack: {
+        entries: {
+          nodes: [1, 2, 3].map((position) => ({
+            position,
+            pullRequest: { number: position + 6, state: 'OPEN' },
+          })),
+        },
+      },
+    };
+    await sendAndWait(workspace.sessions[0].id, `open-pr ${middle}`);
+    await waitFor(async () => (await trackedUrls(workspace.id)).length > 0);
+    await korev.api.prStatuses(workspace.id);
+
+    const merged = await korev.api.mergePr(workspace.id, 8);
+
+    expect(merged.ok).toBe(true);
+    expect(ghMerges).toEqual([['stack', 'merge', '8', '--yes', '--squash']]);
   });
 
   async function workspaceWithStrayPr(strayPath: string, state = 'MERGED') {
