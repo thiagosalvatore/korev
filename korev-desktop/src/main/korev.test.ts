@@ -526,6 +526,19 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toEqual(['user', 'assistant', 'tool', 'result']);
   });
 
+  it('titles an Ask chat from its first question', async () => {
+    const repo = await addRepo();
+
+    const ask = await askAndWait([repo.id], 'Where is the README?');
+
+    await waitFor(
+      async () =>
+        (await korev.api.getState()).askChats.find(
+          (entry) => entry.id === ask.id,
+        )?.session.title === 'Finding the README',
+    );
+  });
+
   it('asks the user before an Ask chat runs a command, even with tool approvals off', async () => {
     const repo = await addRepo();
     const askDir = path.join(home, 'korev', 'workspaces', 'acme', '.ask');

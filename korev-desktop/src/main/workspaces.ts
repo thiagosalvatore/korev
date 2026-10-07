@@ -49,6 +49,9 @@ const NAMING_MODEL = 'claude-haiku-4-5';
 const NAMING_TASK_CHARS = 4_000;
 const NAMING_SYSTEM_PROMPT =
   'You name git branches. Given a task, reply with a 2 to 4 word lowercase kebab-case branch name and nothing else.';
+const TITLE_SYSTEM_PROMPT =
+  "You title chat conversations. Given the user's first message, reply with a 3 to 6 word title in sentence case, without quotes or trailing punctuation, and nothing else.";
+const SURROUNDING_QUOTES = /^["'`]+|["'`]+$/g;
 const NAMING_ARGS = [
   '-p',
   '--model',
@@ -155,14 +158,13 @@ export async function renameBranchPrompt(
   return (await loadRepoConfig(repo, repo.path)).prompts.rename_branch;
 }
 
-export async function suggestName(
+async function askNamingModel(
   ctx: Context,
+  systemPrompt: string,
   task: string,
-  extraPrompt?: string,
 ): Promise<string | null> {
-  const args = [...NAMING_ARGS, withPrompt(NAMING_SYSTEM_PROMPT, extraPrompt)];
   const result = await ctx.deps
-    .run('claude', args, {
+    .run('claude', [...NAMING_ARGS, systemPrompt], {
       cwd: tmpdir(),
       env: ctx.deps.env,
       stdin: `Task:\n${task.slice(0, NAMING_TASK_CHARS)}`,
@@ -170,9 +172,28 @@ export async function suggestName(
     })
     .catch(() => null);
   if (result?.exitCode !== 0) return null;
-  return (
-    truncateName(slugify(result.stdout.trim().split('\n').at(-1) ?? '')) || null
+  return result.stdout.trim().split('\n').at(-1)?.trim() || null;
+}
+
+export async function suggestName(
+  ctx: Context,
+  task: string,
+  extraPrompt?: string,
+): Promise<string | null> {
+  const answer = await askNamingModel(
+    ctx,
+    withPrompt(NAMING_SYSTEM_PROMPT, extraPrompt),
+    task,
   );
+  return truncateName(slugify(answer ?? '')) || null;
+}
+
+export async function suggestTitle(
+  ctx: Context,
+  task: string,
+): Promise<string | null> {
+  const answer = await askNamingModel(ctx, TITLE_SYSTEM_PROMPT, task);
+  return answer?.replace(SURROUNDING_QUOTES, '').trim() || null;
 }
 
 function workspaceNames(ctx: Context, repoId: string, except?: Workspace) {

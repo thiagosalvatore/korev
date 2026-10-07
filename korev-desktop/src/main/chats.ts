@@ -48,6 +48,7 @@ import {
   renameBranchPrompt,
   scriptEnv,
   suggestName,
+  suggestTitle,
   switchAgent,
   workspaceConfig,
 } from './workspaces';
@@ -678,6 +679,9 @@ export function createChats(
     if (workspace && firstMessage && session === workspace.sessions[0]) {
       void autoRenameBranch(workspace, options.text);
     }
+    if (owner.kind === 'ask' && firstMessage) {
+      void autoTitle(session, options.text);
+    }
     return { ok: true, value: undefined };
   }
 
@@ -713,6 +717,15 @@ export function createChats(
     } catch {
       return;
     }
+  }
+
+  async function autoTitle(session: ChatSession, text: string) {
+    const placeholder = session.title;
+    const suggestion = await suggestTitle(ctx, text);
+    if (!suggestion || session.title !== placeholder) return;
+    session.title = titleFrom(suggestion);
+    ctx.store.save();
+    ctx.emitState();
   }
 
   function stop(sessionId: string) {
