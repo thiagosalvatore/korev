@@ -2,7 +2,7 @@
 
 Korev is a Mac app that runs coding agents (Claude Code and Codex) in parallel. Each task gets its own workspace: a git worktree on a new branch, with its own chats, terminal, diff and pull request.
 
-**Docs: https://thiagosalvatore.github.io/korev** — how workspaces, Ask, linked workspaces and the agents work, how to configure a repository, and every setting and shortcut.
+**Docs: https://korev.ai/docs** — how workspaces, Ask, linked workspaces and the agents work, how to configure a repository, and every setting and shortcut.
 
 ## Requirements
 
@@ -33,7 +33,7 @@ npm ci
 REACT_NATIVE_PACKAGER_HOSTNAME=<tailscale-ip> npx expo start
 ```
 
-Open the app with Expo Go on your phone, then pair it from Settings → Remote access. See [Use Korev from your phone](https://thiagosalvatore.github.io/korev/guides/use-korev-from-your-phone.html).
+Open the app with Expo Go on your phone, then pair it from Settings → Remote access. See [Use Korev from your phone](https://korev.ai/docs/guides/use-korev-from-your-phone).
 
 ## Run the landing page
 
@@ -80,7 +80,7 @@ To change the app icon, edit `korev-desktop/assets/icon.svg` and run `npm run ic
 
 ## Repository config
 
-Put a `.korev/settings.toml` in a repository to set up its workspaces: setup, run and archive scripts, preview URLs, files to copy, environment variables, prompts and git options. See [Configure your repository](https://thiagosalvatore.github.io/korev/guides/configure-your-repository.html) and the [config reference](https://thiagosalvatore.github.io/korev/reference/repository-config.html).
+Put a `.korev/settings.toml` in a repository to set up its workspaces: setup, run and archive scripts, preview URLs, files to copy, environment variables, prompts and git options. See [Configure your repository](https://korev.ai/docs/guides/configure-your-repository) and the [config reference](https://korev.ai/docs/reference/repository-config).
 
 ## Checks
 
