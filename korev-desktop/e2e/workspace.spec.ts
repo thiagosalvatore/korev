@@ -15,6 +15,11 @@ import type { KorevBridge } from '../src/shared/api';
 const APP_ENTRY = '.vite/build/main.cjs';
 const FAKE_AGENT_BIN = path.resolve('test-support/bin');
 const SCREENSHOT_DIR = process.env.KOREV_SCREENSHOT_DIR;
+const RENDER_IN_BACKGROUND_ARGS = [
+  '--disable-background-timer-throttling',
+  '--disable-backgrounding-occluded-windows',
+  '--disable-renderer-backgrounding',
+];
 
 test.setTimeout(120_000);
 
@@ -39,11 +44,12 @@ async function snap(window: Page, name: string) {
     await window.screenshot({ path: path.join(SCREENSHOT_DIR, `${name}.png`) });
 }
 
-async function launch(home: string, repo: string) {
-  const app = await electron.launch({
+function launchApp(home: string) {
+  return electron.launch({
     args: [
       APP_ENTRY,
       '--use-mock-keychain',
+      ...RENDER_IN_BACKGROUND_ARGS,
       `--user-data-dir=${path.join(home, 'user-data')}`,
     ],
     env: {
@@ -53,6 +59,10 @@ async function launch(home: string, repo: string) {
       PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}`,
     },
   });
+}
+
+async function launch(home: string, repo: string) {
+  const app = await launchApp(home);
   await app.evaluate(({ dialog }, repoPath) => {
     dialog.showOpenDialog = (async () => ({
       canceled: false,
@@ -177,19 +187,7 @@ test('creates a workspace from an existing branch with the create-from picker', 
 test('asks before a tool call when approvals are on and continues after Allow', async () => {
   const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
   const repo = await createRepo(home);
-  const app = await electron.launch({
-    args: [
-      APP_ENTRY,
-      '--use-mock-keychain',
-      `--user-data-dir=${path.join(home, 'user-data')}`,
-    ],
-    env: {
-      ...process.env,
-      HOME: home,
-      SHELL: '/bin/sh',
-      PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}`,
-    },
-  });
+  const app = await launchApp(home);
   try {
     await app.evaluate(({ dialog }, repoPath) => {
       dialog.showOpenDialog = (async () => ({
@@ -227,19 +225,7 @@ test('asks before a tool call when approvals are on and continues after Allow', 
 test('reviews a turn, searches the workspace and edits a file', async () => {
   const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
   const repo = await createRepo(home);
-  const app = await electron.launch({
-    args: [
-      APP_ENTRY,
-      '--use-mock-keychain',
-      `--user-data-dir=${path.join(home, 'user-data')}`,
-    ],
-    env: {
-      ...process.env,
-      HOME: home,
-      SHELL: '/bin/sh',
-      PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}`,
-    },
-  });
+  const app = await launchApp(home);
   try {
     await app.evaluate(({ dialog }, repoPath) => {
       dialog.showOpenDialog = (async () => ({
@@ -331,19 +317,7 @@ test('opens a terminal tab and an in-app browser tab', async () => {
   );
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
-  const app = await electron.launch({
-    args: [
-      APP_ENTRY,
-      '--use-mock-keychain',
-      `--user-data-dir=${path.join(home, 'user-data')}`,
-    ],
-    env: {
-      ...process.env,
-      HOME: home,
-      SHELL: '/bin/sh',
-      PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}`,
-    },
-  });
+  const app = await launchApp(home);
   try {
     await app.evaluate(({ dialog }, repoPath) => {
       dialog.showOpenDialog = (async () => ({
