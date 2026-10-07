@@ -23,6 +23,15 @@ import {
 } from '../shared/model';
 import { createKorev, PR_POLL_MS, type Korev } from './korev';
 import type { RemoteSettings } from './remote-access';
+import type { Release } from './updates';
+
+const APP_VERSION = '1.2.0';
+const INSTALLED_RELEASE: Release = {
+  version: APP_VERSION,
+  notes: '- Faster startup',
+  url: 'https://github.com/thiagosalvatore/korev/releases/tag/v1.2.0',
+  zipUrl: null,
+};
 
 const FAKE_AGENT_BIN = path.resolve(__dirname, '../../test-support/bin');
 const WAIT_TIMEOUT_MS = 10_000;
@@ -122,6 +131,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   let keepAwake: Mock<(on: boolean) => void>;
   let applyRemote: Mock<(settings: RemoteSettings) => Promise<void>>;
   let emit: Mock<(event: string, payload: unknown) => void>;
+  let fetchRelease: Mock<(which: string) => Promise<Release | null>>;
 
   async function initRepo(name: string) {
     const dir = path.join(home, name);
@@ -169,6 +179,9 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
         apply: applyRemote,
         revoke: async () => undefined,
       },
+      appVersion: APP_VERSION,
+      fetchRelease,
+      installUpdate: async () => ({ ok: true, value: undefined }),
     });
   }
 
@@ -180,6 +193,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     keepAwake = vi.fn();
     applyRemote = vi.fn(async () => undefined);
     emit = vi.fn();
+    fetchRelease = vi.fn(async () => INSTALLED_RELEASE);
     korev = await openKorev();
     await korev.api.updateSettings({
       branchPrefix: 'dev',
@@ -274,6 +288,23 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(applyRemote).toHaveBeenCalledWith(
       expect.objectContaining({ remoteAccess: true }),
     );
+  });
+
+  it('shows the notes of the installed version once', async () => {
+    await korev.showWhatsNew();
+    expect(fetchRelease).toHaveBeenCalledWith(APP_VERSION);
+    expect((await korev.api.getState()).whatsNew?.notes).toBe(
+      '- Faster startup',
+    );
+
+    await korev.api.dismissWhatsNew();
+    const state = await korev.api.getState();
+    expect(state.whatsNew).toBeNull();
+    expect(state.settings.lastSeenVersion).toBe(APP_VERSION);
+
+    fetchRelease.mockClear();
+    await korev.showWhatsNew();
+    expect(fetchRelease).not.toHaveBeenCalled();
   });
 
   it('creates an empty workspace with .context ignored and .env copied', async () => {

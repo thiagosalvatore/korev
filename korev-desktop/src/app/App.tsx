@@ -9,6 +9,7 @@ import { CommandPalette } from './CommandPalette';
 import { useAppState, useMediaQuery } from './hooks';
 import { DRAG_REGION } from './layout';
 import { NewWorkspacePage } from './NewWorkspacePage';
+import { ReleaseNotesDialog } from './ReleaseNotesDialog';
 import { SettingsPage } from './SettingsPage';
 import { Sidebar } from './Sidebar';
 import { Toaster } from './ui/toast';
@@ -98,6 +99,7 @@ export function App() {
   return (
     <>
       {state.repos.length ? <Shell state={state} /> : <Welcome state={state} />}
+      <ReleaseNotesDialog state={state} />
       <Toaster />
     </>
   );

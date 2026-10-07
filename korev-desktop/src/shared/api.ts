@@ -157,6 +157,9 @@ export interface KorevApi {
   updateSettings(patch: Partial<Settings>): Promise<void>;
   remotePairing(): Promise<RemotePairing | null>;
   revokeRemoteDevices(): Promise<void>;
+  checkForUpdates(): Promise<boolean>;
+  installUpdate(): Promise<Result>;
+  dismissWhatsNew(): Promise<void>;
   openTerminal(
     ref: string,
     workspaceId: string,

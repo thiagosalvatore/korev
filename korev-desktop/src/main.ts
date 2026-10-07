@@ -18,11 +18,11 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { spawn as spawnPty } from 'node-pty';
 import { eventChannel, type KorevEvents } from './shared/api';
-import type { AppCommand, WindowBounds } from './shared/model';
+import type { AppCommand, Result, WindowBounds } from './shared/model';
 import { appMenuTemplate } from './main/app-menu';
 import { isAppUrl, isWebUrl, type AppOrigin } from './main/app-origin';
 import { runProcess } from './main/command-runner';
-import type { Notice } from './main/context';
+import { errorMessage, type Notice } from './main/context';
 import { nodeFileSystem } from './main/file-system';
 import { registerIpcHandlers } from './main/ipc';
 import { createKorev, type Korev } from './main/korev';
@@ -30,6 +30,12 @@ import { childEnv, resolveLoginPath } from './main/login-path';
 import { sendPhoneNotification } from './main/phone-notifications';
 import { createRemoteAccess } from './main/remote-access';
 import { LOOPBACK_HOST, tailnetAddress } from './main/remote-server';
+import {
+  canReplaceBundle,
+  fetchRelease,
+  replaceBundle,
+  type Release,
+} from './main/updates';
 import { restorableBounds } from './main/window-bounds';
 
 const DEFAULT_WINDOW_SIZE = { width: 1440, height: 900 };
@@ -40,6 +46,8 @@ const DEV_USER_DATA_DIR = 'Korev Dev';
 const COMMAND_EVENT = 'command';
 const FINISHED_SOUND = '/System/Library/Sounds/Glass.aiff';
 const REMOTE_TOKEN_FILE = 'remote-token';
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60_000;
+const BUNDLE_FROM_EXE = '../../..';
 
 const appOrigin: AppOrigin = {
   devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
@@ -147,6 +155,32 @@ async function chooseDirectory(): Promise<string | null> {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
+async function installUpdate(release: Release): Promise<Result> {
+  const bundle = path.resolve(app.getPath('exe'), BUNDLE_FROM_EXE);
+  if (!release.zipUrl || !(await canReplaceBundle(bundle))) {
+    await shell.openExternal(release.url);
+    return { ok: true, value: undefined };
+  }
+  try {
+    await replaceBundle(release.zipUrl, bundle);
+  } catch (error) {
+    return {
+      ok: false,
+      message: `Could not install the update: ${errorMessage(error)}`,
+    };
+  }
+  app.relaunch();
+  app.quit();
+  return { ok: true, value: undefined };
+}
+
+function watchForUpdates(korev: Korev) {
+  if (!app.isPackaged) return;
+  void korev.showWhatsNew();
+  void korev.api.checkForUpdates();
+  setInterval(() => void korev.api.checkForUpdates(), UPDATE_CHECK_INTERVAL_MS);
+}
+
 async function createKorevApp(): Promise<Korev> {
   const loginPath = await resolveLoginPath(runProcess, process.env);
   const env = childEnv(process.env, loginPath);
@@ -184,6 +218,9 @@ async function createKorevApp(): Promise<Korev> {
       nativeTheme.themeSource = theme;
     },
     remote,
+    appVersion: app.getVersion(),
+    fetchRelease,
+    installUpdate,
   });
   korevApp = korev;
   nativeTheme.themeSource = korev.settings().theme;
@@ -311,6 +348,7 @@ app.whenReady().then(async () => {
   });
   createWindow(korev);
   void remote.apply(korev.settings());
+  watchForUpdates(korev);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -62,6 +62,7 @@ export interface UiState {
   workspaces: Record<string, WorkspaceUi>;
   palette: PaletteMode;
   diffLayout: DiffLayout;
+  updateOpen: boolean;
 }
 
 const STORAGE_KEY = 'korev:ui';
@@ -80,6 +81,7 @@ const INITIAL: UiState = {
   workspaces: {},
   palette: false,
   diffLayout: 'unified',
+  updateOpen: false,
 };
 
 export const EMPTY_WORKSPACE_UI: WorkspaceUi = {
@@ -94,7 +96,7 @@ function load(): UiState {
     const saved = JSON.parse(
       localStorage.getItem(STORAGE_KEY) ?? 'null',
     ) as Partial<UiState> | null;
-    return { ...INITIAL, ...saved, palette: false };
+    return { ...INITIAL, ...saved, palette: false, updateOpen: false };
   } catch {
     return INITIAL;
   }

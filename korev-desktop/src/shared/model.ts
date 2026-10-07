@@ -240,6 +240,7 @@ export interface Settings {
   remotePort: number;
   phoneNotificationsUrl: string;
   windowBounds: WindowBounds | null;
+  lastSeenVersion: string | null;
 }
 
 export interface ReviewModel {
@@ -476,6 +477,13 @@ export interface AppState {
   agents: AgentAvailability[];
   editors: EditorApp[];
   remote: RemoteStatus;
+  update: ReleaseInfo | null;
+  whatsNew: ReleaseInfo | null;
+}
+
+export interface ReleaseInfo {
+  version: string;
+  notes: string;
 }
 
 export interface RemoteStatus {
@@ -757,6 +765,7 @@ export type AppCommand =
   | 'new-chat'
   | 'close-tab'
   | 'show-settings'
+  | 'check-updates'
   | 'show-palette'
   | 'toggle-terminal'
   | 'toggle-sidebar'

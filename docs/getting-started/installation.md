@@ -37,6 +37,14 @@ The build is not signed or notarized, so Gatekeeper blocks it on other Macs. To 
 xattr -dr com.apple.quarantine Korev.app
 ```
 
+## Updates
+
+Korev checks GitHub for a new release when it starts and every 6 hours. To check now, choose **Korev → Check for Updates…**. When a new version is out, a download button shows at the bottom of the sidebar. It opens the release notes. **Install and restart** downloads the new version, replaces `Korev.app` and opens it again. If agents are still working, Korev asks before it quits.
+
+Korev replaces itself only when it can write to the folder that holds `Korev.app`. If it cannot, or if macOS runs it from a temporary location because you opened it straight from the DMG, **Install and restart** opens the release page instead. Move Korev to `/Applications` to update in place.
+
+After an update, Korev shows the notes for the new version once.
+
 ## Check the agents
 
 Open **Settings → Agents**. Each agent shows **Ready** or **Not installed**. If an agent shows **Not installed** but works in your terminal, see [Troubleshooting](../reference/troubleshooting.md).

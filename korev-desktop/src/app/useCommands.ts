@@ -27,6 +27,11 @@ import { api, on } from './bridge';
 import { toast } from './ui/toast';
 import { EMPTY_WORKSPACE_UI, getUi, setUi } from './ui-store';
 
+async function checkForUpdates() {
+  if (await api.checkForUpdates()) setUi({ updateOpen: true });
+  else toast('Korev is up to date');
+}
+
 const SELECT_WORKSPACE_PREFIX = 'select-workspace-';
 const THEME_CYCLE = { dark: 'light', light: 'dark', system: 'light' } as const;
 
@@ -65,6 +70,8 @@ export function runCommand(state: AppState, command: AppCommand) {
       return openNewWorkspace(workspace?.repoId ?? null);
     case 'show-settings':
       return openSettings();
+    case 'check-updates':
+      return void checkForUpdates();
     case 'show-palette':
       return setUi({ palette: getUi().palette ? false : 'all' });
     case 'quick-open':

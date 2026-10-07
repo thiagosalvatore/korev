@@ -29,4 +29,9 @@ describe('openStore', () => {
       [],
     ]);
   });
+
+  it('has not seen any version yet on a fresh install', async () => {
+    const store = await openStore(fileSystemWith({}), '/user-data', '/home');
+    expect(store.state.settings.lastSeenVersion).toBeNull();
+  });
 });

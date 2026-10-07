@@ -55,6 +55,7 @@ export function defaultSettings(home: string): Settings {
     remotePort: DEFAULT_REMOTE_PORT,
     phoneNotificationsUrl: '',
     windowBounds: null,
+    lastSeenVersion: null,
   };
 }
 

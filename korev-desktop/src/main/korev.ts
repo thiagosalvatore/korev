@@ -18,6 +18,7 @@ import {
   type PrStatus,
   type Repo,
   type RepoFolder,
+  type ReleaseInfo,
   type RepoScripts,
   type TerminalPreset,
   type Result,
@@ -77,6 +78,7 @@ import {
   type PersistedState,
 } from './store';
 import { createTerminals, type SpawnPty } from './terminals';
+import { isNewer, type Release } from './updates';
 import {
   archiveWorkspace,
   createLaneWorkspaces,
@@ -189,6 +191,9 @@ export interface KorevDeps extends CoreDeps {
   openExternal(url: string): Promise<void>;
   applyTheme(theme: Settings['theme']): void;
   remote: Pick<RemoteAccess, 'status' | 'pairing' | 'apply' | 'revoke'>;
+  appVersion: string;
+  fetchRelease(which: 'latest' | string): Promise<Release | null>;
+  installUpdate(release: Release): Promise<Result>;
 }
 
 export interface Korev {
@@ -196,6 +201,7 @@ export interface Korev {
   runningAgents(): number;
   settings(): Settings;
   updateSettings(patch: Partial<Settings>): Promise<void>;
+  showWhatsNew(): Promise<void>;
   emitState(): void;
   shutdown(): Promise<void>;
 }
@@ -291,6 +297,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   const git = createGit(deps.run, deps.env);
   const runtimes = new Map<string, WorkspaceRuntime>();
   let agents: AgentAvailability[] = [];
+  let update: Release | null = null;
+  let whatsNew: ReleaseInfo | null = null;
   const editors = installedEditors(deps.home);
 
   const ctx: Context = {
@@ -396,6 +404,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       agents,
       editors,
       remote: deps.remote.status(),
+      update,
+      whatsNew,
     };
   }
 
@@ -759,6 +769,26 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     if (REMOTE_SETTINGS.some((key) => key in patch))
       await deps.remote.apply(store.state.settings);
     ctx.emitState();
+  }
+
+  async function checkForUpdates() {
+    const latest = await deps.fetchRelease('latest');
+    if (latest) {
+      update = isNewer(latest.version, deps.appVersion) ? latest : null;
+      ctx.emitState();
+    }
+    return update !== null;
+  }
+
+  async function showWhatsNew() {
+    if (store.state.settings.lastSeenVersion === deps.appVersion) return;
+    whatsNew = await deps.fetchRelease(deps.appVersion);
+    ctx.emitState();
+  }
+
+  async function dismissWhatsNew() {
+    whatsNew = null;
+    await updateSettings({ lastSeenVersion: deps.appVersion });
   }
 
   async function importFromConductor() {
@@ -1204,6 +1234,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     updateSettings,
     remotePairing: () => deps.remote.pairing(),
     revokeRemoteDevices: () => deps.remote.revoke(),
+    checkForUpdates,
+    installUpdate: async () =>
+      update ? deps.installUpdate(update) : fail('No update is available'),
+    dismissWhatsNew,
     async openTerminal(ref, workspaceId, kind, size, preset = 'shell') {
       assertOwnRef(ref, workspaceId);
       if (kind === 'shell' && !ctx.terminals.isRunning(ref)) {
@@ -1240,6 +1274,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     runningAgents: () => ctx.runningSessions.size,
     settings: () => store.state.settings,
     updateSettings,
+    showWhatsNew,
     emitState: () => ctx.emitState(),
     async shutdown() {
       clearInterval(prWatch);
