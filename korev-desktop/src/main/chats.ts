@@ -210,6 +210,8 @@ export function createChats(ctx: Context): Chats {
     const cached = transcripts.get(sessionId);
     if (cached) return cached;
     const items = await ctx.store.loadTranscript(sessionId);
+    const loadedMeanwhile = transcripts.get(sessionId);
+    if (loadedMeanwhile) return loadedMeanwhile;
     transcripts.set(sessionId, items);
     return items;
   }

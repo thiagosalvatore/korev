@@ -220,6 +220,20 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(await korev.api.transcript(session.id)).toEqual([]);
   });
 
+  it('keeps the turn in a chat that is read while its first message is sent', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+
+    await Promise.all([
+      sendAndWait(session.id, 'Add a note'),
+      korev.api.transcript(session.id),
+    ]);
+
+    expect(
+      (await korev.api.transcript(session.id)).map((item) => item.kind),
+    ).toEqual(['user', 'assistant', 'tool', 'result']);
+  });
+
   it('switches a chat to another agent and starts a fresh agent session', async () => {
     const workspace = await createWorkspace();
     const [session] = workspace.sessions;
