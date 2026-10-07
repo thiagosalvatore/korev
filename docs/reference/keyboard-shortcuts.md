@@ -1,0 +1,62 @@
+---
+title: Keyboard shortcuts
+parent: Reference
+nav_order: 5
+---
+
+# Keyboard shortcuts
+
+**Settings → Keyboard shortcuts** shows the same list in the app.
+
+## General
+
+| Shortcut | Action |
+| --- | --- |
+| ⌘K | Command palette |
+| ⌘, | Settings |
+| ⌘N | New workspace |
+| ⌘I | Create from… (on the New workspace page) |
+| ⌘P | Quick open file |
+| ⌘⇧F | Search in files |
+| ⌘B | Toggle left sidebar |
+| ⌘⌥B | Toggle right sidebar |
+| ⌘J | Toggle terminal |
+| ⌘. | Toggle zen mode |
+| ⌘⌥T | Toggle theme |
+
+## Workspaces
+
+| Shortcut | Action |
+| --- | --- |
+| ⌘1 to ⌘9 | Go to workspace 1 to 9 |
+| ⌘⌥↑ / ⌘⌥↓ | Previous / next workspace |
+| ⌘O | Open in your editor or another app |
+| ⌘R | Start or stop the run script |
+| ⌘⇧D | Open the diff view |
+| ⌘⇧P | Create PR |
+| ⌘⇧X | Fix errors |
+| ⌘⇧M | Merge PR |
+| ⌘⇧A | Archive workspace |
+
+## Tabs and chat
+
+| Shortcut | Action |
+| --- | --- |
+| ⌘T | New chat |
+| ⌘W | Close tab |
+| ⌘L | Focus the composer |
+| ⌘⇧⌫ | Stop the agent |
+| ⌘S | Save the file you are editing |
+
+## Composer
+
+| Shortcut | Action |
+| --- | --- |
+| Enter | Send |
+| ⇧Enter | New line |
+| ⇧Tab | Plan mode |
+| ⌘⇧E | Fast mode |
+| ⌘⇧/ | Cycle effort |
+| ⌃⌘1 to ⌃⌘5 | Pick a loadout model |
+| ⌘; | Insert snippet |
+| ⌘U | Add attachment |
