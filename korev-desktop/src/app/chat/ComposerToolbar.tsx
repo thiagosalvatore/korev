@@ -1,15 +1,16 @@
 import { cn, Icon, IconButton } from '../../design-system';
 import {
+  AGENT_LABELS,
   EFFORT_LEVELS,
   type AgentKind,
-  type AgentModel,
+  type ModelChoice,
 } from '../../shared/model';
 import { Menu, type MenuItem } from '../ui/Menu';
 
 export interface ComposerToolbarProps {
   agent: AgentKind;
-  models: AgentModel[];
-  loadout: AgentModel[];
+  models: ModelChoice[];
+  loadout: ModelChoice[];
   model: string;
   effort: string;
   fast: boolean;
@@ -20,7 +21,7 @@ export interface ComposerToolbarProps {
   canSend: boolean;
   onAttach(): void;
   onInsertSnippet(): void;
-  onModelChange(model: string): void;
+  onModelChange(choice: ModelChoice): void;
   onEffortChange(effort: string): void;
   onFastChange(fast: boolean): void;
   onPlanModeChange(planMode: boolean): void;
@@ -76,29 +77,32 @@ function optionItems(props: ComposerToolbarProps): MenuItem[] {
   ];
 }
 
+function isCurrent(props: ComposerToolbarProps, choice: ModelChoice) {
+  return choice.agent === props.agent && choice.id === props.model;
+}
+
 function modelItems(props: ComposerToolbarProps): MenuItem[] {
   const loadout = props.loadout.map((entry, index) => ({
-    id: `loadout:${entry.id}`,
+    id: `loadout:${entry.agent}:${entry.id}`,
     label: entry.label,
     hint: `⌃⌘${index + 1}`,
     section: 'Loadout',
-    checked: entry.id === props.model,
-    onSelect: () => props.onModelChange(entry.id),
+    checked: isCurrent(props, entry),
+    onSelect: () => props.onModelChange(entry),
   }));
   const all = props.models.map((entry) => ({
-    id: entry.id,
+    id: `${entry.agent}:${entry.id}`,
     label: entry.label,
-    section: loadout.length ? 'All models' : undefined,
-    checked: entry.id === props.model && !loadout.length,
-    onSelect: () => props.onModelChange(entry.id),
+    section: AGENT_LABELS[entry.agent],
+    checked: isCurrent(props, entry) && !loadout.length,
+    onSelect: () => props.onModelChange(entry),
   }));
   return [...loadout, ...all];
 }
 
 export function ComposerToolbar(props: ComposerToolbarProps) {
   const modelLabel =
-    props.models.find((entry) => entry.id === props.model)?.label ??
-    props.model;
+    props.models.find((entry) => isCurrent(props, entry))?.label ?? props.model;
   const showStop = props.running && !props.canSend;
   return (
     <div className="flex items-center gap-1 px-2 pb-2">

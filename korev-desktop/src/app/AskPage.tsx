@@ -4,7 +4,8 @@ import type { AppState, AskChat } from '../shared/model';
 import { deleteAsk, startAsk, startFromAsk } from './actions';
 import { ChatView } from './chat/ChatView';
 import { Composer } from './chat/Composer';
-import { loadoutFor } from './format';
+import { loadoutChoices, modelChoices } from './format';
+import { useModelChoice } from './hooks';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { RepoPicker } from './RepoPicker';
 import { useUi } from './ui-store';
@@ -24,12 +25,10 @@ function NewAsk({
       ? initialRepoIds
       : state.repos.slice(0, 1).map((repo) => repo.id),
   );
-  const agent = state.settings.defaultAgent;
-  const [model, setModel] = useState(state.settings.defaultModels[agent]);
-  const [effort, setEffort] = useState(state.settings.defaultEffort[agent]);
+  const { agent, model, effort, setEffort, choose } = useModelChoice(
+    state.settings,
+  );
   const [fast, setFast] = useState(false);
-  const models =
-    state.agents.find((entry) => entry.agent === agent)?.models ?? [];
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -51,8 +50,8 @@ function NewAsk({
           <Composer
             draftKey={NEW_ASK_DRAFT}
             agent={agent}
-            models={models}
-            loadout={loadoutFor(state, agent)}
+            models={modelChoices(state, agent)}
+            loadout={loadoutChoices(state, agent)}
             snippets={state.settings.snippets}
             fast={fast}
             repoId={repoIds[0] ?? null}
@@ -68,12 +67,19 @@ function NewAsk({
                 ? 'Ask a question. Enter sends it.'
                 : 'Pick at least one repository first.'
             }
-            onModelChange={setModel}
+            onModelChange={choose}
             onEffortChange={setEffort}
             onPlanModeChange={() => undefined}
             onSend={async (text) =>
               repoIds.length > 0 &&
-              startAsk(repoIds, { text, model, effort, planMode: false, fast })
+              startAsk(repoIds, {
+                text,
+                agent,
+                model,
+                effort,
+                planMode: false,
+                fast,
+              })
             }
           />
         </div>

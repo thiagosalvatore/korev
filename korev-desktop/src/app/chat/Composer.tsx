@@ -12,7 +12,7 @@ import {
   EFFORT_LEVELS,
   LOADOUT_SIZE,
   type AgentKind,
-  type AgentModel,
+  type ModelChoice,
   type Snippet,
 } from '../../shared/model';
 import { api } from '../bridge';
@@ -80,8 +80,8 @@ function nextEffort(agent: AgentKind, effort: string): string {
 export interface ComposerProps {
   draftKey: string;
   agent: AgentKind;
-  models: AgentModel[];
-  loadout: AgentModel[];
+  models: ModelChoice[];
+  loadout: ModelChoice[];
   snippets: Snippet[];
   model: string;
   effort: string;
@@ -93,7 +93,7 @@ export interface ComposerProps {
   comments?: DiffComment[];
   placeholder?: string;
   autoFocus?: boolean;
-  onModelChange(model: string): void;
+  onModelChange(choice: ModelChoice): void;
   onEffortChange(effort: string): void;
   onFastChange(fast: boolean): void;
   onPlanModeChange(planMode: boolean): void;
@@ -229,7 +229,7 @@ export function Composer(props: ComposerProps) {
     else if (command && key === ';') openSnippets();
     else if (event.metaKey && event.ctrlKey && /^[1-5]$/.test(event.key)) {
       const entry = props.loadout[Number(event.key) - 1];
-      if (entry) props.onModelChange(entry.id);
+      if (entry) props.onModelChange(entry);
     } else return false;
     return true;
   }

@@ -2,9 +2,9 @@ import {
   AGENT_LABELS,
   loadoutKey,
   type AgentKind,
-  type AgentModel,
   type AppState,
   type ChatSession,
+  type ModelChoice,
 } from '../shared/model';
 
 const MINUTE_MS = 60_000;
@@ -39,13 +39,23 @@ export function dirName(path: string): string {
   return path.split('/').slice(0, -1).join('/');
 }
 
-export function modelsFor(state: AppState, agent: AgentKind): AgentModel[] {
-  return state.agents.find((entry) => entry.agent === agent)?.models ?? [];
+export function modelChoices(
+  state: AppState,
+  current: AgentKind,
+): ModelChoice[] {
+  return state.agents
+    .filter((entry) => entry.version || entry.agent === current)
+    .flatMap((entry) =>
+      entry.models.map((model) => ({ ...model, agent: entry.agent })),
+    );
 }
 
-export function loadoutFor(state: AppState, agent: AgentKind): AgentModel[] {
-  const models = modelsFor(state, agent);
+export function loadoutChoices(
+  state: AppState,
+  current: AgentKind,
+): ModelChoice[] {
+  const choices = modelChoices(state, current);
   return state.settings.loadout.flatMap((key) =>
-    models.filter((model) => loadoutKey(agent, model.id) === key),
+    choices.filter((choice) => loadoutKey(choice.agent, choice.id) === key),
   );
 }

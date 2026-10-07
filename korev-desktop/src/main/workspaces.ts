@@ -87,6 +87,12 @@ export function newChatSession(ctx: Context, agent: AgentKind): ChatSession {
   };
 }
 
+export function switchAgent(session: ChatSession, agent: AgentKind) {
+  if (session.agent === agent) return;
+  session.agent = agent;
+  session.agentSessionId = null;
+}
+
 export function isUntitled(session: ChatSession): boolean {
   return session.title === NEW_CHAT_TITLE;
 }

@@ -15,7 +15,8 @@ import {
   issuePrompt,
   type CreateFrom,
 } from './CreateFromPicker';
-import { loadoutFor, timeAgo } from './format';
+import { loadoutChoices, modelChoices, timeAgo } from './format';
+import { useModelChoice } from './hooks';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { RepoPicker } from './RepoPicker';
 import { AddRepositoryMenu } from './Sidebar';
@@ -110,9 +111,9 @@ export function NewWorkspacePage({
   const [repoIds, setRepoIds] = useState(initialRepoId ? [initialRepoId] : []);
   const repos = state.repos.filter((entry) => repoIds.includes(entry.id));
   const singleRepo = repos.length === 1 ? repos[0] : null;
-  const agent = state.settings.defaultAgent;
-  const [model, setModel] = useState(state.settings.defaultModels[agent]);
-  const [effort, setEffort] = useState(state.settings.defaultEffort[agent]);
+  const { agent, model, effort, setEffort, choose } = useModelChoice(
+    state.settings,
+  );
   const [planMode, setPlanMode] = useState(state.settings.defaultPlanMode);
   const [fast, setFast] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -127,8 +128,6 @@ export function NewWorkspacePage({
     setPicking(false);
     setBaseBranch(null);
   }, [singleRepo?.id]);
-  const models =
-    state.agents.find((entry) => entry.agent === agent)?.models ?? [];
   const recent = state.workspaces
     .filter((ws) => !ws.archivedAt)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -141,7 +140,7 @@ export function NewWorkspacePage({
       from?.kind === 'issue' ? issuePrompt(from.issue, text ?? '') : text;
     const created = await createWorkspaces(
       repos.map((entry) => entry.id),
-      prompt ? { text: prompt, model, effort, planMode, fast } : null,
+      prompt ? { text: prompt, agent, model, effort, planMode, fast } : null,
       singleRepo ? workspaceSource(from, baseBranch) : undefined,
     );
     setCreating(false);
@@ -234,8 +233,8 @@ export function NewWorkspacePage({
           <Composer
             draftKey={`new-workspace:${repoIds.join(',') || 'none'}`}
             agent={agent}
-            models={models}
-            loadout={loadoutFor(state, agent)}
+            models={modelChoices(state, agent)}
+            loadout={loadoutChoices(state, agent)}
             snippets={state.settings.snippets}
             fast={fast}
             repoId={singleRepo?.id ?? null}
@@ -247,7 +246,7 @@ export function NewWorkspacePage({
             workspaceId={null}
             autoFocus
             placeholder={`Describe a task for ${AGENT_LABELS[agent]}. Enter creates the workspace and starts it.`}
-            onModelChange={setModel}
+            onModelChange={choose}
             onEffortChange={setEffort}
             onPlanModeChange={setPlanMode}
             onSend={(text) => create(text)}

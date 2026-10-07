@@ -4,13 +4,14 @@ import {
   AGENT_LABELS,
   type AppState,
   type ChatSession,
+  type ModelChoice,
   type Workspace,
 } from '../../shared/model';
 import { openDiff } from '../actions';
 import { api } from '../bridge';
-import { loadoutFor } from '../format';
+import { loadoutChoices, modelChoices } from '../format';
 import { useTranscript } from '../hooks';
-import { reportFailure } from '../ui/toast';
+import { reportFailure, toast } from '../ui/toast';
 import {
   EMPTY_WORKSPACE_UI,
   updateWorkspaceUi,
@@ -30,6 +31,9 @@ export interface ChatViewProps {
 }
 
 const NO_COMMENTS: DiffComment[] = [];
+const STOP_BEFORE_SWITCHING = 'Stop the agent before switching to another one';
+const SWITCH_REPLAYS_CHAT =
+  'Switching agents mid-chat replays the conversation, so the next reply is slower and uses more tokens';
 
 function EmptyChat({
   session,
@@ -76,6 +80,17 @@ export function ChatView({
   const agent = state.agents.find((entry) => entry.agent === session.agent);
   const archived = Boolean(workspace?.archivedAt);
 
+  function changeModel(choice: ModelChoice) {
+    if (choice.agent === session.agent)
+      return void api.updateSession(session.id, { model: choice.id });
+    if (running) return toast(STOP_BEFORE_SWITCHING);
+    if (items?.length) toast(SWITCH_REPLAYS_CHAT);
+    void api.updateSession(session.id, {
+      agent: choice.agent,
+      model: choice.id,
+    });
+  }
+
   async function revert(itemId: string) {
     const result = await api.revert(session.id, itemId);
     if (!reportFailure(result)) return;
@@ -117,6 +132,7 @@ export function ChatView({
             void api
               .send(session.id, {
                 text,
+                agent: session.agent,
                 model: session.model,
                 effort: session.effort,
                 planMode,
@@ -139,8 +155,8 @@ export function ChatView({
             key={`${session.id}:${draftVersion}`}
             draftKey={session.id}
             agent={session.agent}
-            models={agent?.models ?? []}
-            loadout={loadoutFor(state, session.agent)}
+            models={modelChoices(state, session.agent)}
+            loadout={loadoutChoices(state, session.agent)}
             snippets={state.settings.snippets}
             fast={session.fast}
             repoId={workspace?.repoId ?? repoId ?? null}
@@ -155,9 +171,7 @@ export function ChatView({
             comments={comments}
             placeholder={placeholder}
             autoFocus
-            onModelChange={(model) =>
-              void api.updateSession(session.id, { model })
-            }
+            onModelChange={changeModel}
             onEffortChange={(effort) =>
               void api.updateSession(session.id, { effort })
             }
@@ -171,6 +185,7 @@ export function ChatView({
               reportFailure(
                 await api.send(session.id, {
                   text,
+                  agent: session.agent,
                   model: session.model,
                   effort: session.effort,
                   planMode,

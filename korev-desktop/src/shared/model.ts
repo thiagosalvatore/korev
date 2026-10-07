@@ -12,6 +12,10 @@ export interface AgentModel {
   label: string;
 }
 
+export interface ModelChoice extends AgentModel {
+  agent: AgentKind;
+}
+
 export const CODEX_DEFAULT_MODEL = 'default';
 
 export const EFFORT_LEVELS: Record<AgentKind, readonly string[]> = {
@@ -347,6 +351,7 @@ export interface ChatUpdate {
 
 export interface SendOptions {
   text: string;
+  agent: AgentKind;
   model: string;
   effort: string;
   planMode: boolean;

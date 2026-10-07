@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AppState, ChatItem } from '../shared/model';
+import type {
+  AppState,
+  ChatItem,
+  ModelChoice,
+  Settings,
+} from '../shared/model';
 import { api, on } from './bridge';
 
 export function useAppState(): AppState | null {
@@ -12,6 +17,18 @@ export function useAppState(): AppState | null {
     return stop;
   }, []);
   return state;
+}
+
+export function useModelChoice(settings: Settings) {
+  const [agent, setAgent] = useState(settings.defaultAgent);
+  const [model, setModel] = useState(settings.defaultModels[agent]);
+  const [effort, setEffort] = useState(settings.defaultEffort[agent]);
+  function choose(choice: ModelChoice) {
+    if (choice.agent !== agent) setEffort(settings.defaultEffort[choice.agent]);
+    setAgent(choice.agent);
+    setModel(choice.id);
+  }
+  return { agent, model, effort, setEffort, choose };
 }
 
 export function useTranscript(sessionId: string): ChatItem[] | null {

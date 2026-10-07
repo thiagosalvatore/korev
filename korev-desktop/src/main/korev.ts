@@ -64,6 +64,7 @@ import {
   restoreWorkspace,
   scriptEnv,
   startScript,
+  switchAgent,
   workspaceConfig,
 } from './workspaces';
 
@@ -397,6 +398,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     if (!session) return fail('No chat in this workspace');
     return chats.send(session.id, {
       text,
+      agent: session.agent,
       model: session.model,
       effort: session.effort,
       planMode: false,
@@ -462,6 +464,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         ask.repoIds,
         {
           text: IMPLEMENT_PLAN_TASK,
+          agent: store.state.settings.defaultAgent,
           model: '',
           effort: '',
           planMode: false,
@@ -505,6 +508,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       ctx.emitState();
       const sent = await chats.send(session.id, {
         text: await actionPrompt(workspaceId, 'code_review', REVIEW_PROMPT),
+        agent: session.agent,
         model: session.model,
         effort: session.effort,
         planMode: false,
@@ -564,6 +568,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     async updateSession(sessionId, patch) {
       const session = allSessions().find((entry) => entry.id === sessionId);
       if (!session) return;
+      if (patch.agent && patch.agent !== session.agent) {
+        if (ctx.runningSessions.has(sessionId)) return;
+        switchAgent(session, patch.agent);
+        session.effort = store.state.settings.defaultEffort[patch.agent];
+      }
       if (patch.model) session.model = patch.model;
       if (patch.effort) session.effort = patch.effort;
       if (patch.fast !== undefined) session.fast = patch.fast;

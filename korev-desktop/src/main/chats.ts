@@ -47,6 +47,7 @@ import {
   renameBranchPrompt,
   scriptEnv,
   suggestName,
+  switchAgent,
   workspaceConfig,
 } from './workspaces';
 
@@ -75,7 +76,7 @@ export function replayPrompt(history: ChatItem[], text: string): string {
   });
   if (!lines.length) return text;
   const transcript = lines.join('\n\n').slice(-REPLAY_TOTAL_CHARS);
-  return `<previous-conversation>\nThis chat was reset to an earlier point. Here is the conversation so far, for context:\n\n${transcript}\n</previous-conversation>\n\n${text}`;
+  return `<previous-conversation>\nHere is the conversation so far, for context:\n\n${transcript}\n</previous-conversation>\n\n${text}`;
 }
 
 export interface LinkedWorkspace {
@@ -615,6 +616,7 @@ export function createChats(ctx: Context): Chats {
       checkpoint,
     });
     if (isUntitled(session)) session.title = titleFrom(options.text);
+    switchAgent(session, options.agent);
     session.model = options.model;
     session.effort = options.effort;
     session.fast = options.fast;
@@ -747,7 +749,7 @@ export function createChats(ctx: Context): Chats {
     respondPermission,
     revert,
     async settled() {
-      while (running.size) await Promise.allSettled([...running]);
+      while (running.size) await Promise.allSettled(running);
     },
     async forget(sessionId) {
       stop(sessionId);

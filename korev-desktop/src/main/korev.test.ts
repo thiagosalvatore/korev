@@ -7,7 +7,12 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runProcess } from './command-runner';
 import { nodeFileSystem } from './file-system';
-import type { SendOptions, Workspace, WorkspaceSource } from '../shared/model';
+import {
+  DEFAULT_EFFORT,
+  type SendOptions,
+  type Workspace,
+  type WorkspaceSource,
+} from '../shared/model';
 import { createKorev, type Korev } from './korev';
 
 const FAKE_AGENT_BIN = path.resolve(__dirname, '../../test-support/bin');
@@ -140,6 +145,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   function task(text: string): SendOptions {
     return {
       text,
+      agent: 'claude',
       model: 'claude-sonnet-5-5',
       effort: 'high',
       planMode: false,
@@ -150,6 +156,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   async function sendAndWait(sessionId: string, text: string) {
     const sent = await korev.api.send(sessionId, {
       text,
+      agent: 'claude',
       model: 'claude-sonnet-5-5',
       effort: 'high',
       planMode: false,
@@ -211,6 +218,25 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(reverted).toEqual({ ok: true, value: 'Add a note' });
     expect(existsSync(path.join(workspace.path, 'agent-note.txt'))).toBe(false);
     expect(await korev.api.transcript(session.id)).toEqual([]);
+  });
+
+  it('switches a chat to another agent and starts a fresh agent session', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await sendAndWait(session.id, 'Add a note');
+
+    await korev.api.updateSession(session.id, {
+      agent: 'codex',
+      model: 'gpt-6.1-sol',
+    });
+
+    const state = await korev.api.getState();
+    expect(state.workspaces[0].sessions[0]).toMatchObject({
+      agent: 'codex',
+      model: 'gpt-6.1-sol',
+      effort: DEFAULT_EFFORT.codex,
+      agentSessionId: null,
+    });
   });
 
   it('renames the placeholder branch after the first message', async () => {
@@ -537,6 +563,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     const [session] = workspace.sessions;
     await korev.api.send(session.id, {
       text: 'needs-approval',
+      agent: 'claude',
       model: 'claude-sonnet-5-5',
       effort: 'high',
       planMode: false,
