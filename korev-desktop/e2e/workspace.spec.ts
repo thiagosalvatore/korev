@@ -359,6 +359,9 @@ test('opens a terminal tab and an in-app browser tab', async () => {
       .click();
 
     await window.getByRole('button', { name: 'New tab' }).click();
+    await expect(
+      window.getByRole('menuitem', { name: 'New terminal' }),
+    ).toBeInViewport();
     await window.getByRole('menuitem', { name: 'New terminal' }).click();
     const main = window.getByRole('main');
     await main.locator('.xterm').click();

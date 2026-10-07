@@ -136,74 +136,77 @@ function TabStrip({
   activeKey: string;
 }) {
   return (
-    <div
-      role="tablist"
-      aria-label="Tabs"
-      className="flex h-9 flex-none items-stretch overflow-x-auto border-b border-border-1 bg-surface"
-    >
-      {tabs.map((entry) => {
-        const selected = entry.key === activeKey;
-        const session =
-          entry.tab.kind === 'chat'
-            ? workspace.sessions.find(
-                (item) =>
-                  entry.tab.kind === 'chat' && item.id === entry.tab.sessionId,
-              )
-            : null;
-        return (
-          <div
-            key={entry.key}
-            role="tab"
-            aria-selected={selected}
-            tabIndex={0}
-            className={cn(
-              'group relative flex max-w-56 min-w-0 cursor-pointer items-center gap-1.5 border-r border-border-1 pr-1.5 pl-3 text-sm text-fg-3 hover:text-fg-1',
-              selected &&
-                'bg-app text-fg-1 after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-app',
-            )}
-            onClick={() => activateTab(workspace.id, entry.key)}
-            onAuxClick={(event) => {
-              if (event.button === 1 && entry.closable)
-                void closeTab(workspace, entry.key);
-            }}
-          >
-            {entry.running ? (
-              <Icon
-                name="loader-circle"
-                size={13}
-                className="animate-spin text-accent-text"
-              />
-            ) : (
-              <Icon
-                name={
-                  session
-                    ? session.agent === 'claude'
-                      ? 'sparkle'
-                      : 'hexagon'
-                    : TAB_ICONS[entry.tab.kind as keyof typeof TAB_ICONS]
-                }
-                size={13}
-              />
-            )}
-            <span className="truncate">{entry.label}</span>
-            {entry.closable ? (
-              <button
-                type="button"
-                aria-label={`Close ${entry.label}`}
-                className="flex size-5 cursor-pointer items-center justify-center rounded-sm border-0 bg-transparent text-fg-4 opacity-0 group-hover:opacity-100 hover:bg-hover hover:text-fg-1"
-                onClick={(event) => {
-                  event.stopPropagation();
+    <div className="flex h-9 flex-none items-stretch border-b border-border-1 bg-surface">
+      <div
+        role="tablist"
+        aria-label="Tabs"
+        className="flex min-w-0 items-stretch overflow-x-auto"
+      >
+        {tabs.map((entry) => {
+          const selected = entry.key === activeKey;
+          const session =
+            entry.tab.kind === 'chat'
+              ? workspace.sessions.find(
+                  (item) =>
+                    entry.tab.kind === 'chat' &&
+                    item.id === entry.tab.sessionId,
+                )
+              : null;
+          return (
+            <div
+              key={entry.key}
+              role="tab"
+              aria-selected={selected}
+              tabIndex={0}
+              className={cn(
+                'group relative flex max-w-56 min-w-0 cursor-pointer items-center gap-1.5 border-r border-border-1 pr-1.5 pl-3 text-sm text-fg-3 hover:text-fg-1',
+                selected &&
+                  'bg-app text-fg-1 after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-app',
+              )}
+              onClick={() => activateTab(workspace.id, entry.key)}
+              onAuxClick={(event) => {
+                if (event.button === 1 && entry.closable)
                   void closeTab(workspace, entry.key);
-                }}
-              >
-                <Icon name="x" size={12} />
-              </button>
-            ) : (
-              <span className="w-1" />
-            )}
-          </div>
-        );
-      })}
+              }}
+            >
+              {entry.running ? (
+                <Icon
+                  name="loader-circle"
+                  size={13}
+                  className="animate-spin text-accent-text"
+                />
+              ) : (
+                <Icon
+                  name={
+                    session
+                      ? session.agent === 'claude'
+                        ? 'sparkle'
+                        : 'hexagon'
+                      : TAB_ICONS[entry.tab.kind as keyof typeof TAB_ICONS]
+                  }
+                  size={13}
+                />
+              )}
+              <span className="truncate">{entry.label}</span>
+              {entry.closable ? (
+                <button
+                  type="button"
+                  aria-label={`Close ${entry.label}`}
+                  className="flex size-5 cursor-pointer items-center justify-center rounded-sm border-0 bg-transparent text-fg-4 opacity-0 group-hover:opacity-100 hover:bg-hover hover:text-fg-1"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void closeTab(workspace, entry.key);
+                  }}
+                >
+                  <Icon name="x" size={12} />
+                </button>
+              ) : (
+                <span className="w-1" />
+              )}
+            </div>
+          );
+        })}
+      </div>
       <div className="flex items-center px-1">
         <Menu
           label="New tab"
