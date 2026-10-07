@@ -40,6 +40,12 @@
   }
 }
 
+#nd-sidebar,
+#nd-sidebar-mobile,
+#nd-toc {
+  --text-sm: 15px;
+}
+
 .kd-nav-title {
   display: inline-flex;
   align-items: center;
