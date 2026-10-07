@@ -4,6 +4,8 @@ Korev shows the section of each version in its "What's new" window, so write for
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-07
+
 The first release of Korev.
 
 - Run Claude Code and Codex in parallel. Each task gets its own workspace: a git worktree on a new branch, with its own chats, terminal, diff and pull request.
