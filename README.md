@@ -2,7 +2,7 @@
 
 Korev is a Mac app that runs coding agents (Claude Code and Codex) in parallel. Each task gets its own workspace: a git worktree on a new branch, with its own chats, terminal, diff and pull request.
 
-To ask about code without starting a task, use **Ask**. The agent reads a shared checkout of each repository's default branch and cannot change anything. One Ask chat can cover several repositories.
+To ask about code without starting a task, use **Ask**. The agent reads a shared checkout of each repository's default branch and cannot change anything. One Ask chat can cover several repositories. When you are ready to build what you discussed, press **Start workspace**: the new workspace's chat starts with the whole Ask conversation, and its agent continues from there.
 
 A task that spans repositories (say a frontend and a backend) gets one linked workspace per repository, all on the same branch name. Pick several repositories on the New workspace page, or plan the change in an Ask chat and press **Start workspaces**. Each agent changes only its own repository and can read the linked ones.
 

@@ -119,7 +119,7 @@ function AskChatView({ state, ask }: { state: AppState; ask: AskChat }) {
           className={NO_DRAG}
           disabled={running}
           loading={starting}
-          title={`Create a workspace in ${ask.repoIds.length > 1 ? 'each repository' : 'this repository'} and send it the latest plan`}
+          title={`Continue this conversation in a new workspace in ${ask.repoIds.length > 1 ? 'each repository' : 'this repository'}`}
           onClick={async () => {
             setStarting(true);
             await startFromAsk(ask);

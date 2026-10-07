@@ -175,6 +175,7 @@ export interface Chats {
   transcript(sessionId: string): Promise<ChatItem[]>;
   isRunning(sessionId: string): boolean;
   send(sessionId: string, options: SendOptions): Promise<Result>;
+  seed(sessionId: string, history: ChatItem[]): Promise<void>;
   stop(sessionId: string): void;
   stopWorkspace(workspace: Workspace): void;
   respondPermission(
@@ -754,10 +755,17 @@ export function createChats(ctx: Context): Chats {
     return { ok: true, value: target.text };
   }
 
+  async function seed(sessionId: string, history: ChatItem[]) {
+    const items = await transcript(sessionId);
+    for (const item of history) upsert(sessionId, items, item);
+    persist(sessionId, items);
+  }
+
   return {
     transcript,
     isRunning: (sessionId) => turns.has(sessionId),
     send,
+    seed,
     stop,
     stopWorkspace: (workspace) =>
       workspace.sessions.forEach((session) => stop(session.id)),

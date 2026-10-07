@@ -72,6 +72,7 @@ import {
   startScript,
   switchAgent,
   workspaceConfig,
+  type SendTask,
 } from './workspaces';
 
 const FILE_MAX_BYTES = 1_000_000;
@@ -80,6 +81,8 @@ const ATTACHMENTS_DIR = 'attachments';
 const COMMAND_EXTENSION = '.md';
 const BUILTIN_COMMANDS = ['compact', 'review', 'init'];
 const IMPLEMENT_PLAN_TASK = 'Implement your part of the plan below.';
+const IMPLEMENT_CONVERSATION_TASK =
+  'Implement your part of what we discussed above.';
 const GITHUB_AVATAR_SIZE = 64;
 const GITHUB_AVATAR_TIMEOUT_MS = 10_000;
 
@@ -500,20 +503,24 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       if (!ask) return fail('Ask chat not found');
       if (chats.isRunning(ask.session.id))
         return fail('Wait for the answer to finish');
-      const plan = latestPlan(await chats.transcript(ask.session.id));
-      if (!plan) return fail('Ask for a plan first');
+      const history = await chats.transcript(ask.session.id);
+      const plan = latestPlan(history);
+      const sendWithHistory: SendTask = async (sessionId, options) => {
+        await chats.seed(sessionId, history);
+        return chats.send(sessionId, options);
+      };
       return createWorkspaces(
         ctx,
         ask.repoIds,
         {
-          text: IMPLEMENT_PLAN_TASK,
-          agent: store.state.settings.defaultAgent,
-          model: '',
-          effort: '',
+          text: plan ? IMPLEMENT_PLAN_TASK : IMPLEMENT_CONVERSATION_TASK,
+          agent: ask.session.agent,
+          model: ask.session.model,
+          effort: ask.session.effort,
           planMode: false,
-          fast: false,
+          fast: ask.session.fast,
         },
-        chats.send,
+        sendWithHistory,
         plan,
       );
     },

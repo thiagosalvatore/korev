@@ -154,11 +154,12 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   }
 
   async function waitForTurn(sessionId: string) {
-    await waitFor(async () =>
-      (await korev.api.transcript(sessionId)).some(
-        (item) => item.kind === 'result',
-      ),
-    );
+    await waitFor(async () => {
+      const items = await korev.api.transcript(sessionId);
+      return items
+        .slice(items.findLastIndex((item) => item.kind === 'user'))
+        .some((item) => item.kind === 'result');
+    });
   }
 
   async function createWorkspace(
@@ -508,11 +509,19 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     const started = await korev.api.startFromAsk(ask.id);
 
     if (!started.ok) throw new Error(started.message);
+    for (const workspace of started.value) {
+      await waitFor(
+        async () => (await userMessages(workspace.sessions[0].id)).length === 2,
+      );
+    }
     const [front, back] = await waitForLinkedTurns(started.value);
     expect(back.groupId).toBe(front.groupId);
-    expect((await userMessages(back.sessions[0].id))[0]).toContain(
-      '<plan>\nI added agent-note.txt.\n</plan>',
-    );
+    const [question, firstPrompt] = await userMessages(back.sessions[0].id);
+    expect(question).toBe('Plan the change');
+    expect(firstPrompt).toContain('<plan>\nI added agent-note.txt.\n</plan>');
+    expect(
+      await readFile(path.join(back.path, '.context', 'claude-args'), 'utf8'),
+    ).not.toContain('--resume');
   });
 
   it('archives a workspace and restores its uncommitted work', async () => {

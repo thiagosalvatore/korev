@@ -133,6 +133,17 @@ test('asks a question about a repository without creating a workspace', async ()
       sidebar.getByRole('button', { name: /^Workspace / }),
     ).toHaveCount(0);
     await snap(window, '06-ask-answer');
+
+    await window.getByRole('button', { name: 'Start workspace' }).click();
+    await expect(
+      sidebar.getByRole('button', { name: /^Workspace / }),
+    ).toHaveCount(1);
+    const chat = window.getByRole('main');
+    await expect(
+      chat.getByText('Implement your part of the plan below.'),
+    ).toBeVisible();
+    await expect(chat.getByText('Where is the README?')).toBeVisible();
+    await snap(window, '06b-ask-moved-to-workspace');
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });
