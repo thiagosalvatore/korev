@@ -13,6 +13,7 @@ import type {
   AppState,
   CheckState,
   FileChange,
+  GitWorktree,
   PrStatus,
   ReviewComment,
   ReviewDecision,
@@ -283,7 +284,15 @@ function Changes({
   );
 }
 
-function PrCard({ workspace, pr }: { workspace: Workspace; pr: PrStatus }) {
+function PrCard({
+  workspace,
+  pr,
+  worktree,
+}: {
+  workspace: Workspace;
+  pr: PrStatus;
+  worktree: GitWorktree | null;
+}) {
   const failing = pr.checks.filter((check) => check.state === 'failure').length;
   const pending = pr.checks.filter((check) => check.state === 'pending').length;
   return (
@@ -329,6 +338,15 @@ function PrCard({ workspace, pr }: { workspace: Workspace; pr: PrStatus }) {
           </span>
         ) : null}
       </div>
+      {worktree ? (
+        <div
+          className="flex items-center gap-1.5 truncate font-mono text-xs text-fg-3"
+          title={worktree.path}
+        >
+          <Icon name="folder-git-2" size={12} />
+          {worktree.path}
+        </div>
+      ) : null}
       {pr.state === 'OPEN' ? (
         <div className="flex gap-1.5">
           {pr.mergeable === 'CONFLICTING' ? (
@@ -435,6 +453,7 @@ function Checks({
   workspace: Workspace;
 }) {
   const prs = state.runtime[workspace.id]?.prs ?? [];
+  const strays = state.runtime[workspace.id]?.strayWorktrees ?? [];
   if (!prs.length) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-fg-3">
@@ -454,7 +473,14 @@ function Checks({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
       {openFirst(prs).map((pr) => (
-        <PrSection key={pr.url} workspace={workspace} pr={pr} />
+        <PrSection
+          key={pr.url}
+          workspace={workspace}
+          pr={pr}
+          worktree={
+            strays.find((stray) => stray.branch === pr.headRefName) ?? null
+          }
+        />
       ))}
     </div>
   );
@@ -466,10 +492,18 @@ function openFirst(prs: PrStatus[]): PrStatus[] {
     .sort((a, b) => Number(b.state === 'OPEN') - Number(a.state === 'OPEN'));
 }
 
-function PrSection({ workspace, pr }: { workspace: Workspace; pr: PrStatus }) {
+function PrSection({
+  workspace,
+  pr,
+  worktree,
+}: {
+  workspace: Workspace;
+  pr: PrStatus;
+  worktree: GitWorktree | null;
+}) {
   return (
     <div className="flex flex-col gap-3">
-      <PrCard workspace={workspace} pr={pr} />
+      <PrCard workspace={workspace} pr={pr} worktree={worktree} />
       {pr.state === 'OPEN' ? (
         <ReviewComments workspace={workspace} prNumber={pr.number} />
       ) : null}

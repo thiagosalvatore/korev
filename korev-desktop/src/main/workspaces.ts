@@ -1,9 +1,11 @@
+import { realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   CODEX_DEFAULT_MODEL,
   type AgentKind,
   type ChatSession,
+  type GitWorktree,
   type Repo,
   type RepoConfig,
   type Result,
@@ -22,6 +24,8 @@ import {
   createCheckpoint,
   currentBranch,
   deleteBranch,
+  listWorktrees,
+  removeCleanWorktree,
   removeWorktree,
   restoreCheckpoint,
   restoreWorktree,
@@ -29,6 +33,7 @@ import {
   startPoint,
   userSlug,
 } from './git';
+import { askWorktreePath } from './ask-worktrees';
 import { DEFAULT_SHELL } from './login-path';
 import { loadRepoConfig, withPrompt } from './repo-config';
 import {
@@ -656,6 +661,83 @@ async function runArchiveScript(
     .catch(() => undefined);
 }
 
+function realPath(target: string): string {
+  try {
+    return realpathSync(target);
+  } catch {
+    return path.resolve(target);
+  }
+}
+
+function isInside(root: string, target: string): boolean {
+  return realPath(target).startsWith(`${realPath(root)}${path.sep}`);
+}
+
+export async function strayWorktrees(
+  ctx: Context,
+  workspace: Workspace,
+): Promise<GitWorktree[]> {
+  const repo = ctx.repo(workspace.repoId);
+  const known = new Set(
+    [
+      repo.path,
+      askWorktreePath(ctx.store.state.settings.workspacesRoot, repo),
+      ...ctx.store.state.workspaces.map((other) => other.path),
+    ].map(realPath),
+  );
+  const prBranches = new Set(
+    ctx.runtime(workspace.id).prs.map((pr) => pr.headRefName),
+  );
+  const worktrees = await listWorktrees(ctx.git, repo.path).catch(() => []);
+  return worktrees.filter(
+    (worktree) =>
+      !known.has(realPath(worktree.path)) &&
+      ((worktree.branch !== null && prBranches.has(worktree.branch)) ||
+        isInside(workspace.path, worktree.path)),
+  );
+}
+
+function mergedPrBranches(ctx: Context, workspace: Workspace): Set<string> {
+  return new Set(
+    ctx
+      .runtime(workspace.id)
+      .prs.filter((pr) => pr.state === 'MERGED')
+      .map((pr) => pr.headRefName),
+  );
+}
+
+async function removeStrayWorktrees(
+  ctx: Context,
+  workspace: Workspace,
+  deleteBranches: boolean,
+): Promise<Result<string[]>> {
+  const repo = ctx.repo(workspace.repoId);
+  const merged = mergedPrBranches(ctx, workspace);
+  const kept: string[] = [];
+  for (const stray of await strayWorktrees(ctx, workspace)) {
+    if (await removeCleanWorktree(ctx.git, repo.path, stray.path)) {
+      if (deleteBranches && stray.branch && merged.has(stray.branch))
+        await deleteBranch(ctx.git, repo.path, stray.branch);
+      continue;
+    }
+    if (isInside(workspace.path, stray.path))
+      return {
+        ok: false,
+        message: `${stray.path} has uncommitted changes. Commit or remove them before archiving.`,
+      };
+    kept.push(stray.path);
+  }
+  return { ok: true, value: kept };
+}
+
+function reportKeptWorktrees(ctx: Context, kept: string[]) {
+  for (const worktree of kept)
+    ctx.deps.emit('toast', {
+      title: `Kept ${worktree}: it has uncommitted changes`,
+      tone: 'neutral',
+    });
+}
+
 export async function archiveWorkspace(
   ctx: Context,
   workspaceId: string,
@@ -663,9 +745,15 @@ export async function archiveWorkspace(
 ): Promise<Result> {
   const workspace = ctx.workspace(workspaceId);
   if (workspace.archivedAt) return { ok: true, value: undefined };
+  const config = await workspaceConfig(ctx, workspace);
+  const deleteBranches =
+    config.deleteBranchOnArchive ??
+    ctx.store.state.settings.deleteBranchOnArchive;
+  const strays = await removeStrayWorktrees(ctx, workspace, deleteBranches);
+  if (!strays.ok) return strays;
+  reportKeptWorktrees(ctx, strays.value);
   stopSessions(workspace);
   ctx.terminals.closeMatching(`${workspace.id}:`);
-  const config = await workspaceConfig(ctx, workspace);
   await runArchiveScript(ctx, workspace, config);
   const repo = ctx.repo(workspace.repoId);
   workspace.archiveSnapshot = await createCheckpoint(
@@ -673,12 +761,7 @@ export async function archiveWorkspace(
     workspace.path,
   ).catch(() => null);
   await removeWorktree(ctx.git, repo.path, workspace.path);
-  if (
-    config.deleteBranchOnArchive ??
-    ctx.store.state.settings.deleteBranchOnArchive
-  ) {
-    await deleteBranch(ctx.git, repo.path, workspace.branch);
-  }
+  if (deleteBranches) await deleteBranch(ctx.git, repo.path, workspace.branch);
   workspace.archivedAt = ctx.deps.now().toISOString();
   const runtime = ctx.runtime(workspace.id);
   runtime.status = 'idle';

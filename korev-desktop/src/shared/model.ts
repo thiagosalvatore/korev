@@ -287,11 +287,17 @@ export interface PrStatus {
   checks: PrCheck[];
 }
 
+export interface GitWorktree {
+  path: string;
+  branch: string | null;
+}
+
 export interface WorkspaceRuntime {
   status: WorkspaceStatus;
   unread: boolean;
   stats: DiffStats | null;
   prs: PrStatus[];
+  strayWorktrees: GitWorktree[];
   message: string | null;
   pendingPrompt: string | null;
   runUrl: string | null;

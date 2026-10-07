@@ -366,6 +366,57 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).not.toBeNull();
   });
 
+  async function workspaceWithStrayPr(strayPath: string) {
+    await korev.api.updateSettings({ archiveOnMerge: false });
+    const workspace = await createWorkspace();
+    git(repoPath, 'worktree', 'add', '-q', '-b', 'dev/extra', strayPath);
+    const url = fakePr(8, 'MERGED', new Date().toISOString());
+    prsByUrl[url] = { ...prsByUrl[url], headRefName: 'dev/extra' };
+    await sendAndWait(workspace.sessions[0].id, `open-pr ${url}`);
+    await waitFor(async () => (await trackedUrls(workspace.id)).length > 0);
+    await korev.api.prStatuses(workspace.id);
+    return workspace;
+  }
+
+  it('removes the worktree an agent made for a tracked PR on archive and leaves others alone', async () => {
+    const stray = path.join(home, 'stray');
+    const unrelated = path.join(home, 'unrelated');
+    const workspace = await workspaceWithStrayPr(stray);
+    git(repoPath, 'worktree', 'add', '-q', '-b', 'dev/other', unrelated);
+
+    const archived = await korev.api.archiveWorkspace(workspace.id);
+
+    expect(archived.ok).toBe(true);
+    expect(existsSync(stray)).toBe(false);
+    expect(existsSync(unrelated)).toBe(true);
+  });
+
+  it('keeps a stray worktree with uncommitted work and says so', async () => {
+    const stray = path.join(home, 'stray');
+    const workspace = await workspaceWithStrayPr(stray);
+    await writeFile(path.join(stray, 'wip.txt'), 'unsaved\n');
+
+    await korev.api.archiveWorkspace(workspace.id);
+
+    expect(existsSync(path.join(stray, 'wip.txt'))).toBe(true);
+    expect(emit).toHaveBeenCalledWith(
+      'toast',
+      expect.objectContaining({ title: expect.stringContaining(stray) }),
+    );
+  });
+
+  it('refuses to archive while a worktree inside it has uncommitted work', async () => {
+    const workspace = await createWorkspace();
+    const nested = path.join(workspace.path, '.claude', 'worktrees', 'side');
+    git(repoPath, 'worktree', 'add', '-q', '-b', 'dev/side', nested);
+    await writeFile(path.join(nested, 'wip.txt'), 'unsaved\n');
+
+    const archived = await korev.api.archiveWorkspace(workspace.id);
+
+    expect(archived.ok).toBe(false);
+    expect(existsSync(path.join(nested, 'wip.txt'))).toBe(true);
+  });
+
   it('runs an agent turn, shows its changes and reverts them from a checkpoint', async () => {
     const workspace = await createWorkspace();
     const [session] = workspace.sessions;

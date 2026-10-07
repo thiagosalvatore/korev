@@ -67,6 +67,7 @@ import { createTerminals, type SpawnPty } from './terminals';
 import {
   archiveWorkspace,
   createWorkspaces,
+  strayWorktrees,
   deleteWorkspace,
   newChatSession,
   onScriptExit,
@@ -197,6 +198,7 @@ const IDLE: WorkspaceRuntime = {
   unread: false,
   stats: null,
   prs: [],
+  strayWorktrees: [],
   message: null,
   pendingPrompt: null,
   runUrl: null,
@@ -424,10 +426,13 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       ),
     );
     const prs = fetched.filter((pr): pr is PrStatus => pr !== null);
-    if (JSON.stringify(runtime.prs) !== JSON.stringify(prs)) {
-      runtime.prs = prs;
-      ctx.emitState();
-    }
+    const prsChanged = JSON.stringify(runtime.prs) !== JSON.stringify(prs);
+    runtime.prs = prs;
+    const strays = await strayWorktrees(ctx, workspace);
+    const straysChanged =
+      JSON.stringify(runtime.strayWorktrees) !== JSON.stringify(strays);
+    runtime.strayWorktrees = strays;
+    if (prsChanged || straysChanged) ctx.emitState();
     if (readyToArchive(workspace, prs))
       await archiveIfConfigured(workspaceId, prs);
     return prs;

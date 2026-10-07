@@ -1,6 +1,11 @@
 import { appendFile, copyFile, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Checkpoint, FileChange, FileStatus } from '../shared/model';
+import type {
+  Checkpoint,
+  FileChange,
+  FileStatus,
+  GitWorktree,
+} from '../shared/model';
 import type { CommandRunner } from './command-runner';
 
 const GIT_TIMEOUT_MS = 120_000;
@@ -11,6 +16,8 @@ const FALLBACK_BRANCH = 'main';
 const BINARY_STAT = '-';
 const SNAPSHOT_MESSAGE = 'korev checkpoint';
 const CHECKPOINT_REF_PREFIX = 'refs/korev/checkpoints/';
+const WORKTREE_LINE = 'worktree ';
+const BRANCH_LINE = 'branch refs/heads/';
 const GITHUB_REMOTE =
   /^(?:(?:https?|ssh|git):\/\/)?(?:[^@/]+@)?github\.com[:/]([^/]+)\//;
 
@@ -226,6 +233,33 @@ export async function removeWorktree(
 ): Promise<void> {
   await git.tryRun(repo, ['worktree', 'remove', '--force', worktree]);
   await git.tryRun(repo, ['worktree', 'prune']);
+}
+
+export async function removeCleanWorktree(
+  git: Git,
+  repo: string,
+  worktree: string,
+): Promise<boolean> {
+  return (await git.tryRun(repo, ['worktree', 'remove', worktree])) !== null;
+}
+
+export async function listWorktrees(
+  git: Git,
+  repo: string,
+): Promise<GitWorktree[]> {
+  const output = await git.stdout(repo, ['worktree', 'list', '--porcelain']);
+  return output.split('\n\n').flatMap((entry) => {
+    const lines = entry.split('\n');
+    const worktree = lines.find((line) => line.startsWith(WORKTREE_LINE));
+    if (!worktree) return [];
+    const branch = lines.find((line) => line.startsWith(BRANCH_LINE));
+    return [
+      {
+        path: worktree.slice(WORKTREE_LINE.length),
+        branch: branch ? branch.slice(BRANCH_LINE.length) : null,
+      },
+    ];
+  });
 }
 
 export async function branchExists(git: Git, repo: string, branch: string) {
