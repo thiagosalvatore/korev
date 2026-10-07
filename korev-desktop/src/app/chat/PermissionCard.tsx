@@ -3,9 +3,13 @@ import { Button, cn, Icon, Input } from '../../design-system';
 import {
   answerQuestions,
   DISMISS_QUESTION,
+  laneDrafts,
+  lanesToSplit,
   planLanes,
+  splitLabel,
   type AgentQuestion,
   type ChatItem,
+  type LaneDraft,
   type PermissionResponse,
   type PermissionStatus,
   type PlanLane,
@@ -97,16 +101,6 @@ function ToolApproval({ item, onRespond }: PermissionCardProps) {
   );
 }
 
-interface LaneDraft extends PlanLane {
-  split: boolean;
-}
-
-function lanesToSplit(drafts: LaneDraft[]): PlanLane[] {
-  return drafts
-    .filter((draft) => draft.split && draft.name.trim())
-    .map(({ name, body }) => ({ name: name.trim(), body }));
-}
-
 function LaneList({
   here,
   drafts,
@@ -168,9 +162,7 @@ export function PlanReview({
 }: PlanReviewProps) {
   const [feedback, setFeedback] = useState('');
   const [here, ...others] = planLanes(plan);
-  const [drafts, setDrafts] = useState<LaneDraft[]>(() =>
-    others.map((lane) => ({ ...lane, split: true })),
-  );
+  const [drafts, setDrafts] = useState(() => laneDrafts(others));
   const split = lanesToSplit(drafts);
   return (
     <Shell title="Plan ready for review" icon="list-checks">
@@ -197,7 +189,7 @@ export function PlanReview({
             icon="git-fork"
             onClick={() => onApprove(split)}
           >
-            {`Approve and split off ${split.length} ${split.length === 1 ? 'lane' : 'lanes'}`}
+            {splitLabel(split.length)}
           </Button>
         ) : null}
         <Button

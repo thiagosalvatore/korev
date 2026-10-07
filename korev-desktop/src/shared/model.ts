@@ -601,6 +601,37 @@ export interface PlanLane {
   body: string;
 }
 
+export interface LaneDraft extends PlanLane {
+  split: boolean;
+}
+
+export function laneDrafts(lanes: PlanLane[]): LaneDraft[] {
+  return lanes.map((lane) => ({ ...lane, split: true }));
+}
+
+export function lanesToSplit(drafts: LaneDraft[]): PlanLane[] {
+  return drafts
+    .filter((draft) => draft.split && draft.name.trim())
+    .map(({ name, body }) => ({ name: name.trim(), body }));
+}
+
+export function splitLabel(count: number): string {
+  return `Approve and split off ${count} ${count === 1 ? 'lane' : 'lanes'}`;
+}
+
+export function finishedCodexPlan(
+  session: ChatSession,
+  items: ChatItem[] | null,
+  running: boolean,
+): { id: string; plan: string } | null {
+  if (session.agent !== 'codex' || !session.planMode || running || !items)
+    return null;
+  const last = items.at(-1);
+  if (last?.kind !== 'result' || !last.ok) return null;
+  const plan = latestPlan(items);
+  return plan ? { id: last.id, plan } : null;
+}
+
 const LANES_HEADING = '## Lanes';
 const LANE_PREFIX = '### ';
 const SECTION_PREFIX = '## ';

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Icon, Spinner } from '../../design-system';
 import {
   AGENT_LABELS,
-  latestPlan,
+  finishedCodexPlan,
   STOP_BEFORE_SWITCHING,
   type AppState,
   type ChatItem,
@@ -25,19 +25,6 @@ import {
 import { Composer, saveDraft } from './Composer';
 import { PlanReview } from './PermissionCard';
 import { Transcript } from './Transcript';
-
-function finishedCodexPlan(
-  session: ChatSession,
-  items: ChatItem[] | null,
-  running: boolean,
-): { id: string; plan: string } | null {
-  if (session.agent !== 'codex' || !session.planMode || running || !items)
-    return null;
-  const last = items.at(-1);
-  if (last?.kind !== 'result' || !last.ok) return null;
-  const plan = latestPlan(items);
-  return plan ? { id: last.id, plan } : null;
-}
 
 function toWorkspaceRelative(workspacePath: string, file: string): string {
   const prefix = `${workspacePath}/`;

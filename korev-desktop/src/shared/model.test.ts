@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   answerQuestions,
+  finishedCodexPlan,
   planLanes,
   prBadge,
   type AgentQuestion,
+  type ChatItem,
+  type ChatSession,
   type PrStatus,
 } from './model';
 
@@ -85,5 +88,37 @@ describe('planLanes', () => {
   it('finds no lanes in a plan without a Lanes section or with one lane', () => {
     expect(planLanes('# Plan\n### api\nDo it.')).toEqual([]);
     expect(planLanes('## Lanes\n### api\nDo it.')).toEqual([]);
+  });
+});
+
+describe('finishedCodexPlan', () => {
+  const session = { agent: 'codex', planMode: true } as ChatSession;
+  const result = (ok: boolean): ChatItem => ({
+    id: 'result:1',
+    kind: 'result',
+    ok,
+    text: '',
+    durationMs: null,
+    costUsd: null,
+  });
+  const turn = (ok: boolean): ChatItem[] => [
+    { id: 'u1', kind: 'user', text: 'Plan it', at: '', checkpoint: null },
+    { id: 'a1', kind: 'assistant', text: '# Plan' },
+    result(ok),
+  ];
+
+  it('offers the reply of a finished Codex plan mode turn', () => {
+    expect(finishedCodexPlan(session, turn(true), false)).toEqual({
+      id: 'result:1',
+      plan: '# Plan',
+    });
+  });
+
+  it('offers nothing while running, after a failed turn or outside plan mode', () => {
+    expect(finishedCodexPlan(session, turn(true), true)).toBeNull();
+    expect(finishedCodexPlan(session, turn(false), false)).toBeNull();
+    expect(
+      finishedCodexPlan({ ...session, planMode: false }, turn(true), false),
+    ).toBeNull();
   });
 });

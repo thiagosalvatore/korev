@@ -79,6 +79,8 @@ Tap a workspace to open its chats. The tabs at the top are the chats of the work
 
 When the agent asks before it uses a tool, asks a question or shows a plan, the chat shows a card. Answer it on the phone before the agent's turn ends.
 
+The plan card works as on the Mac. You can split a plan's lanes into [linked workspaces](../concepts/linked-workspaces.md#lanes-from-a-plan), and a Codex plan gets the card under its reply when the turn ends.
+
 The phone app cannot attach files yet, and opening a workspace on the phone does not mark it as read on the Mac.
 
 ## Pull request

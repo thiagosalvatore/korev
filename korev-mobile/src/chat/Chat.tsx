@@ -5,16 +5,19 @@ import {
   KeyboardAvoidingView,
   StyleSheet,
 } from 'react-native';
-import type {
-  AppState,
-  ChatSession,
-  PermissionResponse,
+import {
+  finishedCodexPlan,
+  type AppState,
+  type ChatSession,
+  type PermissionResponse,
+  type PlanLane,
 } from '../../../korev-desktop/src/shared/model';
 import { attempt } from '../attempt';
 import { useTranscript } from '../hooks';
 import { useConnection } from '../korev';
 import { ChatItemView } from './ChatItemView';
 import { Composer } from './Composer';
+import { PlanReview } from './PermissionCard';
 
 export function Chat({
   state,
@@ -32,6 +35,29 @@ export function Chat({
       api.respondPermission(session.id, itemId, response),
     );
 
+  const codexPlan = finishedCodexPlan(
+    session,
+    items,
+    state.runningSessions.includes(session.id),
+  );
+
+  const approvePlan = (lanes: PlanLane[]) =>
+    void attempt('Korev could not approve the plan', () =>
+      api.approvePlan(session.id, lanes),
+    );
+
+  const keepPlanning = (feedback: string) =>
+    void attempt('Korev could not send your feedback', () =>
+      api.send(session.id, {
+        text: feedback,
+        agent: session.agent,
+        model: session.model,
+        effort: session.effort,
+        planMode: true,
+        fast: session.fast,
+      }),
+    );
+
   return (
     <KeyboardAvoidingView
       style={styles.fill}
@@ -46,6 +72,17 @@ export function Chat({
           renderItem={({ item }) => (
             <ChatItemView item={item} onRespond={respond} />
           )}
+          ListHeaderComponent={
+            codexPlan ? (
+              <PlanReview
+                key={codexPlan.id}
+                plan={codexPlan.plan}
+                showPlan={false}
+                onApprove={approvePlan}
+                onKeepPlanning={keepPlanning}
+              />
+            ) : null
+          }
           contentContainerStyle={styles.transcript}
           keyboardDismissMode="interactive"
         />

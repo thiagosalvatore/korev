@@ -14,6 +14,7 @@ export const REMOTE_METHODS = [
   'send',
   'stop',
   'respondPermission',
+  'approvePlan',
   'newSession',
   'closeSession',
   'updateSession',
