@@ -6,7 +6,7 @@ nav_order: 6
 
 # Use Korev from your phone
 
-The Korev phone app shows your workspaces while you are away from your Mac. The app talks to Korev on your Mac through [remote access](../reference/remote-access.html). Korev must be open on the Mac.
+The Korev phone app lets you follow and steer your agents while you are away from your Mac. The app talks to Korev on your Mac through [remote access](../reference/remote-access.html). Korev must be open on the Mac.
 
 The app is not in the App Store or Google Play yet. You run it from the source with [Expo Go](https://expo.dev/go).
 
@@ -53,6 +53,20 @@ The first screen lists the workspaces of each repository, in the same order as t
 - A spinner shows while an agent or the setup script runs.
 - **Needs input** shows when an agent waits for an answer.
 - A dot shows when a workspace has agent output that you did not read.
+
+## Chat with an agent
+
+Tap a workspace to open its chats. The tabs at the top are the chats of the workspace. The last chat opens first. Tap **+ New chat** to start a chat with your default agent.
+
+- Agent replies show as plain text. Markdown is not formatted yet.
+- Tap a tool call or **Thinking…** to see its details.
+- Type in the box at the bottom and tap **Send**. While the agent works, your message steers the agent or waits in the queue, the same as on the Mac.
+- Tap **Stop** to stop the agent.
+- Tap **Plan** to turn plan mode on or off. The box has a dashed border in plan mode.
+
+When the agent asks before it uses a tool, asks a question or shows a plan, the chat shows a card. Answer it on the phone before the agent's turn ends.
+
+The phone app cannot attach files yet, and opening a workspace on the phone does not mark it as read on the Mac.
 
 ## Unpair the phone
 

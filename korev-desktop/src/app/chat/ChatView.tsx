@@ -11,7 +11,7 @@ import {
 } from '../../shared/model';
 import { openDiff, openFile } from '../actions';
 import { api } from '../bridge';
-import { loadoutChoices, modelChoices } from '../format';
+import { loadoutChoices, modelChoices } from '../../shared/format';
 import { useTranscript } from '../hooks';
 import { reportFailure, toast } from '../ui/toast';
 import {

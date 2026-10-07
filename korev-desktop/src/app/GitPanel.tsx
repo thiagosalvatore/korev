@@ -30,7 +30,7 @@ import {
   resolveConflicts,
 } from './actions';
 import { api } from './bridge';
-import { fileName } from './format';
+import { fileName } from '../shared/format';
 import { usePolling } from './hooks';
 import { reportFailure } from './ui/toast';
 import { setUi, updateWorkspaceUi, useUi, type GitPanelTab } from './ui-store';

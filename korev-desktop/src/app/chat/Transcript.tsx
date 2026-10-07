@@ -20,7 +20,7 @@ import type {
   TurnChanges,
   TurnRange,
 } from '../../shared/model';
-import { duration } from '../format';
+import { duration } from '../../shared/format';
 import { Markdown } from './Markdown';
 import { PermissionCard } from './PermissionCard';
 

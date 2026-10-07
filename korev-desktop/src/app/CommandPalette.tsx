@@ -15,7 +15,7 @@ import {
 } from './actions';
 import { fuzzyRank } from './fuzzy';
 import { api } from './bridge';
-import { fileName, timeAgo } from './format';
+import { fileName, timeAgo } from '../shared/format';
 import { openProject } from './Sidebar';
 import { setUi, useUi } from './ui-store';
 

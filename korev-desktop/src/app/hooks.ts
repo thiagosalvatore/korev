@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import type {
-  AppState,
-  ChatItem,
-  ModelChoice,
-  Settings,
+import {
+  upsertChatItem,
+  type AppState,
+  type ChatItem,
+  type ModelChoice,
+  type Settings,
 } from '../shared/model';
 import { api, on } from './bridge';
 
@@ -36,25 +37,18 @@ export function useTranscript(sessionId: string): ChatItem[] | null {
   useEffect(() => {
     let loaded: ChatItem[] | null = null;
     const pending: ChatItem[] = [];
-    const apply = (list: ChatItem[], item: ChatItem) => {
-      const index = list.findIndex((entry) => entry.id === item.id);
-      if (index === -1) return [...list, item];
-      const next = [...list];
-      next[index] = item;
-      return next;
-    };
     const stop = on('chat', (update) => {
       if (update.sessionId !== sessionId) return;
       if (!loaded) {
         pending.push(update.item);
         return;
       }
-      loaded = apply(loaded, update.item);
+      loaded = upsertChatItem(loaded, update.item);
       setItems(loaded);
     });
     setItems(null);
     void api.transcript(sessionId).then((initial) => {
-      loaded = pending.reduce(apply, initial);
+      loaded = pending.reduce(upsertChatItem, initial);
       setItems(loaded);
     });
     return stop;

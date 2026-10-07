@@ -24,7 +24,7 @@ import { FileView } from './FileView';
 import { SearchView } from './SearchView';
 import { BrowserView } from './BrowserView';
 import { XTerm } from './XTerm';
-import { fileName } from './format';
+import { fileName } from '../shared/format';
 import { DRAG_REGION } from './layout';
 import { GitPanel } from './GitPanel';
 import { CollapsedTerminalBar, TerminalPanel } from './TerminalPanel';

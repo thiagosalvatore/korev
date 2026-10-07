@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { cn } from '../../design-system';
 import type { ContextUsage, PlanLimit } from '../../shared/model';
-import { formatTokens } from '../format';
+import { formatTokens } from '../../shared/format';
 import { PANEL, useDismiss } from '../ui/Menu';
 
 const SIZE = 16;

@@ -30,7 +30,7 @@ import {
   type ThemePreference,
 } from '../shared/model';
 import { api } from './bridge';
-import { modelChoices } from './format';
+import { modelChoices } from '../shared/format';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { QrCode } from './QrCode';
 import { toast } from './ui/toast';

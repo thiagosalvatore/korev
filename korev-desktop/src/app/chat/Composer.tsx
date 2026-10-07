@@ -17,7 +17,7 @@ import {
   type TurnUsage,
 } from '../../shared/model';
 import { api } from '../bridge';
-import { fileName } from '../format';
+import { fileName } from '../../shared/format';
 import { reportFailure } from '../ui/toast';
 import type { DiffComment } from '../ui-store';
 import { ComposerToolbar } from './ComposerToolbar';

@@ -5,7 +5,7 @@ import {
   type AppState,
   type ChatSession,
   type ModelChoice,
-} from '../shared/model';
+} from './model';
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;

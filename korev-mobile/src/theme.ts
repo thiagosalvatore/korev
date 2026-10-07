@@ -1,4 +1,4 @@
-import { useColorScheme } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 
 const DARK = {
   bgApp: '#0b0d10',
@@ -46,7 +46,10 @@ const LIGHT: Theme = {
   warningText: '#8e6b12',
 };
 
-export const MONO_FONT = 'Menlo';
+export const MONO_FONT = Platform.select({
+  ios: 'Menlo',
+  default: 'monospace',
+});
 
 export function useTheme(): Theme {
   return useColorScheme() === 'light' ? LIGHT : DARK;

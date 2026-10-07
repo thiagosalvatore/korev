@@ -37,7 +37,7 @@ import {
   selectWorkspace,
 } from './actions';
 import { api } from './bridge';
-import { timeAgo } from './format';
+import { timeAgo } from '../shared/format';
 import { DRAG_REGION, NO_DRAG } from './layout';
 import { RemoteDevices } from './RemoteDevices';
 import { Menu, type MenuItem } from './ui/Menu';

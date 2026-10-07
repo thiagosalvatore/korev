@@ -4,7 +4,7 @@ import type { AppState, AskChat } from '../shared/model';
 import { deleteAsk, startAsk, startFromAsk } from './actions';
 import { ChatView } from './chat/ChatView';
 import { Composer } from './chat/Composer';
-import { loadoutChoices, modelChoices } from './format';
+import { loadoutChoices, modelChoices } from '../shared/format';
 import { useModelChoice } from './hooks';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { RepoPicker } from './RepoPicker';

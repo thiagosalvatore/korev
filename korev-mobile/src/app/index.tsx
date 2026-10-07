@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -67,7 +67,16 @@ function WorkspaceRow({
 }) {
   const waiting = runtime?.status === 'waiting';
   return (
-    <View style={styles.row}>
+    <Pressable
+      accessibilityRole="button"
+      style={styles.row}
+      onPress={() =>
+        router.push({
+          pathname: '/workspace/[id]',
+          params: { id: workspace.id },
+        })
+      }
+    >
       <View style={styles.statusSlot}>
         {runtime && BUSY_STATUSES.has(runtime.status) && (
           <ActivityIndicator size="small" />
@@ -87,7 +96,7 @@ function WorkspaceRow({
       </View>
       {waiting && <Text style={styles.badge}>Needs input</Text>}
       {(runtime?.unread || waiting) && <View style={styles.dot} />}
-    </View>
+    </Pressable>
   );
 }
 

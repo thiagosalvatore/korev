@@ -15,7 +15,7 @@ import {
   issuePrompt,
   type CreateFrom,
 } from './CreateFromPicker';
-import { loadoutChoices, modelChoices, timeAgo } from './format';
+import { loadoutChoices, modelChoices, timeAgo } from '../shared/format';
 import { useModelChoice } from './hooks';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { RepoPicker } from './RepoPicker';

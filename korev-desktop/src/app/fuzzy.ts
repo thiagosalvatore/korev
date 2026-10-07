@@ -1,4 +1,4 @@
-import { fileName } from './format';
+import { fileName } from '../shared/format';
 
 const DEFAULT_LIMIT = 8;
 const NAME_PREFIX_BONUS = -1000;

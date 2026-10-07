@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Button, cn, Icon } from '../../design-system';
-import type {
-  AgentQuestion,
-  ChatItem,
-  PermissionResponse,
-  PermissionStatus,
+import {
+  answerQuestions,
+  DISMISS_QUESTION,
+  type AgentQuestion,
+  type ChatItem,
+  type PermissionResponse,
+  type PermissionStatus,
 } from '../../shared/model';
 import { Markdown } from './Markdown';
 
@@ -189,9 +191,7 @@ function QuestionField({
 function QuestionForm({ item, onRespond }: PermissionCardProps) {
   const questions = item.questions ?? [];
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
-  const complete = questions.every(
-    (question) => answers[question.question]?.length,
-  );
+  const response = answerQuestions(questions, answers);
   return (
     <Shell title="The agent has a question" icon="message-circle-question">
       {questions.map((question) => (
@@ -211,30 +211,15 @@ function QuestionForm({ item, onRespond }: PermissionCardProps) {
         <Button
           size="sm"
           variant="primary"
-          disabled={!complete}
-          onClick={() =>
-            onRespond({
-              allow: true,
-              answers: Object.fromEntries(
-                Object.entries(answers).map(([question, value]) => [
-                  question,
-                  value.join(', '),
-                ]),
-              ),
-            })
-          }
+          disabled={!response}
+          onClick={() => response && onRespond(response)}
         >
           Answer
         </Button>
         <Button
           size="sm"
           variant="ghost"
-          onClick={() =>
-            onRespond({
-              allow: false,
-              message: 'The user dismissed the question.',
-            })
-          }
+          onClick={() => onRespond(DISMISS_QUESTION)}
         >
           Dismiss
         </Button>

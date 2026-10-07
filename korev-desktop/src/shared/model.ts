@@ -453,9 +453,39 @@ export interface PermissionResponse {
   message?: string;
 }
 
+export const DISMISS_QUESTION: PermissionResponse = {
+  allow: false,
+  message: 'The user dismissed the question.',
+};
+
+export function answerQuestions(
+  questions: AgentQuestion[],
+  answers: Record<string, string[]>,
+): PermissionResponse | null {
+  if (!questions.every((question) => answers[question.question]?.length))
+    return null;
+  return {
+    allow: true,
+    answers: Object.fromEntries(
+      Object.entries(answers).map(([question, value]) => [
+        question,
+        value.join(', '),
+      ]),
+    ),
+  };
+}
+
 export interface ChatUpdate {
   sessionId: string;
   item: ChatItem;
+}
+
+export function upsertChatItem(items: ChatItem[], item: ChatItem): ChatItem[] {
+  const index = items.findIndex((entry) => entry.id === item.id);
+  if (index === -1) return [...items, item];
+  const next = [...items];
+  next[index] = item;
+  return next;
 }
 
 export interface SendOptions {

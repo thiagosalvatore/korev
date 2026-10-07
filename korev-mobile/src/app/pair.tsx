@@ -11,6 +11,7 @@ import {
 import { useKorev } from '../korev';
 import { parsePairing } from '../pairing';
 import { useTheme, type Theme } from '../theme';
+import { Button } from '../ui';
 
 const NOT_A_PAIRING_CODE =
   'That is not a Korev pairing code. Use the code in Settings → Remote access.';
@@ -63,9 +64,10 @@ export default function PairScreen() {
           }
         />
       ) : (
-        <Pressable style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Use the camera</Text>
-        </Pressable>
+        <Button
+          label="Use the camera"
+          onPress={() => void requestPermission()}
+        />
       )}
       {busy && <Text style={styles.body}>Connecting…</Text>}
       {error && (
@@ -87,13 +89,11 @@ export default function PairScreen() {
         autoCorrect={false}
         multiline
       />
-      <Pressable
-        style={styles.button}
+      <Button
+        label="Pair"
         disabled={busy || !pasted.trim()}
         onPress={() => void tryPair(pasted)}
-      >
-        <Text style={styles.buttonText}>Pair</Text>
-      </Pressable>
+      />
     </ScrollView>
   );
 }
@@ -113,13 +113,6 @@ function makeStyles(theme: Theme) {
       backgroundColor: theme.bgRaised,
       color: theme.fg1,
     },
-    button: {
-      alignItems: 'center',
-      padding: 12,
-      borderRadius: 8,
-      backgroundColor: theme.accent,
-    },
-    buttonText: { color: theme.fgOnAccent, fontSize: 15, fontWeight: '600' },
     errorBox: { gap: 8 },
     error: { color: theme.dangerText, fontSize: 14, lineHeight: 20 },
     link: { color: theme.accentText, fontSize: 14, fontWeight: '600' },
