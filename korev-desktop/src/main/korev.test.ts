@@ -68,7 +68,10 @@ describe('Korev core', () => {
       openExternal: async () => undefined,
       applyTheme: () => undefined,
     });
-    await korev.api.updateSettings({ branchPrefix: 'dev', autoRenameBranches: false });
+    await korev.api.updateSettings({
+      branchPrefix: 'dev',
+      autoRenameBranches: false,
+    });
   });
 
   afterEach(async () => {
@@ -92,16 +95,22 @@ describe('Korev core', () => {
       planMode: false,
     });
     expect(sent.ok).toBe(true);
-    await waitFor(async () => (await korev.api.getState()).runningSessions.length === 0);
+    await waitFor(
+      async () => (await korev.api.getState()).runningSessions.length === 0,
+    );
   }
 
   it('creates a worktree on a city branch with .context ignored and .env copied', async () => {
     const workspace = await createWorkspace();
 
     expect(workspace.branch).toBe(`dev/${workspace.name}`);
-    expect(git(workspace.path, 'branch', '--show-current')).toBe(workspace.branch);
+    expect(git(workspace.path, 'branch', '--show-current')).toBe(
+      workspace.branch,
+    );
     expect(existsSync(path.join(workspace.path, '.context'))).toBe(true);
-    expect(await readFile(path.join(workspace.path, '.env'), 'utf8')).toBe('SECRET=1\n');
+    expect(await readFile(path.join(workspace.path, '.env'), 'utf8')).toBe(
+      'SECRET=1\n',
+    );
     expect(await korev.api.changes(workspace.id)).toEqual([]);
   });
 
@@ -112,7 +121,12 @@ describe('Korev core', () => {
     await sendAndWait(session.id, 'Add a note');
 
     const transcript = await korev.api.transcript(session.id);
-    expect(transcript.map((item) => item.kind)).toEqual(['user', 'assistant', 'tool', 'result']);
+    expect(transcript.map((item) => item.kind)).toEqual([
+      'user',
+      'assistant',
+      'tool',
+      'result',
+    ]);
     expect(await korev.api.changes(workspace.id)).toEqual([
       { path: 'agent-note.txt', status: 'A', additions: 1, deletions: 0 },
     ]);
@@ -129,6 +143,22 @@ describe('Korev core', () => {
     expect(await korev.api.transcript(session.id)).toEqual([]);
   });
 
+  it('renames the placeholder branch after the first message', async () => {
+    await korev.api.updateSettings({ autoRenameBranches: true });
+    const workspace = await createWorkspace();
+
+    await sendAndWait(workspace.sessions[0].id, 'Add a note');
+    await waitFor(
+      async () =>
+        (await korev.api.getState()).workspaces[0].branch ===
+        'dev/add-agent-note',
+    );
+
+    expect(git(workspace.path, 'branch', '--show-current')).toBe(
+      'dev/add-agent-note',
+    );
+  });
+
   it('archives a workspace and restores its uncommitted work', async () => {
     const workspace = await createWorkspace();
     await writeFile(path.join(workspace.path, 'draft.txt'), 'wip\n');
@@ -137,11 +167,15 @@ describe('Korev core', () => {
 
     expect(archived.ok).toBe(true);
     expect(existsSync(workspace.path)).toBe(false);
-    expect(git(repoPath, 'branch', '--list', workspace.branch)).toContain(workspace.branch);
+    expect(git(repoPath, 'branch', '--list', workspace.branch)).toContain(
+      workspace.branch,
+    );
 
     const restored = await korev.api.restoreWorkspace(workspace.id);
 
     expect(restored.ok).toBe(true);
-    expect(await readFile(path.join(workspace.path, 'draft.txt'), 'utf8')).toBe('wip\n');
+    expect(await readFile(path.join(workspace.path, 'draft.txt'), 'utf8')).toBe(
+      'wip\n',
+    );
   });
 });

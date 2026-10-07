@@ -36,10 +36,7 @@ const ARCHIVE_SCRIPT_TIMEOUT_MS = 5 * 60_000;
 const GH_LOGIN_TIMEOUT_MS = 10_000;
 const NEW_CHAT_TITLE = 'New chat';
 
-export function newChatSession(
-  ctx: Context,
-  agent: AgentKind,
-): ChatSession {
+export function newChatSession(ctx: Context, agent: AgentKind): ChatSession {
   const { settings } = ctx.store.state;
   return {
     id: ctx.deps.newId(),
@@ -76,7 +73,9 @@ function fetchGithubLogin(ctx: Context): Promise<string | null> {
       env: ctx.deps.env,
       timeoutMs: GH_LOGIN_TIMEOUT_MS,
     })
-    .then((result) => (result.exitCode === 0 ? result.stdout.trim() || null : null))
+    .then((result) =>
+      result.exitCode === 0 ? result.stdout.trim() || null : null,
+    )
     .catch(() => null);
   return githubLogin;
 }
@@ -134,7 +133,12 @@ export function onScriptExit(ctx: Context, ref: string, exitCode: number) {
   const [workspaceId, kind] = ref.split(':');
   if (kind === 'setup' && ctx.runtime(workspaceId).status === 'setting-up') {
     if (exitCode === 0) ctx.setStatus(workspaceId, 'idle');
-    else ctx.setStatus(workspaceId, 'error', `Setup script failed (exit ${exitCode})`);
+    else
+      ctx.setStatus(
+        workspaceId,
+        'error',
+        `Setup script failed (exit ${exitCode})`,
+      );
   }
   ctx.emitState();
 }
@@ -142,7 +146,11 @@ export function onScriptExit(ctx: Context, ref: string, exitCode: number) {
 export async function refreshStats(ctx: Context, workspace: Workspace) {
   if (workspace.archivedAt) return [];
   try {
-    const files = await changedFiles(ctx.git, workspace.path, workspace.baseBranch);
+    const files = await changedFiles(
+      ctx.git,
+      workspace.path,
+      workspace.baseBranch,
+    );
     ctx.runtime(workspace.id).stats = {
       additions: files.reduce((sum, file) => sum + file.additions, 0),
       deletions: files.reduce((sum, file) => sum + file.deletions, 0),
@@ -160,7 +168,9 @@ export async function createWorkspace(
 ): Promise<Result<Workspace>> {
   const repo = ctx.repo(repoId);
   const { state } = ctx.store;
-  const name = pickWorkspaceName(new Set(state.workspaces.map((ws) => ws.name)));
+  const name = pickWorkspaceName(
+    new Set(state.workspaces.map((ws) => ws.name)),
+  );
   try {
     const branch = await uniqueBranch(ctx, repo, name);
     const worktree = path.join(
@@ -220,9 +230,10 @@ export async function archiveWorkspace(
   ctx.terminals.closeMatching(`${workspace.id}:`);
   await runArchiveScript(ctx, workspace);
   const repo = ctx.repo(workspace.repoId);
-  workspace.archiveSnapshot = await createCheckpoint(ctx.git, workspace.path).catch(
-    () => null,
-  );
+  workspace.archiveSnapshot = await createCheckpoint(
+    ctx.git,
+    workspace.path,
+  ).catch(() => null);
   await removeWorktree(ctx.git, repo.path, workspace.path);
   if (ctx.store.state.settings.deleteBranchOnArchive) {
     await deleteBranch(ctx.git, repo.path, workspace.branch);
@@ -246,7 +257,9 @@ export async function restoreWorkspace(
   try {
     await restoreWorktree(ctx.git, repo.path, workspace.path, workspace.branch);
     const snapshot = workspace.archiveSnapshot;
-    const head = (await ctx.git.tryRun(workspace.path, ['rev-parse', 'HEAD']))?.trim();
+    const head = (
+      await ctx.git.tryRun(workspace.path, ['rev-parse', 'HEAD'])
+    )?.trim();
     if (snapshot && head === snapshot.head) {
       await restoreCheckpoint(ctx.git, workspace.path, snapshot);
     }

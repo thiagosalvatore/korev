@@ -9,3 +9,5 @@
 @import './theme.css';
 @import './base.css';
 @import './diff.css';
+@import './markdown.css';
+@import '@xterm/xterm/css/xterm.css';

@@ -147,3 +147,4 @@ out/
 
 test-results/
 playwright-report/
+.vitest/

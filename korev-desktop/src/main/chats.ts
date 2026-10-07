@@ -1,3 +1,4 @@
+import { tmpdir } from 'node:os';
 import type {
   ChatItem,
   ChatSession,
@@ -29,11 +30,14 @@ const REPLAY_TOTAL_CHARS = 24_000;
 const RENAME_TIMEOUT_MS = 60_000;
 const RENAME_MODEL = 'claude-haiku-4-5';
 const BRANCH_NAME_MAX_CHARS = 40;
+const RENAME_TASK_CHARS = 4_000;
 
 export function replayPrompt(history: ChatItem[], text: string): string {
   const lines = history.flatMap((item) => {
-    if (item.kind === 'user') return [`User: ${item.text.slice(0, REPLAY_ITEM_CHARS)}`];
-    if (item.kind === 'assistant') return [`Assistant: ${item.text.slice(0, REPLAY_ITEM_CHARS)}`];
+    if (item.kind === 'user')
+      return [`User: ${item.text.slice(0, REPLAY_ITEM_CHARS)}`];
+    if (item.kind === 'assistant')
+      return [`Assistant: ${item.text.slice(0, REPLAY_ITEM_CHARS)}`];
     return [];
   });
   if (!lines.length) return text;
@@ -41,9 +45,24 @@ export function replayPrompt(history: ChatItem[], text: string): string {
   return `<previous-conversation>\nThis chat was reset to an earlier point. Here is the conversation so far, for context:\n\n${transcript}\n</previous-conversation>\n\n${text}`;
 }
 
-function renamePrompt(text: string): string {
-  return `Write a short git branch name (2 to 4 words, lowercase, kebab-case, no prefix) that describes this task. Reply with the branch name only.\n\nTask:\n${text.slice(0, 4_000)}`;
-}
+const RENAME_SYSTEM_PROMPT =
+  'You name git branches. Given a task, reply with a 2 to 4 word lowercase kebab-case branch name and nothing else.';
+const RENAME_ARGS = [
+  '-p',
+  '--model',
+  RENAME_MODEL,
+  '--no-session-persistence',
+  '--output-format',
+  'text',
+  '--tools',
+  '',
+  '--setting-sources',
+  '',
+  '--disable-slash-commands',
+  '--strict-mcp-config',
+  '--system-prompt',
+  RENAME_SYSTEM_PROMPT,
+];
 
 export function systemPrompt(repo: Repo, workspace: Workspace): string {
   return [
@@ -77,9 +96,14 @@ export function createChats(ctx: Context): Chats {
   const transcripts = new Map<string, ChatItem[]>();
   const controllers = new Map<string, AbortController>();
 
-  function locate(sessionId: string): { workspace: Workspace; session: ChatSession } {
+  function locate(sessionId: string): {
+    workspace: Workspace;
+    session: ChatSession;
+  } {
     for (const workspace of ctx.store.state.workspaces) {
-      const session = workspace.sessions.find((entry) => entry.id === sessionId);
+      const session = workspace.sessions.find(
+        (entry) => entry.id === sessionId,
+      );
       if (session) return { workspace, session };
     }
     throw new NotFoundError('Session', sessionId);
@@ -104,7 +128,11 @@ export function createChats(ctx: Context): Chats {
     void ctx.store.saveTranscript(sessionId, items).catch(() => undefined);
   }
 
-  function finishTurn(workspace: Workspace, session: ChatSession, items: ChatItem[]) {
+  function finishTurn(
+    workspace: Workspace,
+    session: ChatSession,
+    items: ChatItem[],
+  ) {
     controllers.delete(session.id);
     ctx.runningSessions.delete(session.id);
     persist(session.id, items);
@@ -112,7 +140,8 @@ export function createChats(ctx: Context): Chats {
       ctx.runningSessions.has(entry.id),
     );
     const runtime = ctx.runtime(workspace.id);
-    if (!stillWorking && runtime.status === 'working') ctx.setStatus(workspace.id, 'idle');
+    if (!stillWorking && runtime.status === 'working')
+      ctx.setStatus(workspace.id, 'idle');
     const watching =
       ctx.deps.isWindowFocused() && ctx.focusedWorkspaceId === workspace.id;
     if (!watching) runtime.unread = true;
@@ -153,12 +182,17 @@ export function createChats(ctx: Context): Chats {
     const turnId = ctx.deps.newId().slice(0, 8);
     let sinceSave = 0;
     const notice = (text: string) =>
-      upsert(session.id, items, { id: `${turnId}:notice`, kind: 'notice', text });
+      upsert(session.id, items, {
+        id: `${turnId}:notice`,
+        kind: 'notice',
+        text,
+      });
     try {
       const result = await ctx.deps.run(agent.binary, agent.args(request), {
         cwd: workspace.path,
         env: scriptEnv(ctx, repo, workspace),
-        stdin: session.agent === 'codex' ? codexPrompt(request, prompt) : prompt,
+        stdin:
+          session.agent === 'codex' ? codexPrompt(request, prompt) : prompt,
         signal,
         timeoutMs: TURN_TIMEOUT_MS,
         onStdoutLine: (line) => {
@@ -178,22 +212,35 @@ export function createChats(ctx: Context): Chats {
         (item) => item.kind === 'result' && item.id.startsWith(`${turnId}:`),
       );
       if (result.exitCode !== 0 && !sawResult) {
-        notice(result.stderr.trim().slice(-STDERR_TAIL_CHARS) || `${agent.binary} exited with code ${result.exitCode}`);
+        notice(
+          result.stderr.trim().slice(-STDERR_TAIL_CHARS) ||
+            `${agent.binary} exited with code ${result.exitCode}`,
+        );
       }
     } catch (error) {
-      notice(error instanceof CommandAbortedError ? 'Stopped' : errorMessage(error));
+      notice(
+        error instanceof CommandAbortedError ? 'Stopped' : errorMessage(error),
+      );
     } finally {
       session.agentSessionId = parser.sessionId() ?? session.agentSessionId;
       finishTurn(workspace, session, items);
     }
   }
 
-  async function send(sessionId: string, options: SendOptions): Promise<Result> {
+  async function send(
+    sessionId: string,
+    options: SendOptions,
+  ): Promise<Result> {
     const { workspace, session } = locate(sessionId);
-    if (workspace.archivedAt) return { ok: false, message: 'Workspace is archived' };
-    if (controllers.has(sessionId)) return { ok: false, message: 'Agent is still working' };
+    if (workspace.archivedAt)
+      return { ok: false, message: 'Workspace is archived' };
+    if (controllers.has(sessionId))
+      return { ok: false, message: 'Agent is still working' };
     const items = await transcript(sessionId);
-    const checkpoint = await createCheckpoint(ctx.git, workspace.path).catch(() => null);
+    const firstMessage = !items.some((item) => item.kind === 'user');
+    const checkpoint = await createCheckpoint(ctx.git, workspace.path).catch(
+      () => null,
+    );
     upsert(sessionId, items, {
       id: ctx.deps.newId(),
       kind: 'user',
@@ -201,7 +248,6 @@ export function createChats(ctx: Context): Chats {
       at: ctx.deps.now().toISOString(),
       checkpoint,
     });
-    const firstMessage = !items.some((item) => item.kind === 'user');
     if (isUntitled(session)) session.title = titleFrom(options.text);
     session.model = options.model;
     session.effort = options.effort;
@@ -212,7 +258,9 @@ export function createChats(ctx: Context): Chats {
     ctx.store.save();
     ctx.emitState();
     void runTurn(workspace, session, options, items, controller.signal);
-    if (firstMessage) void autoRenameBranch(workspace, options.text);
+    if (firstMessage && session === workspace.sessions[0]) {
+      void autoRenameBranch(workspace, options.text);
+    }
     return { ok: true, value: undefined };
   }
 
@@ -221,17 +269,26 @@ export function createChats(ctx: Context): Chats {
   }
 
   async function suggestBranchName(workspace: Workspace, text: string) {
-    const result = await ctx.deps.run(
-      'claude',
-      ['-p', '--model', RENAME_MODEL, '--no-session-persistence', '--output-format', 'text'],
-      { cwd: workspace.path, env: ctx.deps.env, stdin: renamePrompt(text), timeoutMs: RENAME_TIMEOUT_MS },
-    );
+    const result = await ctx.deps.run('claude', RENAME_ARGS, {
+      cwd: tmpdir(),
+      env: ctx.deps.env,
+      stdin: `Task:\n${text.slice(0, RENAME_TASK_CHARS)}`,
+      timeoutMs: RENAME_TIMEOUT_MS,
+    });
     if (result.exitCode !== 0) return null;
-    return slugify(result.stdout.trim().split('\n').at(-1) ?? '').slice(0, BRANCH_NAME_MAX_CHARS).replace(/-+$/, '') || null;
+    return (
+      slugify(result.stdout.trim().split('\n').at(-1) ?? '')
+        .slice(0, BRANCH_NAME_MAX_CHARS)
+        .replace(/-+$/, '') || null
+    );
   }
 
   async function autoRenameBranch(workspace: Workspace, text: string) {
-    if (!ctx.store.state.settings.autoRenameBranches || !isPlaceholderBranch(workspace)) return;
+    if (
+      !ctx.store.state.settings.autoRenameBranches ||
+      !isPlaceholderBranch(workspace)
+    )
+      return;
     try {
       const suggestion = await suggestBranchName(workspace, text);
       if (!suggestion || !isPlaceholderBranch(workspace)) return;
@@ -253,9 +310,13 @@ export function createChats(ctx: Context): Chats {
     controllers.get(sessionId)?.abort();
   }
 
-  async function revert(sessionId: string, itemId: string): Promise<Result<string>> {
+  async function revert(
+    sessionId: string,
+    itemId: string,
+  ): Promise<Result<string>> {
     const { workspace, session } = locate(sessionId);
-    if (controllers.has(sessionId)) return { ok: false, message: 'Stop the agent first' };
+    if (controllers.has(sessionId))
+      return { ok: false, message: 'Stop the agent first' };
     const items = await transcript(sessionId);
     const target = items.find((item) => item.id === itemId);
     if (target?.kind !== 'user' || !target.checkpoint) {
@@ -280,7 +341,8 @@ export function createChats(ctx: Context): Chats {
     isRunning: (sessionId) => controllers.has(sessionId),
     send,
     stop,
-    stopWorkspace: (workspace) => workspace.sessions.forEach((session) => stop(session.id)),
+    stopWorkspace: (workspace) =>
+      workspace.sessions.forEach((session) => stop(session.id)),
     revert,
     async forget(sessionId) {
       stop(sessionId);

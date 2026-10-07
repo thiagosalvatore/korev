@@ -37,7 +37,11 @@ export interface Context {
   runningSessions: Set<string>;
   focusedWorkspaceId: string | null;
   runtime(workspaceId: string): WorkspaceRuntime;
-  setStatus(workspaceId: string, status: WorkspaceStatus, message?: string | null): void;
+  setStatus(
+    workspaceId: string,
+    status: WorkspaceStatus,
+    message?: string | null,
+  ): void;
   emitState(): void;
   workspace(workspaceId: string): Workspace;
   repo(repoId: string): Repo;

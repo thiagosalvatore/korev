@@ -111,6 +111,7 @@ export interface KorevDeps extends CoreDeps {
 
 export interface Korev {
   api: KorevApi;
+  runningAgents(): number;
   settings(): Settings;
   updateSettings(patch: Partial<Settings>): Promise<void>;
   shutdown(): Promise<void>;
@@ -174,7 +175,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
     emitState: () => {
       deps.emit('state', snapshot());
-      deps.setBadge([...runtimes.values()].filter((runtime) => runtime.unread).length);
+      deps.setBadge(
+        [...runtimes.values()].filter((runtime) => runtime.unread).length,
+      );
     },
     workspace(workspaceId) {
       const found = store.state.workspaces.find((ws) => ws.id === workspaceId);
@@ -226,7 +229,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   async function refreshPr(workspaceId: string) {
     const workspace = ctx.workspace(workspaceId);
     if (workspace.archivedAt) return null;
-    const pr = await fetchPrStatus(deps.run, deps.env, workspace.path, workspace.branch);
+    const pr = await fetchPrStatus(
+      deps.run,
+      deps.env,
+      workspace.path,
+      workspace.branch,
+    );
     const runtime = ctx.runtime(workspaceId);
     if (JSON.stringify(runtime.pr) !== JSON.stringify(pr)) {
       runtime.pr = pr;
@@ -244,11 +252,15 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   function openShell(ref: string, workspaceId: string) {
     const workspace = workspacePath(workspaceId);
     const repo = ctx.repo(workspace.repoId);
-    ctx.terminals.start(ref, { cwd: workspace.path, env: scriptEnv(ctx, repo, workspace) });
+    ctx.terminals.start(ref, {
+      cwd: workspace.path,
+      env: scriptEnv(ctx, repo, workspace),
+    });
   }
 
   function assertOwnRef(ref: string, workspaceId: string) {
-    if (!ref.startsWith(`${workspaceId}:`)) throw new Error('Terminal does not belong to workspace');
+    if (!ref.startsWith(`${workspaceId}:`))
+      throw new Error('Terminal does not belong to workspace');
   }
 
   async function updateSettings(patch: Partial<Settings>) {
@@ -258,9 +270,15 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     ctx.emitState();
   }
 
-  async function sendToActiveSession(workspaceId: string, sessionId: string, text: string) {
+  async function sendToActiveSession(
+    workspaceId: string,
+    sessionId: string,
+    text: string,
+  ) {
     const workspace = ctx.workspace(workspaceId);
-    const session = workspace.sessions.find((entry) => entry.id === sessionId) ?? workspace.sessions[0];
+    const session =
+      workspace.sessions.find((entry) => entry.id === sessionId) ??
+      workspace.sessions[0];
     if (!session) return fail('No chat in this workspace');
     return chats.send(session.id, {
       text,
@@ -301,7 +319,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
     async updateRepo(repoId, patch) {
       const repo = ctx.repo(repoId);
-      if (patch.defaultBranch?.trim()) repo.defaultBranch = patch.defaultBranch.trim();
+      if (patch.defaultBranch?.trim())
+        repo.defaultBranch = patch.defaultBranch.trim();
       store.save();
       ctx.emitState();
     },
@@ -311,7 +330,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       ctx.emitState();
     },
     createWorkspace: (repoId) => createWorkspace(ctx, repoId),
-    archiveWorkspace: (workspaceId) => archiveWorkspace(ctx, workspaceId, chats.stopWorkspace),
+    archiveWorkspace: (workspaceId) =>
+      archiveWorkspace(ctx, workspaceId, chats.stopWorkspace),
     restoreWorkspace: (workspaceId) => restoreWorkspace(ctx, workspaceId),
     deleteWorkspace: (workspaceId) => deleteWorkspace(ctx, workspaceId),
     async focusWorkspace(workspaceId) {
@@ -332,8 +352,23 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     async closeSession(workspaceId, sessionId) {
       const workspace = ctx.workspace(workspaceId);
       if (workspace.sessions.length <= 1) return;
-      workspace.sessions = workspace.sessions.filter((entry) => entry.id !== sessionId);
+      workspace.sessions = workspace.sessions.filter(
+        (entry) => entry.id !== sessionId,
+      );
       await chats.forget(sessionId);
+      store.save();
+      ctx.emitState();
+    },
+    async updateSession(sessionId, patch) {
+      for (const workspace of store.state.workspaces) {
+        const session = workspace.sessions.find(
+          (entry) => entry.id === sessionId,
+        );
+        if (!session) continue;
+        if (patch.model) session.model = patch.model;
+        if (patch.effort) session.effort = patch.effort;
+        if (patch.title?.trim()) session.title = patch.title.trim();
+      }
       store.save();
       ctx.emitState();
     },
@@ -344,7 +379,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     async changes(workspaceId) {
       const workspace = workspacePath(workspaceId);
       const files = await refreshStats(ctx, workspace);
-      return files.length ? files : changedFiles(git, workspace.path, workspace.baseBranch).catch(() => []);
+      return files.length
+        ? files
+        : changedFiles(git, workspace.path, workspace.baseBranch).catch(
+            () => [],
+          );
     },
     async fileDiff(workspaceId, file) {
       const workspace = workspacePath(workspaceId);
@@ -365,24 +404,42 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       const workspace = workspacePath(workspaceId);
       const pr = ctx.runtime(workspaceId).pr ?? (await refreshPr(workspaceId));
       if (!pr) return fail('No pull request for this branch');
-      const problem = await mergePr(deps.run, deps.env, workspace.path, pr.number);
+      const problem = await mergePr(
+        deps.run,
+        deps.env,
+        workspace.path,
+        pr.number,
+      );
       await refreshPr(workspaceId);
       return problem ? fail(problem) : ok(undefined);
     },
     async createPr(workspaceId, sessionId) {
       const workspace = ctx.workspace(workspaceId);
-      return sendToActiveSession(workspaceId, sessionId, createPrPrompt(workspace.baseBranch));
+      return sendToActiveSession(
+        workspaceId,
+        sessionId,
+        createPrPrompt(workspace.baseBranch),
+      );
     },
     async resolveConflicts(workspaceId, sessionId) {
       const workspace = ctx.workspace(workspaceId);
-      return sendToActiveSession(workspaceId, sessionId, resolveConflictsPrompt(workspace.baseBranch));
+      return sendToActiveSession(
+        workspaceId,
+        sessionId,
+        resolveConflictsPrompt(workspace.baseBranch),
+      );
     },
     async saveAttachment(workspaceId, name, base64) {
       const workspace = workspacePath(workspaceId);
       const safeName = `${deps.now().getTime()}-${path.basename(name).replace(/[^\w.-]+/g, '_')}`;
       const relative = path.join(CONTEXT_DIR, ATTACHMENTS_DIR, safeName);
-      await mkdir(path.join(workspace.path, CONTEXT_DIR, ATTACHMENTS_DIR), { recursive: true });
-      await writeFile(path.join(workspace.path, relative), Buffer.from(base64, 'base64'));
+      await mkdir(path.join(workspace.path, CONTEXT_DIR, ATTACHMENTS_DIR), {
+        recursive: true,
+      });
+      await writeFile(
+        path.join(workspace.path, relative),
+        Buffer.from(base64, 'base64'),
+      );
       return ok(relative);
     },
     async slashCommands(workspaceId) {
@@ -397,7 +454,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     async fixChecks(workspaceId, sessionId) {
       const pr = ctx.runtime(workspaceId).pr;
       if (!pr) return fail('No pull request for this branch');
-      return sendToActiveSession(workspaceId, sessionId, fixChecksPrompt(pr.checks));
+      return sendToActiveSession(
+        workspaceId,
+        sessionId,
+        fixChecksPrompt(pr.checks),
+      );
     },
     async openIn(workspaceId, editorId: EditorId) {
       const workspace = workspacePath(workspaceId);
@@ -407,26 +468,30 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         await deps.openPath(workspace.path);
         return ok(undefined);
       }
-      const result = await deps.run('open', ['-a', editor.app, workspace.path], {
-        env: deps.env,
-        timeoutMs: 15_000,
-      });
-      return result.exitCode === 0 ? ok(undefined) : fail(result.stderr.trim() || `Could not open ${editor.label}`);
+      const result = await deps.run(
+        'open',
+        ['-a', editor.app, workspace.path],
+        {
+          env: deps.env,
+          timeoutMs: 15_000,
+        },
+      );
+      return result.exitCode === 0
+        ? ok(undefined)
+        : fail(result.stderr.trim() || `Could not open ${editor.label}`);
     },
     openExternal: (url) => deps.openExternal(url),
     updateSettings,
     async openTerminal(ref, workspaceId, kind, size) {
       assertOwnRef(ref, workspaceId);
-      const scrollback = ctx.terminals.attach(ref, size);
-      if (scrollback !== null) return ok(scrollback);
-      if (kind === 'shell') {
+      if (kind === 'shell' && !ctx.terminals.isRunning(ref)) {
         openShell(ref, workspaceId);
-        ctx.terminals.resize(ref, size);
         ctx.emitState();
       }
-      return ok('');
+      return ok(ctx.terminals.attach(ref, size) ?? '');
     },
-    startScript: (workspaceId, kind) => startScript(ctx, workspacePath(workspaceId), kind),
+    startScript: (workspaceId, kind) =>
+      startScript(ctx, workspacePath(workspaceId), kind),
     async stopScript(workspaceId, kind) {
       ctx.terminals.close(terminalRef(workspaceId, kind));
       ctx.emitState();
@@ -451,10 +516,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
 
   return {
     api,
+    runningAgents: () => ctx.runningSessions.size,
     settings: () => store.state.settings,
     updateSettings,
     async shutdown() {
-      for (const workspace of store.state.workspaces) chats.stopWorkspace(workspace);
+      for (const workspace of store.state.workspaces)
+        chats.stopWorkspace(workspace);
       ctx.terminals.closeAll();
       await store.flush();
     },

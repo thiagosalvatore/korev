@@ -34,6 +34,10 @@ export interface KorevApi {
   focusWorkspace(workspaceId: string | null): Promise<void>;
   newSession(workspaceId: string, agent: AgentKind): Promise<ChatSession>;
   closeSession(workspaceId: string, sessionId: string): Promise<void>;
+  updateSession(
+    sessionId: string,
+    patch: { model?: string; effort?: string; title?: string },
+  ): Promise<void>;
   transcript(sessionId: string): Promise<ChatItem[]>;
   send(sessionId: string, options: SendOptions): Promise<Result>;
   stop(sessionId: string): Promise<void>;

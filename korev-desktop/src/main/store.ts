@@ -47,21 +47,21 @@ function isAgentKind(value: unknown): value is AgentKind {
 function sanitize(raw: unknown, home: string): PersistedState {
   const value = (raw ?? {}) as Partial<PersistedState>;
   const defaults = defaultSettings(home);
-  const settings = { ...defaults, ...(value.settings ?? {}) };
+  const settings = { ...defaults, ...value.settings };
   if (!isAgentKind(settings.defaultAgent)) settings.defaultAgent = 'claude';
   settings.defaultModels = {
     ...defaults.defaultModels,
-    ...(settings.defaultModels ?? {}),
+    ...settings.defaultModels,
   };
   settings.defaultEffort = {
     ...defaults.defaultEffort,
-    ...(settings.defaultEffort ?? {}),
+    ...settings.defaultEffort,
   };
   const repos = Array.isArray(value.repos) ? value.repos : [];
   return {
     repos: repos.map((repo) => ({
       ...repo,
-      scripts: { ...EMPTY_SCRIPTS, ...(repo.scripts ?? {}) },
+      scripts: { ...EMPTY_SCRIPTS, ...repo.scripts },
     })),
     workspaces: (Array.isArray(value.workspaces) ? value.workspaces : []).map(
       (workspace) => ({

@@ -12,10 +12,33 @@ describe('PR status', () => {
         isDraft: false,
         mergeable: 'CONFLICTING',
         statusCheckRollup: [
-          { __typename: 'CheckRun', name: 'lint', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: 'https://ci/1' },
-          { __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: 'https://ci/2' },
-          { __typename: 'CheckRun', name: 'e2e', status: 'IN_PROGRESS', conclusion: '', detailsUrl: '' },
-          { __typename: 'StatusContext', context: 'deploy', state: 'ERROR', targetUrl: 'https://ci/3' },
+          {
+            __typename: 'CheckRun',
+            name: 'lint',
+            status: 'COMPLETED',
+            conclusion: 'SUCCESS',
+            detailsUrl: 'https://ci/1',
+          },
+          {
+            __typename: 'CheckRun',
+            name: 'test',
+            status: 'COMPLETED',
+            conclusion: 'FAILURE',
+            detailsUrl: 'https://ci/2',
+          },
+          {
+            __typename: 'CheckRun',
+            name: 'e2e',
+            status: 'IN_PROGRESS',
+            conclusion: '',
+            detailsUrl: '',
+          },
+          {
+            __typename: 'StatusContext',
+            context: 'deploy',
+            state: 'ERROR',
+            targetUrl: 'https://ci/3',
+          },
         ],
       }),
     );

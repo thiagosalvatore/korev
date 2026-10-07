@@ -124,7 +124,10 @@ async function probe(
   args: string[],
 ): Promise<string | null> {
   try {
-    const result = await run(binary, args, { env, timeoutMs: PROBE_TIMEOUT_MS });
+    const result = await run(binary, args, {
+      env,
+      timeoutMs: PROBE_TIMEOUT_MS,
+    });
     return result.exitCode === 0 ? result.stdout : null;
   } catch {
     return null;
@@ -137,8 +140,10 @@ const CODEX_FALLBACK_MODELS: AgentModel[] = [
 
 async function codexModels(run: CommandRunner, env: NodeJS.ProcessEnv) {
   const output = await probe(run, env, 'codex', ['debug', 'models']);
-  const models = output ? parseCodexModels(output) : [];
-  return models.length ? models : CODEX_FALLBACK_MODELS;
+  return [
+    ...CODEX_FALLBACK_MODELS,
+    ...(output ? parseCodexModels(output) : []),
+  ];
 }
 
 export async function detectAgents(

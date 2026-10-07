@@ -3,7 +3,7 @@
   "productName": "Korev",
   "version": "1.0.0",
   "private": true,
-  "description": "My Electron application description",
+  "description": "Run coding agents in parallel git worktrees",
   "keywords": [],
   "license": "MIT",
   "author": {

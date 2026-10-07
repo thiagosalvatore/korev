@@ -1,0 +1,78 @@
+import { useEffect } from 'react';
+import type { AppState } from '../shared/model';
+import { activeWorkspaces, openNewWorkspace, selectWorkspace } from './actions';
+import { api } from './bridge';
+import { CommandPalette } from './CommandPalette';
+import { useAppState, useMediaQuery } from './hooks';
+import { NewWorkspacePage } from './NewWorkspacePage';
+import { SettingsPage } from './SettingsPage';
+import { Sidebar } from './Sidebar';
+import { Toaster } from './ui/toast';
+import { useUi } from './ui-store';
+import { useCommands } from './useCommands';
+import { Welcome } from './Welcome';
+import { WorkspaceView } from './WorkspaceView';
+
+const LIGHT_SCHEME_QUERY = '(prefers-color-scheme: light)';
+
+function useTheme(state: AppState | null) {
+  const systemLight = useMediaQuery(LIGHT_SCHEME_QUERY);
+  const preference = state?.settings.theme ?? 'system';
+  const light =
+    preference === 'light' || (preference === 'system' && systemLight);
+  useEffect(() => {
+    document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  }, [light]);
+}
+
+function Shell({ state }: { state: AppState }) {
+  const page = useUi((ui) => ui.page);
+  const workspaceId = useUi((ui) => ui.workspaceId);
+  const sidebar = useUi((ui) => ui.sidebar);
+  const workspace = state.workspaces.find((ws) => ws.id === workspaceId);
+  const fallback = activeWorkspaces(state)[0];
+
+  useEffect(() => {
+    if (page.kind !== 'workspace' || workspace) return;
+    if (fallback) selectWorkspace(fallback.id);
+    else openNewWorkspace(null);
+  }, [page.kind, workspace, fallback]);
+
+  useEffect(() => {
+    if (page.kind === 'workspace' && workspaceId)
+      void api.focusWorkspace(workspaceId);
+  }, [page.kind, workspaceId]);
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-app text-fg-1">
+      {sidebar ? <Sidebar state={state} /> : null}
+      {page.kind === 'settings' ? (
+        <SettingsPage state={state} section={page.section} />
+      ) : null}
+      {page.kind === 'new-workspace' ? (
+        <NewWorkspacePage
+          key={page.repoId ?? 'any'}
+          state={state}
+          repoId={page.repoId}
+        />
+      ) : null}
+      {page.kind === 'workspace' && workspace ? (
+        <WorkspaceView key={workspace.id} state={state} workspace={workspace} />
+      ) : null}
+      <CommandPalette state={state} />
+    </div>
+  );
+}
+
+export function App() {
+  const state = useAppState();
+  useTheme(state);
+  useCommands(state);
+  if (!state) return <div className="h-screen bg-app" />;
+  return (
+    <>
+      {state.repos.length ? <Shell state={state} /> : <Welcome state={state} />}
+      <Toaster />
+    </>
+  );
+}

@@ -57,9 +57,6 @@
     color: var(--diff-hunk-fg);
     padding: 3px 0;
   }
-  .kv-diff__row--flag .kv-diff__num:first-child {
-    box-shadow: inset 2px 0 0 var(--risk-high);
-  }
   .kv-diff__note td {
     padding: 8px 12px 10px 80px !important;
     background: var(--bg-surface);
@@ -67,14 +64,6 @@
     border-bottom: 1px solid var(--border-1);
     font-family: var(--font-sans);
     white-space: normal;
-  }
-  .kv-diff mark {
-    background: var(--diff-add-word);
-    color: inherit;
-    border-radius: 2px;
-  }
-  .kv-diff__row--del mark {
-    background: var(--diff-del-word);
   }
   .kv-syn-k {
     color: var(--syn-keyword);

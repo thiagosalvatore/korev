@@ -26,9 +26,9 @@ describe('workspace names', () => {
 describe('ports', () => {
   it('gives each workspace its own block of ten ports', () => {
     expect(allocatePort([])).toBe(FIRST_PORT);
-    expect(allocatePort([FIRST_PORT, FIRST_PORT + 2 * PORTS_PER_WORKSPACE])).toBe(
-      FIRST_PORT + PORTS_PER_WORKSPACE,
-    );
+    expect(
+      allocatePort([FIRST_PORT, FIRST_PORT + 2 * PORTS_PER_WORKSPACE]),
+    ).toBe(FIRST_PORT + PORTS_PER_WORKSPACE);
   });
 });
 
@@ -41,7 +41,11 @@ describe('conductor.json', () => {
           runScriptMode: 'nonconcurrent',
         }),
       ),
-    ).toEqual({ setup: 'npm ci', run: 'npm run dev', runMode: 'nonconcurrent' });
+    ).toEqual({
+      setup: 'npm ci',
+      run: 'npm run dev',
+      runMode: 'nonconcurrent',
+    });
   });
 
   it('ignores a malformed file', () => {

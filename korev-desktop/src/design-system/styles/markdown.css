@@ -1,0 +1,91 @@
+@layer components {
+  .kv-md {
+    color: var(--fg-1);
+    font: var(--type-body);
+    overflow-wrap: anywhere;
+  }
+  .kv-md > :first-child {
+    margin-top: 0;
+  }
+  .kv-md > :last-child {
+    margin-bottom: 0;
+  }
+  .kv-md p,
+  .kv-md ul,
+  .kv-md ol,
+  .kv-md pre,
+  .kv-md blockquote,
+  .kv-md table {
+    margin: 0 0 10px;
+  }
+  .kv-md h1,
+  .kv-md h2,
+  .kv-md h3,
+  .kv-md h4 {
+    margin: 18px 0 8px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .kv-md h1 {
+    font-size: 18px;
+  }
+  .kv-md h2 {
+    font-size: 16px;
+  }
+  .kv-md h3,
+  .kv-md h4 {
+    font-size: 14px;
+  }
+  .kv-md ul,
+  .kv-md ol {
+    padding-left: 22px;
+  }
+  .kv-md li {
+    margin: 3px 0;
+  }
+  .kv-md code {
+    font: var(--type-code);
+    background: var(--bg-active);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+  .kv-md pre {
+    background: var(--bg-inset);
+    border: 1px solid var(--border-1);
+    border-radius: 8px;
+    padding: 10px 12px;
+    overflow-x: auto;
+  }
+  .kv-md pre code {
+    background: none;
+    padding: 0;
+  }
+  .kv-md blockquote {
+    border-left: 3px solid var(--border-2);
+    padding-left: 12px;
+    color: var(--fg-2);
+  }
+  .kv-md table {
+    border-collapse: collapse;
+    display: block;
+    overflow-x: auto;
+  }
+  .kv-md th,
+  .kv-md td {
+    border: 1px solid var(--border-2);
+    padding: 5px 9px;
+    text-align: left;
+  }
+  .kv-md th {
+    background: var(--bg-hover);
+    font-weight: 600;
+  }
+  .kv-md hr {
+    border: 0;
+    border-top: 1px solid var(--border-1);
+    margin: 14px 0;
+  }
+  .kv-md a {
+    cursor: pointer;
+  }
+}

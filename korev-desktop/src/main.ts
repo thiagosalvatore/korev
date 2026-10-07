@@ -79,7 +79,10 @@ function showNotice(korev: () => Korev | null, notice: Notice) {
     if (!window) return;
     window.show();
     window.focus();
-    window.webContents.send(eventChannel('focus-workspace'), notice.workspaceId);
+    window.webContents.send(
+      eventChannel('focus-workspace'),
+      notice.workspaceId,
+    );
   });
   notification.show();
 }
@@ -128,6 +131,22 @@ async function createKorevApp(): Promise<Korev> {
   });
   nativeTheme.themeSource = korev.settings().theme;
   return korev;
+}
+
+const QUIT_BUTTON = 0;
+
+function confirmQuit(korev: Korev): boolean {
+  const running = korev.runningAgents();
+  if (!running) return true;
+  const choice = dialog.showMessageBoxSync({
+    type: 'warning',
+    message: `${running} agent${running === 1 ? ' is' : 's are'} still working`,
+    detail: 'Quitting stops them. Their chats keep everything up to now.',
+    buttons: ['Quit', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+  });
+  return choice === QUIT_BUTTON;
 }
 
 function hardenWebContents(contents: WebContents) {
@@ -196,6 +215,10 @@ app.whenReady().then(async () => {
   let shuttingDown = false;
   app.on('before-quit', (event) => {
     if (shuttingDown) return;
+    if (!confirmQuit(korev)) {
+      event.preventDefault();
+      return;
+    }
     shuttingDown = true;
     event.preventDefault();
     void korev.shutdown().finally(() => app.quit());

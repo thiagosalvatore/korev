@@ -282,9 +282,20 @@ export async function createCheckpoint(
   await git.run(worktree, ['add', '-A'], env);
   const tree = (await git.run(worktree, ['write-tree'], env)).trim();
   const snapshot = (
-    await git.run(worktree, ['commit-tree', tree, '-p', head, '-m', SNAPSHOT_MESSAGE])
+    await git.run(worktree, [
+      'commit-tree',
+      tree,
+      '-p',
+      head,
+      '-m',
+      SNAPSHOT_MESSAGE,
+    ])
   ).trim();
-  await git.run(worktree, ['update-ref', `${CHECKPOINT_REF_PREFIX}${snapshot}`, snapshot]);
+  await git.run(worktree, [
+    'update-ref',
+    `${CHECKPOINT_REF_PREFIX}${snapshot}`,
+    snapshot,
+  ]);
   return { head, snapshot };
 }
 
@@ -303,7 +314,12 @@ export async function isIgnored(git: Git, dir: string, file: string) {
   return (await git.tryRun(dir, ['check-ignore', '-q', file])) !== null;
 }
 
-export async function renameBranch(git: Git, worktree: string, from: string, to: string) {
+export async function renameBranch(
+  git: Git,
+  worktree: string,
+  from: string,
+  to: string,
+) {
   await git.run(worktree, ['branch', '-m', from, to]);
 }
 
@@ -312,7 +328,13 @@ export async function deleteBranch(git: Git, repo: string, branch: string) {
 }
 
 export async function hasUpstream(git: Git, worktree: string) {
-  return (await git.tryRun(worktree, ['rev-parse', '--abbrev-ref', '@{upstream}'])) !== null;
+  return (
+    (await git.tryRun(worktree, [
+      'rev-parse',
+      '--abbrev-ref',
+      '@{upstream}',
+    ])) !== null
+  );
 }
 
 export async function userSlug(git: Git, dir: string): Promise<string> {

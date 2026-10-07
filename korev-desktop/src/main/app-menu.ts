@@ -83,7 +83,9 @@ const CHAT_ENTRIES: (CommandEntry | null)[] = [
   ['Cancel Agent', 'CmdOrCtrl+Shift+Backspace', 'cancel-agent'],
 ];
 
-function developmentItems(isDevelopment: boolean): MenuItemConstructorOptions[] {
+function developmentItems(
+  isDevelopment: boolean,
+): MenuItemConstructorOptions[] {
   if (!isDevelopment) return [];
   return [SEPARATOR, { role: 'forceReload' }, { role: 'toggleDevTools' }];
 }

@@ -67,11 +67,15 @@ export async function fetchPrStatus(
   branch: string,
 ): Promise<PrStatus | null> {
   try {
-    const result = await run('gh', ['pr', 'view', branch, '--json', PR_FIELDS], {
-      cwd,
-      env,
-      timeoutMs: GH_TIMEOUT_MS,
-    });
+    const result = await run(
+      'gh',
+      ['pr', 'view', branch, '--json', PR_FIELDS],
+      {
+        cwd,
+        env,
+        timeoutMs: GH_TIMEOUT_MS,
+      },
+    );
     return result.exitCode === 0 ? parsePrStatus(result.stdout) : null;
   } catch {
     return null;
@@ -84,11 +88,11 @@ export async function mergePr(
   cwd: string,
   number: number,
 ): Promise<string | null> {
-  const result = await run(
-    'gh',
-    ['pr', 'merge', String(number), '--squash'],
-    { cwd, env, timeoutMs: GH_TIMEOUT_MS },
-  );
+  const result = await run('gh', ['pr', 'merge', String(number), '--squash'], {
+    cwd,
+    env,
+    timeoutMs: GH_TIMEOUT_MS,
+  });
   return result.exitCode === 0 ? null : result.stderr.trim() || 'Merge failed';
 }
 

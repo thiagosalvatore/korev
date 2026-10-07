@@ -117,7 +117,9 @@ export function createTerminals(deps: TerminalsDeps): Terminals {
     resize: (ref, size) => sessions.get(ref)?.pty.resize(size.cols, size.rows),
     close,
     closeMatching: (prefix) =>
-      [...sessions.keys()].filter((ref) => ref.startsWith(prefix)).forEach(close),
+      [...sessions.keys()]
+        .filter((ref) => ref.startsWith(prefix))
+        .forEach(close),
     closeAll: () => [...sessions.keys()].forEach(close),
   };
 }

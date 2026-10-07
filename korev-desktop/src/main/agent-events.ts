@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import type { ChatItem, Todo, TodoStatus } from '../shared/model';
 
@@ -32,9 +33,19 @@ export function parseJsonLine(line: string): JsonRecord | null {
   }
 }
 
+function realpath(dir: string): string {
+  try {
+    return realpathSync(dir);
+  } catch {
+    return dir;
+  }
+}
+
 function relative(cwd: string, file: string): string {
-  if (!file.startsWith(cwd)) return file;
-  return path.relative(cwd, file) || file;
+  for (const root of new Set([cwd, realpath(cwd)])) {
+    if (file.startsWith(`${root}/`)) return path.relative(root, file);
+  }
+  return file;
 }
 
 const CLAUDE_TOOL_TARGETS: Record<string, string> = {
@@ -63,8 +74,9 @@ function firstString(input: JsonRecord): string {
 
 function claudeToolSummary(name: string, input: JsonRecord, cwd: string) {
   const field = CLAUDE_TOOL_TARGETS[name];
-  const target = field ? str(input[field]) : firstString(input) ?? '';
-  const shown = field && PATH_FIELDS.has(field) ? relative(cwd, target) : target;
+  const target = field ? str(input[field]) : (firstString(input) ?? '');
+  const shown =
+    field && PATH_FIELDS.has(field) ? relative(cwd, target) : target;
   return shown.split('\n')[0];
 }
 
@@ -150,7 +162,8 @@ export function createClaudeParser(cwd: string): TurnParser {
     const id = str(block.id);
     const name = str(block.name);
     const input = record(block.input);
-    if (name === TODO_TOOL) return { id, kind: 'todos', todos: claudeTodos(input) };
+    if (name === TODO_TOOL)
+      return { id, kind: 'todos', todos: claudeTodos(input) };
     const item = {
       id,
       kind: 'tool' as const,
@@ -193,9 +206,12 @@ export function createClaudeParser(cwd: string): TurnParser {
         kind: 'result',
         ok,
         text: ok ? '' : str(event.result) || str(event.subtype),
-        durationMs: typeof event.duration_ms === 'number' ? event.duration_ms : null,
+        durationMs:
+          typeof event.duration_ms === 'number' ? event.duration_ms : null,
         costUsd:
-          typeof event.total_cost_usd === 'number' ? event.total_cost_usd : null,
+          typeof event.total_cost_usd === 'number'
+            ? event.total_cost_usd
+            : null,
       },
     ];
   }
@@ -259,7 +275,9 @@ function codexItem(item: JsonRecord, cwd: string): ChatItem | null {
     case 'agent_message':
       return { id, kind: 'assistant', text: str(item.text) };
     case 'reasoning':
-      return str(item.text) ? { id, kind: 'thinking', text: str(item.text) } : null;
+      return str(item.text)
+        ? { id, kind: 'thinking', text: str(item.text) }
+        : null;
     case 'command_execution': {
       const exitCode = item.exit_code;
       return codexTool(
@@ -275,8 +293,18 @@ function codexItem(item: JsonRecord, cwd: string): ChatItem | null {
     }
     case 'file_change': {
       const changes = codexChanges(item);
-      const first = relative(cwd, changes.split('\n')[0]?.split(' ').at(-1) ?? '');
-      return codexTool(id, 'Edit', first, changes, '', item.status === 'failed');
+      const first = relative(
+        cwd,
+        changes.split('\n')[0]?.split(' ').at(-1) ?? '',
+      );
+      return codexTool(
+        id,
+        'Edit',
+        first,
+        changes,
+        '',
+        item.status === 'failed',
+      );
     }
     case 'mcp_tool_call':
       return codexTool(
@@ -288,7 +316,14 @@ function codexItem(item: JsonRecord, cwd: string): ChatItem | null {
         item.status === 'failed',
       );
     case 'web_search':
-      return codexTool(id, 'WebSearch', str(item.query), str(item.query), '', false);
+      return codexTool(
+        id,
+        'WebSearch',
+        str(item.query),
+        str(item.query),
+        '',
+        false,
+      );
     case 'todo_list':
       return { id, kind: 'todos', todos: codexTodos(item) };
     case 'error':
@@ -317,7 +352,14 @@ export function createCodexParser(cwd: string): TurnParser {
         case 'turn.completed':
           turn += 1;
           return [
-            { id: `result:${turn}`, kind: 'result', ok: true, text: '', durationMs: null, costUsd: null },
+            {
+              id: `result:${turn}`,
+              kind: 'result',
+              ok: true,
+              text: '',
+              durationMs: null,
+              costUsd: null,
+            },
           ];
         case 'turn.failed':
           turn += 1;
@@ -332,7 +374,13 @@ export function createCodexParser(cwd: string): TurnParser {
             },
           ];
         case 'error':
-          return [{ id: `error:${str(event.message)}`, kind: 'notice', text: str(event.message) }];
+          return [
+            {
+              id: `error:${str(event.message)}`,
+              kind: 'notice',
+              text: str(event.message),
+            },
+          ];
         default:
           return [];
       }
