@@ -22,6 +22,7 @@ import {
   type WorkspaceSource,
 } from '../shared/model';
 import { createKorev, PR_POLL_MS, type Korev } from './korev';
+import type { RemoteSettings } from './remote-access';
 
 const FAKE_AGENT_BIN = path.resolve(__dirname, '../../test-support/bin');
 const WAIT_TIMEOUT_MS = 10_000;
@@ -94,6 +95,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   let korev: Korev;
   let playSound: Mock<() => void>;
   let keepAwake: Mock<(on: boolean) => void>;
+  let applyRemote: Mock<(settings: RemoteSettings) => Promise<void>>;
   let emit: Mock<(event: string, payload: unknown) => void>;
 
   async function initRepo(name: string) {
@@ -131,7 +133,17 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       openPath: async () => undefined,
       openExternal: async () => undefined,
       applyTheme: () => undefined,
-      remoteStatus: () => ({ address: null, devices: [] }),
+      remote: {
+        status: () => ({
+          address: null,
+          devices: [],
+          onTailnet: false,
+          error: null,
+        }),
+        pairing: async () => null,
+        apply: applyRemote,
+        revoke: async () => undefined,
+      },
     });
   }
 
@@ -141,6 +153,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     chosenDirectory = repoPath;
     playSound = vi.fn();
     keepAwake = vi.fn();
+    applyRemote = vi.fn(async () => undefined);
     emit = vi.fn();
     korev = await openKorev();
     await korev.api.updateSettings({
@@ -225,6 +238,16 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       async () => (await korev.api.getState()).runningSessions.length === 0,
     );
   }
+
+  it('restarts remote access only when a remote setting changes', async () => {
+    applyRemote.mockClear();
+    await korev.api.updateSettings({ theme: 'dark' });
+    expect(applyRemote).not.toHaveBeenCalled();
+    await korev.api.updateSettings({ remoteAccess: true });
+    expect(applyRemote).toHaveBeenCalledWith(
+      expect.objectContaining({ remoteAccess: true }),
+    );
+  });
 
   it('creates an empty workspace with .context ignored and .env copied', async () => {
     const workspace = await createWorkspace();

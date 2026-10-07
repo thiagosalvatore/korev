@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import {
   Button,
   cn,
+  Dialog,
   Icon,
   Input,
   Select,
@@ -17,6 +18,8 @@ import {
   type AgentKind,
   type AppState,
   type PromptKind,
+  type RemotePairing,
+  type RemoteStatus,
   type Repo,
   type RepoConfig,
   type RepoConfigSource,
@@ -29,6 +32,7 @@ import {
 import { api } from './bridge';
 import { modelChoices } from './format';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
+import { QrCode } from './QrCode';
 import { toast } from './ui/toast';
 import { setUi, useUi } from './ui-store';
 
@@ -44,6 +48,7 @@ const SECTIONS: Section[] = [
   { id: 'agents', label: 'Agents', icon: 'bot' },
   { id: 'git', label: 'Git', icon: 'git-branch' },
   { id: 'storage', label: 'Storage', icon: 'hard-drive' },
+  { id: 'remote', label: 'Remote access', icon: 'smartphone' },
   { id: 'snippets', label: 'Snippets', icon: 'text-quote' },
   { id: 'shortcuts', label: 'Keyboard shortcuts', icon: 'keyboard' },
 ];
@@ -515,6 +520,114 @@ function Git({ settings }: { settings: Settings }) {
           }
         />
       </Row>
+    </>
+  );
+}
+
+const MIN_PORT = 1024;
+const MAX_PORT = 65535;
+
+function parsePort(text: string): number | null {
+  const port = Number(text);
+  const valid = Number.isInteger(port) && port >= MIN_PORT && port <= MAX_PORT;
+  return valid ? port : null;
+}
+
+function savePort(text: string) {
+  const remotePort = parsePort(text);
+  if (remotePort === null) {
+    toast(`Use a port from ${MIN_PORT} to ${MAX_PORT}`, 'danger');
+    return;
+  }
+  update({ remotePort });
+}
+
+function remoteDescription(remote: RemoteStatus): string {
+  if (remote.error) return `Remote access did not start: ${remote.error}`;
+  if (!remote.address)
+    return 'Lets a phone on your Tailscale network use Korev.';
+  if (!remote.onTailnet)
+    return `Listening on ${remote.address}. Tailscale is not running, so only this Mac can connect. Start Tailscale, then turn remote access off and on.`;
+  return `Listening on ${remote.address}.`;
+}
+
+async function revokeDevices() {
+  await api.revokeRemoteDevices();
+  toast('Devices revoked. Pair them again to reconnect.', 'success');
+}
+
+function PairingDialog({
+  pairing,
+  onClose,
+}: {
+  pairing: RemotePairing | null;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog
+      open={pairing !== null}
+      onClose={onClose}
+      title="Pair a device"
+      description="Scan this code with the Korev app. It holds the address and the access token, so do not share it."
+    >
+      {pairing ? (
+        <div className="flex flex-col items-center gap-3">
+          <QrCode value={JSON.stringify(pairing)} label="Pairing code" />
+          <code className="text-xs break-all text-fg-3">{pairing.url}</code>
+        </div>
+      ) : null}
+    </Dialog>
+  );
+}
+
+function Remote({
+  settings,
+  remote,
+}: {
+  settings: Settings;
+  remote: RemoteStatus;
+}) {
+  const [pairing, setPairing] = useState<RemotePairing | null>(null);
+  return (
+    <>
+      <Row title="Remote access" description={remoteDescription(remote)}>
+        <Switch
+          checked={settings.remoteAccess}
+          onChange={(remoteAccess) => update({ remoteAccess })}
+        />
+      </Row>
+      <Row
+        title="Port"
+        description="Remote access restarts when you change it."
+      >
+        <TextSetting
+          value={String(settings.remotePort)}
+          mono
+          onSave={savePort}
+        />
+      </Row>
+      <Row
+        title="Pair a device"
+        description="Shows a code to scan with the Korev app."
+      >
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!remote.address}
+          onClick={async () => setPairing(await api.remotePairing())}
+        >
+          Show code
+        </Button>
+      </Row>
+      <Row
+        title="Connected devices"
+        description={remote.devices.length ? remote.devices.join(', ') : 'None'}
+      >
+        <Button size="sm" variant="secondary" onClick={() => revokeDevices()}>
+          Revoke all
+        </Button>
+      </Row>
+      <PairingDialog pairing={pairing} onClose={() => setPairing(null)} />
     </>
   );
 }
@@ -995,6 +1108,8 @@ export function SettingsPage({
   else if (current?.id === 'git') body = <Git settings={state.settings} />;
   else if (current?.id === 'storage')
     body = <Storage settings={state.settings} />;
+  else if (current?.id === 'remote')
+    body = <Remote settings={state.settings} remote={state.remote} />;
   else if (current?.id === 'shortcuts') body = <Shortcuts />;
   else if (current?.id === 'snippets')
     body = <Snippets settings={state.settings} />;

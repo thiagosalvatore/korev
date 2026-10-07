@@ -51,6 +51,10 @@ A repository's `[git]` table overrides these. See [Repository config](repository
 
 **Workspaces location** is the folder that holds every worktree. Default: `~/korev/workspaces`.
 
+## Remote access
+
+Lets a phone on your Tailscale network use Korev. See [Remote access](remote-access.md).
+
 ## Snippets
 
 Saved text you insert into the composer with ⌘;.

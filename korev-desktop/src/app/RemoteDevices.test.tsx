@@ -1,32 +1,49 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { RemoteStatus } from '../shared/model';
 import { RemoteDevices } from './RemoteDevices';
 
 afterEach(cleanup);
 
 const ADDRESS = '100.101.102.103:7420';
+const OFF: RemoteStatus = {
+  address: null,
+  devices: [],
+  onTailnet: false,
+  error: null,
+};
+
+function renderStatus(remote: Partial<RemoteStatus>, onOpen = vi.fn()) {
+  render(<RemoteDevices remote={{ ...OFF, ...remote }} onOpen={onOpen} />);
+  return screen.queryByRole('button');
+}
 
 describe('RemoteDevices', () => {
   it('shows nothing while remote access is off', () => {
-    render(<RemoteDevices remote={{ address: null, devices: [] }} />);
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(renderStatus({})).toBeNull();
   });
 
   it('says remote access is on when no device is connected', () => {
-    render(<RemoteDevices remote={{ address: ADDRESS, devices: [] }} />);
-    expect(screen.getByRole('status').getAttribute('aria-label')).toBe(
+    expect(renderStatus({ address: ADDRESS })?.getAttribute('aria-label')).toBe(
       `Remote access is on at ${ADDRESS}. No device is connected.`,
     );
   });
 
-  it('names the connected devices', () => {
-    render(
-      <RemoteDevices
-        remote={{ address: ADDRESS, devices: ['iPhone', 'iPad'] }}
-      />,
-    );
-    const status = screen.getByRole('status');
-    expect(status.getAttribute('aria-label')).toBe('Connected: iPhone, iPad');
-    expect(status.textContent).toBe('2');
+  it('names the connected devices and opens remote settings', () => {
+    const onOpen = vi.fn();
+    const button = renderStatus(
+      { address: ADDRESS, devices: ['iPhone', 'iPad'] },
+      onOpen,
+    )!;
+    expect(button.getAttribute('aria-label')).toBe('Connected: iPhone, iPad');
+    expect(button.textContent).toBe('2');
+    fireEvent.click(button);
+    expect(onOpen).toHaveBeenCalled();
+  });
+
+  it('says why remote access did not start', () => {
+    expect(
+      renderStatus({ error: 'listen EADDRINUSE' })?.getAttribute('aria-label'),
+    ).toBe('Remote access did not start: listen EADDRINUSE');
   });
 });

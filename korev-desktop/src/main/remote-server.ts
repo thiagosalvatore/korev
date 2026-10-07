@@ -1,5 +1,4 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { timingSafeEqual } from 'node:crypto';
 import {
   createServer,
   type IncomingMessage,
@@ -45,8 +44,6 @@ const REMOTE_EVENTS: ReadonlySet<keyof KorevEvents> = new Set([
 
 export const DEFAULT_REMOTE_PORT = 7420;
 export const LOOPBACK_HOST = '127.0.0.1';
-const TOKEN_BYTES = 32;
-const TOKEN_FILE_MODE = 0o600;
 const MAX_BODY_BYTES = 1024 * 1024;
 const DEVICE_HEADER = 'x-korev-device';
 const MAX_DEVICE_NAME_LENGTH = 64;
@@ -95,14 +92,6 @@ function remoteHandlers(api: Partial<KorevApi>): IpcHandlers {
       api[method],
     ]),
   ) as IpcHandlers;
-}
-
-export async function loadRemoteToken(tokenPath: string): Promise<string> {
-  const saved = await readFile(tokenPath, 'utf8').catch(() => '');
-  if (saved.trim()) return saved.trim();
-  const token = randomBytes(TOKEN_BYTES).toString('base64url');
-  await writeFile(tokenPath, token, { mode: TOKEN_FILE_MODE });
-  return token;
 }
 
 interface NetworkAddress {

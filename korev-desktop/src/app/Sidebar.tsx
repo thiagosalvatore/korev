@@ -1037,7 +1037,10 @@ export function Sidebar({ state }: { state: AppState }) {
             </button>
           )}
         />
-        <RemoteDevices remote={state.remote} />
+        <RemoteDevices
+          remote={state.remote}
+          onOpen={() => openSettings('remote')}
+        />
         <IconButton
           icon="settings"
           label="Settings"

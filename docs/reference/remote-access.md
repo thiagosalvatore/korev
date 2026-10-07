@@ -8,18 +8,34 @@ nav_order: 9
 
 Remote access lets another device, such as a phone, use Korev on your Mac. The other device and the Mac must be on the same [Tailscale](https://tailscale.com) network.
 
-Remote access is off by default. To turn it on, set `"remoteAccess": true` in the `settings` object of `~/Library/Application Support/Korev/korev-state.json`, then restart Korev.
+## Turn it on
 
-When remote access is on, Korev listens on the Mac's Tailscale address. If Tailscale is not running when Korev starts, Korev listens on `127.0.0.1` only.
+1. Open **Settings → Remote access**.
+2. Turn on **Remote access**.
+3. Click **Show code** and scan the code with the Korev app.
+
+When remote access is on, Korev listens on the Mac's Tailscale address. If Tailscale is not running, Korev listens on `127.0.0.1` only, and the page says so. Start Tailscale, then turn remote access off and on again.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `remoteAccess` | `false` | Start the remote access server when Korev starts |
-| `remotePort` | `7420` | The port the server listens on |
+| Remote access | Off | Start the remote access server |
+| Port | `7420` | The port the server listens on. It must be from 1024 to 65535. Korev restarts the server when you change it. |
+
+## Pairing code
+
+The pairing code is a QR code that holds this JSON:
+
+```json
+{ "url": "http://100.101.102.103:7420", "token": "<token>" }
+```
+
+Anyone who has the code can use Korev on your Mac. Do not share it.
 
 ## Token
 
-Every request must send `Authorization: Bearer <token>`. Korev makes the token the first time remote access starts. It is in `~/Library/Application Support/Korev/remote-token`, and only your user can read the file. To revoke every device, delete the file and restart Korev.
+Every request must send `Authorization: Bearer <token>`. Korev makes the token the first time remote access starts. It is in `~/Library/Application Support/Korev/remote-token`, and only your user can read the file.
+
+To disconnect every device, click **Revoke all** in **Settings → Remote access**. Korev makes a new token, and each device must scan the new pairing code.
 
 ## Calls
 
@@ -49,7 +65,7 @@ The arguments for each method are the same as in `KorevApi` in `korev-desktop/sr
 
 ## Connected devices
 
-A device counts as connected while its `/events` stream is open. While remote access is on, a phone icon shows next to Settings at the bottom of the sidebar. The icon is green and shows a count when one or more devices are connected. Hold the pointer on the icon to see their names.
+A device counts as connected while its `/events` stream is open. While remote access is on, a phone icon shows next to Settings at the bottom of the sidebar. The icon is green and shows a count when one or more devices are connected. It is red if the server did not start. Hold the pointer on the icon to see the device names, or click it to open **Settings → Remote access**.
 
 To give a device a name, send the `X-Korev-Device` header on `/events`, for example `X-Korev-Device: My iPhone`. If a device sends no name, Korev shows its IP address.
 

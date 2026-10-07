@@ -11,6 +11,7 @@ import type {
   IssueSummary,
   PermissionResponse,
   PullRequestSummary,
+  RemotePairing,
   RepoConfig,
   ReviewComment,
   SearchMatch,
@@ -151,6 +152,8 @@ export interface KorevApi {
   openIn(workspaceId: string, editor: EditorId): Promise<Result>;
   openExternal(url: string): Promise<void>;
   updateSettings(patch: Partial<Settings>): Promise<void>;
+  remotePairing(): Promise<RemotePairing | null>;
+  revokeRemoteDevices(): Promise<void>;
   openTerminal(
     ref: string,
     workspaceId: string,

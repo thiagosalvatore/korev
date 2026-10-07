@@ -27,13 +27,8 @@ import { nodeFileSystem } from './main/file-system';
 import { registerIpcHandlers } from './main/ipc';
 import { createKorev, type Korev } from './main/korev';
 import { childEnv, resolveLoginPath } from './main/login-path';
-import {
-  loadRemoteToken,
-  LOOPBACK_HOST,
-  startRemoteServer,
-  tailnetAddress,
-  type RemoteServer,
-} from './main/remote-server';
+import { createRemoteAccess } from './main/remote-access';
+import { LOOPBACK_HOST, tailnetAddress } from './main/remote-server';
 import { restorableBounds } from './main/window-bounds';
 
 const DEFAULT_WINDOW_SIZE = { width: 1440, height: 900 };
@@ -65,36 +60,20 @@ function useSeparateDevData() {
 
 useSeparateDevData();
 
-let remote: RemoteServer | null = null;
-let remoteAddress: string | null = null;
+let korevApp: Korev | null = null;
+
+const remote = createRemoteAccess({
+  tokenPath: path.join(app.getPath('userData'), REMOTE_TOKEN_FILE),
+  api: () => korevApp?.api ?? {},
+  host: () => tailnetAddress(networkInterfaces()) ?? LOOPBACK_HOST,
+  onChange: () => korevApp?.emitState(),
+});
 
 function emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]) {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send(eventChannel(event), payload);
   }
-  remote?.broadcast(event, payload);
-}
-
-async function startRemoteAccess(korev: Korev) {
-  const { remoteAccess, remotePort } = korev.settings();
-  if (!remoteAccess) return;
-  const token = await loadRemoteToken(
-    path.join(app.getPath('userData'), REMOTE_TOKEN_FILE),
-  );
-  const host = tailnetAddress(networkInterfaces()) ?? LOOPBACK_HOST;
-  try {
-    remote = await startRemoteServer({
-      api: korev.api,
-      token,
-      host,
-      port: remotePort,
-      onDevicesChange: () => korev.emitState(),
-    });
-    remoteAddress = `${host}:${remote.port}`;
-    korev.emitState();
-  } catch (error) {
-    console.warn(`Remote access did not start: ${String(error)}`);
-  }
+  remote.broadcast(event, payload);
 }
 
 function sendToFocusedWindow(command: AppCommand) {
@@ -170,8 +149,7 @@ async function chooseDirectory(): Promise<string | null> {
 async function createKorevApp(): Promise<Korev> {
   const loginPath = await resolveLoginPath(runProcess, process.env);
   const env = childEnv(process.env, loginPath);
-  let korev: Korev | null = null;
-  korev = await createKorev({
+  const korev = await createKorev({
     run: runProcess,
     env,
     shell: process.env.SHELL,
@@ -180,7 +158,7 @@ async function createKorevApp(): Promise<Korev> {
     fs: nodeFileSystem,
     spawnPty,
     emit,
-    notify: (notice) => showNotice(() => korev, notice),
+    notify: (notice) => showNotice(() => korevApp, notice),
     playSound,
     isWindowFocused: () => BrowserWindow.getFocusedWindow() !== null,
     setBadge: (count) => app.setBadgeCount(count),
@@ -198,11 +176,9 @@ async function createKorevApp(): Promise<Korev> {
     applyTheme: (theme) => {
       nativeTheme.themeSource = theme;
     },
-    remoteStatus: () => ({
-      address: remoteAddress,
-      devices: remote?.devices() ?? [],
-    }),
+    remote,
   });
+  korevApp = korev;
   nativeTheme.themeSource = korev.settings().theme;
   return korev;
 }
@@ -322,12 +298,12 @@ app.whenReady().then(async () => {
     }
     shuttingDown = true;
     event.preventDefault();
-    void Promise.all([korev.shutdown(), remote?.close()]).finally(() =>
+    void Promise.all([korev.shutdown(), remote.close()]).finally(() =>
       app.quit(),
     );
   });
   createWindow(korev);
-  void startRemoteAccess(korev);
+  void remote.apply(korev.settings());
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
