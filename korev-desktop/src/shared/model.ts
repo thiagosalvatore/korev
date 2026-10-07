@@ -581,14 +581,34 @@ export interface PermissionResponse {
 
 export const PLAN_TOOL = 'ExitPlanMode';
 
+export function planOf(items: ChatItem[]): string | null {
+  const planTool = items.findLast(
+    (item) => item.kind === 'tool' && item.name === PLAN_TOOL,
+  );
+  return planTool?.kind === 'tool' && planTool.detail ? planTool.detail : null;
+}
+
+export function conversationText(
+  items: ChatItem[],
+  itemChars = Infinity,
+): string {
+  return items
+    .flatMap((item) => {
+      if (item.kind === 'user')
+        return [`User: ${item.text.slice(0, itemChars)}`];
+      if (item.kind === 'assistant')
+        return [`Assistant: ${item.text.slice(0, itemChars)}`];
+      return [];
+    })
+    .join('\n\n');
+}
+
 export function latestPlan(items: ChatItem[]): string | null {
   const reply = items.slice(
     items.findLastIndex((item) => item.kind === 'user') + 1,
   );
-  const planTool = reply.findLast(
-    (item) => item.kind === 'tool' && item.name === PLAN_TOOL,
-  );
-  if (planTool?.kind === 'tool' && planTool.detail) return planTool.detail;
+  const plan = planOf(reply);
+  if (plan) return plan;
   const text = reply
     .flatMap((item) => (item.kind === 'assistant' ? [item.text] : []))
     .join('\n\n')

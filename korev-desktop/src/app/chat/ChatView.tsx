@@ -204,6 +204,10 @@ export function ChatView({
             running={running}
             workspaceId={workspace?.id ?? null}
             comments={comments}
+            otherTabs={
+              workspace?.sessions.filter((entry) => entry.id !== session.id) ??
+              []
+            }
             placeholder={placeholder}
             autoFocus
             usage={{

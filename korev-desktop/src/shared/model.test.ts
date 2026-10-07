@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   answerQuestions,
+  conversationText,
   finishedCodexPlan,
   planLanes,
+  planOf,
+  PLAN_TOOL,
   prBadge,
   type AgentQuestion,
   type ChatItem,
@@ -120,5 +123,55 @@ describe('finishedCodexPlan', () => {
     expect(
       finishedCodexPlan({ ...session, planMode: false }, turn(true), false),
     ).toBeNull();
+  });
+});
+
+describe('planOf and conversationText', () => {
+  const user = (text: string): ChatItem => ({
+    id: text,
+    kind: 'user',
+    text,
+    at: '',
+    checkpoint: null,
+  });
+  const assistant = (text: string): ChatItem => ({
+    id: text,
+    kind: 'assistant',
+    text,
+  });
+  const planTool = (plan: string): ChatItem => ({
+    id: plan,
+    kind: 'tool',
+    name: PLAN_TOOL,
+    summary: '',
+    detail: plan,
+    output: null,
+    failed: false,
+  });
+
+  it('finds the last plan, even after later turns', () => {
+    const items = [
+      user('plan it'),
+      planTool('first plan'),
+      user('change step 2'),
+      planTool('second plan'),
+      user('go'),
+      assistant('done'),
+    ];
+    expect(planOf(items)).toBe('second plan');
+  });
+
+  it('finds no plan in a chat without one', () => {
+    expect(planOf([user('hi'), assistant('hello')])).toBeNull();
+  });
+
+  it('keeps only user and assistant messages, in full', () => {
+    const items = [user('hello there'), planTool('a plan'), assistant('hi')];
+    expect(conversationText(items)).toBe('User: hello there\n\nAssistant: hi');
+  });
+
+  it('cuts each message to the given length', () => {
+    const items = [user('hello there'), assistant('hi')];
+    expect(conversationText(items, 5)).toBe('User: hello\n\nAssistant: hi');
   });
 });

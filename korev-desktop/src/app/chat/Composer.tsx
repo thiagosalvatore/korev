@@ -20,6 +20,7 @@ import { api } from '../bridge';
 import { fileName } from '../../shared/format';
 import { reportFailure } from '../ui/toast';
 import type { DiffComment } from '../ui-store';
+import { readAsBase64 } from './attachments';
 import { ComposerToolbar } from './ComposerToolbar';
 import {
   applySuggestion,
@@ -28,6 +29,12 @@ import {
   type Suggestions,
   type SuggestionTrigger,
 } from './suggestions';
+import {
+  TabContextPicker,
+  type ContextTab,
+  type TabContext,
+  type TabContextKind,
+} from './TabContextPicker';
 
 const DRAFT_PREFIX = 'korev:draft:';
 const MAX_TEXTAREA_PX = 320;
@@ -39,6 +46,17 @@ const SUGGESTION_ICONS: Record<
   '/': 'slash',
   '#': 'git-pull-request',
   snippet: 'text-quote',
+};
+const TAB_CONTEXT_LABELS: Record<TabContextKind, string> = {
+  plan: 'Plan',
+  transcript: 'Transcript',
+};
+const TAB_CONTEXT_ICONS: Record<
+  TabContextKind,
+  'list-checks' | 'message-square'
+> = {
+  plan: 'list-checks',
+  transcript: 'message-square',
 };
 
 export function loadDraft(key: string): string {
@@ -64,13 +82,9 @@ function formatAttachments(paths: string[]): string {
   return `\n\nAttached files (read them):\n${paths.map((file) => `- ${file}`).join('\n')}`;
 }
 
-function readAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
+function formatTabContext(contexts: TabContext[]): string {
+  if (!contexts.length) return '';
+  return `\n\nContext from other tabs:\n\n${contexts.map((context) => context.prompt).join('\n\n')}`;
 }
 
 function nextEffort(agent: AgentKind, effort: string): string {
@@ -92,6 +106,7 @@ export interface ComposerProps {
   workspaceId: string | null;
   repoId: string | null;
   comments?: DiffComment[];
+  otherTabs?: ContextTab[];
   placeholder?: string;
   autoFocus?: boolean;
   usage?: TurnUsage;
@@ -112,9 +127,11 @@ export function Composer(props: ComposerProps) {
     running,
     planMode,
     comments = [],
+    otherTabs = [],
   } = props;
   const [text, setText] = useState(() => loadDraft(draftKey));
   const [attachments, setAttachments] = useState<string[]>([]);
+  const [tabContext, setTabContext] = useState<TabContext[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestions | null>(null);
   const [sending, setSending] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -127,6 +144,7 @@ export function Composer(props: ComposerProps) {
   useEffect(() => {
     setText(loadDraft(draftKey));
     setAttachments([]);
+    setTabContext([]);
   }, [draftKey]);
 
   useEffect(() => {
@@ -169,18 +187,31 @@ export function Composer(props: ComposerProps) {
     }
   }
 
-  const canSend = Boolean(text.trim() || comments.length) && !sending;
+  function addTabContext(context: TabContext) {
+    setTabContext((current) =>
+      current.some((entry) => entry.key === context.key)
+        ? current
+        : [...current, context],
+    );
+  }
+
+  const canSend =
+    Boolean(text.trim() || comments.length || tabContext.length) && !sending;
 
   async function send() {
     if (!canSend) return;
     setSending(true);
     const message =
-      text.trim() + formatComments(comments) + formatAttachments(attachments);
+      text.trim() +
+      formatComments(comments) +
+      formatAttachments(attachments) +
+      formatTabContext(tabContext);
     const sent = await props.onSend(message);
     setSending(false);
     if (!sent) return;
     update('');
     setAttachments([]);
+    setTabContext([]);
     props.onClearComments?.();
   }
 
@@ -306,7 +337,7 @@ export function Composer(props: ComposerProps) {
           planMode ? 'border-dashed border-accent-border' : 'border-border-2',
         )}
       >
-        {attachments.length || comments.length ? (
+        {attachments.length || comments.length || tabContext.length ? (
           <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
             {comments.length ? (
               <span className="inline-flex h-6 items-center gap-1.5 rounded-sm bg-accent-subtle px-2 text-xs text-accent-text">
@@ -343,6 +374,30 @@ export function Composer(props: ComposerProps) {
                 </button>
               </span>
             ))}
+            {tabContext.map((context) => {
+              const label = `${TAB_CONTEXT_LABELS[context.kind]} · ${context.tabTitle}`;
+              return (
+                <span
+                  key={context.key}
+                  className="inline-flex h-6 max-w-72 items-center gap-1.5 rounded-sm bg-accent-subtle px-2 text-xs text-accent-text"
+                >
+                  <Icon name={TAB_CONTEXT_ICONS[context.kind]} size={12} />
+                  <span className="truncate">{label}</span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${label}`}
+                    className="cursor-pointer border-0 bg-transparent p-0 text-accent-text"
+                    onClick={() =>
+                      setTabContext((current) =>
+                        current.filter((entry) => entry.key !== context.key),
+                      )
+                    }
+                  >
+                    <Icon name="x" size={12} />
+                  </button>
+                </span>
+              );
+            })}
           </div>
         ) : null}
         <textarea
@@ -387,6 +442,15 @@ export function Composer(props: ComposerProps) {
           running={running}
           canSend={canSend}
           usage={props.usage}
+          contextPicker={
+            otherTabs.length ? (
+              <TabContextPicker
+                workspaceId={workspaceId}
+                tabs={otherTabs}
+                onPick={addTabContext}
+              />
+            ) : null
+          }
           onAttach={() => picker.current?.click()}
           onInsertSnippet={openSnippets}
           onModelChange={props.onModelChange}

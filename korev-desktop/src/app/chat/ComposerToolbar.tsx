@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { cn, Icon, IconButton } from '../../design-system';
 import {
   AGENT_LABELS,
@@ -21,6 +22,7 @@ export interface ComposerToolbarProps {
   running: boolean;
   canSend: boolean;
   usage?: TurnUsage;
+  contextPicker?: ReactNode;
   onAttach(): void;
   onInsertSnippet(): void;
   onModelChange(choice: ModelChoice): void;
@@ -123,6 +125,7 @@ export function ComposerToolbar(props: ComposerToolbarProps) {
         size="sm"
         onClick={props.onAttach}
       />
+      {props.contextPicker}
       <Menu
         label="Model"
         side="top"

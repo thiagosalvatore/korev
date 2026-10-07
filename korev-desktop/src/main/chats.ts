@@ -1,5 +1,6 @@
 import { mkdir } from 'node:fs/promises';
 import {
+  conversationText,
   hasWorktree,
   PLAN_TOOL,
   type AskChat,
@@ -76,15 +77,9 @@ const STATUSES_KEPT_BY_TURNS = new Set([
 ]);
 
 export function replayPrompt(history: ChatItem[], text: string): string {
-  const lines = history.flatMap((item) => {
-    if (item.kind === 'user')
-      return [`User: ${item.text.slice(0, REPLAY_ITEM_CHARS)}`];
-    if (item.kind === 'assistant')
-      return [`Assistant: ${item.text.slice(0, REPLAY_ITEM_CHARS)}`];
-    return [];
-  });
-  if (!lines.length) return text;
-  const transcript = lines.join('\n\n').slice(-REPLAY_TOTAL_CHARS);
+  const conversation = conversationText(history, REPLAY_ITEM_CHARS);
+  if (!conversation) return text;
+  const transcript = conversation.slice(-REPLAY_TOTAL_CHARS);
   return `<previous-conversation>\nHere is the conversation so far, for context:\n\n${transcript}\n</previous-conversation>\n\n${text}`;
 }
 

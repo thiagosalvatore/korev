@@ -11,6 +11,7 @@ import { cn, Icon, Kbd, type IconName } from '../../design-system';
 export interface MenuItem {
   id: string;
   label: ReactNode;
+  ariaLabel?: string;
   icon?: IconName;
   hint?: string;
   checked?: boolean;
@@ -100,6 +101,7 @@ export function Menu({
                 <button
                   type="button"
                   role="menuitem"
+                  aria-label={item.ariaLabel}
                   disabled={item.disabled}
                   className={cn(
                     'flex h-7 w-full cursor-pointer items-center gap-2 rounded-sm border-0 bg-transparent px-2 text-left text-sm text-fg-1 hover:bg-hover disabled:cursor-default disabled:opacity-40',
