@@ -2,16 +2,17 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { KorevApi } from '../shared/api';
-import type {
-  AgentAvailability,
-  AppState,
-  EditorApp,
-  EditorId,
-  Repo,
-  Result,
-  Settings,
-  WorkspaceRuntime,
-  WorkspaceStatus,
+import {
+  hasWorktree,
+  type AgentAvailability,
+  type AppState,
+  type EditorApp,
+  type EditorId,
+  type Repo,
+  type Result,
+  type Settings,
+  type WorkspaceRuntime,
+  type WorkspaceStatus,
 } from '../shared/model';
 import { detectAgents } from './agents';
 import { createChats } from './chats';
@@ -123,6 +124,7 @@ const IDLE: WorkspaceRuntime = {
   stats: null,
   pr: null,
   message: null,
+  pendingPrompt: null,
 };
 
 function ok<T>(value: T): Result<T> {
@@ -246,6 +248,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   function workspacePath(workspaceId: string) {
     const workspace = ctx.workspace(workspaceId);
     if (workspace.archivedAt) throw new Error('Workspace is archived');
+    if (!hasWorktree(ctx.runtime(workspaceId)))
+      throw new Error('Workspace has no worktree yet');
     return workspace;
   }
 
@@ -329,7 +333,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       store.save();
       ctx.emitState();
     },
-    createWorkspace: (repoId) => createWorkspace(ctx, repoId),
+    createWorkspace: async (repoId, task) =>
+      createWorkspace(ctx, repoId, task, chats.send),
     archiveWorkspace: (workspaceId) =>
       archiveWorkspace(ctx, workspaceId, chats.stopWorkspace),
     restoreWorkspace: (workspaceId) => restoreWorkspace(ctx, workspaceId),

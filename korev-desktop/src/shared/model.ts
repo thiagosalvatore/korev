@@ -117,7 +117,13 @@ export interface WindowBounds {
   height: number;
 }
 
-export type WorkspaceStatus = 'idle' | 'setting-up' | 'working' | 'error';
+export type WorkspaceStatus =
+  | 'idle'
+  | 'creating'
+  | 'failed'
+  | 'setting-up'
+  | 'working'
+  | 'error';
 
 export interface DiffStats {
   additions: number;
@@ -150,6 +156,11 @@ export interface WorkspaceRuntime {
   stats: DiffStats | null;
   pr: PrStatus | null;
   message: string | null;
+  pendingPrompt: string | null;
+}
+
+export function hasWorktree(runtime: WorkspaceRuntime): boolean {
+  return runtime.status !== 'creating' && runtime.status !== 'failed';
 }
 
 export interface AgentAvailability {

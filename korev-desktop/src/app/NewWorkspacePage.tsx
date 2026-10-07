@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Icon } from '../design-system';
 import { AGENT_LABELS, type AppState } from '../shared/model';
-import { createWorkspaceAndSend, selectWorkspace } from './actions';
+import { createWorkspace, selectWorkspace } from './actions';
 import { Composer } from './chat/Composer';
 import { timeAgo } from './format';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
@@ -44,7 +44,7 @@ export function NewWorkspacePage({
   async function create(text: string | null) {
     if (!repo) return false;
     setCreating(true);
-    const workspace = await createWorkspaceAndSend(
+    const workspace = await createWorkspace(
       repo.id,
       text ? { text, model, effort, planMode } : null,
     );

@@ -3,25 +3,8 @@ import {
   allocatePort,
   FIRST_PORT,
   parseProjectConfig,
-  pickWorkspaceName,
   PORTS_PER_WORKSPACE,
 } from './workspace-setup';
-
-describe('workspace names', () => {
-  it('picks a city that is not taken', () => {
-    expect(pickWorkspaceName(new Set(['abuja']), () => 0)).toBe('accra');
-  });
-
-  it('adds a version suffix when every city is taken', () => {
-    const everyCity = new Set<string>();
-    let name = pickWorkspaceName(everyCity, () => 0);
-    while (!name.includes('-v')) {
-      everyCity.add(name);
-      name = pickWorkspaceName(everyCity, () => 0);
-    }
-    expect(name).toBe('abuja-v2');
-  });
-});
 
 describe('ports', () => {
   it('gives each workspace its own block of ten ports', () => {

@@ -234,7 +234,7 @@ function Git({ settings }: { settings: Settings }) {
     <>
       <Row
         title="Branch prefix"
-        description="New branches are named prefix/city. Leave empty to use your GitHub username."
+        description="New branches are named prefix/task-name. Leave empty to use your GitHub username."
       >
         <TextSetting
           value={settings.branchPrefix}
@@ -246,8 +246,8 @@ function Git({ settings }: { settings: Settings }) {
         />
       </Row>
       <Row
-        title="Automatically rename new branches"
-        description="After the first message, rename the placeholder branch to describe the task."
+        title="Name workspaces from the task"
+        description="Let Claude Haiku name each workspace and branch from its task. When off, the first words of the task are used."
       >
         <Switch
           checked={settings.autoRenameBranches}
@@ -273,7 +273,7 @@ function Storage({ settings }: { settings: Settings }) {
   return (
     <Row
       title="Workspaces location"
-      description="New workspaces are created at <location>/<repo>/<city>."
+      description="New workspaces are created at <location>/<repo>/<task-name>."
     >
       <TextSetting
         value={settings.workspacesRoot}

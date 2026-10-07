@@ -27,7 +27,10 @@ export interface KorevApi {
   removeRepo(repoId: string): Promise<void>;
   updateRepo(repoId: string, patch: { defaultBranch?: string }): Promise<void>;
   updateRepoScripts(repoId: string, scripts: RepoScripts): Promise<void>;
-  createWorkspace(repoId: string): Promise<Result<Workspace>>;
+  createWorkspace(
+    repoId: string,
+    task: SendOptions | null,
+  ): Promise<Result<Workspace>>;
   archiveWorkspace(workspaceId: string): Promise<Result>;
   restoreWorkspace(workspaceId: string): Promise<Result>;
   deleteWorkspace(workspaceId: string): Promise<void>;

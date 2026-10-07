@@ -23,7 +23,7 @@ Three columns, like Conductor:
 - **Left sidebar** (`--sidebar-w`): Search (⌘K), New workspace (⌘N), then one group per
   repository with its workspaces, then History (archived workspaces), then Add repository
   and Settings.
-- **Centre**: the workspace header (city name, branch, target branch, Open in, PR number,
+- **Centre**: the workspace header (workspace name, branch, target branch, Open in, PR number,
   the next git action), a tab strip (chats, Changes, open files) and the active tab.
 - **Right panel** (`--panel-w`): the git panel (All files / Changes / Checks) on top and
   the terminal panel (Setup / Run / Terminal) below.
@@ -31,7 +31,7 @@ Three columns, like Conductor:
 ## Workspace row
 
 - Line 1: the branch name, bold when the workspace has unread agent output.
-- Line 2: the city name, then the setup error if setup failed.
+- Line 2: the workspace name, then the error if setup or worktree creation failed.
 - Left icon: spinner while an agent or the setup script runs; otherwise the PR state
   (green open, red failing checks, amber conflicts or running checks, purple merged);
   otherwise a branch icon.

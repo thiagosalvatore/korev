@@ -1,4 +1,3 @@
-import { tmpdir } from 'node:os';
 import type {
   ChatItem,
   ChatSession,
@@ -17,9 +16,9 @@ import {
   hasUpstream,
   renameBranch,
   restoreCheckpoint,
-  slugify,
 } from './git';
-import { isUntitled, refreshStats, scriptEnv } from './workspaces';
+import { isUntitledName } from './workspace-setup';
+import { isUntitled, refreshStats, scriptEnv, suggestName } from './workspaces';
 
 const TURN_TIMEOUT_MS = 12 * 60 * 60_000;
 const TITLE_MAX_CHARS = 32;
@@ -27,11 +26,6 @@ const SAVE_EVERY_ITEMS = 20;
 const STDERR_TAIL_CHARS = 2_000;
 const REPLAY_ITEM_CHARS = 2_000;
 const REPLAY_TOTAL_CHARS = 24_000;
-const RENAME_TIMEOUT_MS = 60_000;
-const RENAME_MODEL = 'claude-haiku-4-5';
-const BRANCH_NAME_MAX_CHARS = 40;
-const RENAME_TASK_CHARS = 4_000;
-
 export function replayPrompt(history: ChatItem[], text: string): string {
   const lines = history.flatMap((item) => {
     if (item.kind === 'user')
@@ -44,25 +38,6 @@ export function replayPrompt(history: ChatItem[], text: string): string {
   const transcript = lines.join('\n\n').slice(-REPLAY_TOTAL_CHARS);
   return `<previous-conversation>\nThis chat was reset to an earlier point. Here is the conversation so far, for context:\n\n${transcript}\n</previous-conversation>\n\n${text}`;
 }
-
-const RENAME_SYSTEM_PROMPT =
-  'You name git branches. Given a task, reply with a 2 to 4 word lowercase kebab-case branch name and nothing else.';
-const RENAME_ARGS = [
-  '-p',
-  '--model',
-  RENAME_MODEL,
-  '--no-session-persistence',
-  '--output-format',
-  'text',
-  '--tools',
-  '',
-  '--setting-sources',
-  '',
-  '--disable-slash-commands',
-  '--strict-mcp-config',
-  '--system-prompt',
-  RENAME_SYSTEM_PROMPT,
-];
 
 export function systemPrompt(repo: Repo, workspace: Workspace): string {
   return [
@@ -265,21 +240,9 @@ export function createChats(ctx: Context): Chats {
   }
 
   function isPlaceholderBranch(workspace: Workspace) {
-    return workspace.branch.split('/').at(-1) === workspace.name;
-  }
-
-  async function suggestBranchName(workspace: Workspace, text: string) {
-    const result = await ctx.deps.run('claude', RENAME_ARGS, {
-      cwd: tmpdir(),
-      env: ctx.deps.env,
-      stdin: `Task:\n${text.slice(0, RENAME_TASK_CHARS)}`,
-      timeoutMs: RENAME_TIMEOUT_MS,
-    });
-    if (result.exitCode !== 0) return null;
     return (
-      slugify(result.stdout.trim().split('\n').at(-1) ?? '')
-        .slice(0, BRANCH_NAME_MAX_CHARS)
-        .replace(/-+$/, '') || null
+      isUntitledName(workspace.name) &&
+      workspace.branch.split('/').at(-1) === workspace.name
     );
   }
 
@@ -290,7 +253,7 @@ export function createChats(ctx: Context): Chats {
     )
       return;
     try {
-      const suggestion = await suggestBranchName(workspace, text);
+      const suggestion = await suggestName(ctx, text);
       if (!suggestion || !isPlaceholderBranch(workspace)) return;
       if (await hasUpstream(ctx.git, workspace.path)) return;
       const prefix = workspace.branch.split('/').slice(0, -1).join('/');

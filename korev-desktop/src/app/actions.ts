@@ -93,24 +93,14 @@ export async function closeTab(workspace: Workspace, key: string) {
     updateWorkspaceUi(workspace.id, () => ({ activeKey: null }));
 }
 
-export async function createWorkspaceAndSend(
+export async function createWorkspace(
   repoId: string,
-  options: SendOptions | null,
+  task: SendOptions | null,
 ) {
-  const created = await api.createWorkspace(repoId);
+  const created = await api.createWorkspace(repoId, task);
   if (!reportFailure(created)) return null;
-  const workspace = created.value;
-  selectWorkspace(workspace.id);
-  const [session] = workspace.sessions;
-  if (options && session) {
-    reportFailure(
-      await api.send(session.id, {
-        ...options,
-        model: options.model || session.model,
-      }),
-    );
-  }
-  return workspace;
+  selectWorkspace(created.value.id);
+  return created.value;
 }
 
 export async function archiveWorkspace(state: AppState, workspace: Workspace) {

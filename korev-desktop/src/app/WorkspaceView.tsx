@@ -1,15 +1,24 @@
-import { cn, Icon, IconButton } from '../design-system';
+import { Button, cn, Icon, IconButton } from '../design-system';
 import {
   AGENT_KINDS,
   AGENT_LABELS,
+  hasWorktree,
   type AppState,
   type Workspace,
+  type WorkspaceRuntime,
 } from '../shared/model';
-import { activateTab, closeTab, focusComposer, newChat } from './actions';
+import {
+  activateTab,
+  archiveWorkspace,
+  closeTab,
+  focusComposer,
+  newChat,
+} from './actions';
 import { ChatView } from './chat/ChatView';
 import { DiffView } from './DiffView';
 import { FileView } from './FileView';
 import { fileName } from './format';
+import { DRAG_REGION } from './layout';
 import { GitPanel } from './GitPanel';
 import { CollapsedTerminalBar, TerminalPanel } from './TerminalPanel';
 import { Menu } from './ui/Menu';
@@ -157,7 +166,78 @@ function TabStrip({
   );
 }
 
+function WorkspaceWithoutWorktree({
+  state,
+  workspace,
+  runtime,
+}: {
+  state: AppState;
+  workspace: Workspace;
+  runtime: WorkspaceRuntime;
+}) {
+  const failed = runtime.status === 'failed';
+  return (
+    <div className="flex min-w-0 flex-1 flex-col bg-app">
+      <div className={cn('h-11 flex-none', DRAG_REGION)} />
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+        {failed ? (
+          <Icon name="triangle-alert" size={22} className="text-danger-text" />
+        ) : (
+          <Icon
+            name="loader-circle"
+            size={22}
+            className="animate-spin text-accent-text"
+          />
+        )}
+        <p className="m-0 text-lg font-semibold text-fg-1">
+          {failed ? runtime.message : `Creating ${workspace.name}`}
+        </p>
+        {failed ? null : (
+          <p className="m-0 text-sm text-fg-3">
+            Fetching origin/{workspace.baseBranch} and adding a worktree. You
+            can keep working elsewhere.
+          </p>
+        )}
+        {runtime.pendingPrompt ? (
+          <p className="m-0 max-w-xl rounded-md bg-raised px-3 py-2 text-left text-sm whitespace-pre-wrap text-fg-1">
+            {runtime.pendingPrompt}
+          </p>
+        ) : null}
+        {failed ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="archive"
+            onClick={() => void archiveWorkspace(state, workspace)}
+          >
+            Archive workspace
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function WorkspaceView({
+  state,
+  workspace,
+}: {
+  state: AppState;
+  workspace: Workspace;
+}) {
+  const runtime = state.runtime[workspace.id];
+  if (runtime && !hasWorktree(runtime))
+    return (
+      <WorkspaceWithoutWorktree
+        state={state}
+        workspace={workspace}
+        runtime={runtime}
+      />
+    );
+  return <WorkspaceWithWorktree state={state} workspace={workspace} />;
+}
+
+function WorkspaceWithWorktree({
   state,
   workspace,
 }: {

@@ -101,7 +101,11 @@ function prIcon(pr: PrStatus): {
 }
 
 function StatusIcon({ runtime }: { runtime: WorkspaceRuntime }) {
-  if (runtime.status === 'working' || runtime.status === 'setting-up') {
+  if (
+    runtime.status === 'working' ||
+    runtime.status === 'setting-up' ||
+    runtime.status === 'creating'
+  ) {
     return (
       <Icon
         name="loader-circle"
@@ -110,7 +114,7 @@ function StatusIcon({ runtime }: { runtime: WorkspaceRuntime }) {
       />
     );
   }
-  if (runtime.status === 'error') {
+  if (runtime.status === 'error' || runtime.status === 'failed') {
     return (
       <Icon name="triangle-alert" size={14} className="text-danger-text" />
     );
