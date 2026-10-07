@@ -61,6 +61,7 @@ export interface KorevApi {
   workspaceConfig(workspaceId: string): Promise<RepoConfig>;
   repoConfig(repoId: string): Promise<RepoConfig>;
   listSkills(repoId: string): Promise<Skill[]>;
+  repoIcon(repoId: string): Promise<string | null>;
   startReview(workspaceId: string): Promise<Result<string>>;
   archiveWorkspace(workspaceId: string): Promise<Result>;
   restoreWorkspace(workspaceId: string): Promise<Result>;

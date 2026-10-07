@@ -39,6 +39,7 @@ import {
   listFiles,
   removeWorktree,
   listBranches,
+  originOwner,
   repoRoot,
 } from './git';
 import {
@@ -78,6 +79,23 @@ const ATTACHMENTS_DIR = 'attachments';
 const COMMAND_EXTENSION = '.md';
 const BUILTIN_COMMANDS = ['compact', 'review', 'init'];
 const IMPLEMENT_PLAN_TASK = 'Implement your part of the plan below.';
+const GITHUB_AVATAR_SIZE = 64;
+const GITHUB_AVATAR_TIMEOUT_MS = 10_000;
+
+async function githubAvatar(owner: string): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `https://github.com/${owner}.png?size=${GITHUB_AVATAR_SIZE}`,
+      { signal: AbortSignal.timeout(GITHUB_AVATAR_TIMEOUT_MS) },
+    );
+    if (!response.ok) return null;
+    const type = response.headers.get('content-type') ?? 'image/png';
+    const bytes = Buffer.from(await response.arrayBuffer());
+    return `data:${type};base64,${bytes.toString('base64')}`;
+  } catch {
+    return null;
+  }
+}
 
 async function commandNames(dir: string): Promise<string[]> {
   const entries = await readdir(dir).catch(() => []);
@@ -525,6 +543,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     repoConfig: (repoId) =>
       loadRepoConfig(ctx.repo(repoId), ctx.repo(repoId).path),
     listSkills: (repoId) => listSkills(deps.home, ctx.repo(repoId).path),
+    async repoIcon(repoId) {
+      const owner = await originOwner(git, ctx.repo(repoId).path);
+      return owner ? githubAvatar(owner) : null;
+    },
     async startReview(workspaceId) {
       const workspace = workspacePath(workspaceId);
       const { reviewModel, defaultAgent } = store.state.settings;

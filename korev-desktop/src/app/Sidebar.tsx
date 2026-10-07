@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   Button,
   cn,
@@ -279,7 +279,31 @@ function WorkspaceRow({
   );
 }
 
+const repoIcons = new Map<string, Promise<string | null>>();
+
+function repoIcon(repoId: string): Promise<string | null> {
+  const cached = repoIcons.get(repoId);
+  if (cached) return cached;
+  const icon = api.repoIcon(repoId).catch(() => null);
+  repoIcons.set(repoId, icon);
+  return icon;
+}
+
 function RepoAvatar({ repo }: { repo: Repo }) {
+  const [icon, setIcon] = useState<string | null>(null);
+  useEffect(() => {
+    void repoIcon(repo.id).then(setIcon);
+  }, [repo.id]);
+  if (icon) {
+    return (
+      <img
+        src={icon}
+        alt=""
+        className="size-5 flex-none rounded-xs"
+        onError={() => setIcon(null)}
+      />
+    );
+  }
   return (
     <span className="flex size-5 flex-none items-center justify-center rounded-xs bg-accent-subtle font-mono text-2xs font-semibold text-accent-text uppercase">
       {repo.name.charAt(0)}

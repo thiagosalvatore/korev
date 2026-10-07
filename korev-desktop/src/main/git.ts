@@ -11,6 +11,8 @@ const FALLBACK_BRANCH = 'main';
 const BINARY_STAT = '-';
 const SNAPSHOT_MESSAGE = 'korev checkpoint';
 const CHECKPOINT_REF_PREFIX = 'refs/korev/checkpoints/';
+const GITHUB_REMOTE =
+  /^(?:(?:https?|ssh|git):\/\/)?(?:[^@/]+@)?github\.com[:/]([^/]+)\//;
 
 export class GitError extends Error {
   constructor(args: readonly string[], stderr: string) {
@@ -74,6 +76,18 @@ export async function defaultBranch(git: Git, repo: string): Promise<string> {
   }
   const current = await git.tryRun(repo, ['branch', '--show-current']);
   return current?.trim() || FALLBACK_BRANCH;
+}
+
+export function githubOwner(remoteUrl: string): string | null {
+  return GITHUB_REMOTE.exec(remoteUrl.trim())?.[1] ?? null;
+}
+
+export async function originOwner(
+  git: Git,
+  repo: string,
+): Promise<string | null> {
+  const url = await git.tryRun(repo, ['remote', 'get-url', 'origin']);
+  return url ? githubOwner(url) : null;
 }
 
 export async function cloneRepo(
