@@ -131,6 +131,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       openPath: async () => undefined,
       openExternal: async () => undefined,
       applyTheme: () => undefined,
+      remoteStatus: () => ({ address: null, devices: [] }),
     });
   }
 

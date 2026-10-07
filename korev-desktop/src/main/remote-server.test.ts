@@ -16,12 +16,16 @@ afterEach(async () => {
   server = null;
 });
 
-async function start(api: Record<string, () => unknown>) {
+async function start(
+  api: Record<string, () => unknown>,
+  onDevicesChange = () => undefined,
+) {
   server = await startRemoteServer({
     api,
     token: TOKEN,
     host: LOOPBACK,
     port: ANY_FREE_PORT,
+    onDevicesChange,
   });
   return `http://${LOOPBACK}:${server.port}`;
 }
@@ -71,6 +75,34 @@ describe('remote server', () => {
       'event: toast\ndata: {"title":"Merged","tone":"success"}\n\n',
     );
     await reader.cancel();
+  });
+});
+
+describe('connected devices', () => {
+  function openEvents(base: string, device?: string) {
+    return fetch(`${base}/events`, {
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        ...(device ? { 'x-korev-device': device } : {}),
+      },
+    });
+  }
+
+  it('lists a device while its event stream is open', async () => {
+    const changed = vi.fn();
+    const base = await start({}, changed);
+    const response = await openEvents(base, 'Pixel 9');
+    await vi.waitFor(() => expect(server!.devices()).toEqual(['Pixel 9']));
+    await response.body!.cancel();
+    await vi.waitFor(() => expect(server!.devices()).toEqual([]));
+    expect(changed).toHaveBeenCalledTimes(2);
+  });
+
+  it('names an unnamed device by its address', async () => {
+    const base = await start({});
+    const response = await openEvents(base);
+    await vi.waitFor(() => expect(server!.devices()).toEqual([LOOPBACK]));
+    await response.body!.cancel();
   });
 });
 

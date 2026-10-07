@@ -66,6 +66,7 @@ function useSeparateDevData() {
 useSeparateDevData();
 
 let remote: RemoteServer | null = null;
+let remoteAddress: string | null = null;
 
 function emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]) {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -87,7 +88,10 @@ async function startRemoteAccess(korev: Korev) {
       token,
       host,
       port: remotePort,
+      onDevicesChange: () => korev.emitState(),
     });
+    remoteAddress = `${host}:${remote.port}`;
+    korev.emitState();
   } catch (error) {
     console.warn(`Remote access did not start: ${String(error)}`);
   }
@@ -194,6 +198,10 @@ async function createKorevApp(): Promise<Korev> {
     applyTheme: (theme) => {
       nativeTheme.themeSource = theme;
     },
+    remoteStatus: () => ({
+      address: remoteAddress,
+      devices: remote?.devices() ?? [],
+    }),
   });
   nativeTheme.themeSource = korev.settings().theme;
   return korev;

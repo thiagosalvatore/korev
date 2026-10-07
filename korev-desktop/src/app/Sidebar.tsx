@@ -40,6 +40,7 @@ import {
 import { api } from './bridge';
 import { timeAgo } from './format';
 import { DRAG_REGION, NO_DRAG } from './layout';
+import { RemoteDevices } from './RemoteDevices';
 import { Menu, type MenuItem } from './ui/Menu';
 import { reportFailure } from './ui/toast';
 import { setUi, useUi } from './ui-store';
@@ -1036,6 +1037,7 @@ export function Sidebar({ state }: { state: AppState }) {
             </button>
           )}
         />
+        <RemoteDevices remote={state.remote} />
         <IconButton
           icon="settings"
           label="Settings"

@@ -47,4 +47,10 @@ The arguments for each method are the same as in `KorevApi` in `korev-desktop/sr
 | `chat` | `{ sessionId, item }`. Korev sends the full chat item again each time it changes. |
 | `toast` | `{ title, tone }` |
 
+## Connected devices
+
+A device counts as connected while its `/events` stream is open. While remote access is on, a phone icon shows next to Settings at the bottom of the sidebar. The icon is green and shows a count when one or more devices are connected. Hold the pointer on the icon to see their names.
+
+To give a device a name, send the `X-Korev-Device` header on `/events`, for example `X-Korev-Device: My iPhone`. If a device sends no name, Korev shows its IP address.
+
 An agent waits for an answer to a permission prompt, a question or a plan only while its turn runs. Send `respondPermission` before the turn ends.

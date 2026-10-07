@@ -48,6 +48,9 @@ export const LOOPBACK_HOST = '127.0.0.1';
 const TOKEN_BYTES = 32;
 const TOKEN_FILE_MODE = 0o600;
 const MAX_BODY_BYTES = 1024 * 1024;
+const DEVICE_HEADER = 'x-korev-device';
+const MAX_DEVICE_NAME_LENGTH = 64;
+const UNKNOWN_DEVICE = 'Unknown device';
 const TAILNET_PREFIX_BITS = 10;
 const TAILNET_NETWORK = (100 << 24) | (64 << 16);
 
@@ -64,6 +67,7 @@ export interface RemoteServer {
     event: E,
     payload: KorevEvents[E],
   ): void;
+  devices(): string[];
   close(): Promise<void>;
 }
 
@@ -72,6 +76,7 @@ export interface RemoteServerOptions {
   token: string;
   host: string;
   port: number;
+  onDevicesChange(): void;
 }
 
 class RequestError extends Error {
@@ -178,9 +183,18 @@ async function handleCall(
   }
 }
 
+function deviceName(request: IncomingMessage): string {
+  const named = request.headers[DEVICE_HEADER];
+  const name = typeof named === 'string' ? named.trim() : '';
+  if (name) return name.slice(0, MAX_DEVICE_NAME_LENGTH);
+  return request.socket.remoteAddress ?? UNKNOWN_DEVICE;
+}
+
 function openEventStream(
+  request: IncomingMessage,
   response: ServerResponse,
-  subscribers: Set<ServerResponse>,
+  subscribers: Map<ServerResponse, string>,
+  onDevicesChange: () => void,
 ) {
   response.writeHead(HTTP_OK, {
     'content-type': 'text/event-stream',
@@ -188,14 +202,18 @@ function openEventStream(
     connection: 'keep-alive',
   });
   response.flushHeaders();
-  subscribers.add(response);
-  response.on('close', () => subscribers.delete(response));
+  subscribers.set(response, deviceName(request));
+  onDevicesChange();
+  response.on('close', () => {
+    subscribers.delete(response);
+    onDevicesChange();
+  });
 }
 
 export function startRemoteServer(
   options: RemoteServerOptions,
 ): Promise<RemoteServer> {
-  const subscribers = new Set<ServerResponse>();
+  const subscribers = new Map<ServerResponse, string>();
   const handlers = remoteHandlers(options.api);
   const server = createServer((request, response) => {
     if (!isAuthorized(request, options.token)) {
@@ -207,7 +225,7 @@ export function startRemoteServer(
       return;
     }
     if (request.method === 'GET' && request.url === '/events') {
-      openEventStream(response, subscribers);
+      openEventStream(request, response, subscribers, options.onDevicesChange);
       return;
     }
     sendJson(response, HTTP_NOT_FOUND, { error: 'Not found' });
@@ -221,10 +239,12 @@ export function startRemoteServer(
         broadcast(event, payload) {
           if (!REMOTE_EVENTS.has(event)) return;
           const message = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
-          for (const subscriber of subscribers) subscriber.write(message);
+          for (const subscriber of subscribers.keys())
+            subscriber.write(message);
         },
+        devices: () => [...subscribers.values()],
         close() {
-          for (const subscriber of subscribers) subscriber.end();
+          for (const subscriber of subscribers.keys()) subscriber.end();
           server.closeAllConnections();
           return new Promise((done) => server.close(() => done()));
         },

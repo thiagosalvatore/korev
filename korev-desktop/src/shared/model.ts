@@ -346,6 +346,12 @@ export interface AppState {
   spotlights: Record<string, string>;
   agents: AgentAvailability[];
   editors: EditorApp[];
+  remote: RemoteStatus;
+}
+
+export interface RemoteStatus {
+  address: string | null;
+  devices: string[];
 }
 
 export interface Checkpoint {
