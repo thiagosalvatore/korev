@@ -4,6 +4,7 @@ import {
   cn,
   Dialog,
   Icon,
+  IconButton,
   Input,
   Select,
   Switch,
@@ -16,6 +17,7 @@ import {
   LOADOUT_SIZE,
   loadoutKey,
   type AgentKind,
+  type AppRunScript,
   type AppState,
   type PromptKind,
   type RemotePairing,
@@ -706,8 +708,11 @@ function Shortcuts() {
   );
 }
 
+const SCRIPT_TEXTAREA_CLASS =
+  'resize-y rounded-sm border border-border-2 bg-inset px-2.5 py-2 font-mono text-xs text-fg-1 outline-none focus:border-accent-border';
+
 const SCRIPT_FIELDS: {
-  key: 'setup' | 'run' | 'archive';
+  key: 'setup' | 'archive';
   label: string;
   hint: string;
 }[] = [
@@ -715,11 +720,6 @@ const SCRIPT_FIELDS: {
     key: 'setup',
     label: 'Setup script',
     hint: 'Runs in each new workspace, e.g. npm install.',
-  },
-  {
-    key: 'run',
-    label: 'Run script',
-    hint: 'Started with the Run button (⌘R), e.g. npm run dev -- --port $KOREV_PORT.',
   },
   {
     key: 'archive',
@@ -910,11 +910,81 @@ function ConfigSourceNotice({ repo }: { repo: Repo }) {
   );
 }
 
+function runScriptsProblem(scripts: AppRunScript[]): string | null {
+  const names = scripts.map((script) => script.name.trim());
+  if (scripts.some((script, index) => script.command.trim() && !names[index]))
+    return 'Give every run script a name.';
+  if (new Set(names).size !== names.length)
+    return 'Run script names must be different.';
+  return null;
+}
+
+function RunScriptsEditor({
+  scripts,
+  onChange,
+}: {
+  scripts: AppRunScript[];
+  onChange: (scripts: AppRunScript[]) => void;
+}) {
+  const change = (index: number, edit: Partial<AppRunScript>) =>
+    onChange(
+      scripts.map((script, position) =>
+        position === index ? { ...script, ...edit } : script,
+      ),
+    );
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs font-medium text-fg-2">Run scripts</span>
+      <span className="text-xs text-fg-3">
+        The first one runs on ⌘R. Pick another from the Run tab.
+      </span>
+      {scripts.map((script, index) => (
+        <div key={index} className="flex items-start gap-2">
+          <Input
+            aria-label="Run script name"
+            className="w-36"
+            mono
+            value={script.name}
+            placeholder="frontend"
+            onChange={(event) => change(index, { name: event.target.value })}
+          />
+          <textarea
+            aria-label="Run script command"
+            value={script.command}
+            rows={1}
+            placeholder="npm run dev -- --port $KOREV_PORT"
+            className={cn(SCRIPT_TEXTAREA_CLASS, 'flex-1')}
+            onChange={(event) => change(index, { command: event.target.value })}
+          />
+          <IconButton
+            icon="trash-2"
+            label="Remove run script"
+            onClick={() =>
+              onChange(scripts.filter((_, position) => position !== index))
+            }
+          />
+        </div>
+      ))}
+      <div>
+        <Button
+          size="sm"
+          variant="secondary"
+          icon="plus"
+          onClick={() => onChange([...scripts, { name: '', command: '' }])}
+        >
+          Add run script
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function RepoSettings({ state, repo }: { state: AppState; repo: Repo }) {
   const [scripts, setScripts] = useState<RepoScripts>(repo.scripts);
   const [confirmRemove, setConfirmRemove] = useState(false);
   useEffect(() => setScripts(repo.scripts), [repo.id, repo.scripts]);
   const dirty = JSON.stringify(scripts) !== JSON.stringify(repo.scripts);
+  const problem = runScriptsProblem(scripts.run);
   const workspaceCount = state.workspaces.filter(
     (ws) => ws.repoId === repo.id,
   ).length;
@@ -980,13 +1050,17 @@ function RepoSettings({ state, repo }: { state: AppState; repo: Repo }) {
                 value={scripts[field.key]}
                 rows={2}
                 placeholder={field.hint}
-                className="resize-y rounded-sm border border-border-2 bg-inset px-2.5 py-2 font-mono text-xs text-fg-1 outline-none focus:border-accent-border"
+                className={SCRIPT_TEXTAREA_CLASS}
                 onChange={(event) =>
                   setScripts({ ...scripts, [field.key]: event.target.value })
                 }
               />
             </label>
           ))}
+          <RunScriptsEditor
+            scripts={scripts.run}
+            onChange={(run) => setScripts({ ...scripts, run })}
+          />
           <label className="flex items-center gap-3 text-sm text-fg-2">
             <Switch
               checked={scripts.runMode === 'nonconcurrent'}
@@ -999,18 +1073,27 @@ function RepoSettings({ state, repo }: { state: AppState; repo: Repo }) {
             />
             Stop other workspaces' run scripts when one starts
           </label>
-          <div>
+          <div className="flex items-center gap-3">
             <Button
               size="sm"
               variant="primary"
-              disabled={!dirty}
+              disabled={!dirty || problem !== null}
               onClick={async () => {
-                await api.updateRepoScripts(repo.id, scripts);
+                await api.updateRepoScripts(repo.id, {
+                  ...scripts,
+                  run: scripts.run.map((script) => ({
+                    ...script,
+                    name: script.name.trim(),
+                  })),
+                });
                 toast('Scripts saved', 'success');
               }}
             >
               Save scripts
             </Button>
+            {problem ? (
+              <span className="text-xs text-danger-text">{problem}</span>
+            ) : null}
           </div>
         </div>
       </div>

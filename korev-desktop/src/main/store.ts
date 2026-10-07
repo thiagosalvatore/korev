@@ -5,6 +5,7 @@ import {
   CODEX_DEFAULT_MODEL,
   DEFAULT_EFFORT,
   EMPTY_SCRIPTS,
+  runScriptsFromText,
   type AgentKind,
   type AskChat,
   type ChatItem,
@@ -78,7 +79,11 @@ function sanitize(raw: unknown, home: string): PersistedState {
   return {
     repos: repos.map((repo) => ({
       ...repo,
-      scripts: { ...EMPTY_SCRIPTS, ...repo.scripts },
+      scripts: {
+        ...EMPTY_SCRIPTS,
+        ...repo.scripts,
+        run: runScriptsFromText(repo.scripts?.run),
+      },
       folderId: repo.folderId ?? null,
     })),
     folders: Array.isArray(value.folders) ? value.folders : [],

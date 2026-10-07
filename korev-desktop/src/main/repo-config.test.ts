@@ -3,7 +3,11 @@ import { EMPTY_SCRIPTS } from '../shared/model';
 import { expandPort, resolveRepoConfig } from './repo-config';
 
 const APP = {
-  scripts: { ...EMPTY_SCRIPTS, setup: 'app-setup', run: 'app-run' },
+  scripts: {
+    ...EMPTY_SCRIPTS,
+    setup: 'app-setup',
+    run: [{ name: 'run', command: 'app-run' }],
+  },
   prompts: {},
 };
 const NO_FILES = {
@@ -115,6 +119,53 @@ describe('repo config', () => {
       setup: 'app-setup',
       runScripts: [{ id: 'run', command: 'app-run' }],
     });
+  });
+
+  it('resolves every named app run script, with the first as the default', () => {
+    const app = {
+      ...APP,
+      scripts: {
+        ...EMPTY_SCRIPTS,
+        run: [
+          { name: 'backend', command: 'make api' },
+          { name: 'blank', command: '  ' },
+          { name: 'frontend', command: 'pnpm dev' },
+        ],
+      },
+    };
+    expect(resolveRepoConfig(app, NO_FILES).runScripts).toEqual([
+      {
+        id: 'backend',
+        command: 'make api',
+        cwd: null,
+        icon: 'play',
+        isDefault: true,
+      },
+      {
+        id: 'frontend',
+        command: 'pnpm dev',
+        cwd: null,
+        icon: 'play',
+        isDefault: false,
+      },
+    ]);
+  });
+
+  it('reads several run scripts from a korev.json table', () => {
+    const jsonConfig = JSON.stringify({
+      scripts: {
+        run: {
+          web: { command: 'pnpm dev' },
+          api: { command: 'pnpm api', default: true },
+        },
+      },
+    });
+    expect(
+      resolveRepoConfig(APP, { ...NO_FILES, jsonConfig }).runScripts,
+    ).toMatchObject([
+      { id: 'web', command: 'pnpm dev', isDefault: false },
+      { id: 'api', command: 'pnpm api', isDefault: true },
+    ]);
   });
 
   it('uses the prompts saved in the app unless the repository sets its own', () => {

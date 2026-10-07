@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   EFFORT_LEVELS,
+  runScriptsFromText,
   type RepoScripts,
   type Settings,
 } from '../shared/model';
@@ -46,7 +47,7 @@ function toConductorRepo(row: RepoRow, rootPath: string): ConductorRepo {
     path: rootPath,
     scripts: {
       setup: row.setup_script ?? '',
-      run: row.run_script ?? '',
+      run: runScriptsFromText(row.run_script),
       archive: row.archive_script ?? '',
       runMode:
         row.run_script_mode === NONCONCURRENT ? NONCONCURRENT : 'concurrent',

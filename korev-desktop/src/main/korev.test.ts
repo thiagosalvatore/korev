@@ -1243,12 +1243,12 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
     const { repos, settings } = await korev.api.getState();
     expect(repos.map((repo) => [repo.name, repo.scripts])).toEqual([
-      ['acme', { setup: '', run: '', archive: '', runMode: 'concurrent' }],
+      ['acme', { setup: '', run: [], archive: '', runMode: 'concurrent' }],
       [
         'widgets',
         {
           setup: 'npm ci',
-          run: 'npm start',
+          run: [{ name: 'run', command: 'npm start' }],
           archive: '',
           runMode: 'nonconcurrent',
         },

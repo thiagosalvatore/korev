@@ -44,6 +44,7 @@ command = "pnpm storybook -p $((KOREV_PORT + 1))"
 
 - Use `$KOREV_PORT` so two workspaces never use the same port. Each workspace has ten ports from `$KOREV_PORT`.
 - With more than one run script, the **Run** button has a menu. The one with `default = true` runs when you press ⌘R. Without a default, the first one runs.
+- In the app, **Settings → Repositories → your repo → Scripts** has a **Run scripts** list. Give each script a name, for example `backend`, `frontend` or `mobile`. The first one runs when you press ⌘R.
 - `auto_run_after_setup = true` under `[scripts]` starts the default run script when setup succeeds.
 - `run_mode = "nonconcurrent"` under `[scripts]` stops the run scripts in your other workspaces of this repository when you start one.
 

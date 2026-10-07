@@ -53,19 +53,33 @@ export interface EditorApp {
   label: string;
 }
 
+export interface AppRunScript {
+  name: string;
+  command: string;
+}
+
 export interface RepoScripts {
   setup: string;
-  run: string;
+  run: AppRunScript[];
   archive: string;
   runMode: 'concurrent' | 'nonconcurrent';
 }
 
 export const EMPTY_SCRIPTS: RepoScripts = {
   setup: '',
-  run: '',
+  run: [],
   archive: '',
   runMode: 'concurrent',
 };
+
+export const SINGLE_RUN_SCRIPT_NAME = 'run';
+
+export function runScriptsFromText(run: unknown): AppRunScript[] {
+  if (Array.isArray(run)) return run as AppRunScript[];
+  return typeof run === 'string' && run.trim()
+    ? [{ name: SINGLE_RUN_SCRIPT_NAME, command: run }]
+    : [];
+}
 
 export type PromptKind =
   | 'general'

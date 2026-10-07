@@ -1,14 +1,16 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parse as parseToml } from 'smol-toml';
-import type {
-  PreviewUrl,
-  PromptKind,
-  Repo,
-  RepoConfig,
-  RepoConfigSource,
-  RepoPrompts,
-  RunScript,
+import {
+  SINGLE_RUN_SCRIPT_NAME,
+  type AppRunScript,
+  type PreviewUrl,
+  type PromptKind,
+  type Repo,
+  type RepoConfig,
+  type RepoConfigSource,
+  type RepoPrompts,
+  type RunScript,
 } from '../shared/model';
 
 const SHARED_SETTINGS_FILE = '.korev/settings.toml';
@@ -17,7 +19,6 @@ const JSON_CONFIG_FILE = 'korev.json';
 const CONDUCTOR_SHARED_SETTINGS_FILE = '.conductor/settings.toml';
 const CONDUCTOR_LOCAL_SETTINGS_FILE = '.conductor/settings.local.toml';
 const DEFAULT_RUN_ICON = 'play';
-const SINGLE_RUN_ID = 'run';
 const PROMPT_KINDS: readonly PromptKind[] = [
   'general',
   'code_review',
@@ -114,7 +115,7 @@ function runScriptsFrom(value: unknown): RunScript[] {
     return value.trim()
       ? [
           {
-            id: SINGLE_RUN_ID,
+            id: SINGLE_RUN_SCRIPT_NAME,
             command: value,
             cwd: null,
             icon: DEFAULT_RUN_ICON,
@@ -196,13 +197,25 @@ function fromSettings(
   };
 }
 
+function fromAppRunScripts(scripts: AppRunScript[]): RunScript[] {
+  return scripts
+    .filter((script) => script.command.trim())
+    .map((script, index) => ({
+      id: script.name,
+      command: script.command,
+      cwd: null,
+      icon: DEFAULT_RUN_ICON,
+      isDefault: index === 0,
+    }));
+}
+
 function fromApp({ scripts, prompts }: AppRepoSettings): RepoConfig {
   return {
     source: 'app',
     setup: scripts.setup,
     archive: scripts.archive,
     runMode: scripts.runMode,
-    runScripts: runScriptsFrom(scripts.run),
+    runScripts: fromAppRunScripts(scripts.run),
     autoRunAfterSetup: false,
     previewUrls: [],
     fileIncludeGlobs: null,
@@ -230,9 +243,7 @@ function fromJsonConfig(json: string, app: AppRepoSettings): RepoConfig | null {
     setup: text(scripts.setup) ?? base.setup,
     archive: text(scripts.archive) ?? base.archive,
     runScripts:
-      typeof scripts.run === 'string'
-        ? runScriptsFrom(scripts.run)
-        : base.runScripts,
+      scripts.run === undefined ? base.runScripts : runScriptsFrom(scripts.run),
     runMode:
       raw.runScriptMode === 'nonconcurrent' ? 'nonconcurrent' : base.runMode,
   };

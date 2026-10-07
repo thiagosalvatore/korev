@@ -134,3 +134,16 @@ A simpler format. It supports only these keys:
   "runScriptMode": "nonconcurrent"
 }
 ```
+
+For several run scripts, make `run` an object. Each entry takes the same keys as a `[scripts.run.<id>]` table:
+
+```json
+{
+  "scripts": {
+    "run": {
+      "web": { "command": "pnpm dev", "options": { "cwd": "apps/web" } },
+      "api": { "command": "pnpm api", "default": true }
+    }
+  }
+}
+```
