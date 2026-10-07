@@ -18,10 +18,16 @@ function Screens() {
         }}
       >
         <Stack.Protected guard={connection !== null}>
-          <Stack.Screen name="index" options={{ title: 'Korev' }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="workspace/[id]" options={{ title: '' }} />
-          <Stack.Screen name="new" options={{ title: 'New workspace' }} />
-          <Stack.Screen name="ask/new" options={{ title: 'Ask' }} />
+          <Stack.Screen
+            name="new"
+            options={{ title: 'New workspace', presentation: 'modal' }}
+          />
+          <Stack.Screen
+            name="ask/new"
+            options={{ title: 'Ask a question', presentation: 'modal' }}
+          />
           <Stack.Screen name="ask/[id]" options={{ title: '' }} />
         </Stack.Protected>
         <Stack.Protected guard={connection === null}>
