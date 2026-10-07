@@ -11,15 +11,11 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { KorevBridge } from '../src/shared/api';
+import type { AppState } from '../src/shared/model';
 
 const APP_ENTRY = '.vite/build/main.cjs';
 const FAKE_AGENT_BIN = path.resolve('test-support/bin');
 const SCREENSHOT_DIR = process.env.KOREV_SCREENSHOT_DIR;
-const RENDER_IN_BACKGROUND_ARGS = [
-  '--disable-background-timer-throttling',
-  '--disable-backgrounding-occluded-windows',
-  '--disable-renderer-backgrounding',
-];
 
 test.setTimeout(120_000);
 
@@ -44,12 +40,25 @@ async function snap(window: Page, name: string) {
     await window.screenshot({ path: path.join(SCREENSHOT_DIR, `${name}.png`) });
 }
 
+async function runningAgents(window: Page): Promise<number> {
+  const state = (await window.evaluate(() =>
+    (globalThis as unknown as { korev: KorevBridge }).korev.call(
+      'getState',
+      [],
+    ),
+  )) as AppState;
+  return state.runningSessions.length;
+}
+
+async function waitForAgentsToFinish(window: Page) {
+  await expect.poll(() => runningAgents(window)).toBe(0);
+}
+
 function launchApp(home: string) {
   return electron.launch({
     args: [
       APP_ENTRY,
       '--use-mock-keychain',
-      ...RENDER_IN_BACKGROUND_ARGS,
       `--user-data-dir=${path.join(home, 'user-data')}`,
     ],
     env: {
@@ -114,6 +123,7 @@ test('creates a workspace, runs an agent turn, shows the diff and archives it', 
       window.getByRole('heading', { name: 'New workspace' }),
     ).toBeVisible();
     await expect(window.getByRole('region', { name: 'History' })).toBeVisible();
+    await waitForAgentsToFinish(window);
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });
@@ -154,6 +164,7 @@ test('asks a question about a repository without creating a workspace', async ()
     ).toBeVisible();
     await expect(chat.getByText('Where is the README?')).toBeVisible();
     await snap(window, '06b-ask-moved-to-workspace');
+    await waitForAgentsToFinish(window);
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });
@@ -216,6 +227,7 @@ test('asks before a tool call when approvals are on and continues after Allow', 
 
     await expect(window.getByText('· Approved')).toBeVisible();
     await expect(window.getByText('I added agent-note.txt.')).toBeVisible();
+    await waitForAgentsToFinish(window);
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });
@@ -276,6 +288,7 @@ test('reviews a turn, searches the workspace and edits a file', async () => {
     await window.getByRole('button', { name: 'Save' }).click();
     await expect(window.getByText('Saved agent-note.txt')).toBeVisible();
     await snap(window, '08-edited');
+    await waitForAgentsToFinish(window);
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });
@@ -303,6 +316,7 @@ test('opens a file the agent mentions from outside the workspace', async () => {
     ).toBeVisible();
     await expect(window.getByRole('button', { name: 'Edit' })).toHaveCount(0);
     await snap(window, '09-mentioned-file');
+    await waitForAgentsToFinish(window);
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });
