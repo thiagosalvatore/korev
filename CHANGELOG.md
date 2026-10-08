@@ -4,7 +4,13 @@ Korev shows the section of each version in its "What's new" window, so write for
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-08
+
+Remote access works from any Tailscale network, and each agent has its own settings tab.
+
 - Remote access works whatever network your Mac's Tailscale app is on. Korev joins your phone's Tailscale network as its own device, so you can keep the Mac on your employer's network. The first time, click **Sign in** next to **Tailscale** in **Settings → Remote access**. Phones you paired before must scan the code again.
+- **Settings → Agents** has a tab for each agent. It shows if the agent is connected, not signed in or not installed. Click **Refresh** after you sign in, so you do not have to restart Korev. Model menus show only the agents you can use.
+- When you open a branch that is already checked out in another worktree, Korev uses that worktree for the workspace. Before, this failed with git's "already used by worktree" error. Files that are already in the worktree, such as .env, stay as they are.
 
 ## [0.6.0] - 2026-10-08
 
