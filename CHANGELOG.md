@@ -4,6 +4,8 @@ Korev shows the section of each version in its "What's new" window, so write for
 
 ## [Unreleased]
 
+- Remote access works whatever network your Mac's Tailscale app is on. Korev joins your phone's Tailscale network as its own device, so you can keep the Mac on your employer's network. The first time, click **Sign in** next to **Tailscale** in **Settings → Remote access**. Phones you paired before must scan the code again.
+
 ## [0.6.0] - 2026-10-08
 
 Pull request comments get their own tab, and plans are easier to review.

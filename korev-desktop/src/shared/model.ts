@@ -508,7 +508,7 @@ export interface ReleaseInfo {
 export interface RemoteStatus {
   address: string | null;
   devices: string[];
-  onTailnet: boolean;
+  loginUrl: string | null;
   error: string | null;
 }
 

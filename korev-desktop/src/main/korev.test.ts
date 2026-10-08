@@ -174,7 +174,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
         status: () => ({
           address: null,
           devices: [],
-          onTailnet: false,
+          loginUrl: null,
           error: null,
         }),
         pairing: async () => null,

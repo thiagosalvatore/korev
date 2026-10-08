@@ -13,10 +13,19 @@ const TOKEN_FILE_MODE = 0o600;
 
 export type RemoteSettings = Pick<Settings, 'remoteAccess' | 'remotePort'>;
 
+export interface Tailnet {
+  ip(): string | null;
+  loginUrl(): string | null;
+  error(): string | null;
+  close(): void;
+}
+
+export type StartTailnet = (port: number, onChange: () => void) => Tailnet;
+
 export interface RemoteAccessOptions {
   tokenPath: string;
   api(): Partial<KorevApi>;
-  host(): string;
+  startTailnet: StartTailnet;
   onChange(): void;
 }
 
@@ -45,32 +54,35 @@ async function loadToken(tokenPath: string): Promise<string> {
 
 export function createRemoteAccess(options: RemoteAccessOptions): RemoteAccess {
   let server: RemoteServer | null = null;
-  let host = LOOPBACK_HOST;
+  let tailnet: Tailnet | null = null;
   let error: string | null = null;
   let settings: RemoteSettings | null = null;
 
   async function stop() {
+    tailnet?.close();
+    tailnet = null;
     await server?.close();
     server = null;
   }
 
   async function start(current: RemoteSettings) {
-    host = options.host();
     try {
       server = await startRemoteServer({
         api: options.api(),
         token: await loadToken(options.tokenPath),
-        host,
+        host: LOOPBACK_HOST,
         port: current.remotePort,
         onDevicesChange: options.onChange,
       });
+      tailnet = options.startTailnet(server.port, options.onChange);
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
     }
   }
 
   function address(): string | null {
-    return server ? `${host}:${server.port}` : null;
+    const ip = tailnet?.ip();
+    return server && ip ? `${ip}:${server.port}` : null;
   }
 
   async function apply(next: RemoteSettings) {
@@ -85,8 +97,8 @@ export function createRemoteAccess(options: RemoteAccessOptions): RemoteAccess {
     status: () => ({
       address: address(),
       devices: server?.devices() ?? [],
-      onTailnet: host !== LOOPBACK_HOST,
-      error,
+      loginUrl: tailnet?.loginUrl() ?? null,
+      error: error ?? tailnet?.error() ?? null,
     }),
     async pairing() {
       const current = address();

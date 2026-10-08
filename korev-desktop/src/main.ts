@@ -14,7 +14,7 @@ import {
 } from 'electron';
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { homedir, networkInterfaces } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { spawn as spawnPty } from 'node-pty';
@@ -37,13 +37,13 @@ import { sendPhoneNotification } from './main/phone-notifications';
 import { createQuitGate, type QuitGate } from './main/quit-gate';
 import { createDictation, WHISPER_MODELS } from './main/dictation';
 import { createRemoteAccess } from './main/remote-access';
-import { LOOPBACK_HOST, tailnetAddress } from './main/remote-server';
 import {
   canReplaceBundle,
   fetchRelease,
   updateFeedUrl,
   type Release,
 } from './main/updates';
+import { tailnetStarter } from './main/tailnet';
 import { loadWhisper } from './main/whisper';
 import { restorableBounds } from './main/window-bounds';
 
@@ -55,6 +55,11 @@ const DEV_USER_DATA_DIR = 'Korev Dev';
 const COMMAND_EVENT = 'command';
 const FINISHED_SOUND = '/System/Library/Sounds/Glass.aiff';
 const REMOTE_TOKEN_FILE = 'remote-token';
+const TAILNET_STATE_DIR = 'tailscale';
+const TAILNET_BINARY = 'korev-tailnet';
+const TAILNET_BIN_DIR = 'tailnet/bin';
+const UNPACKED_ASAR_DIR = 'app.asar.unpacked';
+const TAILNET_HOSTNAME_PREFIX = 'korev-';
 const MODELS_DIR = 'models';
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60_000;
 const BUNDLE_FROM_EXE = '../../..';
@@ -82,10 +87,26 @@ useSeparateDevData();
 let korevApp: Korev | null = null;
 let quitGate: QuitGate | null = null;
 
+function tailnetBinary(): string {
+  const appDir = app.isPackaged
+    ? path.join(process.resourcesPath, UNPACKED_ASAR_DIR)
+    : app.getAppPath();
+  return path.join(
+    appDir,
+    TAILNET_BIN_DIR,
+    `${process.platform}-${process.arch}`,
+    TAILNET_BINARY,
+  );
+}
+
 const remote = createRemoteAccess({
   tokenPath: path.join(app.getPath('userData'), REMOTE_TOKEN_FILE),
   api: () => korevApp?.api ?? {},
-  host: () => tailnetAddress(networkInterfaces()) ?? LOOPBACK_HOST,
+  startTailnet: tailnetStarter({
+    binary: tailnetBinary(),
+    stateDir: path.join(app.getPath('userData'), TAILNET_STATE_DIR),
+    hostname: TAILNET_HOSTNAME_PREFIX + hostname().split('.')[0],
+  }),
   onChange: () => korevApp?.emitState(),
 });
 

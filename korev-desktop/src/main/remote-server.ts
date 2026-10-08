@@ -56,8 +56,6 @@ const MAX_BODY_BYTES = 10 * 1024 * 1024;
 const DEVICE_HEADER = 'x-korev-device';
 const MAX_DEVICE_NAME_LENGTH = 64;
 const UNKNOWN_DEVICE = 'Unknown device';
-const TAILNET_PREFIX_BITS = 10;
-const TAILNET_NETWORK = (100 << 24) | (64 << 16);
 
 const HTTP_OK = 200;
 const HTTP_BAD_REQUEST = 400;
@@ -100,33 +98,6 @@ function remoteHandlers(api: Partial<KorevApi>): IpcHandlers {
       api[method],
     ]),
   ) as IpcHandlers;
-}
-
-interface NetworkAddress {
-  family: string;
-  address: string;
-}
-
-function ipv4ToNumber(address: string): number {
-  return address
-    .split('.')
-    .reduce((value, octet) => (value << 8) | Number(octet), 0);
-}
-
-function isTailnetAddress(address: string): boolean {
-  const mask = -1 << (32 - TAILNET_PREFIX_BITS);
-  return (ipv4ToNumber(address) & mask) === (TAILNET_NETWORK & mask);
-}
-
-export function tailnetAddress(
-  interfaces: Record<string, NetworkAddress[] | undefined>,
-): string | null {
-  const match = Object.values(interfaces)
-    .flatMap((addresses) => addresses ?? [])
-    .find(
-      ({ family, address }) => family === 'IPv4' && isTailnetAddress(address),
-    );
-  return match?.address ?? null;
 }
 
 function isAuthorized(request: IncomingMessage, token: string): boolean {

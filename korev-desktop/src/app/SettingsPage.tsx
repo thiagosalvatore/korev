@@ -567,12 +567,12 @@ function savePort(text: string) {
   update({ remotePort });
 }
 
-function remoteDescription(remote: RemoteStatus): string {
+function remoteDescription(remote: RemoteStatus, enabled: boolean): string {
   if (remote.error) return `Remote access did not start: ${remote.error}`;
-  if (!remote.address)
-    return 'Lets a phone on your Tailscale network use Korev.';
-  if (!remote.onTailnet)
-    return `Listening on ${remote.address}. Tailscale is not running, so only this Mac can connect. Start Tailscale, then turn remote access off and on.`;
+  if (!enabled) return 'Lets a phone on your Tailscale network use Korev.';
+  if (remote.loginUrl)
+    return 'Sign in to Tailscale with the account your phone uses.';
+  if (!remote.address) return 'Connecting to Tailscale…';
   return `Listening on ${remote.address}.`;
 }
 
@@ -664,12 +664,29 @@ function Remote({
   const [pairing, setPairing] = useState<RemotePairing | null>(null);
   return (
     <>
-      <Row title="Remote access" description={remoteDescription(remote)}>
+      <Row
+        title="Remote access"
+        description={remoteDescription(remote, settings.remoteAccess)}
+      >
         <Switch
           checked={settings.remoteAccess}
           onChange={(remoteAccess) => update({ remoteAccess })}
         />
       </Row>
+      {remote.loginUrl && (
+        <Row
+          title="Tailscale"
+          description="Korev joins your tailnet as its own device, whatever network this Mac's Tailscale app is on."
+        >
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => void api.openExternal(remote.loginUrl!)}
+          >
+            Sign in
+          </Button>
+        </Row>
+      )}
       <Row
         title="Port"
         description="Remote access restarts when you change it."

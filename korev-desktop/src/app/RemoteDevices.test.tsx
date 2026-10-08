@@ -9,7 +9,7 @@ const ADDRESS = '100.101.102.103:7420';
 const OFF: RemoteStatus = {
   address: null,
   devices: [],
-  onTailnet: false,
+  loginUrl: null,
   error: null,
 };
 

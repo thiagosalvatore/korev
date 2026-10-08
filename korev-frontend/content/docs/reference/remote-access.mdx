@@ -3,15 +3,16 @@ title: Remote access
 description: 'Remote access lets another device, such as a phone, use Korev on your Mac.'
 ---
 
-The other device and the Mac must be on the same [Tailscale](https://tailscale.com) network.
+The other device must be on a [Tailscale](https://tailscale.com) network. Korev joins that network as its own device, separately from the Mac's Tailscale app. So the Mac's Tailscale app can stay on another network, for example your employer's, and the Mac does not need Tailscale installed at all.
 
 ## Turn it on
 
 1. Open **Settings → Remote access**.
 2. Turn on **Remote access**.
-3. Click **Show code** and scan the code with the Korev app. See [Use Korev from your phone](../guides/use-korev-from-your-phone.mdx).
+3. The first time, click **Sign in** next to **Tailscale**, and sign in with the account your phone uses. Korev shows up in that network as `korev-<your Mac's name>`. Korev remembers the sign-in in `~/Library/Application Support/Korev/tailscale`.
+4. Click **Show code** and scan the code with the Korev app. See [Use Korev from your phone](../guides/use-korev-from-your-phone.mdx).
 
-When remote access is on, Korev listens on the Mac's Tailscale address. If Tailscale is not running, Korev listens on `127.0.0.1` only, and the page says so. Start Tailscale, then turn remote access off and on again.
+When remote access is on, the server listens on `127.0.0.1`. Korev's Tailscale device takes connections on its own Tailscale address at the same port and passes them to the server. To use a different Tailscale account, turn remote access off, delete `~/Library/Application Support/Korev/tailscale`, and turn remote access on again.
 
 | Setting       | Default | Meaning                                                                                                      |
 | ------------- | ------- | ------------------------------------------------------------------------------------------------------------ |

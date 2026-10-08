@@ -18,7 +18,7 @@ const NOT_A_PAIRING_CODE =
 
 function unreachable(url: string, error: unknown): string {
   const reason = error instanceof Error ? error.message : String(error);
-  return `Korev did not answer at ${url}. Check that Tailscale is on, on the phone and on the Mac. (${reason})`;
+  return `Korev did not answer at ${url}. Check that Tailscale is on, on the phone, and that Korev on the Mac is signed in to the same tailnet. (${reason})`;
 }
 
 export default function PairScreen() {

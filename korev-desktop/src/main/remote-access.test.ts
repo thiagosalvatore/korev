@@ -11,16 +11,40 @@ import {
   vi,
   type Mock,
 } from 'vitest';
-import { createRemoteAccess, type RemoteAccess } from './remote-access';
+import {
+  createRemoteAccess,
+  type RemoteAccess,
+  type Tailnet,
+} from './remote-access';
 
 const LOOPBACK = '127.0.0.1';
 const ANY_FREE_PORT = 0;
 const ON = { remoteAccess: true, remotePort: ANY_FREE_PORT };
 const OFF = { remoteAccess: false, remotePort: ANY_FREE_PORT };
+const LOGIN_URL = 'https://login.tailscale.com/a/abc';
+
+interface FakeTailnet extends Tailnet {
+  signIn(ip: string): void;
+}
+
+function fakeTailnet(onChange: () => void): FakeTailnet {
+  let ip: string | null = null;
+  return {
+    ip: () => ip,
+    loginUrl: () => (ip ? null : LOGIN_URL),
+    error: () => null,
+    close: () => {},
+    signIn(address) {
+      ip = address;
+      onChange();
+    },
+  };
+}
 
 let dir: string;
 let remote: RemoteAccess;
 let onChange: Mock<() => void>;
+let tailnet: FakeTailnet | null;
 
 beforeEach(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'korev-remote-'));
@@ -28,10 +52,15 @@ beforeEach(async () => {
   remote = createRemoteAccess({
     tokenPath: path.join(dir, 'remote-token'),
     api: () => ({ getState: async () => ({}) as never }),
-    host: () => LOOPBACK,
+    startTailnet: (_port, changed) => (tailnet = fakeTailnet(changed)),
     onChange,
   });
 });
+
+async function applySignedIn() {
+  await remote.apply(ON);
+  tailnet!.signIn(LOOPBACK);
+}
 
 afterEach(async () => {
   await remote.close();
@@ -48,7 +77,7 @@ function getState(url: string, token: string) {
 
 describe('remote access', () => {
   it('starts and stops with the setting', async () => {
-    await remote.apply(ON);
+    await applySignedIn();
     const pairing = await remote.pairing();
     expect(pairing?.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     expect((await getState(pairing!.url, pairing!.token)).status).toBe(200);
@@ -60,10 +89,25 @@ describe('remote access', () => {
     expect(onChange).toHaveBeenCalled();
   });
 
-  it('rejects the old token after revoking devices', async () => {
+  it('pairs only after the tailnet is signed in', async () => {
     await remote.apply(ON);
+    expect(remote.status()).toMatchObject({
+      address: null,
+      loginUrl: LOGIN_URL,
+    });
+    expect(await remote.pairing()).toBeNull();
+
+    tailnet!.signIn('100.1.2.3');
+    const port = remote.status().address!.split(':')[1];
+    expect((await remote.pairing())?.url).toBe(`http://100.1.2.3:${port}`);
+    expect(remote.status().loginUrl).toBeNull();
+  });
+
+  it('rejects the old token after revoking devices', async () => {
+    await applySignedIn();
     const before = (await remote.pairing())!;
     await remote.revoke();
+    tailnet!.signIn(LOOPBACK);
     const after = (await remote.pairing())!;
     expect(after.token).not.toBe(before.token);
     expect((await getState(after.url, before.token)).status).toBe(401);

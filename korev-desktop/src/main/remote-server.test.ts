@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  startRemoteServer,
-  tailnetAddress,
-  type RemoteServer,
-} from './remote-server';
+import { startRemoteServer, type RemoteServer } from './remote-server';
 
 const TOKEN = 'secret-token';
 const LOOPBACK = '127.0.0.1';
@@ -116,25 +112,5 @@ describe('connected devices', () => {
     const response = await openEvents(base);
     await vi.waitFor(() => expect(server!.devices()).toEqual([LOOPBACK]));
     await response.body!.cancel();
-  });
-});
-
-describe('tailnet address', () => {
-  it('picks the Tailscale IPv4 address', () => {
-    expect(
-      tailnetAddress({
-        en0: [{ family: 'IPv4', address: '192.168.1.20' }],
-        utun4: [
-          { family: 'IPv6', address: 'fd7a:115c:a1e0::1' },
-          { family: 'IPv4', address: '100.101.102.103' },
-        ],
-      }),
-    ).toBe('100.101.102.103');
-  });
-
-  it('returns null when Tailscale is not running', () => {
-    expect(
-      tailnetAddress({ en0: [{ family: 'IPv4', address: '10.0.0.5' }] }),
-    ).toBeNull();
   });
 });
