@@ -7,10 +7,14 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { execFile } from 'node:child_process';
 import { cp } from 'node:fs/promises';
 import path from 'node:path';
+import { promisify } from 'node:util';
 
 const ICON = 'assets/icon';
+const APP_BUNDLE = 'Korev.app';
+const AD_HOC_IDENTITY = '-';
 const MICROPHONE_USAGE =
   'Korev uses the microphone to turn what you say into text.';
 
@@ -52,6 +56,18 @@ async function copyNativePackages(
   }
 }
 
+async function signAppBundlesAdHoc(outputPaths: string[]) {
+  for (const outputPath of outputPaths) {
+    await promisify(execFile)('codesign', [
+      '--force',
+      '--deep',
+      '--sign',
+      AD_HOC_IDENTITY,
+      path.join(outputPath, APP_BUNDLE),
+    ]);
+  }
+}
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: {
@@ -64,6 +80,9 @@ const config: ForgeConfig = {
   hooks: {
     packageAfterCopy: (_config, buildPath, _electronVersion, platform, arch) =>
       copyNativePackages(buildPath, platform, arch),
+    postPackage: async (_config, { platform, outputPaths }) => {
+      if (platform === 'darwin') await signAppBundlesAdHoc(outputPaths);
+    },
   },
   makers: [
     new MakerSquirrel({ setupIcon: `${ICON}.ico` }),

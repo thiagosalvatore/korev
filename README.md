@@ -58,7 +58,7 @@ make package-run   # both
 
 To build what a release ships, run `make dist`. It writes a DMG and a zip for Apple silicon (`arm64`) and Intel (`x64`) under `korev-desktop/out/make/`.
 
-The build is not signed or notarized (see `TODOS.md`), so Gatekeeper blocks it on other Macs. To open it there, right-click the app and choose Open, or run `xattr -dr com.apple.quarantine Korev.app`.
+The build is signed ad hoc but not notarized (see `TODOS.md`), so Gatekeeper blocks it on other Macs. To open it there, open it once, then go to System Settings → Privacy & Security and click Open Anyway. Or run `xattr -dr com.apple.quarantine /Applications/Korev.app`.
 
 To change the app icon, edit `korev-desktop/assets/icon.svg` and run `npm run icons`. It needs `rsvg-convert` and ImageMagick (`brew install librsvg imagemagick`).
 
