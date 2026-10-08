@@ -22,7 +22,23 @@ export type Page =
   | { kind: 'workspace' }
   | { kind: 'new-workspace'; repoId: string | null }
   | { kind: 'ask'; askChatId: string | null; repoIds: string[] }
-  | { kind: 'settings'; section: string };
+  | { kind: 'settings'; section: string }
+  | { kind: 'grid' };
+
+export type GridLayout = '2x1' | '1x2' | '2x2';
+
+export interface GridPane {
+  workspaceId: string;
+  tabKey: string;
+}
+
+export const GRID_PANES = 4;
+
+export interface GridUi {
+  layout: GridLayout;
+  panes: (GridPane | null)[];
+  focused: number;
+}
 
 export interface DiffComment {
   id: string;
@@ -65,6 +81,7 @@ export interface UiState {
   historyOpen: boolean;
   askOpen: boolean;
   workspaces: Record<string, WorkspaceUi>;
+  grid: GridUi;
   palette: PaletteMode;
   diffLayout: DiffLayout;
   updateOpen: boolean;
@@ -86,6 +103,11 @@ const INITIAL: UiState = {
   historyOpen: false,
   askOpen: true,
   workspaces: {},
+  grid: {
+    layout: '2x2',
+    panes: Array<GridPane | null>(GRID_PANES).fill(null),
+    focused: 0,
+  },
   palette: false,
   diffLayout: 'unified',
   updateOpen: false,

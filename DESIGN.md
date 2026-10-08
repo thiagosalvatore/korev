@@ -28,6 +28,10 @@ Three columns:
 - **Right panel** (`--panel-w`): the git panel (All files / Changes / Checks) on top and
   the terminal panel (Setup / Run / Terminal) below.
 
+The **Grid** page (⌘G) replaces the centre and the right panel with 2 or 4 panes. Each pane
+shows one chat of a workspace. The pane header has the branch, the workspace name, the chat
+picker, **Open in full view** and **Remove from grid**. The focused pane has an accent border.
+
 ## Workspace row
 
 - Line 1: the branch name, bold when the workspace has unread agent output.

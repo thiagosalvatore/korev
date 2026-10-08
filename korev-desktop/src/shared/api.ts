@@ -87,7 +87,7 @@ export interface KorevApi {
   archiveWorkspace(workspaceId: string): Promise<Result>;
   restoreWorkspace(workspaceId: string): Promise<Result>;
   deleteWorkspace(workspaceId: string): Promise<void>;
-  focusWorkspace(workspaceId: string | null): Promise<void>;
+  focusWorkspaces(workspaceIds: string[]): Promise<void>;
   createAskChat(repoIds: string[]): Promise<AskChat>;
   deleteAskChat(askChatId: string): Promise<void>;
   startFromAsk(askChatId: string): Promise<Result<Workspace[]>>;

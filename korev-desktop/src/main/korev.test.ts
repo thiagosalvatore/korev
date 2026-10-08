@@ -667,9 +667,9 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(keepAwake).toHaveBeenLastCalledWith(false);
   });
 
-  it('stays quiet when a turn finishes in the workspace you are looking at', async () => {
+  it('stays quiet when a turn finishes in any workspace you are looking at', async () => {
     const workspace = await createWorkspace();
-    await korev.api.focusWorkspace(workspace.id);
+    await korev.api.focusWorkspaces(['other-workspace', workspace.id]);
 
     await sendAndWait(workspace.sessions[0].id, 'Add a note');
 

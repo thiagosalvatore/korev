@@ -57,6 +57,7 @@ const VIEW_ENTRIES: (CommandEntry | null)[] = [
   ['Toggle Right Sidebar', 'CmdOrCtrl+Alt+B', 'toggle-panel'],
   ['Toggle Terminal', 'CmdOrCtrl+J', 'toggle-terminal'],
   ['Toggle Zen Mode', 'CmdOrCtrl+.', 'toggle-zen'],
+  ['Toggle Grid View', 'CmdOrCtrl+G', 'toggle-grid'],
   ['Toggle Theme', 'CmdOrCtrl+Alt+T', 'toggle-theme'],
   null,
   ['Open Diff View', 'CmdOrCtrl+Shift+D', 'open-diff'],

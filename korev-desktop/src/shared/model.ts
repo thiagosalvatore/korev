@@ -822,6 +822,7 @@ export type AppCommand =
   | 'cancel-agent'
   | 'toggle-theme'
   | 'toggle-zen'
+  | 'toggle-grid'
   | 'quick-open'
   | 'search-files'
   | 'confirm-quit'

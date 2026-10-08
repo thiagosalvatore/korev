@@ -236,52 +236,60 @@ function worktreeProgress(workspace: Workspace, runtime: WorkspaceRuntime) {
   };
 }
 
-function WorkspaceWithoutWorktree({
-  state,
-  workspace,
-  runtime,
-}: {
+interface WorktreeStatusProps {
   state: AppState;
   workspace: Workspace;
   runtime: WorkspaceRuntime;
-}) {
-  const failed = runtime.status === 'failed';
-  const progress = worktreeProgress(workspace, runtime);
+}
+
+function WorkspaceWithoutWorktree(props: WorktreeStatusProps) {
   return (
     <div className="flex min-w-0 flex-1 flex-col bg-app">
       <div className={cn('h-11 flex-none', DRAG_REGION)} />
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-        {failed ? (
-          <Icon name="triangle-alert" size={22} className="text-danger-text" />
-        ) : (
-          <Icon
-            name="loader-circle"
-            size={22}
-            className="animate-spin text-accent-text"
-          />
-        )}
-        <p className="m-0 text-lg font-semibold text-fg-1">
-          {failed ? runtime.message : progress.title}
+      <WorktreePending {...props} />
+    </div>
+  );
+}
+
+export function WorktreePending({
+  state,
+  workspace,
+  runtime,
+}: WorktreeStatusProps) {
+  const failed = runtime.status === 'failed';
+  const progress = worktreeProgress(workspace, runtime);
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+      {failed ? (
+        <Icon name="triangle-alert" size={22} className="text-danger-text" />
+      ) : (
+        <Icon
+          name="loader-circle"
+          size={22}
+          className="animate-spin text-accent-text"
+        />
+      )}
+      <p className="m-0 text-lg font-semibold text-fg-1">
+        {failed ? runtime.message : progress.title}
+      </p>
+      {failed ? null : (
+        <p className="m-0 text-sm text-fg-3">{progress.detail}</p>
+      )}
+      {runtime.pendingPrompt ? (
+        <p className="m-0 max-w-xl rounded-md bg-raised px-3 py-2 text-left text-sm whitespace-pre-wrap text-fg-1">
+          {runtime.pendingPrompt}
         </p>
-        {failed ? null : (
-          <p className="m-0 text-sm text-fg-3">{progress.detail}</p>
-        )}
-        {runtime.pendingPrompt ? (
-          <p className="m-0 max-w-xl rounded-md bg-raised px-3 py-2 text-left text-sm whitespace-pre-wrap text-fg-1">
-            {runtime.pendingPrompt}
-          </p>
-        ) : null}
-        {failed ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            icon="archive"
-            onClick={() => archiveWorkspace(state, workspace)}
-          >
-            Archive workspace
-          </Button>
-        ) : null}
-      </div>
+      ) : null}
+      {failed ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="archive"
+          onClick={() => archiveWorkspace(state, workspace)}
+        >
+          Archive workspace
+        </Button>
+      ) : null}
     </div>
   );
 }

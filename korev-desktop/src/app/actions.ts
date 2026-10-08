@@ -14,6 +14,7 @@ import type {
 } from '../shared/model';
 import { activeWorkspaces } from '../shared/workspaces';
 import { api } from './bridge';
+import { paneCount, placeInPane } from './grid';
 import { reportFailure, toast } from './ui/toast';
 import {
   EMPTY_WORKSPACE_UI,
@@ -21,22 +22,24 @@ import {
   setUi,
   tabKey,
   updateWorkspaceUi,
+  type GridLayout,
+  type GridPane,
   type MainTab,
 } from './ui-store';
 
 export function selectWorkspace(workspaceId: string) {
   setUi({ workspaceId, page: { kind: 'workspace' } });
-  void api.focusWorkspace(workspaceId);
+  void api.focusWorkspaces([workspaceId]);
 }
 
 export function openNewWorkspace(repoId: string | null) {
   setUi({ page: { kind: 'new-workspace', repoId } });
-  void api.focusWorkspace(null);
+  void api.focusWorkspaces([]);
 }
 
 export function openAsk(askChatId: string | null, repoIds: string[] = []) {
   setUi({ page: { kind: 'ask', askChatId, repoIds } });
-  void api.focusWorkspace(null);
+  void api.focusWorkspaces([]);
 }
 
 export async function startAsk(repoIds: string[], question: SendOptions) {
@@ -66,6 +69,7 @@ export function activateTab(workspaceId: string, key: string) {
 }
 
 function openExtraTab(workspaceId: string, tab: MainTab) {
+  if (getUi().page.kind === 'grid') selectWorkspace(workspaceId);
   updateWorkspaceUi(workspaceId, (current) => {
     const key = tabKey(tab);
     const exists = current.extraTabs.some((entry) => tabKey(entry) === key);
@@ -285,5 +289,80 @@ export async function startRunScript(workspace: Workspace, scriptId: string) {
 }
 
 export function focusComposer() {
-  document.querySelector<HTMLTextAreaElement>('[data-composer]')?.focus();
+  const composer =
+    document.querySelector<HTMLTextAreaElement>(
+      '[data-grid-focused] [data-composer]',
+    ) ?? document.querySelector<HTMLTextAreaElement>('[data-composer]');
+  composer?.focus();
+}
+
+export function openGrid() {
+  setUi({ page: { kind: 'grid' } });
+}
+
+export function focusedPane(): GridPane | null {
+  const { grid } = getUi();
+  return grid.panes[grid.focused] ?? null;
+}
+
+export function expandPane(pane: GridPane) {
+  selectWorkspace(pane.workspaceId);
+  activateTab(pane.workspaceId, pane.tabKey);
+}
+
+export function toggleGrid() {
+  if (getUi().page.kind !== 'grid') return openGrid();
+  const pane = focusedPane();
+  if (pane) return expandPane(pane);
+  setUi({ page: { kind: 'workspace' } });
+}
+
+export function focusPane(index: number) {
+  setUi((ui) => ({ grid: { ...ui.grid, focused: index } }));
+  const pane = getUi().grid.panes[index];
+  if (pane) activateTab(pane.workspaceId, pane.tabKey);
+}
+
+export function showInPane(index: number, pane: GridPane | null) {
+  setUi((ui) => ({
+    grid: {
+      ...ui.grid,
+      panes: placeInPane(ui.grid.panes, index, pane),
+      focused: index,
+    },
+  }));
+  if (!pane) return;
+  activateTab(pane.workspaceId, pane.tabKey);
+  requestAnimationFrame(focusComposer);
+}
+
+export function chatPane(workspaceId: string, sessionId: string): GridPane {
+  return { workspaceId, tabKey: tabKey({ kind: 'chat', sessionId }) };
+}
+
+export function clearPane(index: number) {
+  showInPane(index, null);
+}
+
+export function fillPane(index: number, workspace: Workspace) {
+  showInPane(index, chatPane(workspace.id, activeSessionId(workspace)));
+}
+
+export async function newChatInPane(
+  index: number,
+  workspace: Workspace,
+  agent: AgentKind,
+) {
+  const session = await newChat(workspace, agent);
+  showInPane(index, chatPane(workspace.id, session.id));
+}
+
+export function setGridLayout(layout: GridLayout) {
+  setUi((ui) => ({
+    grid: {
+      ...ui.grid,
+      layout,
+      focused: ui.grid.focused < paneCount(layout) ? ui.grid.focused : 0,
+    },
+  }));
 }

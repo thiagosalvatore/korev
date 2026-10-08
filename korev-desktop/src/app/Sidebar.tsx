@@ -1,11 +1,4 @@
-import {
-  Children,
-  Fragment,
-  useEffect,
-  useState,
-  type DragEvent,
-  type ReactNode,
-} from 'react';
+import { Children, Fragment, useEffect, useState, type ReactNode } from 'react';
 import {
   Button,
   cn,
@@ -33,6 +26,7 @@ import {
   archiveWorkspace,
   deleteAsk,
   openAsk,
+  openGrid,
   openIn,
   openNewWorkspace,
   openSettings,
@@ -41,6 +35,7 @@ import {
 } from './actions';
 import { api } from './bridge';
 import { timeAgo } from '../shared/format';
+import { draggable, useDropTarget, WORKSPACE_DRAG_TYPE } from './dnd';
 import { DRAG_REGION, NO_DRAG } from './layout';
 import { RemoteDevices } from './RemoteDevices';
 import { Menu, type MenuItem } from './ui/Menu';
@@ -201,6 +196,7 @@ function WorkspaceRow({
       tabIndex={0}
       aria-current={selected ? 'page' : undefined}
       aria-label={`Workspace ${workspace.name}`}
+      {...draggable(WORKSPACE_DRAG_TYPE, workspace.id)}
       onClick={() => selectWorkspace(workspace.id)}
       onKeyDown={(event) => {
         if (event.key === 'Enter') selectWorkspace(workspace.id);
@@ -339,45 +335,6 @@ const REPO_DRAG_TYPE = 'application/x-korev-repo';
 const FOLDER_DRAG_TYPE = 'application/x-korev-folder';
 const DROP_INDICATOR = 'shadow-[inset_0_2px_0_0_var(--color-accent)]';
 const MOVE_TO_FOLDER = 'Move to folder';
-
-type DropHandlers = Partial<Record<string, (draggedId: string) => void>>;
-
-function draggable(type: string, id: string) {
-  return {
-    draggable: true,
-    onDragStart: (event: DragEvent) => {
-      event.dataTransfer.setData(type, id);
-      event.dataTransfer.effectAllowed = 'move';
-    },
-  };
-}
-
-function useDropTarget(handlers: DropHandlers) {
-  const [over, setOver] = useState(false);
-  const acceptedType = (event: DragEvent) =>
-    event.dataTransfer.types.find((type) => handlers[type]);
-  return {
-    over,
-    props: {
-      onDragOver: (event: DragEvent) => {
-        if (!acceptedType(event)) return;
-        event.preventDefault();
-        setOver(true);
-      },
-      onDragLeave: (event: DragEvent) => {
-        if (event.currentTarget.contains(event.relatedTarget as Node)) return;
-        setOver(false);
-      },
-      onDrop: (event: DragEvent) => {
-        setOver(false);
-        const type = acceptedType(event);
-        if (!type) return;
-        event.preventDefault();
-        handlers[type]?.(event.dataTransfer.getData(type));
-      },
-    },
-  };
-}
 
 function useCollapsed(
   key: 'collapsedRepos' | 'expandedRepos' | 'collapsedFolders',
@@ -1003,6 +960,7 @@ export function Sidebar({ state }: { state: AppState }) {
           label="Ask"
           onClick={() => openAsk(null)}
         />
+        <NavRow icon="layout-grid" label="Grid" hint="⌘G" onClick={openGrid} />
       </div>
       <AskChats state={state} />
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-1">

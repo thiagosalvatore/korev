@@ -297,7 +297,8 @@ export function createChats(
 
   function isWatching(workspace: Workspace) {
     return (
-      ctx.deps.isWindowFocused() && ctx.focusedWorkspaceId === workspace.id
+      ctx.deps.isWindowFocused() &&
+      ctx.focusedWorkspaceIds.includes(workspace.id)
     );
   }
 

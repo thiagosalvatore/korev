@@ -853,6 +853,7 @@ const SHORTCUTS: [string, string][] = [
   ['⌘⌥B', 'Toggle right sidebar'],
   ['⌘J', 'Toggle terminal'],
   ['⌘.', 'Zen mode'],
+  ['⌘G', 'Toggle grid view'],
   ['⌘L', 'Focus chat input'],
   ['⇧Tab', 'Toggle plan mode'],
   ['⌘⇧E', 'Toggle fast mode'],

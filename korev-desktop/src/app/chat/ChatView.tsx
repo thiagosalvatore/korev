@@ -38,6 +38,7 @@ export interface ChatViewProps {
   empty?: ReactNode;
   placeholder?: string;
   repoId?: string | null;
+  autoFocus?: boolean;
 }
 
 const NO_COMMENTS: DiffComment[] = [];
@@ -83,6 +84,7 @@ export function ChatView({
   empty,
   placeholder,
   repoId,
+  autoFocus = true,
 }: ChatViewProps) {
   const items = useTranscript(session.id);
   const running = state.runningSessions.includes(session.id);
@@ -219,7 +221,7 @@ export function ChatView({
               void api.updateSession(session.id, { pendingPlan: null })
             }
             placeholder={placeholder}
-            autoFocus
+            autoFocus={autoFocus}
             usage={{
               context: latestContext(items),
               limits: state.planLimits[session.agent] ?? [],

@@ -324,7 +324,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     }),
     runningSessions: new Set(),
     planLimits: {},
-    focusedWorkspaceId: null,
+    focusedWorkspaceIds: [],
     runtime(workspaceId) {
       let runtime = runtimes.get(workspaceId);
       if (!runtime) {
@@ -379,7 +379,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       deps.notify({
         title: 'Spotlight',
         body: message,
-        workspaceId: ctx.focusedWorkspaceId ?? '',
+        workspaceId: ctx.focusedWorkspaceIds[0] ?? '',
       }),
   );
 
@@ -1083,12 +1083,13 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
     restoreWorkspace: (workspaceId) => restoreWorkspace(ctx, workspaceId),
     deleteWorkspace: (workspaceId) => deleteWorkspace(ctx, workspaceId),
-    async focusWorkspace(workspaceId) {
-      ctx.focusedWorkspaceId = workspaceId;
-      if (!workspaceId) return;
-      const runtime = ctx.runtime(workspaceId);
-      if (!runtime.unread) return;
-      runtime.unread = false;
+    async focusWorkspaces(workspaceIds) {
+      ctx.focusedWorkspaceIds = workspaceIds;
+      const unread = workspaceIds
+        .map((workspaceId) => ctx.runtime(workspaceId))
+        .filter((runtime) => runtime.unread);
+      if (!unread.length) return;
+      for (const runtime of unread) runtime.unread = false;
       ctx.emitState();
     },
     async createAskChat(repoIds) {

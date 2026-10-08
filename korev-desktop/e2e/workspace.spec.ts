@@ -380,3 +380,53 @@ test('opens a terminal tab and an in-app browser tab', async () => {
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test('shows chats from two workspaces side by side in the grid', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const { app, window } = await launch(home, repo);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window
+      .getByRole('button', { name: 'Create empty workspace' })
+      .click();
+    const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
+    await sidebar.getByRole('button', { name: /^New workspace/ }).click();
+    await window
+      .getByRole('button', { name: 'Create empty workspace' })
+      .click();
+    const rows = sidebar.getByRole('button', { name: /^Workspace / });
+    await expect(rows).toHaveCount(2);
+
+    await sidebar.getByRole('button', { name: /^Grid/ }).click();
+    const first = window.getByRole('region', { name: 'Pane 1' });
+    const second = window.getByRole('region', { name: 'Pane 2' });
+    await rows.first().hover();
+    await window.mouse.down();
+    await first.hover();
+    await first.hover({ position: { x: 20, y: 20 } });
+    await window.mouse.up();
+    await expect(
+      first.getByRole('button', { name: 'Open in full view' }),
+    ).toBeVisible();
+    await second.getByRole('button', { name: 'Choose workspace' }).click();
+    await window.getByRole('menuitem').nth(1).click();
+
+    await second.getByRole('textbox', { name: 'Message' }).fill('Add a note');
+    await second.getByRole('textbox', { name: 'Message' }).press('Enter');
+    await expect(second.getByText('I added agent-note.txt.')).toBeVisible();
+    await expect(first.getByText('I added agent-note.txt.')).toHaveCount(0);
+    await snap(window, '10-grid');
+    await waitForAgentsToFinish(window);
+
+    await second.getByRole('button', { name: 'Open in full view' }).click();
+    await expect(
+      window.getByRole('main').getByText('I added agent-note.txt.'),
+    ).toBeVisible();
+    await sidebar.getByRole('button', { name: /^Grid/ }).click();
+    await expect(second.getByText('I added agent-note.txt.')).toBeVisible();
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});

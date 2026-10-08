@@ -40,7 +40,7 @@ export interface Context {
   terminals: Terminals;
   runningSessions: Set<string>;
   planLimits: PlanLimits;
-  focusedWorkspaceId: string | null;
+  focusedWorkspaceIds: string[];
   runtime(workspaceId: string): WorkspaceRuntime;
   setStatus(
     workspaceId: string,

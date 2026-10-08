@@ -9,18 +9,22 @@ import { activeWorkspaces } from '../shared/workspaces';
 import {
   activeSessionId,
   archiveWorkspace,
+  clearPane,
   closeTab,
   createPr,
   fixErrors,
   focusComposer,
+  focusedPane,
   mergePr,
   newChat,
+  newChatInPane,
   openDiff,
   openSearch,
   openIn,
   openNewWorkspace,
   openSettings,
   selectWorkspace,
+  toggleGrid,
   toggleRunScript,
 } from './actions';
 import { api, on } from './bridge';
@@ -35,10 +39,16 @@ async function checkForUpdates() {
 const SELECT_WORKSPACE_PREFIX = 'select-workspace-';
 const THEME_CYCLE = { dark: 'light', light: 'dark', system: 'light' } as const;
 
-function currentWorkspace(state: AppState): Workspace | null {
+function currentWorkspaceId(): string | null {
   const ui = getUi();
-  if (ui.page.kind !== 'workspace') return null;
-  return state.workspaces.find((ws) => ws.id === ui.workspaceId) ?? null;
+  if (ui.page.kind === 'grid') return focusedPane()?.workspaceId ?? null;
+  if (ui.page.kind === 'workspace') return ui.workspaceId;
+  return null;
+}
+
+function currentWorkspace(state: AppState): Workspace | null {
+  const workspaceId = currentWorkspaceId();
+  return state.workspaces.find((ws) => ws.id === workspaceId) ?? null;
 }
 
 function stepWorkspace(state: AppState, step: number) {
@@ -89,6 +99,8 @@ export function runCommand(state: AppState, command: AppCommand) {
       const zen = !getUi().sidebar && !getUi().panel;
       return setUi({ sidebar: zen, panel: zen });
     }
+    case 'toggle-grid':
+      return toggleGrid();
     case 'toggle-theme':
       return void api.updateSettings({
         theme: THEME_CYCLE[state.settings.theme],
@@ -110,6 +122,16 @@ export function runCommand(state: AppState, command: AppCommand) {
     state.runtime[workspace.id],
     getUi().workspaces[workspace.id]?.prUrl,
   );
+  const { page, grid } = getUi();
+  if (page.kind === 'grid') {
+    if (command === 'new-chat')
+      return void newChatInPane(
+        grid.focused,
+        workspace,
+        state.settings.defaultAgent,
+      );
+    if (command === 'close-tab') return clearPane(grid.focused);
+  }
   switch (command) {
     case 'new-chat':
       return void newChat(workspace, state.settings.defaultAgent);
