@@ -1,7 +1,6 @@
 import type { KeyboardEvent } from 'react';
 import { Icon, IconButton } from '../../design-system';
 import type { DictationStatus } from '../../shared/model';
-import { api } from '../bridge';
 import type { DictationPhase } from './dictation';
 
 export const DICTATION_SHORTCUT = '⌘⇧S';
@@ -27,21 +26,24 @@ export function DictationButton({
 }: DictationButtonProps) {
   if (status?.status === 'downloading')
     return (
-      <span
-        className="flex h-7 items-center gap-1 px-2 text-xs text-fg-3"
+      <button
+        type="button"
+        aria-label="Downloading the voice model"
         title="Downloading the voice model"
+        className="flex h-7 cursor-pointer items-center gap-1 rounded-sm border-0 bg-transparent px-2 text-xs text-fg-3 tabular-nums hover:bg-hover hover:text-fg-1"
+        onClick={onToggle}
       >
         <Icon name="mic" size={14} />
         {status.progress}%
-      </span>
+      </button>
     );
   if (status?.status !== 'ready')
     return (
       <IconButton
         icon="mic"
-        label="Voice input: download the voice model (550 MB)"
+        label="Voice input (download needed)"
         size="sm"
-        onClick={() => void api.prepareDictation()}
+        onClick={onToggle}
       />
     );
   if (phase === 'transcribing')

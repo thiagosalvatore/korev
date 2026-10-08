@@ -21,6 +21,7 @@ export interface ModelFile {
   url: string;
   fileName: string;
   sha256: string;
+  bytes: number;
 }
 
 export interface SpeechModels<T> {
@@ -33,11 +34,13 @@ export const WHISPER_MODELS: SpeechModels<ModelFile> = {
     url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin',
     fileName: 'ggml-large-v3-turbo-q5_0.bin',
     sha256: '394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2',
+    bytes: 574_041_195,
   },
   voiceActivity: {
     url: 'https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin',
     fileName: 'ggml-silero-v6.2.0.bin',
     sha256: '2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987',
+    bytes: 885_098,
   },
 };
 
@@ -76,6 +79,7 @@ async function toSpeechWav(input: string, output: string) {
 
 export function createDictation(options: DictationOptions): Dictation {
   const files = [options.models.voiceActivity, options.models.speech];
+  const totalBytes = files.reduce((sum, file) => sum + file.bytes, 0);
   const pathOf = (file: ModelFile) =>
     path.join(options.modelsDir, file.fileName);
   const paths: SpeechModels<string> = {
@@ -94,22 +98,21 @@ export function createDictation(options: DictationOptions): Dictation {
     options.onChange();
   }
 
-  function reportProgress(received: number, total: number) {
-    const progress = Math.floor((received / total) * PERCENT);
+  function reportProgress(received: number) {
+    const progress = Math.floor((received / totalBytes) * PERCENT);
     if (status.status === 'downloading' && status.progress === progress) return;
     setStatus({ status: 'downloading', progress });
   }
 
-  async function downloadFile(file: ModelFile) {
+  async function downloadFile(file: ModelFile, bytesBefore: number) {
     const target = pathOf(file);
     if (existsSync(target)) return;
     const partialPath = target + PARTIAL_SUFFIX;
     const response = await options.download(file.url);
     if (!response.ok || !response.body)
       throw new Error(`Model download failed (HTTP ${response.status})`);
-    const total = Number(response.headers.get('content-length')) || 1;
     const hash = createHash('sha256');
-    let received = 0;
+    let received = bytesBefore;
     await mkdir(options.modelsDir, { recursive: true });
     await pipeline(
       Readable.fromWeb(response.body as ReadableStream<Uint8Array>),
@@ -117,7 +120,7 @@ export function createDictation(options: DictationOptions): Dictation {
         for await (const chunk of chunks) {
           hash.update(chunk);
           received += chunk.length;
-          reportProgress(received, total);
+          reportProgress(received);
           yield chunk;
         }
       },
@@ -131,7 +134,11 @@ export function createDictation(options: DictationOptions): Dictation {
   }
 
   async function downloadAll() {
-    for (const file of files) await downloadFile(file);
+    let bytesBefore = 0;
+    for (const file of files) {
+      await downloadFile(file, bytesBefore);
+      bytesBefore += file.bytes;
+    }
   }
 
   function prepare() {

@@ -18,6 +18,7 @@ function modelFile(name: string): ModelFile {
     url: `https://example.test/${name}`,
     fileName: name,
     sha256: MODEL_SHA256,
+    bytes: MODEL_BYTES.length,
   };
 }
 
@@ -87,6 +88,20 @@ describe('dictation model', () => {
     expect(existsSync(path.join(modelsDir, MODELS.speech.fileName))).toBe(
       false,
     );
+  });
+
+  it('reports progress across all model files, not per file', async () => {
+    const { dictation, onChange } = dictationWith(serving(MODEL_BYTES));
+    const progress: number[] = [];
+    onChange.mockImplementation(() => {
+      const status = dictation.status();
+      if (status.status === 'downloading') progress.push(status.progress);
+    });
+
+    dictation.prepare();
+    await settled(dictation);
+
+    expect(progress).toEqual([0, 50, 100]);
   });
 
   it('downloads each model once when asked again during a download', async () => {

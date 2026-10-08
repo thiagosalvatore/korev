@@ -34,6 +34,7 @@ import { insertDictation } from '../../shared/dictation';
 import { useDictation } from './dictation';
 import { DictationButton, isDictationShortcut } from './DictationButton';
 import { RecordingBar } from './RecordingBar';
+import { VoiceModelDialog } from './VoiceModelDialog';
 import { PlanChip } from './PlanChip';
 import {
   applySuggestion,
@@ -196,6 +197,17 @@ export function Composer(props: ComposerProps) {
   const dictationStatus = useAppState()?.dictation;
   const dictation = useDictation(insertDictated);
   const dictating = dictation.phase !== 'idle';
+  const [voiceSetupOpen, setVoiceSetupOpen] = useState(false);
+
+  function toggleDictation() {
+    if (dictationStatus?.status === 'ready') dictation.toggle();
+    else setVoiceSetupOpen(true);
+  }
+
+  function startDictationAfterSetup() {
+    setVoiceSetupOpen(false);
+    dictation.toggle();
+  }
   const wasDictating = useRef(false);
 
   useEffect(() => {
@@ -300,7 +312,7 @@ export function Composer(props: ComposerProps) {
       props.onEffortChange(nextEffort(props.agent, props.effort));
     else if (command && key === 'u') picker.current?.click();
     else if (command && key === ';') openSnippets();
-    else if (isDictationShortcut(event)) dictation.toggle();
+    else if (isDictationShortcut(event)) toggleDictation();
     else if (event.metaKey && event.ctrlKey && /^[1-5]$/.test(event.key)) {
       const entry = props.loadout[Number(event.key) - 1];
       if (entry) props.onModelChange(entry);
@@ -520,7 +532,7 @@ export function Composer(props: ComposerProps) {
             <DictationButton
               status={dictationStatus}
               phase={dictation.phase}
-              onToggle={dictation.toggle}
+              onToggle={toggleDictation}
             />
           }
           contextPicker={
@@ -542,6 +554,14 @@ export function Composer(props: ComposerProps) {
           onStop={props.onStop}
         />
       </div>
+      {voiceSetupOpen && dictationStatus ? (
+        <VoiceModelDialog
+          status={dictationStatus}
+          onDownload={() => void api.prepareDictation()}
+          onStart={startDictationAfterSetup}
+          onClose={() => setVoiceSetupOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
