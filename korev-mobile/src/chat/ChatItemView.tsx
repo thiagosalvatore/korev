@@ -91,7 +91,7 @@ function MessageAttachments({
   );
 }
 
-function UserMessage({
+export function UserMessage({
   item,
   sessionId,
 }: {

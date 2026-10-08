@@ -30,9 +30,13 @@ import { PlanChip } from './PlanChip';
 export function Composer({
   state,
   session,
+  onSend,
+  onSendFailed,
 }: {
   state: AppState;
   session: ChatSession;
+  onSend(text: string): void;
+  onSendFailed(): void;
 }) {
   const { api } = useConnection();
   const theme = useTheme();
@@ -51,6 +55,7 @@ export function Composer({
     const message = text.trim();
     if (!canSend) return;
     setText('');
+    onSend(message);
     const sent = await attempt('Korev could not send the message', () =>
       api.send(session.id, {
         text: message,
@@ -61,7 +66,9 @@ export function Composer({
         fast: session.fast,
       }),
     );
-    if (!sent) setText(message);
+    if (sent) return;
+    onSendFailed();
+    setText(message);
   }
 
   const togglePlanMode = () =>

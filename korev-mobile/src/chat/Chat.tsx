@@ -1,4 +1,5 @@
 import { useHeaderHeight } from 'expo-router/react-navigation';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -17,7 +18,9 @@ import { useTranscript } from '../hooks';
 import { useConnection } from '../korev';
 import { ChatItemView } from './ChatItemView';
 import { Composer } from './Composer';
+import { pendingSend, withPendingMessage, type PendingSend } from './pending';
 import { PlanReview } from './PermissionCard';
+import { WorkingIndicator } from './WorkingIndicator';
 
 export function Chat({
   state,
@@ -31,17 +34,23 @@ export function Chat({
   const { api } = useConnection();
   const items = useTranscript(session.id);
   const headerHeight = useHeaderHeight();
+  const [pending, setPending] = useState<PendingSend | null>(null);
+  const running = state.runningSessions.includes(session.id);
+  const shown = items && withPendingMessage(items, pending);
+  const working = running || shown !== items;
+  const lastUser = shown?.findLast((item) => item.kind === 'user');
+
+  const startSending = (text: string) =>
+    setPending(
+      text && items ? pendingSend(items, text, new Date().toISOString()) : null,
+    );
 
   const respond = (itemId: string, response: PermissionResponse) =>
     void attempt('Korev could not send your answer', () =>
       api.respondPermission(session.id, itemId, response),
     );
 
-  const codexPlan = finishedCodexPlan(
-    session,
-    items,
-    state.runningSessions.includes(session.id),
-  );
+  const codexPlan = finishedCodexPlan(session, items, running);
 
   const approvePlan = (lanes: PlanLane[]) =>
     void attempt('Korev could not approve the plan', () =>
@@ -75,10 +84,10 @@ export function Chat({
       behavior="padding"
       keyboardVerticalOffset={headerHeight}
     >
-      {items ? (
+      {shown ? (
         <FlatList
           inverted
-          data={[...items].reverse()}
+          data={[...shown].reverse()}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <ChatItemView
@@ -89,7 +98,12 @@ export function Chat({
             />
           )}
           ListHeaderComponent={
-            codexPlan ? (
+            working ? (
+              <WorkingIndicator
+                label="Working…"
+                since={lastUser && Date.parse(lastUser.at)}
+              />
+            ) : codexPlan ? (
               <PlanReview
                 key={codexPlan.id}
                 plan={codexPlan.plan}
@@ -106,7 +120,12 @@ export function Chat({
       ) : (
         <ActivityIndicator style={styles.fill} />
       )}
-      <Composer state={state} session={session} />
+      <Composer
+        state={state}
+        session={session}
+        onSend={startSending}
+        onSendFailed={() => setPending(null)}
+      />
     </KeyboardAvoidingView>
   );
 }

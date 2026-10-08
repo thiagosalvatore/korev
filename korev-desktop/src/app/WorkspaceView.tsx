@@ -24,6 +24,7 @@ import { SearchView } from './SearchView';
 import { BrowserView } from './BrowserView';
 import { XTerm } from './XTerm';
 import { fileName } from '../shared/format';
+import { worktreeProgress } from '../shared/workspaces';
 import { DRAG_REGION } from './layout';
 import { GitPanel } from './GitPanel';
 import { CollapsedTerminalBar, TerminalPanel } from './TerminalPanel';
@@ -227,18 +228,6 @@ function TabStrip({
       </div>
     </div>
   );
-}
-
-function worktreeProgress(workspace: Workspace, runtime: WorkspaceRuntime) {
-  if (runtime.status === 'archiving')
-    return {
-      title: `Archiving ${workspace.name}`,
-      detail: 'Stopping agents and removing the worktree.',
-    };
-  return {
-    title: `Creating ${workspace.name}`,
-    detail: `Fetching origin/${workspace.baseBranch} and adding a worktree. You can keep working elsewhere.`,
-  };
 }
 
 interface WorktreeStatusProps {

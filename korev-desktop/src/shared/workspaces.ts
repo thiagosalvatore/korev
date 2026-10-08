@@ -1,4 +1,11 @@
-import type { AppState, AskChat, Repo, RepoFolder, Workspace } from './model';
+import type {
+  AppState,
+  AskChat,
+  Repo,
+  RepoFolder,
+  Workspace,
+  WorkspaceRuntime,
+} from './model';
 
 export interface RepoSection {
   folder: RepoFolder | null;
@@ -51,4 +58,19 @@ function groupStartTimes(workspaces: Workspace[]): Map<string, string> {
     if (!start || ws.createdAt < start) starts.set(ws.groupId, ws.createdAt);
   }
   return starts;
+}
+
+export function worktreeProgress(
+  workspace: Workspace,
+  runtime: WorkspaceRuntime,
+) {
+  if (runtime.status === 'archiving')
+    return {
+      title: `Archiving ${workspace.name}`,
+      detail: 'Stopping agents and removing the worktree.',
+    };
+  return {
+    title: `Creating ${workspace.name}`,
+    detail: `Fetching origin/${workspace.baseBranch} and adding a worktree. You can keep working elsewhere.`,
+  };
 }
