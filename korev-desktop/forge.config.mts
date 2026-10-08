@@ -20,6 +20,10 @@ const RELEASES_DOWNLOAD_URL =
   'https://github.com/thiagosalvatore/korev/releases/download';
 const MICROPHONE_USAGE =
   'Korev uses the microphone to turn what you say into text.';
+const TAILNET_DIR = 'tailnet';
+const TAILNET_BIN_DIR = `${TAILNET_DIR}/bin`;
+const TAILNET_BINARY = 'korev-tailnet';
+const GO_ARCH: Record<string, string> = { arm64: 'arm64', x64: 'amd64' };
 
 interface NativePackage {
   dir: string;
@@ -43,7 +47,29 @@ const NATIVE_PACKAGES: NativePackage[] = [
       `node-whisper-${platform}-${arch}`,
     ],
   },
+  {
+    dir: TAILNET_BIN_DIR,
+    runtimeFiles: (platform, arch) => [`${platform}-${arch}`],
+  },
 ];
+
+async function buildTailnet(platform: string, arch: string) {
+  await promisify(execFile)(
+    'go',
+    [
+      'build',
+      '-trimpath',
+      '-ldflags=-s -w',
+      '-o',
+      path.join('bin', `${platform}-${arch}`, TAILNET_BINARY),
+      '.',
+    ],
+    {
+      cwd: TAILNET_DIR,
+      env: { ...process.env, GOOS: platform, GOARCH: GO_ARCH[arch] ?? arch },
+    },
+  );
+}
 
 async function copyNativePackages(
   buildPath: string,
@@ -94,6 +120,7 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   hooks: {
+    generateAssets: (_config, platform, arch) => buildTailnet(platform, arch),
     packageAfterCopy: (_config, buildPath, _electronVersion, platform, arch) =>
       copyNativePackages(buildPath, platform, arch),
     postPackage: async (_config, { platform, outputPaths }) => {

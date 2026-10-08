@@ -8,6 +8,7 @@ Korev is a Mac app that runs coding agents (Claude Code and Codex) in parallel. 
 
 - macOS.
 - Node 24 and npm, the versions CI uses.
+- Go, the version in `korev-desktop/tailnet/go.mod`. The build compiles Korev's Tailscale device from it.
 - The `claude` and `codex` CLIs on your PATH, signed in. Korev uses their own sign-in. You need only the agents you plan to use.
 - `gh`, signed in. Korev uses it for pull requests, issues and checks.
 

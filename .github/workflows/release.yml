@@ -23,6 +23,10 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: korev-desktop/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: korev-desktop/tailnet/go.mod
+          cache-dependency-path: korev-desktop/tailnet/go.sum
       - name: Check that the tag matches package.json
         run: |
           version="${GITHUB_REF_NAME#v}"

@@ -148,3 +148,5 @@ out/
 test-results/
 playwright-report/
 .vitest/
+
+tailnet/bin/
