@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Button,
   cn,
@@ -764,6 +764,14 @@ function Remote({
   remote: RemoteStatus;
 }) {
   const [pairing, setPairing] = useState<RemotePairing | null>(null);
+  const previousDevices = useRef(remote.devices);
+  useEffect(() => {
+    const connected = remote.devices.length > previousDevices.current.length;
+    previousDevices.current = remote.devices;
+    if (!pairing || !connected) return;
+    setPairing(null);
+    toast(`${remote.devices.at(-1)} connected`, 'success');
+  }, [remote.devices, pairing]);
   return (
     <>
       <Row

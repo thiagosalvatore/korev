@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLAUDE_MODELS, type AppState } from '../shared/model';
 import { SettingsPage } from './SettingsPage';
 import { resetUiForTests } from './ui-store';
+import { Toaster } from './ui/toast';
 
 afterEach(() => {
   cleanup();
@@ -57,5 +58,42 @@ describe('Agents settings', () => {
 
     expect(screen.getByText('Not installed')).toBeTruthy();
     expect(screen.queryByLabelText('Codex model')).toBeNull();
+  });
+});
+
+describe('Remote settings', () => {
+  const ADDRESS = '100.101.102.103:7420';
+
+  function remoteState(devices: string[]): AppState {
+    return {
+      ...STATE,
+      settings: { ...STATE.settings, remoteAccess: true, remotePort: 7420 },
+      remote: { address: ADDRESS, devices, loginUrl: null, error: null },
+    };
+  }
+
+  function renderRemote(devices: string[]) {
+    return (
+      <>
+        <SettingsPage state={remoteState(devices)} section="remote" />
+        <Toaster />
+      </>
+    );
+  }
+
+  it('closes the pairing code and says which device connected', async () => {
+    window.korev.call = vi.fn(async () => ({
+      url: `http://${ADDRESS}`,
+      token: 'secret',
+    })) as Window['korev']['call'];
+    const { rerender } = render(renderRemote([]));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show code' }));
+    await screen.findByRole('dialog', { name: 'Pair a device' });
+
+    rerender(renderRemote(['iPhone']));
+
+    expect(screen.queryByRole('dialog', { name: 'Pair a device' })).toBeNull();
+    expect(screen.getByText('iPhone connected')).toBeTruthy();
   });
 });
