@@ -160,6 +160,8 @@ export interface KorevApi {
   updateSettings(patch: Partial<Settings>): Promise<void>;
   remotePairing(): Promise<RemotePairing | null>;
   revokeRemoteDevices(): Promise<void>;
+  prepareDictation(): Promise<void>;
+  transcribe(audioBase64: string): Promise<string>;
   checkForUpdates(): Promise<boolean>;
   installUpdate(): Promise<Result>;
   dismissWhatsNew(): Promise<void>;

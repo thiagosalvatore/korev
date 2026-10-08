@@ -32,6 +32,7 @@ import {
   type WorkspaceStatus,
 } from '../shared/model';
 import { detectAgents } from './agents';
+import type { Dictation } from './dictation';
 import type { RemoteAccess } from './remote-access';
 import { askWorktreePath } from './ask-worktrees';
 import { createChats, lanesElsewhereNote, type TurnPrLinks } from './chats';
@@ -193,6 +194,7 @@ export interface KorevDeps extends CoreDeps {
   openExternal(url: string): Promise<void>;
   applyTheme(theme: Settings['theme']): void;
   remote: Pick<RemoteAccess, 'status' | 'pairing' | 'apply' | 'revoke'>;
+  dictation: Pick<Dictation, 'status' | 'prepare' | 'transcribe'>;
   appVersion: string;
   fetchRelease(which: 'latest' | string): Promise<Release | null>;
   installUpdate(release: Release): Promise<Result>;
@@ -414,6 +416,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       agents,
       editors,
       remote: deps.remote.status(),
+      dictation: deps.dictation.status(),
       update,
       whatsNew,
     };
@@ -1285,6 +1288,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     updateSettings,
     remotePairing: () => deps.remote.pairing(),
     revokeRemoteDevices: () => deps.remote.revoke(),
+    prepareDictation: async () => deps.dictation.prepare(),
+    transcribe: (audioBase64) =>
+      deps.dictation.transcribe(
+        audioBase64,
+        store.state.settings.dictationLanguage,
+      ),
     checkForUpdates,
     installUpdate: async () =>
       update ? deps.installUpdate(update) : fail('No update is available'),

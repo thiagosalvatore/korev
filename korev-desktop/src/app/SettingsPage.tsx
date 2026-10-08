@@ -20,6 +20,8 @@ import {
   type AgentKind,
   type AppRunScript,
   type AppState,
+  type DictationLanguage,
+  type DictationStatus,
   type PromptKind,
   type RemotePairing,
   type RemoteStatus,
@@ -52,6 +54,7 @@ const SECTIONS: Section[] = [
   { id: 'git', label: 'Git', icon: 'git-branch' },
   { id: 'storage', label: 'Storage', icon: 'hard-drive' },
   { id: 'remote', label: 'Remote access', icon: 'smartphone' },
+  { id: 'voice', label: 'Voice input', icon: 'mic' },
   { id: 'snippets', label: 'Snippets', icon: 'text-quote' },
   { id: 'shortcuts', label: 'Keyboard shortcuts', icon: 'keyboard' },
 ];
@@ -60,6 +63,12 @@ const THEMES: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: 'System' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
+];
+
+const DICTATION_LANGUAGES: { value: DictationLanguage; label: string }[] = [
+  { value: 'auto', label: 'Detect' },
+  { value: 'pt', label: 'Português' },
+  { value: 'en', label: 'English' },
 ];
 
 function update(patch: Partial<Settings>) {
@@ -565,6 +574,55 @@ function remoteDescription(remote: RemoteStatus): string {
   if (!remote.onTailnet)
     return `Listening on ${remote.address}. Tailscale is not running, so only this Mac can connect. Start Tailscale, then turn remote access off and on.`;
   return `Listening on ${remote.address}.`;
+}
+
+function dictationDescription(dictation: DictationStatus): string {
+  if (dictation.status === 'ready')
+    return 'Downloaded. Speech is turned into text on this Mac, offline.';
+  if (dictation.status === 'downloading')
+    return `Downloading… ${dictation.progress}%`;
+  if (dictation.status === 'failed')
+    return `The download did not finish: ${dictation.error}`;
+  return 'Speech is turned into text on this Mac. Needs a one-time 550 MB download.';
+}
+
+function Voice({
+  settings,
+  dictation,
+}: {
+  settings: Settings;
+  dictation: DictationStatus;
+}) {
+  const canDownload =
+    dictation.status === 'missing' || dictation.status === 'failed';
+  return (
+    <>
+      <Row
+        title="Language"
+        description="Detect works for most people. Pick one language if Korev mistakes yours for another."
+      >
+        <Select
+          ariaLabel="Language"
+          className="w-40"
+          options={DICTATION_LANGUAGES}
+          value={settings.dictationLanguage}
+          onChange={(language) =>
+            update({ dictationLanguage: language as DictationLanguage })
+          }
+        />
+      </Row>
+      <Row title="Voice model" description={dictationDescription(dictation)}>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!canDownload}
+          onClick={() => void api.prepareDictation()}
+        >
+          Download
+        </Button>
+      </Row>
+    </>
+  );
 }
 
 async function revokeDevices() {
@@ -1250,6 +1308,8 @@ export function SettingsPage({
     body = <Storage settings={state.settings} />;
   else if (current?.id === 'remote')
     body = <Remote settings={state.settings} remote={state.remote} />;
+  else if (current?.id === 'voice')
+    body = <Voice settings={state.settings} dictation={state.dictation} />;
   else if (current?.id === 'shortcuts') body = <Shortcuts />;
   else if (current?.id === 'snippets')
     body = <Snippets settings={state.settings} />;

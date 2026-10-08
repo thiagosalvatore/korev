@@ -179,6 +179,11 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
         apply: applyRemote,
         revoke: async () => undefined,
       },
+      dictation: {
+        status: () => ({ status: 'missing' }),
+        prepare: () => undefined,
+        transcribe: async () => '',
+      },
       appVersion: APP_VERSION,
       fetchRelease,
       installUpdate: async () => ({ ok: true, value: undefined }),

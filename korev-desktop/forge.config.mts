@@ -11,33 +11,59 @@ import { cp } from 'node:fs/promises';
 import path from 'node:path';
 
 const ICON = 'assets/icon';
-const NODE_PTY = 'node_modules/node-pty';
+const MICROPHONE_USAGE =
+  'Korev uses the microphone to turn what you say into text.';
 
-function nodePtyRuntimeFiles(platform: string, arch: string): string[] {
-  return ['package.json', 'lib', `prebuilds/${platform}-${arch}`];
+interface NativePackage {
+  dir: string;
+  runtimeFiles(platform: string, arch: string): string[];
 }
 
-async function copyNodePty(buildPath: string, platform: string, arch: string) {
-  for (const entry of nodePtyRuntimeFiles(platform, arch)) {
-    await cp(
-      path.join(NODE_PTY, entry),
-      path.join(buildPath, NODE_PTY, entry),
-      {
+const NATIVE_PACKAGES: NativePackage[] = [
+  {
+    dir: 'node_modules/node-pty',
+    runtimeFiles: (platform, arch) => [
+      'package.json',
+      'lib',
+      `prebuilds/${platform}-${arch}`,
+    ],
+  },
+  {
+    dir: 'node_modules/@fugood',
+    runtimeFiles: (platform, arch) => [
+      'whisper.node/package.json',
+      'whisper.node/lib',
+      `node-whisper-${platform}-${arch}`,
+    ],
+  },
+];
+
+async function copyNativePackages(
+  buildPath: string,
+  platform: string,
+  arch: string,
+) {
+  for (const { dir, runtimeFiles } of NATIVE_PACKAGES) {
+    for (const entry of runtimeFiles(platform, arch)) {
+      await cp(path.join(dir, entry), path.join(buildPath, dir, entry), {
         recursive: true,
-      },
-    );
+      });
+    }
   }
 }
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: { unpack: `**/${NODE_PTY}/**` },
+    asar: {
+      unpack: `**/{${NATIVE_PACKAGES.map(({ dir }) => dir).join(',')}}/**`,
+    },
     icon: ICON,
+    extendInfo: { NSMicrophoneUsageDescription: MICROPHONE_USAGE },
   },
   rebuildConfig: {},
   hooks: {
     packageAfterCopy: (_config, buildPath, _electronVersion, platform, arch) =>
-      copyNodePty(buildPath, platform, arch),
+      copyNativePackages(buildPath, platform, arch),
   },
   makers: [
     new MakerSquirrel({ setupIcon: `${ICON}.ico` }),
@@ -54,6 +80,11 @@ const config: ForgeConfig = {
         {
           // `entry` is just an alias for `build.lib.entry` in the corresponding file of `config`.
           entry: 'src/main.ts',
+          config: 'vite.main.config.mts',
+          target: 'main',
+        },
+        {
+          entry: 'src/whisper-worker.ts',
           config: 'vite.main.config.mts',
           target: 'main',
         },

@@ -34,6 +34,7 @@ import { createKorev, type Korev } from './main/korev';
 import { childEnv, resolveLoginPath } from './main/login-path';
 import { sendPhoneNotification } from './main/phone-notifications';
 import { createQuitGate, type QuitGate } from './main/quit-gate';
+import { createDictation, WHISPER_MODELS } from './main/dictation';
 import { createRemoteAccess } from './main/remote-access';
 import { LOOPBACK_HOST, tailnetAddress } from './main/remote-server';
 import {
@@ -42,6 +43,7 @@ import {
   replaceBundle,
   type Release,
 } from './main/updates';
+import { loadWhisper } from './main/whisper';
 import { restorableBounds } from './main/window-bounds';
 
 const DEFAULT_WINDOW_SIZE = { width: 1440, height: 900 };
@@ -52,6 +54,7 @@ const DEV_USER_DATA_DIR = 'Korev Dev';
 const COMMAND_EVENT = 'command';
 const FINISHED_SOUND = '/System/Library/Sounds/Glass.aiff';
 const REMOTE_TOKEN_FILE = 'remote-token';
+const MODELS_DIR = 'models';
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60_000;
 const BUNDLE_FROM_EXE = '../../..';
 
@@ -82,6 +85,14 @@ const remote = createRemoteAccess({
   tokenPath: path.join(app.getPath('userData'), REMOTE_TOKEN_FILE),
   api: () => korevApp?.api ?? {},
   host: () => tailnetAddress(networkInterfaces()) ?? LOOPBACK_HOST,
+  onChange: () => korevApp?.emitState(),
+});
+
+const dictation = createDictation({
+  modelsDir: path.join(app.getPath('userData'), MODELS_DIR),
+  models: WHISPER_MODELS,
+  download: fetch,
+  loadModel: loadWhisper,
   onChange: () => korevApp?.emitState(),
 });
 
@@ -226,6 +237,7 @@ async function createKorevApp(): Promise<Korev> {
       nativeTheme.themeSource = theme;
     },
     remote,
+    dictation,
     appVersion: app.getVersion(),
     fetchRelease,
     installUpdate,
@@ -376,9 +388,11 @@ app.whenReady().then(async () => {
     }
     shuttingDown = true;
     event.preventDefault();
-    void Promise.all([korev.shutdown(), remote.close()]).finally(() =>
-      app.quit(),
-    );
+    void Promise.all([
+      korev.shutdown(),
+      remote.close(),
+      dictation.close(),
+    ]).finally(() => app.quit());
   });
   createWindow(korev);
   void remote.apply(korev.settings());

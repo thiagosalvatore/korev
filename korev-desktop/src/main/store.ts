@@ -54,6 +54,7 @@ export function defaultSettings(home: string): Settings {
     remoteAccess: false,
     remotePort: DEFAULT_REMOTE_PORT,
     phoneNotificationsUrl: '',
+    dictationLanguage: 'auto',
     windowBounds: null,
     lastSeenVersion: null,
   };

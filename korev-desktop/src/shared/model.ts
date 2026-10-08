@@ -248,6 +248,7 @@ export interface Settings {
   remoteAccess: boolean;
   remotePort: number;
   phoneNotificationsUrl: string;
+  dictationLanguage: DictationLanguage;
   windowBounds: WindowBounds | null;
   lastSeenVersion: string | null;
 }
@@ -488,6 +489,7 @@ export interface AppState {
   agents: AgentAvailability[];
   editors: EditorApp[];
   remote: RemoteStatus;
+  dictation: DictationStatus;
   update: ReleaseInfo | null;
   whatsNew: ReleaseInfo | null;
 }
@@ -503,6 +505,14 @@ export interface RemoteStatus {
   onTailnet: boolean;
   error: string | null;
 }
+
+export type DictationLanguage = 'auto' | 'pt' | 'en';
+
+export type DictationStatus =
+  | { status: 'missing' }
+  | { status: 'downloading'; progress: number }
+  | { status: 'ready' }
+  | { status: 'failed'; error: string };
 
 export interface RemotePairing {
   url: string;
