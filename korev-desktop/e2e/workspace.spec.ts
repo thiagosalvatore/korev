@@ -456,6 +456,16 @@ test('runs a terminal in a grid pane and keeps it in the full view', async () =>
     );
     await snap(window, '11-grid-terminal');
 
+    const second = window.getByRole('region', { name: 'Pane 2' });
+    await second.getByRole('button', { name: 'Choose workspace' }).click();
+    await window.getByRole('menuitem').first().click();
+    await expect(
+      second.getByRole('textbox', { name: 'Message' }),
+    ).toBeVisible();
+    await expect(pane.locator('.xterm-rows')).toContainText(
+      'korev-grid-terminal',
+    );
+
     await pane.getByRole('button', { name: 'Open in full view' }).click();
     await expect(window.getByRole('main').locator('.xterm-rows')).toContainText(
       'korev-grid-terminal',

@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState } from '../shared/model';
 import { WORKSPACE_DRAG_TYPE } from './dnd';
@@ -12,7 +18,9 @@ afterEach(() => {
 
 beforeEach(() => {
   window.korev = {
-    call: vi.fn(async () => null),
+    call: vi.fn(async (method: string) =>
+      method === 'newSession' ? { id: 's2' } : null,
+    ),
     on: () => () => {},
   } as unknown as Window['korev'];
 });
@@ -59,5 +67,19 @@ describe('GridView', () => {
     expect(getUi().page).toEqual({ kind: 'workspace' });
     expect(getUi().workspaceId).toBe('w1');
     expect(getUi().workspaces.w1.activeKey).toBe('chat:s1');
+  });
+
+  it('starts a new chat instead of taking the chat another pane shows', async () => {
+    render(<GridView state={state} />);
+
+    dropWorkspace(screen.getByRole('region', { name: 'Pane 1' }), 'w1');
+    dropWorkspace(screen.getByRole('region', { name: 'Pane 2' }), 'w1');
+
+    await waitFor(() =>
+      expect(getUi().grid.panes.slice(0, 2)).toEqual([
+        { workspaceId: 'w1', tabKey: 'chat:s1' },
+        { workspaceId: 'w1', tabKey: 'chat:s2' },
+      ]),
+    );
   });
 });

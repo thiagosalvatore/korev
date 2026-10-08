@@ -14,7 +14,7 @@ import type {
 } from '../shared/model';
 import { activeWorkspaces } from '../shared/workspaces';
 import { api } from './bridge';
-import { paneCount, placeInPane, terminalTabs } from './grid';
+import { freeTab, paneCount, placeInPane, terminalTabs } from './grid';
 import { reportFailure, toast } from './ui/toast';
 import {
   EMPTY_WORKSPACE_UI,
@@ -347,18 +347,27 @@ export function clearPane(index: number) {
   showInPane(index, null);
 }
 
-function lastUsedPane(workspace: Workspace): GridPane {
-  const activeKey = getUi().workspaces[workspace.id]?.activeKey;
-  const terminal = terminalTabs(getUi().workspaces, workspace.id).find(
-    (tab) => tabKey(tab) === activeKey,
+function panesByLastUse(workspace: Workspace): GridPane[] {
+  const { workspaces } = getUi();
+  const chats = [...workspace.sessions]
+    .reverse()
+    .map((session) => chatPane(workspace.id, session.id));
+  const terminals = terminalTabs(workspaces, workspace.id).map(
+    (tab): GridPane => ({ workspaceId: workspace.id, tabKey: tabKey(tab) }),
   );
-  return terminal
-    ? { workspaceId: workspace.id, tabKey: tabKey(terminal) }
-    : chatPane(workspace.id, activeSessionId(workspace));
+  const tabs = [...chats, ...terminals];
+  const activeKey = workspaces[workspace.id]?.activeKey;
+  return [...tabs.filter((pane) => pane.tabKey === activeKey), ...tabs];
 }
 
-export function fillPane(index: number, workspace: Workspace) {
-  showInPane(index, lastUsedPane(workspace));
+export function fillPane(
+  index: number,
+  workspace: Workspace,
+  agent: AgentKind,
+) {
+  const pane = freeTab(getUi().grid.panes, index, panesByLastUse(workspace));
+  if (pane) return showInPane(index, pane);
+  void newChatInPane(index, workspace, agent);
 }
 
 export function newTerminalInPane(

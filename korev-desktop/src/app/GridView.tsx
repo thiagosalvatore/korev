@@ -274,7 +274,7 @@ function EmptyPane({ state, index }: { state: AppState; index: number }) {
       id: workspace.id,
       label: workspace.name,
       section: repoName(state, workspace),
-      onSelect: () => fillPane(index, workspace),
+      onSelect: () => fillPane(index, workspace, state.settings.defaultAgent),
     }),
   );
   return (
@@ -319,7 +319,7 @@ function Pane({
       const workspace = activeWorkspaces(state).find(
         (entry) => entry.id === workspaceId,
       );
-      if (workspace) fillPane(index, workspace);
+      if (workspace) fillPane(index, workspace, state.settings.defaultAgent);
     },
   });
   const focus = () => {

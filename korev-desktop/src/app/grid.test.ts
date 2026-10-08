@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AppState, Workspace } from '../shared/model';
-import { placeInPane, resolvePane } from './grid';
+import { freeTab, placeInPane, resolvePane } from './grid';
 import type { WorkspaceUi } from './ui-store';
 
 const workspace = {
@@ -37,6 +37,26 @@ describe('placeInPane', () => {
       chat,
       null,
     ]);
+  });
+});
+
+describe('freeTab', () => {
+  const terminalPane = { workspaceId: 'w1', tabKey: 'terminal:t1' };
+
+  it('skips a tab that another pane shows', () => {
+    expect(freeTab([chat, null, null, null], 1, [chat, terminalPane])).toEqual(
+      terminalPane,
+    );
+  });
+
+  it('keeps a tab the target pane already shows', () => {
+    expect(freeTab([chat, null, null, null], 0, [chat])).toEqual(chat);
+  });
+
+  it('is null when other panes show every tab', () => {
+    expect(
+      freeTab([chat, terminalPane, null, null], 2, [chat, terminalPane]),
+    ).toBeNull();
   });
 });
 

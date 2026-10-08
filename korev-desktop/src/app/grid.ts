@@ -42,6 +42,18 @@ export function placeInPane(
   });
 }
 
+export function freeTab(
+  panes: (GridPane | null)[],
+  index: number,
+  candidates: GridPane[],
+): GridPane | null {
+  const shownElsewhere = (candidate: GridPane) =>
+    panes.some(
+      (pane, slot) => slot !== index && pane && samePane(pane, candidate),
+    );
+  return candidates.find((candidate) => !shownElsewhere(candidate)) ?? null;
+}
+
 export function terminalTabs(
   workspaces: Record<string, WorkspaceUi>,
   workspaceId: string,
