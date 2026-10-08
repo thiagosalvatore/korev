@@ -1,3 +1,4 @@
+import { constants } from 'node:fs';
 import {
   copyFile,
   mkdir,
@@ -114,13 +115,27 @@ export async function copyIncludedFiles(
     ['check-ignore', '--stdin'],
     candidates.join('\n'),
   );
-  const files = ignored.split('\n').filter(Boolean);
-  for (const file of files) {
-    const target = path.join(workspacePath, file);
-    await mkdir(path.dirname(target), { recursive: true });
-    await copyFile(path.join(repoPath, file), target);
+  const copied: string[] = [];
+  for (const file of ignored.split('\n').filter(Boolean)) {
+    if (await copyIfMissing(repoPath, workspacePath, file)) copied.push(file);
   }
-  return files;
+  return copied;
+}
+
+async function copyIfMissing(
+  repoPath: string,
+  workspacePath: string,
+  file: string,
+): Promise<boolean> {
+  const target = path.join(workspacePath, file);
+  await mkdir(path.dirname(target), { recursive: true });
+  try {
+    await copyFile(path.join(repoPath, file), target, constants.COPYFILE_EXCL);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+    throw error;
+  }
 }
 
 const LOCAL_URL =

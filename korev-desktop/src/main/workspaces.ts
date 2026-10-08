@@ -548,6 +548,14 @@ async function checkOutSource(
   source: CheckoutSource,
 ) {
   if (source.kind === 'branch') {
+    const existing = (await untrackedWorktrees(ctx, repo)).find(
+      (worktree) => worktree.branch === source.branch,
+    );
+    if (existing) {
+      workspace.path = existing.path;
+      await prepareWorktree(ctx.git, workspace.path);
+      return;
+    }
     await addBranchWorktree(ctx.git, repo.path, workspace.path, source.branch);
     return;
   }
@@ -760,11 +768,10 @@ function isInside(root: string, target: string): boolean {
   return realPath(target).startsWith(`${realPath(root)}${path.sep}`);
 }
 
-export async function strayWorktrees(
+async function untrackedWorktrees(
   ctx: Context,
-  workspace: Workspace,
+  repo: Repo,
 ): Promise<GitWorktree[]> {
-  const repo = ctx.repo(workspace.repoId);
   const known = new Set(
     [
       repo.path,
@@ -772,15 +779,22 @@ export async function strayWorktrees(
       ...ctx.store.state.workspaces.map((other) => other.path),
     ].map(realPath),
   );
+  const worktrees = await listWorktrees(ctx.git, repo.path).catch(() => []);
+  return worktrees.filter((worktree) => !known.has(realPath(worktree.path)));
+}
+
+export async function strayWorktrees(
+  ctx: Context,
+  workspace: Workspace,
+): Promise<GitWorktree[]> {
   const prBranches = new Set(
     ctx.runtime(workspace.id).prs.map((pr) => pr.headRefName),
   );
-  const worktrees = await listWorktrees(ctx.git, repo.path).catch(() => []);
+  const worktrees = await untrackedWorktrees(ctx, ctx.repo(workspace.repoId));
   return worktrees.filter(
     (worktree) =>
-      !known.has(realPath(worktree.path)) &&
-      ((worktree.branch !== null && prBranches.has(worktree.branch)) ||
-        isInside(workspace.path, worktree.path)),
+      (worktree.branch !== null && prBranches.has(worktree.branch)) ||
+      isInside(workspace.path, worktree.path),
   );
 }
 

@@ -1164,6 +1164,41 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     );
   });
 
+  it('adopts the worktree that already has the branch checked out', async () => {
+    const elsewhere = path.join(home, 'elsewhere');
+    git(repoPath, 'worktree', 'add', elsewhere, '-b', 'feature/login');
+    await writeFile(path.join(repoPath, '.gitignore'), '.env\n');
+    await writeFile(path.join(repoPath, '.env'), 'FROM=main\n');
+    await writeFile(path.join(elsewhere, '.env'), 'FROM=mine\n');
+    await writeFile(path.join(elsewhere, 'draft.txt'), 'wip\n');
+
+    const workspace = await createWorkspace(null, {
+      kind: 'branch',
+      branch: 'feature/login',
+    });
+
+    const { runtime } = await workspaceState(workspace.id);
+    expect(runtime.status).toBe('idle');
+    expect(workspace.path).toBe(realpathSync(elsewhere));
+    expect(await readFile(path.join(elsewhere, 'draft.txt'), 'utf8')).toBe(
+      'wip\n',
+    );
+    expect(await readFile(path.join(elsewhere, '.env'), 'utf8')).toBe(
+      'FROM=mine\n',
+    );
+  });
+
+  it('does not adopt the main checkout', async () => {
+    const workspace = await createWorkspace(null, {
+      kind: 'branch',
+      branch: git(repoPath, 'branch', '--show-current'),
+    });
+
+    const { runtime } = await workspaceState(workspace.id);
+    expect(runtime.status).toBe('failed');
+    expect(workspace.path).not.toBe(repoPath);
+  });
+
   it('names the workspace and branch after the issue it starts from', async () => {
     const workspace = await createWorkspace(null, {
       kind: 'issue',
