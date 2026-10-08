@@ -111,7 +111,8 @@ function StatusIcon({
   if (
     runtime.status === 'working' ||
     runtime.status === 'setting-up' ||
-    runtime.status === 'creating'
+    runtime.status === 'creating' ||
+    runtime.status === 'archiving'
   ) {
     return (
       <Icon

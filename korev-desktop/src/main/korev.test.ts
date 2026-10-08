@@ -17,6 +17,7 @@ import { runProcess, type CommandRunner } from './command-runner';
 import { nodeFileSystem } from './file-system';
 import {
   DEFAULT_EFFORT,
+  type AppState,
   type SendOptions,
   type Workspace,
   type WorkspaceSource,
@@ -543,6 +544,24 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
     expect(archived.ok).toBe(false);
     expect(existsSync(path.join(nested, 'wip.txt'))).toBe(true);
+    expect((await workspaceState(workspace.id)).runtime.status).toBe('idle');
+  });
+
+  it('shows the workspace as archiving until its worktree is gone', async () => {
+    const workspace = await createWorkspace();
+    const emitted: { status: string; worktreeExists: boolean }[] = [];
+    emit.mockImplementation((event, payload) => {
+      if (event !== 'state') return;
+      emitted.push({
+        status: (payload as AppState).runtime[workspace.id].status,
+        worktreeExists: existsSync(workspace.path),
+      });
+    });
+
+    await korev.api.archiveWorkspace(workspace.id);
+
+    expect(emitted[0]).toEqual({ status: 'archiving', worktreeExists: true });
+    expect(emitted.at(-1)).toEqual({ status: 'idle', worktreeExists: false });
   });
 
   it('opens the worktree an agent made for a PR as its own workspace, forking the chat', async () => {

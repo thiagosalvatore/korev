@@ -831,13 +831,22 @@ export async function archiveWorkspace(
   stopSessions: (workspace: Workspace) => void,
 ): Promise<Result> {
   const workspace = ctx.workspace(workspaceId);
-  if (workspace.archivedAt) return { ok: true, value: undefined };
+  const runtime = ctx.runtime(workspace.id);
+  if (workspace.archivedAt || runtime.status === 'archiving')
+    return { ok: true, value: undefined };
+  const { status, message } = runtime;
+  ctx.setStatus(workspace.id, 'archiving');
+  ctx.emitState();
   const config = await workspaceConfig(ctx, workspace);
   const deleteBranches =
     config.deleteBranchOnArchive ??
     ctx.store.state.settings.deleteBranchOnArchive;
   const strays = await removeStrayWorktrees(ctx, workspace, deleteBranches);
-  if (!strays.ok) return strays;
+  if (!strays.ok) {
+    ctx.setStatus(workspace.id, status, message);
+    ctx.emitState();
+    return strays;
+  }
   reportKeptWorktrees(ctx, strays.value);
   stopSessions(workspace);
   ctx.terminals.closeMatching(`${workspace.id}:`);
@@ -850,7 +859,6 @@ export async function archiveWorkspace(
   await removeWorktree(ctx.git, repo.path, workspace.path);
   if (deleteBranches) await deleteBranch(ctx.git, repo.path, workspace.branch);
   workspace.archivedAt = ctx.deps.now().toISOString();
-  const runtime = ctx.runtime(workspace.id);
   runtime.status = 'idle';
   runtime.unread = false;
   runtime.stats = null;

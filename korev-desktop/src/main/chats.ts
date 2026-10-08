@@ -76,6 +76,7 @@ const LANES_ELSEWHERE_NOTE =
   '## Lanes in other workspaces\nThese lanes are built at the same time in other linked workspaces. Do not build them here: ';
 const STATUSES_KEPT_BY_TURNS = new Set([
   'creating',
+  'archiving',
   'failed',
   'setting-up',
   'error',

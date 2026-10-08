@@ -221,6 +221,18 @@ function TabStrip({
   );
 }
 
+function worktreeProgress(workspace: Workspace, runtime: WorkspaceRuntime) {
+  if (runtime.status === 'archiving')
+    return {
+      title: `Archiving ${workspace.name}`,
+      detail: 'Stopping agents and removing the worktree.',
+    };
+  return {
+    title: `Creating ${workspace.name}`,
+    detail: `Fetching origin/${workspace.baseBranch} and adding a worktree. You can keep working elsewhere.`,
+  };
+}
+
 function WorkspaceWithoutWorktree({
   state,
   workspace,
@@ -231,6 +243,7 @@ function WorkspaceWithoutWorktree({
   runtime: WorkspaceRuntime;
 }) {
   const failed = runtime.status === 'failed';
+  const progress = worktreeProgress(workspace, runtime);
   return (
     <div className="flex min-w-0 flex-1 flex-col bg-app">
       <div className={cn('h-11 flex-none', DRAG_REGION)} />
@@ -245,13 +258,10 @@ function WorkspaceWithoutWorktree({
           />
         )}
         <p className="m-0 text-lg font-semibold text-fg-1">
-          {failed ? runtime.message : `Creating ${workspace.name}`}
+          {failed ? runtime.message : progress.title}
         </p>
         {failed ? null : (
-          <p className="m-0 text-sm text-fg-3">
-            Fetching origin/{workspace.baseBranch} and adding a worktree. You
-            can keep working elsewhere.
-          </p>
+          <p className="m-0 text-sm text-fg-3">{progress.detail}</p>
         )}
         {runtime.pendingPrompt ? (
           <p className="m-0 max-w-xl rounded-md bg-raised px-3 py-2 text-left text-sm whitespace-pre-wrap text-fg-1">

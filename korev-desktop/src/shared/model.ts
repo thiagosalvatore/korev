@@ -281,6 +281,7 @@ export interface WindowBounds {
 export type WorkspaceStatus =
   | 'idle'
   | 'creating'
+  | 'archiving'
   | 'failed'
   | 'setting-up'
   | 'working'
@@ -466,7 +467,11 @@ export function primaryPr(
 }
 
 export function hasWorktree(runtime: WorkspaceRuntime): boolean {
-  return runtime.status !== 'creating' && runtime.status !== 'failed';
+  return (
+    runtime.status !== 'creating' &&
+    runtime.status !== 'failed' &&
+    runtime.status !== 'archiving'
+  );
 }
 
 export interface AgentAvailability {
