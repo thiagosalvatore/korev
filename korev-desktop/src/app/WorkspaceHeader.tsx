@@ -220,6 +220,18 @@ export function WorkspaceHeader({
           <span className="truncate">{workspace.branch}</span>
         </button>
         <TargetBranch workspace={workspace} />
+        <Button
+          size="sm"
+          variant={workspace.keepAfterMerge ? 'secondary' : 'ghost'}
+          icon="pin"
+          aria-pressed={workspace.keepAfterMerge}
+          title="Don't archive this workspace when its pull request merges"
+          onClick={() =>
+            void api.setKeepAfterMerge(workspace.id, !workspace.keepAfterMerge)
+          }
+        >
+          Keep after merge
+        </Button>
       </div>
       <div className="flex-1" />
       <div className={cn('flex items-center gap-1.5', NO_DRAG)}>
