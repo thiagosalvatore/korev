@@ -4,8 +4,13 @@ Korev shows the section of each version in its "What's new" window, so write for
 
 ## [Unreleased]
 
-- Lists in "What's new" and in agent replies show bullets and numbers.
+## [0.3.0] - 2026-10-08
+
+Korev now opens like any other Mac app.
+
 - Korev is signed and notarized by Apple. A download opens like any other app, with no Open Anyway step.
+- A repository with no active workspace starts collapsed in the sidebar, so it takes one row. A repository with workspaces still starts open.
+- Lists in "What's new" and in agent replies show bullets and numbers.
 
 ## [0.2.0] - 2026-10-08
 
