@@ -1,6 +1,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,7 +28,7 @@ export default function PairScreen() {
   const styles = makeStyles(theme);
   const [permission, requestPermission] = useCameraPermissions();
   const [pasted, setPasted] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [connectingTo, setConnectingTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function tryPair(text: string) {
@@ -36,18 +37,48 @@ export default function PairScreen() {
       setError(NOT_A_PAIRING_CODE);
       return;
     }
-    setBusy(true);
+    setConnectingTo(pairing.url);
     setError(null);
     try {
       await pair(pairing);
     } catch (failure) {
       setError(unreachable(pairing.url, failure));
     } finally {
-      setBusy(false);
+      setConnectingTo(null);
     }
   }
 
+  const busy = connectingTo !== null;
   const scanning = !busy && !error;
+
+  function renderScanner() {
+    if (connectingTo) {
+      return (
+        <View style={styles.connecting}>
+          <ActivityIndicator size="large" color={theme.accentText} />
+          <Text style={styles.connectingTitle}>Connecting to Korev…</Text>
+          <Text style={styles.connectingUrl}>{connectingTo}</Text>
+        </View>
+      );
+    }
+    if (!permission?.granted) {
+      return (
+        <Button
+          label="Use the camera"
+          onPress={() => void requestPermission()}
+        />
+      );
+    }
+    return (
+      <CameraView
+        style={styles.camera}
+        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+        onBarcodeScanned={
+          scanning ? ({ data }) => void tryPair(data) : undefined
+        }
+      />
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.page}>
@@ -55,21 +86,7 @@ export default function PairScreen() {
         On your Mac, open Korev, go to Settings → Remote access, turn it on and
         click Show code. Then scan the code here.
       </Text>
-      {permission?.granted ? (
-        <CameraView
-          style={styles.camera}
-          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-          onBarcodeScanned={
-            scanning ? ({ data }) => void tryPair(data) : undefined
-          }
-        />
-      ) : (
-        <Button
-          label="Use the camera"
-          onPress={() => void requestPermission()}
-        />
-      )}
-      {busy && <Text style={styles.body}>Connecting…</Text>}
+      {renderScanner()}
       {error && (
         <View style={styles.errorBox}>
           <Text style={styles.error}>{error}</Text>
@@ -98,11 +115,23 @@ export default function PairScreen() {
   );
 }
 
+const cameraBox = { width: '100%', aspectRatio: 1, borderRadius: 12 } as const;
+
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
     page: { padding: 20, gap: 16 },
     body: { color: theme.fg2, fontSize: 15, lineHeight: 21 },
-    camera: { width: '100%', aspectRatio: 1, borderRadius: 12 },
+    camera: cameraBox,
+    connecting: {
+      ...cameraBox,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+      padding: 20,
+      backgroundColor: theme.bgRaised,
+    },
+    connectingTitle: { color: theme.fg1, fontSize: 17, fontWeight: '600' },
+    connectingUrl: { color: theme.fg3, fontSize: 13, textAlign: 'center' },
     label: { color: theme.fg3, fontSize: 13, marginTop: 8 },
     input: {
       minHeight: 72,
