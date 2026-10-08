@@ -10,6 +10,7 @@ import {
   type AskPane,
   type GridLayout,
   type GridPane,
+  type GridUi,
   type MainTab,
   type WorkspacePane,
   type WorkspaceUi,
@@ -37,6 +38,14 @@ export function paneCount(layout: GridLayout): number {
 
 export function isAskPane(pane: GridPane): pane is AskPane {
   return 'askChatId' in pane;
+}
+
+export function focusedGridPane(grid: GridUi): GridPane | null {
+  return grid.panes[grid.focused] ?? null;
+}
+
+export function paneAskChatId(pane: GridPane | null): string | null {
+  return pane && isAskPane(pane) ? pane.askChatId : null;
 }
 
 export function paneWorkspaceId(pane: GridPane | null): string | null {

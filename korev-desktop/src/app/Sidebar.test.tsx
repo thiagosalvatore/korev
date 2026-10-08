@@ -8,7 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState } from '../shared/model';
 import { Sidebar } from './Sidebar';
-import { resetUiForTests } from './ui-store';
+import { resetUiForTests, setUi, type GridPane } from './ui-store';
 
 afterEach(() => {
   cleanup();
@@ -41,7 +41,15 @@ const state = {
       sessions: [],
     },
   ],
-  askChats: [],
+  askChats: [
+    {
+      id: 'a1',
+      repoIds: ['busy'],
+      session: { id: 'as1', title: 'How does login work?', agent: 'claude' },
+      createdAt: '2026-01-01T00:00:00Z',
+      lastMessageAt: '2026-01-01T00:00:00Z',
+    },
+  ],
   runningSessions: [],
   runtime: {},
   remote: {},
@@ -95,5 +103,34 @@ describe('Sidebar repo groups', () => {
       />,
     );
     expect(repoHeader('idle-repo').getAttribute('aria-expanded')).toBe('true');
+  });
+});
+
+describe('Sidebar on the grid page', () => {
+  function showGrid(focusedPane: GridPane) {
+    setUi((ui) => ({
+      page: { kind: 'grid' },
+      grid: { ...ui.grid, panes: [focusedPane, null, null, null], focused: 0 },
+    }));
+  }
+
+  it('marks the workspace of the focused pane', () => {
+    showGrid({ workspaceId: 'w1', tabKey: 'chat:s1' });
+    render(<Sidebar state={state} />);
+    expect(
+      screen
+        .getByRole('button', { name: 'Workspace login-page' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+  });
+
+  it('marks the Ask chat of the focused pane', () => {
+    showGrid({ askChatId: 'a1' });
+    render(<Sidebar state={state} />);
+    expect(
+      screen
+        .getByRole('button', { name: 'Ask How does login work?' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
   });
 });

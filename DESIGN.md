@@ -32,7 +32,8 @@ The **Grid** page (⌘G) replaces the centre and the right panel with 2 or 4 pan
 shows one chat or terminal tab of a workspace, or one Ask chat. The pane header has the
 branch, the workspace name, the tab picker, **Open in full view** and **Remove from grid**. An
 Ask pane header has the chat title and its repositories instead of the branch and the tab
-picker. The focused pane has an accent border.
+picker. The focused pane has an accent border, and the sidebar marks its workspace or Ask chat
+as the current row.
 
 ## Workspace row
 

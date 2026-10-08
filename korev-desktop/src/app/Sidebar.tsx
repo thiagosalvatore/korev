@@ -45,6 +45,7 @@ import {
   useDropTarget,
   WORKSPACE_DRAG_TYPE,
 } from './dnd';
+import { focusedGridPane, paneAskChatId, paneWorkspaceId } from './grid';
 import { DRAG_REGION, NO_DRAG } from './layout';
 import { RemoteDevices } from './RemoteDevices';
 import { Menu, type MenuItem } from './ui/Menu';
@@ -690,9 +691,10 @@ function RootEndDropZone() {
 }
 
 function AskChats({ state }: { state: AppState }) {
-  const selectedId = useUi((ui) =>
-    ui.page.kind === 'ask' ? ui.page.askChatId : null,
-  );
+  const selectedId = useUi((ui) => {
+    if (ui.page.kind === 'grid') return paneAskChatId(focusedGridPane(ui.grid));
+    return ui.page.kind === 'ask' ? ui.page.askChatId : null;
+  });
   const open = useUi((ui) => ui.askOpen);
   if (!state.askChats.length) return null;
   const newestFirst = asksNewestFirst(state);
@@ -925,9 +927,11 @@ export function AddRepositoryMenu({
 }
 
 export function Sidebar({ state }: { state: AppState }) {
-  const selectedId = useUi((ui) =>
-    ui.page.kind === 'workspace' ? ui.workspaceId : null,
-  );
+  const selectedId = useUi((ui) => {
+    if (ui.page.kind === 'grid')
+      return paneWorkspaceId(focusedGridPane(ui.grid));
+    return ui.page.kind === 'workspace' ? ui.workspaceId : null;
+  });
   const active = activeWorkspaces(state);
   const indexOf = (workspace: Workspace) => active.indexOf(workspace);
   return (

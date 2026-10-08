@@ -15,6 +15,7 @@ import type {
 import { activeWorkspaces } from '../shared/workspaces';
 import { api } from './bridge';
 import {
+  focusedGridPane,
   freeTab,
   isAskPane,
   paneCount,
@@ -315,8 +316,7 @@ export function openGrid() {
 }
 
 export function focusedPane(): GridPane | null {
-  const { grid } = getUi();
-  return grid.panes[grid.focused] ?? null;
+  return focusedGridPane(getUi().grid);
 }
 
 export function expandPane(pane: GridPane) {
