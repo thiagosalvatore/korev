@@ -4,8 +4,19 @@ Korev shows the section of each version in its "What's new" window, so write for
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-08
+
+Pull request comments get their own tab, and plans are easier to review.
+
 - Pull request comments have their own Comments tab, next to Checks. Replies show in their thread, and you can switch between comments from people and comments from bots. "Open as tab" shows the comments next to your chats, with more room to read.
 - Comments on the pull request itself and review summaries now show too. Before, Korev showed only comments on lines of code, and none at all on pull requests with more than 30 of them.
+- The plan feedback box has the microphone and ⌘⇧S, like the chat. Enter sends your feedback, and Shift+Enter adds a new line.
+- After you approve a plan or send it back, click the "Plan" line to read the plan again.
+- ⌘N and the New workspace button no longer choose a repository for you, so a new workspace does not go into the wrong one by mistake. If you have only one repository, Korev still chooses it.
+- Your message shows in the chat as soon as you press Enter. Before, on a large repository, it stayed in the box for a moment.
+- The Checks tab no longer has its own Merge button. Use the button in the workspace header or the command palette.
+- The "…" menu on a workspace in the sidebar no longer closes when the pointer leaves the row.
+- Korev checks for a new version every hour. Before, it checked every 6 hours.
 
 ## [0.5.0] - 2026-10-08
 
