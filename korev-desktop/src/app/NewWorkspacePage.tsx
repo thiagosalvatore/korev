@@ -120,6 +120,7 @@ export function NewWorkspacePage({
   const [from, setFrom] = useState<CreateFrom | null>(null);
   const [picking, setPicking] = useState(false);
   const [baseBranch, setBaseBranch] = useState<string | null>(null);
+  const [keepAfterMerge, setKeepAfterMerge] = useState(false);
   useCreateFromShortcut(Boolean(singleRepo), () =>
     setPicking((value) => !value),
   );
@@ -142,6 +143,7 @@ export function NewWorkspacePage({
       repos.map((entry) => entry.id),
       prompt ? { text: prompt, agent, model, effort, planMode, fast } : null,
       singleRepo ? workspaceSource(from, baseBranch) : undefined,
+      keepAfterMerge,
     );
     setCreating(false);
     return created;
@@ -199,6 +201,16 @@ export function NewWorkspacePage({
                 onClick={() => setFrom(null)}
               />
             ) : null}
+            <Button
+              size="sm"
+              variant={keepAfterMerge ? 'secondary' : 'ghost'}
+              icon="pin"
+              aria-pressed={keepAfterMerge}
+              title="Don't archive this workspace when its pull request merges"
+              onClick={() => setKeepAfterMerge((value) => !value)}
+            >
+              Keep after merge
+            </Button>
             <span className="flex-1" />
             <AddRepositoryMenu
               trigger={(toggle) => (

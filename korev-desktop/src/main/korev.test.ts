@@ -398,6 +398,24 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toBeNull();
   });
 
+  it('keeps a workspace set to keep after merge when its PR merges', async () => {
+    await korev.api.updateSettings({ archiveOnMerge: true });
+    const workspace = await createWorkspace();
+    await korev.api.setKeepAfterMerge(workspace.id, true);
+    openPr = {
+      number: 7,
+      url: BRANCH_PR_URL,
+      state: 'MERGED',
+      mergedAt: '2020-01-01T00:00:00Z',
+    };
+
+    await korev.api.prStatuses(workspace.id);
+
+    expect(
+      (await workspaceState(workspace.id)).workspace.archivedAt,
+    ).toBeNull();
+  });
+
   function fakePr(number: number, state: string, createdAt: string) {
     const url = `https://github.com/acme/web/pull/${number}`;
     prsByUrl[url] = { number, url, state, createdAt, mergedAt: null };

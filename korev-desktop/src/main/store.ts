@@ -95,6 +95,7 @@ function sanitize(raw: unknown, home: string): PersistedState {
         ...workspace,
         archiveSnapshot: workspace.archiveSnapshot ?? null,
         restoredAt: workspace.restoredAt ?? null,
+        keepAfterMerge: workspace.keepAfterMerge ?? false,
         groupId: workspace.groupId ?? null,
         prs: workspace.prs ?? [],
         sessions: workspace.sessions.map((session) => ({

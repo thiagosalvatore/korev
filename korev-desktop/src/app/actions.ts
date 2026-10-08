@@ -159,8 +159,17 @@ export async function createWorkspaces(
   repoIds: string[],
   task: SendOptions | null,
   source?: WorkspaceSource,
+  keepAfterMerge = false,
 ) {
-  return openCreated(await api.createWorkspaces(repoIds, task, source));
+  const created = await api.createWorkspaces(repoIds, task, source);
+  if (created.ok && keepAfterMerge) {
+    await Promise.all(
+      created.value.map((workspace) =>
+        api.setKeepAfterMerge(workspace.id, true),
+      ),
+    );
+  }
+  return openCreated(created);
 }
 
 export async function startFromAsk(ask: AskChat) {

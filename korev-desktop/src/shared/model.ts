@@ -209,6 +209,7 @@ export interface Workspace {
   archivedAt: string | null;
   restoredAt: string | null;
   archiveSnapshot: Checkpoint | null;
+  keepAfterMerge: boolean;
   sessions: ChatSession[];
   prs: TrackedPr[];
 }

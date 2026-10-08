@@ -510,6 +510,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
 
   async function archiveIfConfigured(workspaceId: string, prs: PrStatus[]) {
     const workspace = ctx.workspace(workspaceId);
+    if (workspace.keepAfterMerge) return;
     const config = await workspaceConfig(ctx, workspace);
     if (!(config.archiveOnMerge ?? store.state.settings.archiveOnMerge)) return;
     if (
@@ -1012,6 +1013,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       store.save();
       ctx.emitState();
       ctx.background(refreshStats(ctx, workspace));
+    },
+    async setKeepAfterMerge(workspaceId, keep) {
+      ctx.workspace(workspaceId).keepAfterMerge = keep;
+      saveAndEmit();
     },
     async workspaceConfig(workspaceId) {
       const workspace = workspacePath(workspaceId);

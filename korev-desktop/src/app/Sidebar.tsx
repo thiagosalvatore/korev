@@ -266,6 +266,17 @@ function WorkspaceRow({
               onSelect: () => void openIn(workspace, 'finder'),
             },
             {
+              id: 'keep-after-merge',
+              label: 'Keep after merge',
+              icon: 'pin',
+              checked: workspace.keepAfterMerge,
+              onSelect: () =>
+                void api.setKeepAfterMerge(
+                  workspace.id,
+                  !workspace.keepAfterMerge,
+                ),
+            },
+            {
               id: 'archive',
               label: 'Archive',
               icon: 'archive',
