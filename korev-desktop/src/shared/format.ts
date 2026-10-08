@@ -97,7 +97,10 @@ export function pickerLabel(picked: Repo[]): string {
   return `${names[0]} +${names.length - 1}`;
 }
 
+const NO_REPOSITORY = 'No repository';
+
 export function askRepoNames(state: AppState, ask: AskChat): string {
+  if (!ask.repoIds.length) return NO_REPOSITORY;
   return ask.repoIds
     .map((repoId) => state.repos.find((repo) => repo.id === repoId)?.name)
     .join(', ');

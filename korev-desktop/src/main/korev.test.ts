@@ -850,6 +850,31 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toEqual(['user', 'assistant', 'tool', 'result']);
   });
 
+  it('answers an Ask chat without a repository in an empty folder', async () => {
+    const askDir = path.join(home, 'korev', 'workspaces', '.ask');
+    await mkdir(path.join(askDir, '.context'), { recursive: true });
+
+    const ask = await askAndWait([], 'What is a monad?');
+
+    const args = await readFile(
+      path.join(askDir, '.context', 'claude-args'),
+      'utf8',
+    );
+    expect(args).toContain('--disallowedTools Edit Write NotebookEdit');
+    expect(await korev.api.startFromAsk(ask.id)).toMatchObject({ ok: false });
+  });
+
+  it('keeps an Ask chat without a repository when a repository is removed', async () => {
+    const repo = await addRepo();
+    const ask = await korev.api.createAskChat([]);
+
+    await korev.api.removeRepo(repo.id);
+
+    expect(
+      (await korev.api.getState()).askChats.map((entry) => entry.id),
+    ).toEqual([ask.id]);
+  });
+
   it('titles an Ask chat from its first question', async () => {
     const repo = await addRepo();
 

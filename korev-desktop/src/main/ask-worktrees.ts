@@ -19,6 +19,10 @@ export function askWorktreePath(workspacesRoot: string, repo: Repo): string {
   );
 }
 
+export function askScratchPath(workspacesRoot: string): string {
+  return path.join(workspacesRoot, ASK_WORKTREE_DIR);
+}
+
 export async function prepareAskWorktree(
   git: Git,
   workspacesRoot: string,

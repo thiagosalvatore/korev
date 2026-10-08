@@ -34,7 +34,7 @@ import {
 import { detectAgents, reconcileDefaultModels } from './agents';
 import type { Dictation } from './dictation';
 import type { RemoteAccess } from './remote-access';
-import { askWorktreePath } from './ask-worktrees';
+import { askScratchPath, askWorktreePath } from './ask-worktrees';
 import { createChats, lanesElsewhereNote, type TurnPrLinks } from './chats';
 import { readConductorRepos, readConductorSettings } from './conductor-import';
 import {
@@ -587,10 +587,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       (entry) => entry.session.id === sessionId,
     );
     if (!ask) throw new NotFoundError('Session', sessionId);
-    return askWorktreePath(
-      store.state.settings.workspacesRoot,
-      ctx.repo(ask.repoIds[0]),
-    );
+    const root = store.state.settings.workspacesRoot;
+    const [repoId] = ask.repoIds;
+    return repoId
+      ? askWorktreePath(root, ctx.repo(repoId))
+      : askScratchPath(root);
   }
 
   function implementOptions(session: ChatSession, text: string): SendOptions {
@@ -795,7 +796,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   }
 
   async function removeRepoFromAskChats(repo: Repo) {
-    for (const ask of store.state.askChats) {
+    const asked = store.state.askChats.filter((ask) =>
+      ask.repoIds.includes(repo.id),
+    );
+    for (const ask of asked) {
       ask.repoIds = ask.repoIds.filter((repoId) => repoId !== repo.id);
       if (!ask.repoIds.length) await deleteAskChat(ask.id);
     }

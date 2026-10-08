@@ -35,7 +35,7 @@ import {
   isUserMessageAck,
   type TurnRequest,
 } from './agents';
-import { prepareAskWorktree } from './ask-worktrees';
+import { askScratchPath, prepareAskWorktree } from './ask-worktrees';
 import { errorMessage, NotFoundError, type Context } from './context';
 import {
   branchExists,
@@ -149,9 +149,16 @@ function mergeLimits(current: PlanLimit[], next: PlanLimit[]): PlanLimit[] {
   return [...byLabel.values()];
 }
 
+const ASK_INTRO = `You are answering questions inside Korev, a Mac app that lets the user run many coding agents in parallel.`;
+
+const NO_REPO_ASK_PROMPT = [
+  ASK_INTRO,
+  `The user did not pick a repository. Answer the question directly. Do not edit files, create branches or commit.`,
+].join('\n');
+
 export function askSystemPrompt(repos: Repo[], checkouts: string[]): string {
   return [
-    `You are answering questions inside Korev, a Mac app that lets the user run many coding agents in parallel.`,
+    ASK_INTRO,
     `The user is asking about these repositories. Each one is checked out read-only at its latest default branch:`,
     ...repos.map(
       (repo, index) =>
@@ -383,8 +390,21 @@ export function createChats(
     return dir;
   }
 
+  async function noRepoAskTarget(root: string): Promise<TurnTarget> {
+    const cwd = askScratchPath(root);
+    await mkdir(cwd, { recursive: true });
+    return {
+      cwd,
+      env: ctx.deps.env,
+      systemPrompt: NO_REPO_ASK_PROMPT,
+      readOnly: true,
+      addDirs: [await readableAttachments()],
+    };
+  }
+
   async function askTarget(ask: AskChat): Promise<TurnTarget> {
     const root = ctx.store.state.settings.workspacesRoot;
+    if (!ask.repoIds.length) return noRepoAskTarget(root);
     const repos = ask.repoIds.map((repoId) => ctx.repo(repoId));
     const checkouts = await Promise.all(
       repos.map((repo) =>
