@@ -14,7 +14,7 @@ import type {
 } from '../shared/model';
 import { activeWorkspaces } from '../shared/workspaces';
 import { api } from './bridge';
-import { paneCount, placeInPane } from './grid';
+import { paneCount, placeInPane, terminalTabs } from './grid';
 import { reportFailure, toast } from './ui/toast';
 import {
   EMPTY_WORKSPACE_UI,
@@ -70,6 +70,10 @@ export function activateTab(workspaceId: string, key: string) {
 
 function openExtraTab(workspaceId: string, tab: MainTab) {
   if (getUi().page.kind === 'grid') selectWorkspace(workspaceId);
+  addExtraTab(workspaceId, tab);
+}
+
+function addExtraTab(workspaceId: string, tab: MainTab) {
   updateWorkspaceUi(workspaceId, (current) => {
     const key = tabKey(tab);
     const exists = current.extraTabs.some((entry) => tabKey(entry) === key);
@@ -289,11 +293,10 @@ export async function startRunScript(workspace: Workspace, scriptId: string) {
 }
 
 export function focusComposer() {
-  const composer =
-    document.querySelector<HTMLTextAreaElement>(
-      '[data-grid-focused] [data-composer]',
-    ) ?? document.querySelector<HTMLTextAreaElement>('[data-composer]');
-  composer?.focus();
+  const scope = getUi().page.kind === 'grid' ? '[data-grid-focused] ' : '';
+  document
+    .querySelector<HTMLTextAreaElement>(`${scope}[data-composer]`)
+    ?.focus();
 }
 
 export function openGrid() {
@@ -344,8 +347,28 @@ export function clearPane(index: number) {
   showInPane(index, null);
 }
 
+function lastUsedPane(workspace: Workspace): GridPane {
+  const activeKey = getUi().workspaces[workspace.id]?.activeKey;
+  const terminal = terminalTabs(getUi().workspaces, workspace.id).find(
+    (tab) => tabKey(tab) === activeKey,
+  );
+  return terminal
+    ? { workspaceId: workspace.id, tabKey: tabKey(terminal) }
+    : chatPane(workspace.id, activeSessionId(workspace));
+}
+
 export function fillPane(index: number, workspace: Workspace) {
-  showInPane(index, chatPane(workspace.id, activeSessionId(workspace)));
+  showInPane(index, lastUsedPane(workspace));
+}
+
+export function newTerminalInPane(
+  index: number,
+  workspaceId: string,
+  preset: TerminalPreset,
+) {
+  const tab: MainTab = { kind: 'terminal', id: tabId(), preset };
+  addExtraTab(workspaceId, tab);
+  showInPane(index, { workspaceId, tabKey: tabKey(tab) });
 }
 
 export async function newChatInPane(

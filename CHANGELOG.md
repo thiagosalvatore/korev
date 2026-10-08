@@ -4,7 +4,7 @@ Korev shows the section of each version in its "What's new" window, so write for
 
 ## [Unreleased]
 
-- The new grid view shows chats from different workspaces side by side, in a 2×1, 1×2 or 2×2 layout. Click **Grid** in the sidebar or press ⌘G. Drag a workspace from the sidebar onto a pane, or click **Choose workspace** in an empty pane. **Open in full view** on a pane opens that chat in its workspace, and ⌘G brings you back to the grid.
+- The new grid view shows chats and terminals from different workspaces side by side, in a 2×1, 1×2 or 2×2 layout. Click **Grid** in the sidebar or press ⌘G. Drag a workspace from the sidebar onto a pane, or click **Choose workspace** in an empty pane. The menu in the pane header switches the pane to another chat or terminal, or opens a new one. **Open in full view** on a pane opens that tab in its workspace, and ⌘G brings you back to the grid.
 
 ## [0.7.0] - 2026-10-08
 

@@ -29,8 +29,9 @@ Three columns:
   the terminal panel (Setup / Run / Terminal) below.
 
 The **Grid** page (⌘G) replaces the centre and the right panel with 2 or 4 panes. Each pane
-shows one chat of a workspace. The pane header has the branch, the workspace name, the chat
-picker, **Open in full view** and **Remove from grid**. The focused pane has an accent border.
+shows one chat or terminal tab of a workspace. The pane header has the branch, the workspace
+name, the tab picker, **Open in full view** and **Remove from grid**. The focused pane has an
+accent border.
 
 ## Workspace row
 

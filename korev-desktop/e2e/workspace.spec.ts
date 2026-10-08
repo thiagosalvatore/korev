@@ -430,3 +430,38 @@ test('shows chats from two workspaces side by side in the grid', async () => {
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test('runs a terminal in a grid pane and keeps it in the full view', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const { app, window } = await launch(home, repo);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window
+      .getByRole('button', { name: 'Create empty workspace' })
+      .click();
+    const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
+    await sidebar.getByRole('button', { name: /^Grid/ }).click();
+    const pane = window.getByRole('region', { name: 'Pane 1' });
+    await pane.getByRole('button', { name: 'Choose workspace' }).click();
+    await window.getByRole('menuitem').first().click();
+
+    await pane.getByRole('button', { name: 'New chat' }).click();
+    await window.getByRole('menuitem', { name: 'New terminal' }).click();
+    await pane.locator('.xterm').click();
+    await window.keyboard.type('echo korev-grid-terminal');
+    await window.keyboard.press('Enter');
+    await expect(pane.locator('.xterm-rows')).toContainText(
+      'korev-grid-terminal',
+    );
+    await snap(window, '11-grid-terminal');
+
+    await pane.getByRole('button', { name: 'Open in full view' }).click();
+    await expect(window.getByRole('main').locator('.xterm-rows')).toContainText(
+      'korev-grid-terminal',
+    );
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});

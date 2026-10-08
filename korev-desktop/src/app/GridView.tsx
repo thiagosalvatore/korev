@@ -15,22 +15,37 @@ import {
   focusComposer,
   focusPane,
   newChatInPane,
+  newTerminalInPane,
   setGridLayout,
   showInPane,
+  terminalTabRef,
 } from './actions';
 import { ChatView } from './chat/ChatView';
 import { useDropTarget, WORKSPACE_DRAG_TYPE } from './dnd';
-import { GRID_LAYOUTS, resolvePane, type PaneContent } from './grid';
+import {
+  GRID_LAYOUTS,
+  resolvePane,
+  terminalTabs,
+  type PaneContent,
+} from './grid';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { Menu, type MenuItem } from './ui/Menu';
 import {
   getUi,
   setUi,
+  tabKey,
   useUi,
   type GridLayout,
   type GridPane,
+  type WorkspaceUi,
 } from './ui-store';
-import { WorktreePending } from './WorkspaceView';
+import {
+  newTerminalLabel,
+  PRESET_LABELS,
+  TERMINAL_PRESETS,
+  WorktreePending,
+} from './WorkspaceView';
+import { XTerm } from './XTerm';
 
 const LAYOUT_ICONS: Record<GridLayout, IconName> = {
   '2x1': 'columns-2',
@@ -77,23 +92,47 @@ function LayoutPicker({ layout }: { layout: GridLayout }) {
 
 function paneTabItems(
   state: AppState,
+  workspacesUi: Record<string, WorkspaceUi>,
   index: number,
-  content: PaneContent,
+  pane: GridPane,
+  workspace: Workspace,
 ): MenuItem[] {
-  const { workspace } = content;
-  const chats = workspace.sessions.map((session): MenuItem => {
-    const pane = chatPane(workspace.id, session.id);
-    return {
-      id: pane.tabKey,
+  const showItem = (
+    key: string,
+    item: Omit<MenuItem, 'id' | 'checked' | 'onSelect'>,
+  ): MenuItem => ({
+    ...item,
+    id: key,
+    checked: key === pane.tabKey,
+    onSelect: () =>
+      showInPane(index, { workspaceId: workspace.id, tabKey: key }),
+  });
+  const chats = workspace.sessions.map((session) =>
+    showItem(chatPane(workspace.id, session.id).tabKey, {
       label: session.title,
       icon: AGENT_ICONS[session.agent],
-      checked: session.id === content.session.id,
       section: 'Chats',
-      onSelect: () => showInPane(index, pane),
-    };
-  });
+    }),
+  );
+  const terminals = terminalTabs(workspacesUi, workspace.id).map((terminal) =>
+    showItem(tabKey(terminal), {
+      label: PRESET_LABELS[terminal.preset],
+      icon: 'square-terminal',
+      section: 'Terminals',
+    }),
+  );
+  const newTerminals = TERMINAL_PRESETS.map(
+    (preset): MenuItem => ({
+      id: `new-terminal-${preset}`,
+      label: newTerminalLabel(preset),
+      icon: 'square-terminal',
+      section: 'New',
+      onSelect: () => newTerminalInPane(index, workspace.id, preset),
+    }),
+  );
   return [
     ...chats,
+    ...terminals,
     {
       id: 'new-chat',
       label: 'New chat',
@@ -103,22 +142,40 @@ function paneTabItems(
       onSelect: () =>
         void newChatInPane(index, workspace, state.settings.defaultAgent),
     },
+    ...newTerminals,
   ];
+}
+
+function paneTitle(content: PaneContent): { label: string; icon: IconName } {
+  if (content.kind === 'terminal')
+    return {
+      label: PRESET_LABELS[content.terminal.preset],
+      icon: 'square-terminal',
+    };
+  return {
+    label: content.session.title,
+    icon: AGENT_ICONS[content.session.agent],
+  };
 }
 
 function PaneHeader({
   state,
+  workspacesUi,
   index,
   pane,
   content,
 }: {
   state: AppState;
+  workspacesUi: Record<string, WorkspaceUi>;
   index: number;
   pane: GridPane;
   content: PaneContent;
 }) {
-  const { workspace, session } = content;
-  const running = state.runningSessions.includes(session.id);
+  const { workspace } = content;
+  const { label, icon } = paneTitle(content);
+  const running =
+    content.kind === 'chat' &&
+    state.runningSessions.includes(content.session.id);
   return (
     <div className="flex h-9 flex-none items-center gap-2 border-b border-border-1 bg-surface pr-1 pl-3 text-sm">
       {running ? (
@@ -128,11 +185,7 @@ function PaneHeader({
           className="animate-spin text-accent-text"
         />
       ) : (
-        <Icon
-          name={AGENT_ICONS[session.agent]}
-          size={13}
-          className="text-fg-3"
-        />
+        <Icon name={icon} size={13} className="text-fg-3" />
       )}
       <span
         className="min-w-0 truncate font-medium text-fg-1"
@@ -146,7 +199,7 @@ function PaneHeader({
       <Menu
         label={`${workspace.name} tabs`}
         align="right"
-        items={paneTabItems(state, index, content)}
+        items={paneTabItems(state, workspacesUi, index, pane, workspace)}
         trigger={({ toggle }) => (
           <Button
             size="sm"
@@ -155,7 +208,7 @@ function PaneHeader({
             className="min-w-0 max-w-48"
             onClick={toggle}
           >
-            <span className="truncate">{session.title}</span>
+            <span className="truncate">{label}</span>
           </Button>
         )}
       />
@@ -182,18 +235,29 @@ function PaneBody({
   state: AppState;
   content: PaneContent;
 }) {
-  const { workspace, session } = content;
+  const { workspace } = content;
   const runtime = state.runtime[workspace.id];
   if (runtime && !hasWorktree(runtime))
     return (
       <WorktreePending state={state} workspace={workspace} runtime={runtime} />
     );
+  if (content.kind === 'terminal')
+    return (
+      <XTerm
+        key={content.terminal.id}
+        workspaceId={workspace.id}
+        terminalRef={terminalTabRef(workspace.id, content.terminal.id)}
+        kind="shell"
+        preset={content.terminal.preset}
+        interactive
+      />
+    );
   return (
     <ChatView
-      key={session.id}
+      key={content.session.id}
       state={state}
       workspace={workspace}
-      session={session}
+      session={content.session}
       autoFocus={false}
     />
   );
@@ -248,7 +312,8 @@ function Pane({
   pane: GridPane | null;
   focused: boolean;
 }) {
-  const content = resolvePane(state, pane);
+  const workspacesUi = useUi((ui) => ui.workspaces);
+  const content = resolvePane(state, workspacesUi, pane);
   const drop = useDropTarget({
     [WORKSPACE_DRAG_TYPE]: (workspaceId) => {
       const workspace = activeWorkspaces(state).find(
@@ -273,6 +338,7 @@ function Pane({
         <>
           <PaneHeader
             state={state}
+            workspacesUi={workspacesUi}
             index={index}
             pane={pane}
             content={content}

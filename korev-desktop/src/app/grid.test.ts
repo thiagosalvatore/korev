@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AppState, Workspace } from '../shared/model';
 import { placeInPane, resolvePane } from './grid';
+import type { WorkspaceUi } from './ui-store';
 
 const workspace = {
   id: 'w1',
@@ -14,6 +15,19 @@ function stateWith(workspaces: Workspace[]): AppState {
 }
 
 const chat = { workspaceId: 'w1', tabKey: 'chat:s1' };
+const terminal = {
+  kind: 'terminal' as const,
+  id: 't1',
+  preset: 'claude' as const,
+};
+const withTerminal: Record<string, WorkspaceUi> = {
+  w1: {
+    extraTabs: [terminal],
+    activeKey: null,
+    terminalTab: 'shell',
+    comments: [],
+  },
+};
 
 describe('placeInPane', () => {
   it('moves a tab out of the pane that already shows it', () => {
@@ -28,16 +42,25 @@ describe('placeInPane', () => {
 
 describe('resolvePane', () => {
   it('finds the chat a pane points at', () => {
-    expect(resolvePane(stateWith([workspace]), chat)).toEqual({
+    expect(resolvePane(stateWith([workspace]), {}, chat)).toEqual({
       kind: 'chat',
       workspace,
       session: workspace.sessions[0],
     });
   });
 
+  it('finds the terminal tab a pane points at', () => {
+    expect(
+      resolvePane(stateWith([workspace]), withTerminal, {
+        workspaceId: 'w1',
+        tabKey: 'terminal:t1',
+      }),
+    ).toEqual({ kind: 'terminal', workspace, terminal });
+  });
+
   it('is empty once the chat is closed', () => {
     expect(
-      resolvePane(stateWith([{ ...workspace, sessions: [] }]), chat),
+      resolvePane(stateWith([{ ...workspace, sessions: [] }]), {}, chat),
     ).toBeNull();
   });
 
@@ -45,6 +68,7 @@ describe('resolvePane', () => {
     expect(
       resolvePane(
         stateWith([{ ...workspace, archivedAt: '2026-10-08T00:00:00Z' }]),
+        {},
         chat,
       ),
     ).toBeNull();

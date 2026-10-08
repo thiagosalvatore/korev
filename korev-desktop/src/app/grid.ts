@@ -1,5 +1,12 @@
 import type { AppState, ChatSession, Workspace } from '../shared/model';
-import { GRID_PANES, tabKey, type GridLayout, type GridPane } from './ui-store';
+import {
+  GRID_PANES,
+  tabKey,
+  type GridLayout,
+  type GridPane,
+  type MainTab,
+  type WorkspaceUi,
+} from './ui-store';
 
 export const GRID_LAYOUTS: Record<GridLayout, { cols: number; rows: number }> =
   {
@@ -8,11 +15,11 @@ export const GRID_LAYOUTS: Record<GridLayout, { cols: number; rows: number }> =
     '2x2': { cols: 2, rows: 2 },
   };
 
-export type PaneContent = {
-  kind: 'chat';
-  workspace: Workspace;
-  session: ChatSession;
-};
+export type TerminalTab = Extract<MainTab, { kind: 'terminal' }>;
+
+export type PaneContent =
+  | { kind: 'chat'; workspace: Workspace; session: ChatSession }
+  | { kind: 'terminal'; workspace: Workspace; terminal: TerminalTab };
 
 export function paneCount(layout: GridLayout): number {
   const { cols, rows } = GRID_LAYOUTS[layout];
@@ -35,17 +42,31 @@ export function placeInPane(
   });
 }
 
+export function terminalTabs(
+  workspaces: Record<string, WorkspaceUi>,
+  workspaceId: string,
+): TerminalTab[] {
+  return (workspaces[workspaceId]?.extraTabs ?? []).flatMap((tab) =>
+    tab.kind === 'terminal' ? [tab] : [],
+  );
+}
+
 export function resolvePane(
   state: AppState,
+  workspaces: Record<string, WorkspaceUi>,
   pane: GridPane | null,
 ): PaneContent | null {
   if (!pane) return null;
   const workspace = state.workspaces.find(
     (entry) => entry.id === pane.workspaceId && !entry.archivedAt,
   );
-  const session = workspace?.sessions.find(
+  if (!workspace) return null;
+  const session = workspace.sessions.find(
     (entry) => tabKey({ kind: 'chat', sessionId: entry.id }) === pane.tabKey,
   );
-  if (!workspace || !session) return null;
-  return { kind: 'chat', workspace, session };
+  if (session) return { kind: 'chat', workspace, session };
+  const terminal = terminalTabs(workspaces, workspace.id).find(
+    (tab) => tabKey(tab) === pane.tabKey,
+  );
+  return terminal ? { kind: 'terminal', workspace, terminal } : null;
 }

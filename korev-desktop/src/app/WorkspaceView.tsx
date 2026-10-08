@@ -70,11 +70,19 @@ const TAB_ICONS = {
   browser: 'globe',
 } as const;
 
-const PRESET_LABELS: Record<TerminalPreset, string> = {
+export const PRESET_LABELS: Record<TerminalPreset, string> = {
   shell: 'Terminal',
   claude: 'Claude Code',
   codex: 'Codex',
 };
+
+export const TERMINAL_PRESETS = ['shell', 'claude', 'codex'] as const;
+
+export function newTerminalLabel(preset: TerminalPreset): string {
+  return preset === 'shell'
+    ? 'New terminal'
+    : `${PRESET_LABELS[preset]} in a terminal`;
+}
 
 function extraTabLabel(tab: MainTab): string {
   if (tab.kind === 'diff') return tab.range ? 'Turn changes' : 'Changes';
@@ -97,13 +105,10 @@ function newTabItems(state: AppState, workspace: Workspace): MenuItem[] {
       section: 'Chat',
       onSelect: () => void newChat(workspace, state.settings.defaultAgent),
     },
-    ...(['shell', 'claude', 'codex'] as const).map(
+    ...TERMINAL_PRESETS.map(
       (preset): MenuItem => ({
         id: `terminal-${preset}`,
-        label:
-          preset === 'shell'
-            ? 'New terminal'
-            : `${PRESET_LABELS[preset]} in a terminal`,
+        label: newTerminalLabel(preset),
         icon: 'square-terminal',
         section: 'Terminal',
         onSelect: () => openTerminalTab(workspace.id, preset),
