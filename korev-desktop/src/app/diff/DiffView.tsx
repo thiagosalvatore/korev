@@ -7,15 +7,14 @@ import {
   Icon,
   Spinner,
 } from '../../design-system';
-import {
-  primaryPr,
-  type AppState,
-  type FileChange,
-  type ReviewComment,
-  type TurnRange,
-  type Workspace,
+import type {
+  AppState,
+  FileChange,
+  TurnRange,
+  Workspace,
 } from '../../shared/model';
 import { api } from '../bridge';
+import { usePrThreads } from '../comments/PrComments';
 import { usePolling } from '../hooks';
 import { EMPTY_WORKSPACE_UI, setUi, useUi, type DiffLayout } from '../ui-store';
 import { FileDiff } from './FileDiff';
@@ -54,17 +53,6 @@ function useChanges(workspace: Workspace, range: TurnRange | null) {
   return changes;
 }
 
-function useReviewComments(state: AppState, workspace: Workspace) {
-  const prUrl = useUi((ui) => ui.workspaces[workspace.id]?.prUrl);
-  const pr = primaryPr(workspace, state.runtime[workspace.id], prUrl);
-  const [comments, setComments] = useState<ReviewComment[]>([]);
-  useEffect(() => {
-    if (pr?.state !== 'OPEN') return;
-    void api.reviewComments(workspace.id, pr.number).then(setComments);
-  }, [workspace.id, pr?.number, pr?.state]);
-  return comments;
-}
-
 export function DiffView({
   state,
   workspace,
@@ -77,7 +65,9 @@ export function DiffView({
     (value) => value.workspaces[workspace.id] ?? EMPTY_WORKSPACE_UI,
   );
   const layout = useUi((value) => value.diffLayout);
-  const reviewComments = useReviewComments(state, workspace);
+  const lineThreads = (usePrThreads(state, workspace).threads ?? []).filter(
+    (thread) => thread.line !== null,
+  );
   const viewedCount = (changes ?? []).filter(
     (change) => ui.viewed?.[change.path],
   ).length;
@@ -161,11 +151,11 @@ export function DiffView({
               {entry.label}
             </button>
           ))}
-          {reviewComments.length ? (
+          {lineThreads.length ? (
             <span className="ml-2 flex items-center gap-1 text-xs text-fg-3">
               <Icon name="git-pull-request" size={12} />
-              {reviewComments.length} review comment
-              {reviewComments.length === 1 ? '' : 's'}
+              {lineThreads.length} review thread
+              {lineThreads.length === 1 ? '' : 's'}
             </span>
           ) : null}
         </div>
@@ -178,8 +168,8 @@ export function DiffView({
               range={range}
               layout={layout}
               comments={ui.comments}
-              reviewComments={reviewComments.filter(
-                (comment) => comment.path === change.path,
+              reviewThreads={lineThreads.filter(
+                (thread) => thread.path === change.path,
               )}
               viewedSignature={ui.viewed?.[change.path] ?? null}
             />

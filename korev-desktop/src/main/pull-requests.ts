@@ -3,8 +3,9 @@ import {
   type CheckState,
   type PrCheck,
   type PrStack,
+  type PrComment,
   type PrStatus,
-  type ReviewComment,
+  type PrThread,
 } from '../shared/model';
 import type { CommandRunner } from './command-runner';
 
@@ -65,6 +66,25 @@ const REQUIRED_CHECKS_QUERY = `query($url: URI!, $number: Int!, $endCursor: Stri
 }`;
 const REQUIRED_CHECK_NAMES =
   '.data.resource.commits.nodes[0].commit.statusCheckRollup.contexts.nodes[]? | select(.isRequired) | .name // .context';
+
+const THREADS_PAGE_SIZE = 100;
+const THREAD_REPLIES_PAGE_SIZE = 50;
+const COMMENT_FIELDS = 'id body url createdAt author { login __typename }';
+const PR_THREADS_QUERY = `query($url: URI!) {
+  resource(url: $url) {
+    ... on PullRequest {
+      reviewThreads(first: ${THREADS_PAGE_SIZE}) {
+        nodes {
+          id isResolved isOutdated path line
+          comments(first: ${THREAD_REPLIES_PAGE_SIZE}) { nodes { ${COMMENT_FIELDS} diffHunk } }
+        }
+      }
+      comments(last: ${THREADS_PAGE_SIZE}) { nodes { ${COMMENT_FIELDS} } }
+      reviews(last: ${THREADS_PAGE_SIZE}) { nodes { ${COMMENT_FIELDS} } }
+    }
+  }
+}`;
+const GHOST_AUTHOR = 'ghost';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -334,49 +354,80 @@ export function onPrBranch(prompt: string, pr: PrStatus, branch: string) {
 export const REVIEW_PROMPT =
   'Review the changes on this branch compared to its target branch (committed and uncommitted). Look for bugs, missing tests and unclear code. List concrete findings with file and line, most severe first. Do not edit files.';
 
-export function parseReviewComments(json: string): ReviewComment[] {
-  let rows: unknown;
+function nodes(connection: unknown): JsonRecord[] {
+  const list = (connection as { nodes?: unknown } | undefined)?.nodes;
+  return Array.isArray(list) ? (list as JsonRecord[]) : [];
+}
+
+function toPrComment(node: JsonRecord): PrComment {
+  const author = node.author as JsonRecord | null | undefined;
+  return {
+    id: str(node.id),
+    author: str(author?.login) || GHOST_AUTHOR,
+    isBot: author?.__typename === 'Bot',
+    body: str(node.body),
+    url: str(node.url),
+    createdAt: str(node.createdAt),
+  };
+}
+
+function toReviewThread(node: JsonRecord): PrThread {
+  const comments = nodes(node.comments);
+  return {
+    id: str(node.id),
+    path: str(node.path),
+    line: typeof node.line === 'number' ? node.line : null,
+    diffHunk: str(comments[0]?.diffHunk),
+    isResolved: node.isResolved === true,
+    isOutdated: node.isOutdated === true,
+    comments: comments.map(toPrComment),
+  };
+}
+
+function toConversationThread(node: JsonRecord): PrThread {
+  const comment = toPrComment(node);
+  return {
+    id: comment.id,
+    path: null,
+    line: null,
+    diffHunk: '',
+    isResolved: false,
+    isOutdated: false,
+    comments: [comment],
+  };
+}
+
+export function parsePrThreads(json: string): PrThread[] {
+  let pr: JsonRecord | undefined;
   try {
-    rows = JSON.parse(json);
+    pr = (JSON.parse(json) as { data?: { resource?: JsonRecord } }).data
+      ?.resource;
   } catch {
     return [];
   }
-  if (!Array.isArray(rows)) return [];
-  return (rows as JsonRecord[]).flatMap((row) =>
-    typeof row.id === 'number'
-      ? [
-          {
-            id: row.id,
-            path: str(row.path),
-            line: typeof row.line === 'number' ? row.line : null,
-            body: str(row.body),
-            author: str((row.user as JsonRecord | undefined)?.login),
-            url: str(row.html_url),
-          },
-        ]
-      : [],
-  );
+  if (!pr) return [];
+  const conversation = [...nodes(pr.comments), ...nodes(pr.reviews)]
+    .filter((node) => str(node.body).trim())
+    .map(toConversationThread)
+    .sort((a, b) =>
+      a.comments[0].createdAt.localeCompare(b.comments[0].createdAt),
+    );
+  return [...nodes(pr.reviewThreads).map(toReviewThread), ...conversation];
 }
 
-export async function fetchReviewComments(
+export async function fetchPrThreads(
   run: CommandRunner,
   env: NodeJS.ProcessEnv,
   cwd: string,
-  number: number,
-): Promise<ReviewComment[]> {
+  url: string,
+): Promise<PrThread[]> {
   try {
     const result = await run(
       'gh',
-      [
-        'api',
-        `repos/{owner}/{repo}/pulls/${number}/comments`,
-        '--paginate',
-        '--jq',
-        '.',
-      ],
+      ['api', 'graphql', '-f', `query=${PR_THREADS_QUERY}`, '-f', `url=${url}`],
       { cwd, env, timeoutMs: GH_TIMEOUT_MS },
     );
-    return result.exitCode === 0 ? parseReviewComments(result.stdout) : [];
+    return result.exitCode === 0 ? parsePrThreads(result.stdout) : [];
   } catch {
     return [];
   }

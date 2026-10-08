@@ -4,6 +4,7 @@ import type {
   AppState,
   EditorId,
   PrStatus,
+  PrThread,
   Result,
   SendOptions,
   TerminalPreset,
@@ -93,6 +94,39 @@ export function openFile(
 
 export function openSearch(workspaceId: string) {
   openExtraTab(workspaceId, { kind: 'search' });
+}
+
+export function openComments(workspaceId: string) {
+  openExtraTab(workspaceId, { kind: 'comments' });
+}
+
+const CONVERSATION_FILE = 'PR conversation';
+
+export function addThreadToChat(
+  workspaceId: string,
+  thread: PrThread,
+  code = '',
+) {
+  const id = `gh-${thread.id}`;
+  const body = thread.comments
+    .map((comment) => `@${comment.author} on GitHub: ${comment.body}`)
+    .join('\n  ');
+  updateWorkspaceUi(workspaceId, (current) =>
+    current.comments.some((comment) => comment.id === id)
+      ? {}
+      : {
+          comments: [
+            ...current.comments,
+            {
+              id,
+              file: thread.path ?? CONVERSATION_FILE,
+              line: thread.line ?? 0,
+              code,
+              body,
+            },
+          ],
+        },
+  );
 }
 
 function tabId(): string {

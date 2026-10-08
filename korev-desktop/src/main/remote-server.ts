@@ -32,7 +32,7 @@ export const REMOTE_METHODS = [
   'readFile',
   'readImage',
   'prStatuses',
-  'reviewComments',
+  'prThreads',
   'createPr',
   'fixChecks',
   'resolveConflicts',

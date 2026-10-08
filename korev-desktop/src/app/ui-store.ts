@@ -6,6 +6,7 @@ export type MainTab =
   | { kind: 'diff'; file: string | null; range?: TurnRange | null }
   | { kind: 'file'; file: string; line?: number | null; editing?: boolean }
   | { kind: 'search' }
+  | { kind: 'comments' }
   | { kind: 'terminal'; id: string; preset: TerminalPreset }
   | { kind: 'browser'; id: string; url: string };
 
@@ -13,7 +14,7 @@ export type DiffLayout = 'unified' | 'split';
 
 export type PaletteMode = false | 'all' | 'files';
 
-export type GitPanelTab = 'files' | 'changes' | 'checks';
+export type GitPanelTab = 'files' | 'changes' | 'checks' | 'comments';
 
 export type QuitPrompt = 'closed' | 'asking' | 'waiting';
 
@@ -45,6 +46,7 @@ export function tabKey(tab: MainTab): string {
   if (tab.kind === 'chat') return `chat:${tab.sessionId}`;
   if (tab.kind === 'file') return `file:${tab.file}`;
   if (tab.kind === 'search') return 'search';
+  if (tab.kind === 'comments') return 'comments';
   if (tab.kind === 'terminal') return `terminal:${tab.id}`;
   if (tab.kind === 'browser') return `browser:${tab.id}`;
   return tab.range ? `diff:${tab.range.to}` : 'diff';

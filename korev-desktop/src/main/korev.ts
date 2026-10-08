@@ -61,7 +61,7 @@ import {
   createPrPrompt,
   fetchPrStatus,
   onPrBranch,
-  fetchReviewComments,
+  fetchPrThreads,
   fixChecksPrompt,
   mergePr,
   resolveConflictsPrompt,
@@ -1166,9 +1166,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       ctx.background(refreshStats(ctx, ctx.workspace(workspaceId)));
       return ok(undefined);
     },
-    async reviewComments(workspaceId, prNumber) {
+    async prThreads(workspaceId, prUrl) {
       const workspace = workspacePath(workspaceId);
-      return fetchReviewComments(deps.run, deps.env, workspace.path, prNumber);
+      return fetchPrThreads(deps.run, deps.env, workspace.path, prUrl);
     },
     async listFiles(workspaceId) {
       return listFiles(git, workspacePath(workspaceId).path);

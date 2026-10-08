@@ -15,11 +15,11 @@ import {
 } from '../../shared/diff';
 import type {
   FileChange,
-  ReviewComment,
+  PrThread,
   TurnRange,
   Workspace,
 } from '../../shared/model';
-import { openFile } from '../actions';
+import { addThreadToChat, openFile } from '../actions';
 import { api } from '../bridge';
 import {
   updateWorkspaceUi,
@@ -51,7 +51,7 @@ export interface FileDiffProps {
   range: TurnRange | null;
   layout: DiffLayout;
   comments: DiffComment[];
-  reviewComments: ReviewComment[];
+  reviewThreads: PrThread[];
   viewedSignature: string | null;
 }
 
@@ -106,17 +106,22 @@ function LocalNote({
 }
 
 function GithubNote({
-  comment,
+  thread,
   onAddToChat,
 }: {
-  comment: ReviewComment;
+  thread: PrThread;
   onAddToChat: () => void;
 }) {
   return (
     <div className="flex items-start gap-2 text-sm text-fg-1">
       <Icon name="git-pull-request" size={13} className="mt-0.5 text-fg-3" />
-      <span className="flex-1 whitespace-pre-wrap">
-        <span className="font-medium">@{comment.author}</span> {comment.body}
+      <span className="flex flex-1 flex-col gap-1 whitespace-pre-wrap">
+        {thread.comments.map((comment) => (
+          <span key={comment.id}>
+            <span className="font-medium">@{comment.author}</span>{' '}
+            {comment.body}
+          </span>
+        ))}
       </span>
       <button
         type="button"
@@ -128,7 +133,7 @@ function GithubNote({
       <button
         type="button"
         className="cursor-pointer border-0 bg-transparent text-xs text-fg-3 hover:text-fg-1"
-        onClick={() => void api.openExternal(comment.url)}
+        onClick={() => void api.openExternal(thread.comments[0]?.url ?? '')}
       >
         Open
       </button>
@@ -160,7 +165,7 @@ export function FileDiff({
   range,
   layout,
   comments,
-  reviewComments,
+  reviewThreads,
   viewedSignature,
 }: FileDiffProps) {
   const patch = useFilePatch(workspace.id, change, range);
@@ -187,19 +192,6 @@ export function FileDiff({
       comments: [...current.comments, comment],
     }));
     setDraftLine(null);
-  }
-
-  function addReviewComment(review: ReviewComment, row: DiffRow) {
-    const comment: DiffComment = {
-      id: newId(),
-      file: change.path,
-      line: review.line ?? 0,
-      code: row.code,
-      body: `@${review.author} on GitHub: ${review.body}`,
-    };
-    updateWorkspaceUi(workspace.id, (current) => ({
-      comments: [...current.comments, comment],
-    }));
   }
 
   function removeComment(id: string) {
@@ -234,15 +226,17 @@ export function FileDiff({
         </tr>,
       );
     }
-    for (const review of reviewComments.filter(
+    for (const thread of reviewThreads.filter(
       (entry) => entry.line === row.newLine,
     )) {
       notes.push(
-        <tr key={`${key}-gh-${review.id}`} className="kv-diff__note">
+        <tr key={`${key}-gh-${thread.id}`} className="kv-diff__note">
           <td colSpan={colSpan}>
             <GithubNote
-              comment={review}
-              onAddToChat={() => addReviewComment(review, row)}
+              thread={thread}
+              onAddToChat={() =>
+                addThreadToChat(workspace.id, thread, row.code)
+              }
             />
           </td>
         </tr>,

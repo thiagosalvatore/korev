@@ -51,10 +51,19 @@ Only the checks that the repository requires for merge count. If a check that is
 The **Checks** tab shows the pull request:
 
 - Its state, conflicts, failing and running checks, and review status.
-- Review comments from GitHub, each with **Add to chat**.
 - The list of checks. Click one to open it on GitHub.
 
 Korev refreshes the pull request every 30 seconds and after each agent turn.
+
+## Comments
+
+The **Comments** tab shows the comments on the open pull request as threads. A thread on a line shows the code it is about and every reply. Comments on the pull request itself and review summaries show as **Conversation**.
+
+- **Humans** and **Bots** split the threads by who started them. Bots are GitHub apps, such as CodeRabbit or Codecov.
+- A resolved thread starts closed. Click it to open it.
+- **Add to chat** puts the whole thread in the composer for the agent.
+- **Diff** opens the file in the diff view, where the thread also shows under its line.
+- **Open as tab** opens the same view as a tab next to your chats, with more room to read.
 
 ## Archive on merge
 

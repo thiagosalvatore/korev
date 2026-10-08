@@ -4,6 +4,9 @@ Korev shows the section of each version in its "What's new" window, so write for
 
 ## [Unreleased]
 
+- Pull request comments have their own Comments tab, next to Checks. Replies show in their thread, and you can switch between comments from people and comments from bots. "Open as tab" shows the comments next to your chats, with more room to read.
+- Comments on the pull request itself and review summaries now show too. Before, Korev showed only comments on lines of code, and none at all on pull requests with more than 30 of them.
+
 ## [0.5.0] - 2026-10-08
 
 Small fixes to the workspace header, the sidebar menus and archiving.

@@ -14,12 +14,12 @@ import type {
   PullRequestSummary,
   RemotePairing,
   RepoConfig,
-  ReviewComment,
   SearchMatch,
   SearchOptions,
   TurnRange,
   WorkspaceSource,
   PrStatus,
+  PrThread,
   Repo,
   RepoFolder,
   RepoPrompts,
@@ -150,10 +150,7 @@ export interface KorevApi {
     path: string,
     contents: string,
   ): Promise<Result>;
-  reviewComments(
-    workspaceId: string,
-    prNumber: number,
-  ): Promise<ReviewComment[]>;
+  prThreads(workspaceId: string, prUrl: string): Promise<PrThread[]>;
   listFiles(workspaceId: string): Promise<string[]>;
   readFile(workspaceId: string, path: string): Promise<string | null>;
   readImage(sessionId: string, path: string): Promise<string | null>;

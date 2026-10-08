@@ -19,6 +19,7 @@ import {
 import { ChatView } from './chat/ChatView';
 import { DiffView } from './diff/DiffView';
 import { FileView } from './FileView';
+import { PrComments } from './comments/PrComments';
 import { SearchView } from './SearchView';
 import { BrowserView } from './BrowserView';
 import { XTerm } from './XTerm';
@@ -64,6 +65,7 @@ const TAB_ICONS = {
   diff: 'git-compare',
   file: 'file',
   search: 'search',
+  comments: 'message-square',
   terminal: 'square-terminal',
   browser: 'globe',
 } as const;
@@ -78,6 +80,7 @@ function extraTabLabel(tab: MainTab): string {
   if (tab.kind === 'diff') return tab.range ? 'Turn changes' : 'Changes';
   if (tab.kind === 'file') return fileName(tab.file);
   if (tab.kind === 'search') return 'Search';
+  if (tab.kind === 'comments') return 'Comments';
   if (tab.kind === 'terminal') return PRESET_LABELS[tab.preset];
   if (tab.kind === 'browser') return 'Browser';
   return '';
@@ -374,6 +377,9 @@ function WorkspaceWithWorktree({
           ) : null}
           {activeTab?.kind === 'search' ? (
             <SearchView workspace={workspace} />
+          ) : null}
+          {activeTab?.kind === 'comments' ? (
+            <PrComments state={state} workspace={workspace} wide />
           ) : null}
           {activeTab?.kind === 'terminal' ? (
             <XTerm

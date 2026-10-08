@@ -849,11 +849,21 @@ export interface SearchMatch {
   text: string;
 }
 
-export interface ReviewComment {
-  id: number;
-  path: string;
-  line: number | null;
-  body: string;
+export interface PrComment {
+  id: string;
   author: string;
+  isBot: boolean;
+  body: string;
   url: string;
+  createdAt: string;
+}
+
+export interface PrThread {
+  id: string;
+  path: string | null;
+  line: number | null;
+  diffHunk: string;
+  isResolved: boolean;
+  isOutdated: boolean;
+  comments: PrComment[];
 }

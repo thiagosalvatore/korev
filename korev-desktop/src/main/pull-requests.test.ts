@@ -4,7 +4,7 @@ import {
   parsePrStack,
   fetchPrStatus,
   parsePrStatus,
-  parseReviewComments,
+  parsePrThreads,
 } from './pull-requests';
 import type { CommandResult, CommandRunner } from './command-runner';
 
@@ -191,34 +191,116 @@ describe('required checks', () => {
   });
 });
 
-describe('review comments', () => {
-  it('keeps the current line, or null when GitHub marks the comment outdated', () => {
-    const comments = parseReviewComments(
-      JSON.stringify([
-        {
-          id: 1,
-          path: 'src/a.ts',
-          line: 12,
-          body: 'Rename this',
-          user: { login: 'sakce' },
-          html_url: 'https://github.com/x/1',
+function prComment(
+  id: string,
+  login: string,
+  createdAt = '2026-01-01T00:00:00Z',
+  type = 'User',
+) {
+  return {
+    id,
+    body: `${id} body`,
+    url: `https://github.com/x/${id}`,
+    createdAt,
+    diffHunk: '@@ -1 +1 @@\n+code',
+    author: { login, __typename: type },
+  };
+}
+
+function threadsResponse(resource: Record<string, unknown>): string {
+  return JSON.stringify({
+    data: {
+      resource: {
+        reviewThreads: { nodes: [] },
+        comments: { nodes: [] },
+        reviews: { nodes: [] },
+        ...resource,
+      },
+    },
+  });
+}
+
+describe('PR threads', () => {
+  it('groups replies under their review thread and keeps outdated threads', () => {
+    const threads = parsePrThreads(
+      threadsResponse({
+        reviewThreads: {
+          nodes: [
+            {
+              id: 't1',
+              path: 'src/a.ts',
+              line: 12,
+              isResolved: false,
+              isOutdated: false,
+              comments: {
+                nodes: [prComment('c1', 'ana'), prComment('c2', 'bob')],
+              },
+            },
+            {
+              id: 't2',
+              path: 'src/b.ts',
+              line: null,
+              isResolved: true,
+              isOutdated: true,
+              comments: { nodes: [prComment('c3', 'ana')] },
+            },
+          ],
         },
-        {
-          id: 2,
-          path: 'src/b.ts',
-          line: null,
-          body: 'Old',
-          user: { login: 'sakce' },
-          html_url: 'https://github.com/x/2',
-        },
-      ]),
+      }),
     );
     expect(
-      comments.map((comment) => [comment.path, comment.line, comment.author]),
+      threads.map((thread) => [
+        thread.path,
+        thread.line,
+        thread.isResolved,
+        thread.comments.map((comment) => comment.author),
+      ]),
     ).toEqual([
-      ['src/a.ts', 12, 'sakce'],
-      ['src/b.ts', null, 'sakce'],
+      ['src/a.ts', 12, false, ['ana', 'bob']],
+      ['src/b.ts', null, true, ['ana']],
     ]);
+    expect(threads[0].diffHunk).toBe('@@ -1 +1 @@\n+code');
+  });
+
+  it('marks comments from GitHub app bots', () => {
+    const threads = parsePrThreads(
+      threadsResponse({
+        comments: {
+          nodes: [
+            prComment('c1', 'ana'),
+            prComment('c2', 'coderabbitai', undefined, 'Bot'),
+          ],
+        },
+      }),
+    );
+    expect(threads.map((thread) => thread.comments[0].isBot)).toEqual([
+      false,
+      true,
+    ]);
+  });
+
+  it('turns conversation comments and review summaries into file-less threads in time order', () => {
+    const threads = parsePrThreads(
+      threadsResponse({
+        comments: {
+          nodes: [prComment('late', 'ana', '2026-01-03T00:00:00Z')],
+        },
+        reviews: {
+          nodes: [
+            prComment('early', 'bob', '2026-01-02T00:00:00Z'),
+            { ...prComment('empty', 'bob'), body: '' },
+          ],
+        },
+      }),
+    );
+    expect(threads.map((thread) => [thread.path, thread.id])).toEqual([
+      [null, 'early'],
+      [null, 'late'],
+    ]);
+  });
+
+  it('returns no threads when gh output is not JSON', () => {
+    expect(parsePrThreads('not json')).toEqual([]);
   });
 });
 
