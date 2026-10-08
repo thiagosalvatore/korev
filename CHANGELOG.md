@@ -4,6 +4,14 @@ Korev shows the section of each version in its "What's new" window, so write for
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-08
+
+Small fixes to the workspace header, the sidebar menus and archiving.
+
+- The workspace header has a "Keep after merge" toggle next to the target branch. It stays in sync with the toggle in the workspace's "…" menu in the sidebar.
+- A "…" menu low in the sidebar is no longer hidden under History and the footer. When there is no room below it, the menu opens upward.
+- When you archive a workspace, Korev shows "Archiving" and a spinner until the archive is done. Before, the Changes tab filled with deleted files while the workspace was removed.
+
 ## [0.4.0] - 2026-10-08
 
 Korev tells you about new versions and installs them for you.
