@@ -17,7 +17,7 @@ afterEach(async () => {
 });
 
 async function start(
-  api: Record<string, () => unknown>,
+  api: Record<string, (...args: never[]) => unknown>,
   onDevicesChange = () => undefined,
 ) {
   server = await startRemoteServer({
@@ -60,6 +60,19 @@ describe('remote server', () => {
     const response = await call(base, 'openExternal');
     expect(response.status).toBe(404);
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('accepts a few minutes of recorded speech from the phone', async () => {
+    const transcribe = vi.fn((audio: string) => `${audio.length} bytes`);
+    const base = await start({ transcribe });
+    const recording = 'a'.repeat(3 * 1024 * 1024);
+    const response = await fetch(`${base}/call`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ method: 'transcribe', args: [recording] }),
+    });
+    expect(response.status).toBe(200);
+    expect(transcribe).toHaveBeenCalledWith(recording);
   });
 
   it('streams remote events and leaves out the rest', async () => {

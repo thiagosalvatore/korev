@@ -11,8 +11,11 @@ import type {
   AppState,
   AskChat,
 } from '../../../korev-desktop/src/shared/model';
+import { insertDictation } from '../../../korev-desktop/src/shared/dictation';
 import { repoSections } from '../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../attempt';
+import { MicButton, RecordingBar } from '../VoiceInput';
+import { useDictation } from '../dictation';
 import { useModelChoice } from '../hooks';
 import { useConnection } from '../korev';
 import { ModelPicker } from '../ModelPicker';
@@ -44,6 +47,12 @@ export function NewAskForm({
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
   const { agent, model, effort, choose } = useModelChoice(state.settings);
+  const dictation = useDictation((spoken) =>
+    setQuestion(
+      (current) => insertDictation(current, current.length, spoken).text,
+    ),
+  );
+  const dictating = dictation.phase !== 'idle';
   const text = question.trim();
 
   async function ask() {
@@ -76,15 +85,19 @@ export function NewAskForm({
         multiple
         onToggle={(repoId) => setRepoIds(toggled(repoIds, repoId))}
       />
-      <TextInput
-        style={styles.input}
-        value={question}
-        onChangeText={setQuestion}
-        placeholder="Ask a question about the code. The agent reads it and changes nothing."
-        placeholderTextColor={theme.fg4}
-        multiline
-        autoFocus
-      />
+      {dictating ? (
+        <RecordingBar dictation={dictation} style={styles.input} />
+      ) : (
+        <TextInput
+          style={styles.input}
+          value={question}
+          onChangeText={setQuestion}
+          placeholder="Ask a question about the code. The agent reads it and changes nothing."
+          placeholderTextColor={theme.fg4}
+          multiline
+          autoFocus
+        />
+      )}
       <View style={styles.toolbar}>
         <View style={styles.model}>
           <ModelPicker
@@ -95,9 +108,10 @@ export function NewAskForm({
           />
         </View>
         {asking ? <ActivityIndicator /> : null}
+        <MicButton status={state.dictation} dictation={dictation} />
         <Button
           label="Ask"
-          disabled={asking || !text || !repoIds.length}
+          disabled={asking || !text || !repoIds.length || dictating}
           onPress={() => void ask()}
         />
       </View>

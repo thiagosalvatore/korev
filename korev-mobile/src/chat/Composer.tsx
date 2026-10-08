@@ -16,8 +16,11 @@ import {
   type ChatSession,
   type ModelChoice,
 } from '../../../korev-desktop/src/shared/model';
+import { insertDictation } from '../../../korev-desktop/src/shared/dictation';
 import { planFileName } from '../../../korev-desktop/src/shared/message';
 import { attempt } from '../attempt';
+import { MicButton, RecordingBar } from '../VoiceInput';
+import { useDictation } from '../dictation';
 import { useConnection } from '../korev';
 import { ModelPicker } from '../ModelPicker';
 import { useTheme, type Theme } from '../theme';
@@ -38,7 +41,11 @@ export function Composer({
   const [text, setText] = useState('');
   const running = state.runningSessions.includes(session.id);
   const { pendingPlan } = session;
-  const canSend = Boolean(text.trim() || pendingPlan);
+  const dictation = useDictation((spoken) =>
+    setText((current) => insertDictation(current, current.length, spoken).text),
+  );
+  const dictating = dictation.phase !== 'idle';
+  const canSend = Boolean(text.trim() || pendingPlan) && !dictating;
 
   async function send() {
     const message = text.trim();
@@ -108,14 +115,18 @@ export function Composer({
           </Pressable>
         </View>
       ) : null}
-      <TextInput
-        style={styles.input}
-        value={text}
-        onChangeText={setText}
-        placeholder={placeholder(running, Boolean(pendingPlan))}
-        placeholderTextColor={theme.fg4}
-        multiline
-      />
+      {dictating ? (
+        <RecordingBar dictation={dictation} />
+      ) : (
+        <TextInput
+          style={styles.input}
+          value={text}
+          onChangeText={setText}
+          placeholder={placeholder(running, Boolean(pendingPlan))}
+          placeholderTextColor={theme.fg4}
+          multiline
+        />
+      )}
       <View style={styles.toolbar}>
         <Pressable
           accessibilityRole="switch"
@@ -137,6 +148,7 @@ export function Composer({
         {running ? (
           <Button label="Stop" variant="secondary" onPress={stop} />
         ) : null}
+        <MicButton status={state.dictation} dictation={dictation} />
         <Button label="Send" disabled={!canSend} onPress={() => void send()} />
       </View>
     </View>

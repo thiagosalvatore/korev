@@ -15,8 +15,11 @@ import {
   type SendOptions,
   type Workspace,
 } from '../../../korev-desktop/src/shared/model';
+import { insertDictation } from '../../../korev-desktop/src/shared/dictation';
 import { repoSections } from '../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../attempt';
+import { MicButton, RecordingBar } from '../VoiceInput';
+import { useDictation } from '../dictation';
 import { useAppState, useModelChoice } from '../hooks';
 import { useConnection } from '../korev';
 import { ModelPicker } from '../ModelPicker';
@@ -46,6 +49,12 @@ function NewWorkspaceForm({
   const [planMode, setPlanMode] = useState(state.settings.defaultPlanMode);
   const [creating, setCreating] = useState(false);
   const { agent, model, effort, choose } = useModelChoice(state.settings);
+  const dictation = useDictation((spoken) =>
+    setPrompt(
+      (current) => insertDictation(current, current.length, spoken).text,
+    ),
+  );
+  const dictating = dictation.phase !== 'idle';
   const task: SendOptions = {
     text: prompt.trim(),
     agent,
@@ -80,15 +89,22 @@ function NewWorkspaceForm({
         selected={repoId ? [repoId] : []}
         onToggle={setRepoId}
       />
-      <TextInput
-        style={[styles.input, planMode && styles.inputPlanMode]}
-        value={prompt}
-        onChangeText={setPrompt}
-        placeholder={`Describe a task for ${AGENT_LABELS[task.agent]}`}
-        placeholderTextColor={theme.fg4}
-        multiline
-        autoFocus
-      />
+      {dictating ? (
+        <RecordingBar
+          dictation={dictation}
+          style={[styles.input, planMode && styles.inputPlanMode]}
+        />
+      ) : (
+        <TextInput
+          style={[styles.input, planMode && styles.inputPlanMode]}
+          value={prompt}
+          onChangeText={setPrompt}
+          placeholder={`Describe a task for ${AGENT_LABELS[task.agent]}`}
+          placeholderTextColor={theme.fg4}
+          multiline
+          autoFocus
+        />
+      )}
       <View style={styles.toolbar}>
         <Pressable
           accessibilityRole="switch"
@@ -107,9 +123,10 @@ function NewWorkspaceForm({
           />
         </View>
         {creating ? <ActivityIndicator /> : null}
+        <MicButton status={state.dictation} dictation={dictation} />
         <Button
           label={task.text ? 'Create and start' : 'Create'}
-          disabled={creating || !repoId}
+          disabled={creating || !repoId || dictating}
           onPress={() => void create()}
         />
       </View>

@@ -40,6 +40,8 @@ export const REMOTE_METHODS = [
   'repoIcon',
   'createAskChat',
   'deleteAskChat',
+  'prepareDictation',
+  'transcribe',
 ] as const satisfies readonly (keyof KorevApi)[];
 
 const REMOTE_EVENTS: ReadonlySet<keyof KorevEvents> = new Set([
@@ -50,7 +52,7 @@ const REMOTE_EVENTS: ReadonlySet<keyof KorevEvents> = new Set([
 
 export const DEFAULT_REMOTE_PORT = 7420;
 export const LOOPBACK_HOST = '127.0.0.1';
-const MAX_BODY_BYTES = 1024 * 1024;
+const MAX_BODY_BYTES = 10 * 1024 * 1024;
 const DEVICE_HEADER = 'x-korev-device';
 const MAX_DEVICE_NAME_LENGTH = 64;
 const UNKNOWN_DEVICE = 'Unknown device';

@@ -26,7 +26,13 @@
           "cameraPermission": "Korev uses the camera to scan the pairing code from Korev on your Mac."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Korev uses the microphone to turn what you say into text."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
