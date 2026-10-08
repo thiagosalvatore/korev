@@ -5,6 +5,8 @@ PACKAGED_KOREV := Korev\.app/Contents/MacOS/Korev$$
 VERSION ?= $(shell node -p "require('./$(APP_DIR)/package.json').version")
 TAG = v$(VERSION)
 DIST_ARCHS := arm64 x64
+WHISPER_VERSION = $(shell node -p "require('./$(APP_DIR)/package-lock.json').packages['node_modules/@fugood/whisper.node'].version")
+WHISPER_BINARIES := $(DIST_ARCHS:%=$(APP_DIR)/node_modules/@fugood/node-whisper-darwin-%)
 RELEASE_NOTES = awk -v heading='\#\# [$(VERSION)]' 'index($$0, "\#\# ") == 1 { printing = index($$0, heading) == 1; next } printing' CHANGELOG.md
 
 .PHONY: package stop run package-run dist release-notes bump release
@@ -25,7 +27,11 @@ run: stop
 
 package-run: package run
 
-dist: $(APP_DIR)/node_modules
+$(APP_DIR)/node_modules/@fugood/node-whisper-darwin-%: | $(APP_DIR)/node_modules
+	mkdir -p $@
+	cd $@ && tarball=$$(npm pack --silent @fugood/node-whisper-darwin-$*@$(WHISPER_VERSION)) && tar -xzf $$tarball --strip-components=1 && rm $$tarball
+
+dist: $(APP_DIR)/node_modules $(WHISPER_BINARIES)
 	rm -rf $(APP_DIR)/out/make
 	for arch in $(DIST_ARCHS); do (cd $(APP_DIR) && npm run make -- --arch=$$arch) || exit 1; done
 
