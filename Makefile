@@ -6,6 +6,7 @@ VERSION ?= $(shell node -p "require('./$(APP_DIR)/package.json').version")
 TAG = v$(VERSION)
 DIST_ARCHS := arm64 x64
 DMG_DIR := $(APP_DIR)/out/make/dmg
+ZIP_DIR := $(APP_DIR)/out/make/zip/darwin
 WHISPER_VERSION = $(shell node -p "require('./$(APP_DIR)/package-lock.json').packages['node_modules/@fugood/whisper.node'].version")
 WHISPER_BINARIES := $(DIST_ARCHS:%=$(APP_DIR)/node_modules/@fugood/node-whisper-darwin-%)
 RELEASE_NOTES = awk -v heading='\#\# [$(VERSION)]' 'index($$0, "\#\# ") == 1 { printing = index($$0, heading) == 1; next } printing' CHANGELOG.md
@@ -37,6 +38,7 @@ dist: $(APP_DIR)/node_modules $(WHISPER_BINARIES)
 	for arch in $(DIST_ARCHS); do \
 		(cd $(APP_DIR) && npm run make -- --arch=$$arch) || exit 1; \
 		mv $(DMG_DIR)/$$arch/Korev-$(VERSION)-$$arch.dmg $(DMG_DIR)/$$arch/Korev-$$arch.dmg || exit 1; \
+		mv $(ZIP_DIR)/$$arch/RELEASES.json $(ZIP_DIR)/$$arch/RELEASES-darwin-$$arch.json || exit 1; \
 	done
 
 release-notes:

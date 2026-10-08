@@ -1,5 +1,6 @@
 import {
   app,
+  autoUpdater,
   BrowserWindow,
   dialog,
   ipcMain,
@@ -40,7 +41,7 @@ import { LOOPBACK_HOST, tailnetAddress } from './main/remote-server';
 import {
   canReplaceBundle,
   fetchRelease,
-  replaceBundle,
+  updateFeedUrl,
   type Release,
 } from './main/updates';
 import { loadWhisper } from './main/whisper';
@@ -174,23 +175,42 @@ async function chooseDirectory(): Promise<string | null> {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
+function downloadUpdate(): Promise<Result> {
+  return new Promise((resolve) => {
+    const settle = (result: Result) => {
+      autoUpdater.off('update-downloaded', onDownloaded);
+      autoUpdater.off('update-not-available', onNotAvailable);
+      autoUpdater.off('error', onError);
+      resolve(result);
+    };
+    const onDownloaded = () => settle({ ok: true, value: undefined });
+    const onNotAvailable = () =>
+      settle({ ok: false, message: 'No update is available' });
+    const onError = (error: Error) =>
+      settle({
+        ok: false,
+        message: `Could not install the update: ${errorMessage(error)}`,
+      });
+    autoUpdater.once('update-downloaded', onDownloaded);
+    autoUpdater.once('update-not-available', onNotAvailable);
+    autoUpdater.once('error', onError);
+    autoUpdater.setFeedURL({
+      url: updateFeedUrl(process.arch),
+      serverType: 'json',
+    });
+    autoUpdater.checkForUpdates();
+  });
+}
+
 async function installUpdate(release: Release): Promise<Result> {
   const bundle = path.resolve(app.getPath('exe'), BUNDLE_FROM_EXE);
-  if (!release.zipUrl || !(await canReplaceBundle(bundle))) {
+  if (!(await canReplaceBundle(bundle))) {
     await shell.openExternal(release.url);
     return { ok: true, value: undefined };
   }
-  try {
-    await replaceBundle(release.zipUrl, bundle);
-  } catch (error) {
-    return {
-      ok: false,
-      message: `Could not install the update: ${errorMessage(error)}`,
-    };
-  }
-  app.relaunch();
-  app.quit();
-  return { ok: true, value: undefined };
+  const downloaded = await downloadUpdate();
+  if (downloaded.ok) autoUpdater.quitAndInstall();
+  return downloaded;
 }
 
 function watchForUpdates(korev: Korev) {

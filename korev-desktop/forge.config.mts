@@ -11,10 +11,13 @@ import { execFile } from 'node:child_process';
 import { cp } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { version } from './package.json';
 
 const ICON = 'assets/icon';
 const APP_BUNDLE = 'Korev.app';
 const AD_HOC_IDENTITY = '-';
+const RELEASES_DOWNLOAD_URL =
+  'https://github.com/thiagosalvatore/korev/releases/download';
 const MICROPHONE_USAGE =
   'Korev uses the microphone to turn what you say into text.';
 
@@ -100,7 +103,10 @@ const config: ForgeConfig = {
   },
   makers: [
     new MakerSquirrel({ setupIcon: `${ICON}.ico` }),
-    new MakerZIP({}, ['darwin']),
+    new MakerZIP(
+      { macUpdateManifestBaseUrl: `${RELEASES_DOWNLOAD_URL}/v${version}` },
+      ['darwin'],
+    ),
     new MakerDMG({ icon: `${ICON}.icns` }),
     new MakerRpm({ options: { icon: `${ICON}.png` } }),
     new MakerDeb({ options: { icon: `${ICON}.png` } }),

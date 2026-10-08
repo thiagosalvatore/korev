@@ -30,7 +30,6 @@ const INSTALLED_RELEASE: Release = {
   version: APP_VERSION,
   notes: '- Faster startup',
   url: 'https://github.com/thiagosalvatore/korev/releases/tag/v1.2.0',
-  zipUrl: null,
 };
 
 const FAKE_AGENT_BIN = path.resolve(__dirname, '../../test-support/bin');
