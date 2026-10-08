@@ -71,8 +71,11 @@ export interface KorevApi {
     prNumber: number,
   ): Promise<Result<Workspace>>;
   listBranches(repoId: string): Promise<string[]>;
-  listPullRequests(repoId: string): Promise<PullRequestSummary[]>;
-  listIssues(repoId: string): Promise<IssueSummary[]>;
+  listPullRequests(
+    repoId: string,
+    query?: string,
+  ): Promise<PullRequestSummary[]>;
+  listIssues(repoId: string, query?: string): Promise<IssueSummary[]>;
   setBaseBranch(workspaceId: string, branch: string): Promise<void>;
   workspaceConfig(workspaceId: string): Promise<RepoConfig>;
   repoConfig(repoId: string): Promise<RepoConfig>;

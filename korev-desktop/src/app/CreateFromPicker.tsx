@@ -25,6 +25,7 @@ const TABS: { id: PickerTab; label: string }[] = [
   { id: 'issues', label: 'GitHub issues' },
 ];
 const RESULT_LIMIT = 50;
+const SEARCH_DELAY_MS = 250;
 
 export function createFromLabel(source: CreateFrom): string {
   if (source.kind === 'branch') return source.branch;
@@ -40,7 +41,11 @@ export function issuePrompt(issue: IssueSummary, text: string): string {
     : `${heading}\n\nWork on this issue.`;
 }
 
-function useOptions(repoId: string, tab: PickerTab): Option[] | null {
+function useOptions(
+  repoId: string,
+  tab: PickerTab,
+  remoteQuery: string,
+): Option[] | null {
   const [options, setOptions] = useState<Option[] | null>(null);
   useEffect(() => {
     let current = true;
@@ -56,7 +61,7 @@ function useOptions(repoId: string, tab: PickerTab): Option[] | null {
         }));
       }
       if (tab === 'prs') {
-        return (await api.listPullRequests(repoId)).map((pr) => ({
+        return (await api.listPullRequests(repoId, remoteQuery)).map((pr) => ({
           key: String(pr.number),
           label: `#${pr.number} ${pr.title}`,
           detail: `${pr.headRefName} · @${pr.author}`,
@@ -64,7 +69,7 @@ function useOptions(repoId: string, tab: PickerTab): Option[] | null {
           value: { kind: 'pr', pr },
         }));
       }
-      return (await api.listIssues(repoId)).map((issue) => ({
+      return (await api.listIssues(repoId, remoteQuery)).map((issue) => ({
         key: String(issue.number),
         label: `#${issue.number} ${issue.title}`,
         detail: '',
@@ -72,13 +77,19 @@ function useOptions(repoId: string, tab: PickerTab): Option[] | null {
         value: { kind: 'issue', issue },
       }));
     };
-    void load().then((loaded) => {
-      if (current) setOptions(loaded);
-    });
+    const timer = setTimeout(
+      () => {
+        void load().then((loaded) => {
+          if (current) setOptions(loaded);
+        });
+      },
+      remoteQuery ? SEARCH_DELAY_MS : 0,
+    );
     return () => {
       current = false;
+      clearTimeout(timer);
     };
-  }, [repoId, tab]);
+  }, [repoId, tab, remoteQuery]);
   return options;
 }
 
@@ -94,17 +105,18 @@ export function CreateFromPicker({
   const [tab, setTab] = useState<PickerTab>('branches');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
-  const options = useOptions(repoId, tab);
+  const searchesGitHub = tab !== 'branches';
+  const options = useOptions(repoId, tab, searchesGitHub ? query.trim() : '');
   const results = useMemo(() => {
     if (!options) return [];
-    if (!query.trim()) return options.slice(0, RESULT_LIMIT);
+    if (searchesGitHub || !query.trim()) return options.slice(0, RESULT_LIMIT);
     const byLabel = new Map(
       options.map((option) => [`${option.label} ${option.detail}`, option]),
     );
     return fuzzyRank(query.trim(), [...byLabel.keys()], RESULT_LIMIT).flatMap(
       (key) => byLabel.get(key) ?? [],
     );
-  }, [options, query]);
+  }, [options, query, searchesGitHub]);
 
   return (
     <div

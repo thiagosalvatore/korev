@@ -1001,10 +1001,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       return ok(workspace);
     },
     listBranches: (repoId) => listBranches(git, ctx.repo(repoId).path),
-    listPullRequests: (repoId) =>
-      listPullRequests(deps.run, deps.env, ctx.repo(repoId).path),
-    listIssues: (repoId) =>
-      listIssues(deps.run, deps.env, ctx.repo(repoId).path),
+    listPullRequests: (repoId, query) =>
+      listPullRequests(deps.run, deps.env, ctx.repo(repoId).path, query),
+    listIssues: (repoId, query) =>
+      listIssues(deps.run, deps.env, ctx.repo(repoId).path, query),
     async setBaseBranch(workspaceId, branch) {
       const workspace = ctx.workspace(workspaceId);
       if (!branch.trim()) return;

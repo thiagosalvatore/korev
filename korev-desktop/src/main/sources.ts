@@ -30,6 +30,11 @@ async function ghJson(
   }
 }
 
+function searchArgs(query: string): string[] {
+  const trimmed = query.trim();
+  return trimmed ? ['--search', trimmed] : [];
+}
+
 export function parsePullRequests(rows: JsonRecord[]): PullRequestSummary[] {
   return rows.flatMap((row) =>
     typeof row.number === 'number'
@@ -51,12 +56,14 @@ export async function listPullRequests(
   run: CommandRunner,
   env: NodeJS.ProcessEnv,
   cwd: string,
+  query = '',
 ): Promise<PullRequestSummary[]> {
   const rows = await ghJson(run, env, cwd, [
     'pr',
     'list',
     '--limit',
     LIST_LIMIT,
+    ...searchArgs(query),
     '--json',
     'number,title,headRefName,baseRefName,author,isDraft',
   ]);
@@ -67,12 +74,14 @@ export async function listIssues(
   run: CommandRunner,
   env: NodeJS.ProcessEnv,
   cwd: string,
+  query = '',
 ): Promise<IssueSummary[]> {
   const rows = await ghJson(run, env, cwd, [
     'issue',
     'list',
     '--limit',
     LIST_LIMIT,
+    ...searchArgs(query),
     '--json',
     'number,title,body,url',
   ]);
