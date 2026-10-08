@@ -31,6 +31,12 @@ Use `$KOREV_PORT` in your run scripts instead of a fixed port. See [Environment 
 
 The root checkout must be clean, with no merge or rebase in progress. Commit or stash your changes in the main checkout first.
 
+## The phone cannot reach Korev
+
+The phone must be on the Tailscale network that you signed Korev in to. This can be different from the network of the Mac's Tailscale app. Check that `korev-<your Mac's name>` shows in the device list of the phone's Tailscale app. See [How Korev uses Tailscale](./remote-access.mdx#how-korev-uses-tailscale).
+
+If **Settings → Remote access** shows **Sign in** again, Tailscale wants you to sign in again. This happens when the device key expires, after 180 days by default. To stop it, turn off key expiry for Korev's device in the Tailscale admin console.
+
 ## Where is my data?
 
 See [Where Korev keeps its files](../getting-started/installation.mdx#where-korev-keeps-its-files).

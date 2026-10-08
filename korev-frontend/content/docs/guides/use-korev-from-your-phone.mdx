@@ -14,7 +14,7 @@ The app is not in the App Store or Google Play yet. You run it from the source w
 
 ## Before you start
 
-- Install [Tailscale](https://tailscale.com) on the phone and sign in. Korev joins the same network on its own when you pair, so the Mac's Tailscale app can stay on another network.
+- Install [Tailscale](https://tailscale.com) on the phone and sign in. Korev joins the same network on its own when you pair, so the Mac's Tailscale app can stay on another network. See [How Korev uses Tailscale](../reference/remote-access.mdx#how-korev-uses-tailscale).
 - Install Expo Go on the phone.
 - On the Mac, install Node 24 and npm.
 
@@ -31,6 +31,8 @@ The app is not in the App Store or Google Play yet. You run it from the source w
 2. Scan the QR code in the terminal with the phone camera. Expo Go opens the app.
 
 Replace `<tailscale-ip>` with the Mac's Tailscale address, for example `100.101.102.103`. The Tailscale menu shows it. `REACT_NATIVE_PACKAGER_HOSTNAME` lets the phone load the app over Tailscale. If the phone and the Mac are on the same Wi-Fi, you can leave it out.
+
+This address belongs to the Mac's Tailscale app, not to Korev's own device. Korev's device does not carry Expo. So the address works only when the Mac's Tailscale app is on the same network as the phone. If it is not, put the phone and the Mac on the same Wi-Fi and leave `REACT_NATIVE_PACKAGER_HOSTNAME` out.
 
 ## Pair the phone
 
