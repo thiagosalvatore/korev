@@ -10,9 +10,6 @@ import {
   type IconName,
 } from '../design-system';
 import {
-  mergeStep,
-  PR_STEPS,
-  stackBlocked,
   type AppState,
   type CheckState,
   type FileChange,
@@ -24,7 +21,6 @@ import {
 import {
   createPr,
   fixErrors,
-  mergePr,
   openPrAsWorkspace,
   activateTab,
   openComments,
@@ -373,15 +369,6 @@ function PrCard({
               Fix errors
             </Button>
           ) : null}
-          <Button
-            size="sm"
-            variant="success"
-            icon="git-merge"
-            disabled={pr.mergeable === 'CONFLICTING' || stackBlocked(pr)}
-            onClick={() => mergePr(workspace, pr)}
-          >
-            {PR_STEPS[mergeStep(pr)].label}
-          </Button>
           {pr.headRefName !== workspace.branch ? (
             <Button
               size="sm"
