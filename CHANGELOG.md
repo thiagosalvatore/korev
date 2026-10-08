@@ -4,8 +4,15 @@ Korev shows the section of each version in its "What's new" window, so write for
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-08
+
+Korev tells you about new versions and installs them for you.
+
 - When a new version of Korev is out, Korev tells you with a window that shows what changed. Before, the only sign was a small icon at the bottom of the sidebar.
 - Korev installs updates with the macOS updater that Electron includes. Before it installs a new version, it checks that Apple signed it for Korev.
+- When you click the microphone or press ⌘⇧S and the voice model is not on your Mac yet, Korev asks before it downloads the model (about 550 MB). It shows the progress, then a "Start voice input" button.
+- In "Create from", the PR and issue tabs search GitHub. You can find any open PR or issue by its number or its text, not only the 50 newest.
+- With archive on merge turned on, you can keep a workspace after its PR merges. Click "Keep after merge" on the New workspace page, or use the workspace's "…" menu in the sidebar.
 
 ## [0.3.0] - 2026-10-08
 
