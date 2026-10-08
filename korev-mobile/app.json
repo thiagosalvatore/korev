@@ -7,8 +7,26 @@
     "icon": "./assets/icon.png",
     "scheme": "korev",
     "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "ai.korev.mobile",
+      "icon": "./assets/icon-ios.png",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
+    },
     "android": {
-      "predictiveBackGestureEnabled": false
+      "package": "ai.korev.mobile",
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -32,11 +50,26 @@
         {
           "microphonePermission": "Korev uses the microphone to turn what you say into text."
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8d78dea2-0c26-417b-9746-80340165b709"
+      }
     }
   }
 }

@@ -36,6 +36,10 @@ REACT_NATIVE_PACKAGER_HOSTNAME=<tailscale-ip> npx expo start
 
 Open the app with Expo Go on your phone, then pair it from Settings → Remote access. See [Use Korev from your phone](https://korev.ai/docs/guides/use-korev-from-your-phone).
 
+`make testflight` builds the iOS app with [EAS](https://expo.dev/eas) and uploads it to TestFlight. The first time, run `npx eas-cli@latest login`, then run the same build without `--non-interactive` from `korev-mobile`, so EAS can sign in to Apple and create the signing certificate and provisioning profile.
+
+`make android-apk` builds an Android APK and prints a link to install it. The first time, run the same build without `--non-interactive`, so EAS can create the Android keystore.
+
 ## Run the landing page
 
 `korev-frontend` is the marketing site, built with [Next.js](https://nextjs.org). `next build` writes a static site to `korev-frontend/out/`.
