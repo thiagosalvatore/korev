@@ -56,7 +56,7 @@ const COMMAND_EVENT = 'command';
 const FINISHED_SOUND = '/System/Library/Sounds/Glass.aiff';
 const REMOTE_TOKEN_FILE = 'remote-token';
 const MODELS_DIR = 'models';
-const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60_000;
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60_000;
 const BUNDLE_FROM_EXE = '../../..';
 
 const appOrigin: AppOrigin = {
