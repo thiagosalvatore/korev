@@ -69,6 +69,7 @@ let openPr: Record<string, unknown> | null = null;
 let prsByUrl: Record<string, Record<string, unknown>> = {};
 let stacksByUrl: Record<string, Record<string, unknown>> = {};
 let ghMerges: string[][] = [];
+let gitAddGate: Promise<void> | null = null;
 
 const BRANCH_PR_URL = 'https://github.com/acme/web/pull/7';
 const NO_PR = { exitCode: 1, stdout: '', stderr: 'no pull requests found' };
@@ -106,6 +107,7 @@ const runWithFakeSqlite: CommandRunner = async (file, args, options) => {
     ghMerges.push([...args]);
     return { exitCode: 0, stdout: '', stderr: '' };
   }
+  if (file === 'git' && args[0] === 'add' && gitAddGate) await gitAddGate;
   return runProcess(file, args, options);
 };
 
@@ -211,6 +213,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     prsByUrl = {};
     stacksByUrl = {};
     ghMerges = [];
+    gitAddGate = null;
     await korev.shutdown();
     vi.useRealTimers();
     await rm(home, { recursive: true, force: true });
@@ -628,6 +631,23 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(reverted).toEqual({ ok: true, value: 'Add a note' });
     expect(existsSync(path.join(workspace.path, 'agent-note.txt'))).toBe(false);
     expect(await korev.api.transcript(session.id)).toEqual([]);
+  });
+
+  it('shows the user message before the checkpoint is taken', async () => {
+    const workspace = await createWorkspace();
+    let releaseGitAdd!: () => void;
+    gitAddGate = new Promise((resolve) => (releaseGitAdd = resolve));
+    const userMessageShown = () =>
+      emit.mock.calls.some(
+        ([event, payload]) =>
+          event === 'chat' &&
+          (payload as { item: { kind: string } }).item.kind === 'user',
+      );
+
+    const sent = sendAndWait(workspace.sessions[0].id, 'Add a note');
+    await waitFor(async () => userMessageShown());
+    releaseGitAdd();
+    await sent;
   });
 
   it('plays a sound when a turn finishes in a workspace you are not looking at', async () => {

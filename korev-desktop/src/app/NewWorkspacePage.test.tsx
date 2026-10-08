@@ -65,7 +65,7 @@ describe('NewWorkspacePage', () => {
     expect(repoPicker().textContent).toBe('korev');
   });
 
-  it('keeps the typed task when a repository is picked afterwards', () => {
+  it('keeps the typed task when a repository is picked afterwards', async () => {
     render(
       <NewWorkspacePage
         state={stateWith([repo('korev'), repo('posthog')])}
@@ -77,9 +77,8 @@ describe('NewWorkspacePage', () => {
     fireEvent.keyDown(message, { key: 'Enter' });
     fireEvent.click(repoPicker());
     fireEvent.click(screen.getByRole('checkbox', { name: 'posthog' }));
-    expect(
-      (screen.getByRole('textbox', { name: 'Message' }) as HTMLTextAreaElement)
-        .value,
-    ).toBe('Add a note');
+    expect(await screen.findByDisplayValue('Add a note')).toBe(
+      screen.getByRole('textbox', { name: 'Message' }),
+    );
   });
 });

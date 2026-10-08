@@ -723,16 +723,18 @@ export function createChats(
       return { ok: true, value: undefined };
     }
     const firstMessage = !items.some((item) => item.kind === 'user');
-    const checkpoint = workspace
-      ? await createCheckpoint(ctx.git, workspace.path).catch(() => null)
-      : null;
-    upsert(sessionId, items, {
+    const message: Extract<ChatItem, { kind: 'user' }> = {
       id: ctx.deps.newId(),
       kind: 'user',
       text: options.text,
       at: ctx.deps.now().toISOString(),
-      checkpoint,
-    });
+      checkpoint: null,
+    };
+    upsert(sessionId, items, message);
+    const checkpoint = workspace
+      ? await createCheckpoint(ctx.git, workspace.path).catch(() => null)
+      : null;
+    if (checkpoint) upsert(sessionId, items, { ...message, checkpoint });
     touch(owner);
     if (isUntitled(session)) session.title = titleFrom(options.text);
     switchAgent(session, options.agent);

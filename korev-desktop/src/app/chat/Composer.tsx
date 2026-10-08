@@ -219,10 +219,13 @@ export function Composer(props: ComposerProps) {
       formatComments(comments) +
       formatAttachments(attachments) +
       formatTabContext(tabContext);
+    update('');
     const sent = await props.onSend(message);
     setSending(false);
-    if (!sent) return;
-    update('');
+    if (!sent) {
+      update(text);
+      return;
+    }
     setAttachments([]);
     setTabContext([]);
     props.onClearComments?.();
