@@ -255,7 +255,7 @@ function WorkspaceRow({
           />
         ) : null}
       </span>
-      <span className="absolute top-1 right-1 hidden group-hover:flex">
+      <span className="absolute top-1 right-1 hidden group-hover:flex has-[[role=menu]]:flex">
         <Menu
           label={`${workspace.name} actions`}
           align="right"

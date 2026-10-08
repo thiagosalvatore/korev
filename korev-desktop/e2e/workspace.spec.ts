@@ -104,6 +104,13 @@ test('creates a workspace, runs an agent turn, shows the diff and archives it', 
     await expect(
       workspaces.getByText('dev-person/add-agent-note'),
     ).toBeVisible();
+    await workspaces.getByText('dev-person/add-agent-note').hover();
+    await workspaces.getByRole('button', { name: 'Workspace actions' }).click();
+    await window.mouse.move(600, 600);
+    await expect(
+      window.getByRole('menuitem', { name: 'Archive' }),
+    ).toBeVisible();
+    await window.keyboard.press('Escape');
     const panel = window.getByRole('complementary', {
       name: 'Workspace panel',
     });
