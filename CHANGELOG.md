@@ -5,6 +5,7 @@ Korev shows the section of each version in its "What's new" window, so write for
 ## [Unreleased]
 
 - Lists in "What's new" and in agent replies show bullets and numbers.
+- Korev is signed and notarized by Apple. A download opens like any other app, with no Open Anyway step.
 
 ## [0.2.0] - 2026-10-08
 

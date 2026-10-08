@@ -68,6 +68,18 @@ async function signAppBundlesAdHoc(outputPaths: string[]) {
   }
 }
 
+function notaryCredentials() {
+  const {
+    APPLE_API_KEY: appleApiKey,
+    APPLE_API_KEY_ID: appleApiKeyId,
+    APPLE_API_ISSUER: appleApiIssuer,
+  } = process.env;
+  if (!appleApiKey || !appleApiKeyId || !appleApiIssuer) return undefined;
+  return { appleApiKey, appleApiKeyId, appleApiIssuer };
+}
+
+const osxNotarize = notaryCredentials();
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: {
@@ -75,13 +87,15 @@ const config: ForgeConfig = {
     },
     icon: ICON,
     extendInfo: { NSMicrophoneUsageDescription: MICROPHONE_USAGE },
+    ...(osxNotarize && { osxSign: {}, osxNotarize }),
   },
   rebuildConfig: {},
   hooks: {
     packageAfterCopy: (_config, buildPath, _electronVersion, platform, arch) =>
       copyNativePackages(buildPath, platform, arch),
     postPackage: async (_config, { platform, outputPaths }) => {
-      if (platform === 'darwin') await signAppBundlesAdHoc(outputPaths);
+      if (platform === 'darwin' && !osxNotarize)
+        await signAppBundlesAdHoc(outputPaths);
     },
   },
   makers: [
