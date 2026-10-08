@@ -33,6 +33,17 @@ export interface MenuProps {
 export const PANEL =
   'absolute z-50 max-h-[60vh] min-w-48 animate-fade-fast overflow-y-auto rounded-md bg-raised p-1 shadow-pop';
 
+const POSITION_AREAS = {
+  bottom: {
+    left: '[position-area:bottom_span-right]',
+    right: '[position-area:bottom_span-left]',
+  },
+  top: {
+    left: '[position-area:top_span-right]',
+    right: '[position-area:top_span-left]',
+  },
+} as const;
+
 export function useDismiss(
   root: RefObject<HTMLElement | null>,
   open: boolean,
@@ -65,8 +76,13 @@ export function Menu({
 }: MenuProps) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useDismiss(root, open, close);
+  useEffect(() => {
+    if (open && root.current)
+      panel.current?.showPopover?.({ source: root.current });
+  }, [open]);
 
   let lastSection: string | undefined;
   return (
@@ -74,14 +90,14 @@ export function Menu({
       {trigger({ open, toggle: () => setOpen((value) => !value) })}
       {open ? (
         <div
+          ref={panel}
+          popover="manual"
           role="menu"
           aria-label={label}
           className={cn(
             PANEL,
-            align === 'right' ? 'right-0' : 'left-0',
-            side === 'bottom'
-              ? 'top-[calc(100%+4px)]'
-              : 'bottom-[calc(100%+4px)]',
+            'fixed inset-auto m-0 my-1 border-0 [position-try-fallbacks:flip-block]',
+            POSITION_AREAS[side][align],
           )}
           style={width ? { width } : undefined}
         >
