@@ -34,4 +34,17 @@ describe('openStore', () => {
     const store = await openStore(fileSystemWith({}), '/user-data', '/home');
     expect(store.state.settings.lastSeenVersion).toBeNull();
   });
+
+  it('stops pinning codex to the old default model placeholder', async () => {
+    const store = await openStore(
+      fileSystemWith({
+        settings: { defaultModels: { claude: 'opus', codex: 'default' } },
+        workspaces: [{ sessions: [{ agent: 'codex', model: 'default' }] }],
+      }),
+      '/user-data',
+      '/home',
+    );
+    expect(store.state.settings.defaultModels.codex).toBe('');
+    expect(store.state.workspaces[0].sessions[0].model).toBe('');
+  });
 });

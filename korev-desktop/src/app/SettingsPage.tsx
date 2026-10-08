@@ -8,6 +8,7 @@ import {
   Input,
   Select,
   Switch,
+  Tabs,
   type IconName,
 } from '../design-system';
 import {
@@ -15,8 +16,10 @@ import {
   AGENT_LABELS,
   DEFAULT_INCLUDE_GLOBS,
   EFFORT_LEVELS,
+  isAgentReady,
   LOADOUT_SIZE,
   loadoutKey,
+  type AgentAvailability,
   type AgentKind,
   type AppRunScript,
   type AppState,
@@ -208,15 +211,23 @@ function General({ settings }: { settings: Settings }) {
   );
 }
 
+function agentEntry(state: AppState, agent: AgentKind) {
+  return state.agents.find((entry) => entry.agent === agent);
+}
+
 function Models({ state }: { state: AppState }) {
   const { settings } = state;
+  const agents = AGENT_KINDS.filter((agent) => {
+    const entry = agentEntry(state, agent);
+    return agent === settings.defaultAgent || (entry && isAgentReady(entry));
+  });
   return (
     <>
       <Row title="Default agent" description="Used for new workspaces and ⌘T.">
         <Select
           ariaLabel="Default agent"
           className="w-48"
-          options={AGENT_KINDS.map((agent) => ({
+          options={agents.map((agent) => ({
             value: agent,
             label: AGENT_LABELS[agent],
           }))}
@@ -224,47 +235,6 @@ function Models({ state }: { state: AppState }) {
           onChange={(agent) => update({ defaultAgent: agent as AgentKind })}
         />
       </Row>
-      {AGENT_KINDS.map((agent) => {
-        const models =
-          state.agents.find((entry) => entry.agent === agent)?.models ?? [];
-        return (
-          <Row key={agent} title={`${AGENT_LABELS[agent]} model`}>
-            <div className="flex gap-2">
-              <Select
-                ariaLabel={`${AGENT_LABELS[agent]} model`}
-                className="w-44"
-                options={models.map((model) => ({
-                  value: model.id,
-                  label: model.label,
-                }))}
-                value={settings.defaultModels[agent]}
-                onChange={(model) =>
-                  update({
-                    defaultModels: {
-                      ...settings.defaultModels,
-                      [agent]: model,
-                    },
-                  })
-                }
-              />
-              <Select
-                ariaLabel={`${AGENT_LABELS[agent]} effort`}
-                className="w-28"
-                options={[...EFFORT_LEVELS[agent]]}
-                value={settings.defaultEffort[agent]}
-                onChange={(effort) =>
-                  update({
-                    defaultEffort: {
-                      ...settings.defaultEffort,
-                      [agent]: effort,
-                    },
-                  })
-                }
-              />
-            </div>
-          </Row>
-        );
-      })}
       <ReviewModel state={state} />
       <Loadout state={state} />
       <Row
@@ -456,33 +426,165 @@ function Snippets({ settings }: { settings: Settings }) {
   );
 }
 
+type AgentStatus = 'checking' | 'missing' | 'signed-out' | 'connected';
+
+const AGENT_STATUS: Record<AgentStatus, { label: string; dot: string }> = {
+  checking: { label: 'Checking…', dot: 'bg-fg-4' },
+  missing: { label: 'Not installed', dot: 'bg-danger' },
+  'signed-out': { label: 'Not signed in', dot: 'bg-warning' },
+  connected: { label: 'Connected', dot: 'bg-success' },
+};
+
+const SIGN_IN_COMMANDS: Record<AgentKind, string> = {
+  claude: 'claude auth login',
+  codex: 'codex login',
+};
+
+function agentStatus(entry: AgentAvailability | undefined): AgentStatus {
+  if (!entry) return 'checking';
+  if (!entry.version) return 'missing';
+  return entry.account ? 'connected' : 'signed-out';
+}
+
+function AgentDetails({ entry }: { entry: AgentAvailability }) {
+  const details = [
+    ['Version', entry.version],
+    ['Login method', entry.account?.method],
+    ['Email', entry.account?.email],
+    ['Organization', entry.account?.organization],
+  ].filter((detail): detail is [string, string] => Boolean(detail[1]));
+  if (!details.length) return null;
+  return (
+    <dl className="m-0 overflow-hidden rounded-sm border border-border-1 text-sm">
+      {details.map(([label, value]) => (
+        <div
+          key={label}
+          className="flex border-b border-border-1 last:border-b-0"
+        >
+          <dt className="w-40 flex-none bg-inset px-3 py-2 text-fg-3">
+            {label}
+          </dt>
+          <dd className="m-0 min-w-0 truncate px-3 py-2 text-fg-1">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function AgentModel({
+  state,
+  entry,
+}: {
+  state: AppState;
+  entry: AgentAvailability;
+}) {
+  const { settings } = state;
+  const { agent } = entry;
+  const label = AGENT_LABELS[agent];
+  return (
+    <Row
+      title="Default model"
+      description="Used for new chats with this agent."
+    >
+      <div className="flex gap-2">
+        <Select
+          ariaLabel={`${label} model`}
+          className="w-44"
+          options={entry.models.map((model) => ({
+            value: model.id,
+            label: model.label,
+          }))}
+          value={settings.defaultModels[agent]}
+          onChange={(model) =>
+            update({
+              defaultModels: { ...settings.defaultModels, [agent]: model },
+            })
+          }
+        />
+        <Select
+          ariaLabel={`${label} effort`}
+          className="w-28"
+          options={[...EFFORT_LEVELS[agent]]}
+          value={settings.defaultEffort[agent]}
+          onChange={(effort) =>
+            update({
+              defaultEffort: { ...settings.defaultEffort, [agent]: effort },
+            })
+          }
+        />
+      </div>
+    </Row>
+  );
+}
+
+function AgentSetup({
+  agent,
+  status,
+}: {
+  agent: AgentKind;
+  status: AgentStatus;
+}) {
+  if (status === 'missing')
+    return (
+      <p className="my-4 text-xs text-fg-3">
+        Install the {AGENT_LABELS[agent]} CLI so it is on your PATH, then press
+        Refresh.
+      </p>
+    );
+  if (status === 'signed-out')
+    return (
+      <p className="my-4 text-xs text-fg-3">
+        Run <code className="font-mono">{SIGN_IN_COMMANDS[agent]}</code> in a
+        terminal, then press Refresh.
+      </p>
+    );
+  return null;
+}
+
+function AgentTab({ state, agent }: { state: AppState; agent: AgentKind }) {
+  const entry = agentEntry(state, agent);
+  const status = agentStatus(entry);
+  return (
+    <div className="border-b border-border-1">
+      <div className="flex items-center justify-between py-4">
+        <span className="inline-flex items-center gap-2 text-sm text-fg-1">
+          <span
+            className={cn('size-2 rounded-full', AGENT_STATUS[status].dot)}
+          />
+          {AGENT_STATUS[status].label}
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="rotate-cw"
+          onClick={() => api.refreshAgents()}
+        >
+          Refresh
+        </Button>
+      </div>
+      {entry ? <AgentDetails entry={entry} /> : null}
+      {entry && status === 'connected' ? (
+        <AgentModel state={state} entry={entry} />
+      ) : (
+        <AgentSetup agent={agent} status={status} />
+      )}
+    </div>
+  );
+}
+
 function Agents({ state }: { state: AppState }) {
+  const [agent, setAgent] = useState<AgentKind>(AGENT_KINDS[0]);
   return (
     <>
-      {state.agents.map((agent) => (
-        <Row
-          key={agent.agent}
-          title={AGENT_LABELS[agent.agent]}
-          description={
-            agent.version
-              ? `Using the ${agent.agent} CLI from your PATH (v${agent.version}). Sign-in and MCP servers come from its own config.`
-              : `The ${agent.agent} CLI was not found on your PATH.`
-          }
-        >
-          <span
-            className={cn(
-              'inline-flex items-center gap-1.5 text-xs',
-              agent.version ? 'text-success-text' : 'text-danger-text',
-            )}
-          >
-            <Icon
-              name={agent.version ? 'circle-check' : 'circle-x'}
-              size={13}
-            />
-            {agent.version ? 'Ready' : 'Not installed'}
-          </span>
-        </Row>
-      ))}
+      <Tabs
+        tabs={AGENT_KINDS.map((kind) => ({
+          id: kind,
+          label: AGENT_LABELS[kind],
+        }))}
+        value={agent}
+        onChange={(id) => setAgent(id as AgentKind)}
+      />
+      <AgentTab state={state} agent={agent} />
       <Row
         title="Ask before tool calls"
         description="Claude Code asks you to allow each edit and command. Plan approvals and questions always ask. Codex runs in its workspace-write sandbox either way."

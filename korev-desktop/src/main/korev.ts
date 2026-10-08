@@ -31,7 +31,7 @@ import {
   type WorkspaceSource,
   type WorkspaceStatus,
 } from '../shared/model';
-import { detectAgents } from './agents';
+import { detectAgents, reconcileDefaultModels } from './agents';
 import type { Dictation } from './dictation';
 import type { RemoteAccess } from './remote-access';
 import { askWorktreePath } from './ask-worktrees';
@@ -815,6 +815,16 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     ctx.emitState();
   }
 
+  async function refreshAgents() {
+    agents = await detectAgents(deps.run, deps.env);
+    await updateSettings({
+      defaultModels: reconcileDefaultModels(
+        store.state.settings.defaultModels,
+        agents,
+      ),
+    });
+  }
+
   async function checkForUpdates() {
     const latest = await deps.fetchRelease('latest');
     if (latest) {
@@ -872,6 +882,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
 
   const api: KorevApi = {
     getState: async () => snapshot(),
+    refreshAgents,
     async addRepo() {
       const dir = await deps.chooseDirectory();
       if (!dir) return ok(null);
@@ -1325,10 +1336,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
   };
 
-  void detectAgents(deps.run, deps.env).then((detected) => {
-    agents = detected;
-    ctx.emitState();
-  });
+  void refreshAgents();
   for (const workspace of activeWorkspaces(ctx))
     ctx.background(refreshStats(ctx, workspace));
   void refreshAllPrs();

@@ -19,8 +19,6 @@ export interface ModelChoice extends AgentModel {
   agent: AgentKind;
 }
 
-export const CODEX_DEFAULT_MODEL = 'default';
-
 export const EFFORT_LEVELS: Record<AgentKind, readonly string[]> = {
   claude: ['low', 'medium', 'high', 'xhigh', 'max'],
   codex: ['minimal', 'low', 'medium', 'high', 'xhigh'],
@@ -474,10 +472,21 @@ export function hasWorktree(runtime: WorkspaceRuntime): boolean {
   );
 }
 
+export interface AgentAccount {
+  method: string | null;
+  email: string | null;
+  organization: string | null;
+}
+
 export interface AgentAvailability {
   agent: AgentKind;
   version: string | null;
+  account: AgentAccount | null;
   models: AgentModel[];
+}
+
+export function isAgentReady(entry: AgentAvailability): boolean {
+  return Boolean(entry.version && entry.account);
 }
 
 export interface AppState {

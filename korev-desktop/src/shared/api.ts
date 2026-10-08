@@ -38,6 +38,7 @@ import type {
 
 export interface KorevApi {
   getState(): Promise<AppState>;
+  refreshAgents(): Promise<void>;
   addRepo(): Promise<Result<Repo | null>>;
   cloneRepo(url: string): Promise<Result<Repo>>;
   importFromConductor(): Promise<{ repos: number; settings: number }>;

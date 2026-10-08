@@ -1,5 +1,6 @@
 import {
   AGENT_LABELS,
+  isAgentReady,
   loadoutKey,
   type AgentKind,
   type AppState,
@@ -70,7 +71,7 @@ export function modelChoices(
   current: AgentKind,
 ): ModelChoice[] {
   return state.agents
-    .filter((entry) => entry.version || entry.agent === current)
+    .filter((entry) => isAgentReady(entry) || entry.agent === current)
     .flatMap((entry) =>
       entry.models.map((model) => ({ ...model, agent: entry.agent })),
     );

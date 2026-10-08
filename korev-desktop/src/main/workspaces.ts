@@ -2,7 +2,6 @@ import { realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
-  CODEX_DEFAULT_MODEL,
   type AgentKind,
   type ChatSession,
   type GitWorktree,
@@ -90,7 +89,7 @@ export function newChatSession(ctx: Context, agent: AgentKind): ChatSession {
     id: ctx.deps.newId(),
     title: NEW_CHAT_TITLE,
     agent,
-    model: settings.defaultModels[agent] ?? CODEX_DEFAULT_MODEL,
+    model: settings.defaultModels[agent],
     effort: settings.defaultEffort[agent],
     fast: false,
     planMode: settings.defaultPlanMode,

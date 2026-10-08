@@ -2,13 +2,14 @@ import path from 'node:path';
 import {
   AGENT_KINDS,
   CLAUDE_MODELS,
-  CODEX_DEFAULT_MODEL,
   DEFAULT_EFFORT,
   EMPTY_SCRIPTS,
+  loadoutKey,
   runScriptsFromText,
   type AgentKind,
   type AskChat,
   type ChatItem,
+  type ChatSession,
   type Repo,
   type RepoFolder,
   type Settings,
@@ -18,6 +19,7 @@ import type { FileSystem } from './file-system';
 import { DEFAULT_REMOTE_PORT } from './remote-server';
 
 const STATE_FILE = 'korev-state.json';
+const LEGACY_CODEX_DEFAULT_MODEL = 'default';
 const TRANSCRIPTS_DIR = 'transcripts';
 export const ATTACHMENTS_DIR = 'attachments';
 const SAVE_DELAY_MS = 400;
@@ -35,7 +37,7 @@ export function defaultSettings(home: string): Settings {
   return {
     theme: 'system',
     defaultAgent: 'claude',
-    defaultModels: { claude: CLAUDE_MODELS[0].id, codex: CODEX_DEFAULT_MODEL },
+    defaultModels: { claude: CLAUDE_MODELS[0].id, codex: '' },
     branchPrefix: '',
     workspacesRoot: path.join(home, 'korev', 'workspaces'),
     defaultEffort: DEFAULT_EFFORT,
@@ -64,6 +66,21 @@ function isAgentKind(value: unknown): value is AgentKind {
   return AGENT_KINDS.includes(value as AgentKind);
 }
 
+function isLegacyCodexDefault(agent: AgentKind, model: string) {
+  return agent === 'codex' && model === LEGACY_CODEX_DEFAULT_MODEL;
+}
+
+function withoutLegacyCodexDefault(agent: AgentKind, model: string) {
+  return isLegacyCodexDefault(agent, model) ? '' : model;
+}
+
+function sessionWithoutLegacyCodexDefault(session: ChatSession): ChatSession {
+  return {
+    ...session,
+    model: withoutLegacyCodexDefault(session.agent, session.model),
+  };
+}
+
 function sanitize(raw: unknown, home: string): PersistedState {
   const value = (raw ?? {}) as Partial<PersistedState>;
   const defaults = defaultSettings(home);
@@ -73,6 +90,18 @@ function sanitize(raw: unknown, home: string): PersistedState {
     ...defaults.defaultModels,
     ...settings.defaultModels,
   };
+  settings.defaultModels.codex = withoutLegacyCodexDefault(
+    'codex',
+    settings.defaultModels.codex,
+  );
+  if (
+    settings.reviewModel &&
+    isLegacyCodexDefault(settings.reviewModel.agent, settings.reviewModel.model)
+  )
+    settings.reviewModel = null;
+  settings.loadout = settings.loadout.filter(
+    (key) => key !== loadoutKey('codex', LEGACY_CODEX_DEFAULT_MODEL),
+  );
   settings.defaultEffort = {
     ...defaults.defaultEffort,
     ...settings.defaultEffort,
@@ -99,7 +128,7 @@ function sanitize(raw: unknown, home: string): PersistedState {
         groupId: workspace.groupId ?? null,
         prs: workspace.prs ?? [],
         sessions: workspace.sessions.map((session) => ({
-          ...session,
+          ...sessionWithoutLegacyCodexDefault(session),
           effort: session.effort ?? defaults.defaultEffort[session.agent],
           fast: session.fast ?? false,
           forkOnNextTurn: session.forkOnNextTurn ?? false,
@@ -108,7 +137,11 @@ function sanitize(raw: unknown, home: string): PersistedState {
       }),
     ),
     askChats: (Array.isArray(value.askChats) ? value.askChats : []).map(
-      (ask) => ({ ...ask, lastMessageAt: ask.lastMessageAt ?? ask.createdAt }),
+      (ask) => ({
+        ...ask,
+        session: sessionWithoutLegacyCodexDefault(ask.session),
+        lastMessageAt: ask.lastMessageAt ?? ask.createdAt,
+      }),
     ),
     settings,
   };

@@ -1,12 +1,14 @@
 import {
+  AGENT_KINDS,
   CLAUDE_MODELS,
-  CODEX_DEFAULT_MODEL,
+  isAgentReady,
+  type AgentAccount,
   type AgentAvailability,
   type AgentKind,
   type AgentModel,
   type TurnUsage,
 } from '../shared/model';
-import type { CommandRunner } from './command-runner';
+import type { CommandResult, CommandRunner } from './command-runner';
 import {
   createClaudeParser,
   createCodexParser,
@@ -18,6 +20,7 @@ import { readCodexUsage } from './codex-usage';
 const VERSION_PATTERN = /\d+\.\d+\.\d+\S*/;
 const PROBE_TIMEOUT_MS = 15_000;
 const LISTED_MODEL_VISIBILITY = 'list';
+const CODEX_SIGNED_IN_PATTERN = /Logged in using (.+)/;
 const STDIN_PROMPT = '-';
 const READ_ONLY_DISALLOWED_TOOLS = ['Edit', 'Write', 'NotebookEdit'];
 
@@ -90,10 +93,7 @@ function claudeArgs(request: TurnRequest): string[] {
 }
 
 function codexArgs(request: TurnRequest): string[] {
-  const model =
-    request.model && request.model !== CODEX_DEFAULT_MODEL
-      ? ['--model', request.model]
-      : [];
+  const model = request.model ? ['--model', request.model] : [];
   const options = [
     '--json',
     '--skip-git-repo-check',
@@ -164,50 +164,102 @@ async function probe(
   env: NodeJS.ProcessEnv,
   binary: string,
   args: string[],
-): Promise<string | null> {
+): Promise<CommandResult | null> {
   try {
     const result = await run(binary, args, {
       env,
       timeoutMs: PROBE_TIMEOUT_MS,
     });
-    return result.exitCode === 0 ? result.stdout : null;
+    return result.exitCode === 0 ? result : null;
   } catch {
     return null;
   }
 }
 
-const CODEX_FALLBACK_MODELS: AgentModel[] = [
-  { id: CODEX_DEFAULT_MODEL, label: 'Codex default' },
-];
-
-async function codexModels(run: CommandRunner, env: NodeJS.ProcessEnv) {
-  const output = await probe(run, env, 'codex', ['debug', 'models']);
-  return [
-    ...CODEX_FALLBACK_MODELS,
-    ...(output ? parseCodexModels(output) : []),
-  ];
+function stringOrNull(value: unknown): string | null {
+  return typeof value === 'string' && value ? value : null;
 }
 
-export async function detectAgents(
+export function parseClaudeAccount(stdout: string): AgentAccount | null {
+  const status = parseJsonLine(stdout);
+  if (status?.loggedIn !== true) return null;
+  return {
+    method: stringOrNull(status.authMethod),
+    email: stringOrNull(status.email),
+    organization: stringOrNull(status.orgName),
+  };
+}
+
+export function parseCodexAccount(output: string): AgentAccount | null {
+  const method = CODEX_SIGNED_IN_PATTERN.exec(output)?.[1].trim();
+  return method ? { method, email: null, organization: null } : null;
+}
+
+interface AgentProbe {
+  account(
+    run: CommandRunner,
+    env: NodeJS.ProcessEnv,
+  ): Promise<AgentAccount | null>;
+  models(run: CommandRunner, env: NodeJS.ProcessEnv): Promise<AgentModel[]>;
+}
+
+const AGENT_PROBES: Record<AgentKind, AgentProbe> = {
+  claude: {
+    async account(run, env) {
+      const result = await probe(run, env, 'claude', ['auth', 'status']);
+      return result ? parseClaudeAccount(result.stdout) : null;
+    },
+    models: async () => CLAUDE_MODELS,
+  },
+  codex: {
+    async account(run, env) {
+      const result = await probe(run, env, 'codex', ['login', 'status']);
+      return result
+        ? parseCodexAccount(`${result.stdout}\n${result.stderr}`)
+        : null;
+    },
+    async models(run, env) {
+      const result = await probe(run, env, 'codex', ['debug', 'models']);
+      return result ? parseCodexModels(result.stdout) : [];
+    },
+  },
+};
+
+async function detectAgent(
+  agent: AgentKind,
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+): Promise<AgentAvailability> {
+  const installed = await probe(run, env, AGENTS[agent].binary, ['--version']);
+  const version = installed
+    ? (VERSION_PATTERN.exec(installed.stdout)?.[0] ?? null)
+    : null;
+  const account = version ? await AGENT_PROBES[agent].account(run, env) : null;
+  const models = account ? await AGENT_PROBES[agent].models(run, env) : [];
+  return { agent, version, account, models };
+}
+
+export function detectAgents(
   run: CommandRunner,
   env: NodeJS.ProcessEnv,
 ): Promise<AgentAvailability[]> {
-  const [claude, codex] = await Promise.all([
-    probe(run, env, 'claude', ['--version']),
-    probe(run, env, 'codex', ['--version']),
-  ]);
-  return [
-    {
-      agent: 'claude',
-      version: claude ? (VERSION_PATTERN.exec(claude)?.[0] ?? null) : null,
-      models: CLAUDE_MODELS,
-    },
-    {
-      agent: 'codex',
-      version: codex ? (VERSION_PATTERN.exec(codex)?.[0] ?? null) : null,
-      models: codex ? await codexModels(run, env) : CODEX_FALLBACK_MODELS,
-    },
-  ];
+  return Promise.all(AGENT_KINDS.map((agent) => detectAgent(agent, run, env)));
+}
+
+export function reconcileDefaultModels(
+  defaultModels: Record<AgentKind, string>,
+  agents: AgentAvailability[],
+): Record<AgentKind, string> {
+  const reconciled = { ...defaultModels };
+  for (const entry of agents) {
+    const offered = entry.models.map((model) => model.id);
+    const keep =
+      !isAgentReady(entry) ||
+      !offered.length ||
+      offered.includes(reconciled[entry.agent]);
+    if (!keep) reconciled[entry.agent] = offered[0];
+  }
+  return reconciled;
 }
 
 export function claudeUserMessage(text: string): string {

@@ -5,7 +5,11 @@ description: 'Fixes for common problems.'
 
 ## An agent shows "Not installed"
 
-Korev looks for `claude` and `codex` on your login shell's PATH, plus `~/.local/bin`, `~/.npm-global/bin`, `~/.bun/bin`, `/opt/homebrew/bin` and `/usr/local/bin`. Check that `claude --version` or `codex --version` works in a new terminal window, then restart Korev.
+Korev looks for `claude` and `codex` on your login shell's PATH, plus `~/.local/bin`, `~/.npm-global/bin`, `~/.bun/bin`, `/opt/homebrew/bin` and `/usr/local/bin`. Check that `claude --version` or `codex --version` works in a new terminal window, then press **Refresh** in **Settings → Agents**.
+
+## An agent shows "Not signed in"
+
+Run `claude auth login` or `codex login` in a terminal, then press **Refresh** in **Settings → Agents**. Korev lists an agent's models only after it signs in.
 
 ## macOS says Korev can't be opened
 

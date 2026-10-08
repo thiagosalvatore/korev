@@ -1,7 +1,8 @@
 #!/bin/sh
 case " $* " in
   *" --version "*) echo "codex-cli 9.9.9"; exit 0 ;;
-  *" debug "*) exit 1 ;;
+  " login status ") echo "Logged in using ChatGPT" >&2; exit 0 ;;
+  *" debug "*) echo '{"models":[{"slug":"gpt-fake","display_name":"GPT Fake","priority":1,"visibility":"list"}]}'; exit 0 ;;
 esac
 prompt=$(cat)
 [ -d .context ] && printf '%s' "$prompt" > .context/codex-prompt
