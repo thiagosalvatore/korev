@@ -40,6 +40,12 @@
   .kv-md ol {
     padding-left: 22px;
   }
+  .kv-md ul {
+    list-style: disc;
+  }
+  .kv-md ol {
+    list-style: decimal;
+  }
   .kv-md li {
     margin: 3px 0;
   }

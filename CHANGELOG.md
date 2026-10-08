@@ -4,6 +4,8 @@ Korev shows the section of each version in its "What's new" window, so write for
 
 ## [Unreleased]
 
+- Lists in "What's new" and in agent replies show bullets and numbers.
+
 ## [0.2.0] - 2026-10-08
 
 Speak to your agents instead of typing.
