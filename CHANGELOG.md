@@ -4,6 +4,8 @@ Korev shows the section of each version in its "What's new" window, so write for
 
 ## [Unreleased]
 
+- When a new version of Korev is out, Korev tells you with a window that shows what changed. Before, the only sign was a small icon at the bottom of the sidebar.
+
 ## [0.3.0] - 2026-10-08
 
 Korev now opens like any other Mac app.

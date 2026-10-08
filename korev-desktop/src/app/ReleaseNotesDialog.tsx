@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Button, Dialog } from '../design-system';
 import type { AppState, ReleaseInfo } from '../shared/model';
 import { api } from './bridge';
@@ -59,6 +60,10 @@ function UpdateAvailable({ release }: { release: ReleaseInfo }) {
 
 export function ReleaseNotesDialog({ state }: { state: AppState }) {
   const updateOpen = useUi((ui) => ui.updateOpen);
+  const updateVersion = state.update?.version;
+  useEffect(() => {
+    if (updateVersion) setUi({ updateOpen: true });
+  }, [updateVersion]);
   if (state.whatsNew) return <WhatsNew release={state.whatsNew} />;
   if (updateOpen && state.update)
     return <UpdateAvailable release={state.update} />;
