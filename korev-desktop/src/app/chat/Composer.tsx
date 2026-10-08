@@ -27,8 +27,13 @@ import { api } from '../bridge';
 import { fileName } from '../../shared/format';
 import { reportFailure } from '../ui/toast';
 import type { DiffComment } from '../ui-store';
+import { useAppState } from '../hooks';
 import { readAsBase64 } from './attachments';
 import { ComposerToolbar } from './ComposerToolbar';
+import { insertDictation } from '../../shared/dictation';
+import { useDictation } from './dictation';
+import { DictationButton, isDictationShortcut } from './DictationButton';
+import { RecordingBar } from './RecordingBar';
 import { PlanChip } from './PlanChip';
 import {
   applySuggestion,
@@ -169,16 +174,42 @@ export function Composer(props: ComposerProps) {
     saveDraft(draftKey, next);
   }
 
+  function placeCaret(caret: number) {
+    requestAnimationFrame(() => {
+      input.current?.focus();
+      input.current?.setSelectionRange(caret, caret);
+    });
+  }
+
+  function insertDictated(dictated: string) {
+    const element = input.current;
+    const current = element?.value ?? text;
+    const inserted = insertDictation(
+      current,
+      element?.selectionStart ?? current.length,
+      dictated,
+    );
+    update(inserted.text);
+    placeCaret(inserted.caret);
+  }
+
+  const dictationStatus = useAppState()?.dictation;
+  const dictation = useDictation(insertDictated);
+  const dictating = dictation.phase !== 'idle';
+  const wasDictating = useRef(false);
+
+  useEffect(() => {
+    if (!dictating && wasDictating.current) input.current?.focus();
+    wasDictating.current = dictating;
+  }, [dictating]);
+
   function accept(index: number) {
     const option = suggestions?.options[index];
     if (!suggestions || !option) return;
     const applied = applySuggestion(text, suggestions, option);
     update(applied.text);
     setSuggestions(null);
-    requestAnimationFrame(() => {
-      input.current?.focus();
-      input.current?.setSelectionRange(applied.caret, applied.caret);
-    });
+    placeCaret(applied.caret);
   }
 
   async function addFiles(list: FileList | File[]) {
@@ -204,7 +235,9 @@ export function Composer(props: ComposerProps) {
   const canSend =
     Boolean(
       text.trim() || comments.length || tabContext.length || pendingPlan,
-    ) && !sending;
+    ) &&
+    !sending &&
+    !dictating;
 
   async function send() {
     if (!canSend) return;
@@ -267,6 +300,7 @@ export function Composer(props: ComposerProps) {
       props.onEffortChange(nextEffort(props.agent, props.effort));
     else if (command && key === 'u') picker.current?.click();
     else if (command && key === ';') openSnippets();
+    else if (isDictationShortcut(event)) dictation.toggle();
     else if (event.metaKey && event.ctrlKey && /^[1-5]$/.test(event.key)) {
       const entry = props.loadout[Number(event.key) - 1];
       if (entry) props.onModelChange(entry);
@@ -431,11 +465,20 @@ export function Composer(props: ComposerProps) {
             })}
           </div>
         ) : null}
+        {dictating ? (
+          <RecordingBar
+            stream={dictation.stream}
+            phase={dictation.phase}
+            onDone={dictation.done}
+            onCancel={dictation.cancel}
+          />
+        ) : null}
         <textarea
           ref={input}
           data-composer
           aria-label="Message"
           rows={2}
+          hidden={dictating}
           value={text}
           placeholder={
             (pendingPlan ? PENDING_PLAN_PLACEHOLDER : props.placeholder) ??
@@ -473,6 +516,13 @@ export function Composer(props: ComposerProps) {
           running={running}
           canSend={canSend}
           usage={props.usage}
+          dictation={
+            <DictationButton
+              status={dictationStatus}
+              phase={dictation.phase}
+              onToggle={dictation.toggle}
+            />
+          }
           contextPicker={
             otherTabs.length ? (
               <TabContextPicker

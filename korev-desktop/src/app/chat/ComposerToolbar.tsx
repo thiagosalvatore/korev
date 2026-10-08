@@ -23,6 +23,7 @@ export interface ComposerToolbarProps {
   canSend: boolean;
   usage?: TurnUsage;
   contextPicker?: ReactNode;
+  dictation?: ReactNode;
   onAttach(): void;
   onInsertSnippet(): void;
   onModelChange(choice: ModelChoice): void;
@@ -207,6 +208,7 @@ export function ComposerToolbar(props: ComposerToolbarProps) {
             : 'Queued until the agent finishes'}
         </span>
       ) : null}
+      {props.dictation}
       {props.running && props.onStop ? (
         <button
           type="button"
