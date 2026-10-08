@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PlanReview } from './PermissionCard';
+import { PermissionCard, PlanReview } from './PermissionCard';
 
 afterEach(cleanup);
 
@@ -52,5 +52,29 @@ describe('PlanReview feedback', () => {
     fireEvent.keyDown(feedback, { key: 'Enter' });
 
     expect(onKeepPlanning).not.toHaveBeenCalled();
+  });
+});
+
+describe('PermissionCard after a plan is resolved', () => {
+  it('opens the approved plan', () => {
+    render(
+      <PermissionCard
+        item={{
+          id: 'plan-1',
+          kind: 'permission',
+          tool: 'ExitPlanMode',
+          summary: 'Ship it',
+          detail: '',
+          questions: null,
+          plan: '# Ship it\n\nStep one.',
+          status: 'allowed',
+        }}
+        onRespond={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Plan/ }));
+
+    expect(screen.getByRole('dialog').textContent).toContain('Step one.');
   });
 });

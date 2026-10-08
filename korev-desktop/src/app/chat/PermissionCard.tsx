@@ -14,8 +14,10 @@ import {
   type PermissionStatus,
   type PlanLane,
 } from '../../shared/model';
+import { planFileName } from '../../shared/message';
 import { DictationButton, isDictationShortcut } from './DictationButton';
 import { Markdown } from './Markdown';
+import { PlanChip } from './PlanChip';
 import { RecordingBar } from './RecordingBar';
 import { useVoiceInput } from './voiceInput';
 
@@ -36,6 +38,20 @@ const STATUS_LABELS: Record<Exclude<PermissionStatus, 'pending'>, string> = {
 
 const OTHER_OPTION = 'Other';
 
+function ResolvedPlan({ plan, summary }: { plan: string; summary: string }) {
+  return (
+    <PlanChip
+      name={planFileName(plan)}
+      markdown={plan}
+      className="flex min-w-0 items-center gap-2 rounded-sm border-0 bg-transparent p-0 text-fg-3 hover:text-fg-1"
+    >
+      <span className="font-medium text-fg-2">Plan</span>
+      <Icon name="file-text" size={13} />
+      <span className="truncate font-mono text-xs">{summary}</span>
+    </PlanChip>
+  );
+}
+
 function Resolved({ item }: { item: PermissionItem }) {
   const label = item.status === 'pending' ? '' : STATUS_LABELS[item.status];
   return (
@@ -44,10 +60,16 @@ function Resolved({ item }: { item: PermissionItem }) {
         name={item.status === 'allowed' ? 'circle-check' : 'circle-slash'}
         size={13}
       />
-      <span className="font-medium text-fg-2">
-        {item.plan !== null ? 'Plan' : item.questions ? 'Question' : item.tool}
-      </span>
-      <span className="truncate font-mono text-xs">{item.summary}</span>
+      {item.plan !== null ? (
+        <ResolvedPlan plan={item.plan} summary={item.summary} />
+      ) : (
+        <>
+          <span className="font-medium text-fg-2">
+            {item.questions ? 'Question' : item.tool}
+          </span>
+          <span className="truncate font-mono text-xs">{item.summary}</span>
+        </>
+      )}
       <span className="text-xs">· {label}</span>
     </div>
   );
