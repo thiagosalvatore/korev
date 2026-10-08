@@ -27,14 +27,11 @@ import { api } from '../bridge';
 import { fileName } from '../../shared/format';
 import { reportFailure } from '../ui/toast';
 import type { DiffComment } from '../ui-store';
-import { useAppState } from '../hooks';
 import { readAsBase64 } from './attachments';
 import { ComposerToolbar } from './ComposerToolbar';
-import { insertDictation } from '../../shared/dictation';
-import { useDictation } from './dictation';
 import { DictationButton, isDictationShortcut } from './DictationButton';
 import { RecordingBar } from './RecordingBar';
-import { VoiceModelDialog } from './VoiceModelDialog';
+import { placeCaret, useVoiceInput } from './voiceInput';
 import { PlanChip } from './PlanChip';
 import {
   applySuggestion,
@@ -175,45 +172,8 @@ export function Composer(props: ComposerProps) {
     saveDraft(draftKey, next);
   }
 
-  function placeCaret(caret: number) {
-    requestAnimationFrame(() => {
-      input.current?.focus();
-      input.current?.setSelectionRange(caret, caret);
-    });
-  }
-
-  function insertDictated(dictated: string) {
-    const element = input.current;
-    const current = element?.value ?? text;
-    const inserted = insertDictation(
-      current,
-      element?.selectionStart ?? current.length,
-      dictated,
-    );
-    update(inserted.text);
-    placeCaret(inserted.caret);
-  }
-
-  const dictationStatus = useAppState()?.dictation;
-  const dictation = useDictation(insertDictated);
-  const dictating = dictation.phase !== 'idle';
-  const [voiceSetupOpen, setVoiceSetupOpen] = useState(false);
-
-  function toggleDictation() {
-    if (dictationStatus?.status === 'ready') dictation.toggle();
-    else setVoiceSetupOpen(true);
-  }
-
-  function startDictationAfterSetup() {
-    setVoiceSetupOpen(false);
-    dictation.toggle();
-  }
-  const wasDictating = useRef(false);
-
-  useEffect(() => {
-    if (!dictating && wasDictating.current) input.current?.focus();
-    wasDictating.current = dictating;
-  }, [dictating]);
+  const voice = useVoiceInput(input, text, update);
+  const { dictation, dictating } = voice;
 
   function accept(index: number) {
     const option = suggestions?.options[index];
@@ -221,7 +181,7 @@ export function Composer(props: ComposerProps) {
     const applied = applySuggestion(text, suggestions, option);
     update(applied.text);
     setSuggestions(null);
-    placeCaret(applied.caret);
+    placeCaret(input, applied.caret);
   }
 
   async function addFiles(list: FileList | File[]) {
@@ -312,7 +272,7 @@ export function Composer(props: ComposerProps) {
       props.onEffortChange(nextEffort(props.agent, props.effort));
     else if (command && key === 'u') picker.current?.click();
     else if (command && key === ';') openSnippets();
-    else if (isDictationShortcut(event)) toggleDictation();
+    else if (isDictationShortcut(event)) voice.toggle();
     else if (event.metaKey && event.ctrlKey && /^[1-5]$/.test(event.key)) {
       const entry = props.loadout[Number(event.key) - 1];
       if (entry) props.onModelChange(entry);
@@ -530,9 +490,9 @@ export function Composer(props: ComposerProps) {
           usage={props.usage}
           dictation={
             <DictationButton
-              status={dictationStatus}
+              status={voice.status}
               phase={dictation.phase}
-              onToggle={toggleDictation}
+              onToggle={voice.toggle}
             />
           }
           contextPicker={
@@ -554,14 +514,7 @@ export function Composer(props: ComposerProps) {
           onStop={props.onStop}
         />
       </div>
-      {voiceSetupOpen && dictationStatus ? (
-        <VoiceModelDialog
-          status={dictationStatus}
-          onDownload={() => void api.prepareDictation()}
-          onStart={startDictationAfterSetup}
-          onClose={() => setVoiceSetupOpen(false)}
-        />
-      ) : null}
+      {voice.setupDialog}
     </div>
   );
 }

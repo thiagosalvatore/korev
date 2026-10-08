@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { Button, cn, Icon, Input } from '../../design-system';
 import {
   answerQuestions,
@@ -14,7 +14,10 @@ import {
   type PermissionStatus,
   type PlanLane,
 } from '../../shared/model';
+import { DictationButton, isDictationShortcut } from './DictationButton';
 import { Markdown } from './Markdown';
+import { RecordingBar } from './RecordingBar';
+import { useVoiceInput } from './voiceInput';
 
 type PermissionItem = Extract<ChatItem, { kind: 'permission' }>;
 
@@ -149,6 +152,68 @@ function LaneList({
   );
 }
 
+function FeedbackInput({
+  value,
+  onChange,
+  onSubmit,
+}: {
+  value: string;
+  onChange(value: string): void;
+  onSubmit(): void;
+}) {
+  const input = useRef<HTMLTextAreaElement>(null);
+  const voice = useVoiceInput(input, value, onChange);
+
+  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (isDictationShortcut(event)) {
+      event.preventDefault();
+      voice.toggle();
+      return;
+    }
+    if (
+      event.key !== 'Enter' ||
+      event.shiftKey ||
+      event.nativeEvent.isComposing
+    )
+      return;
+    event.preventDefault();
+    onSubmit();
+  }
+
+  return (
+    <div className="mb-2 flex items-end rounded-md border border-border-2 bg-inset focus-within:border-accent-border">
+      {voice.dictating ? (
+        <div className="min-w-0 flex-1">
+          <RecordingBar
+            stream={voice.dictation.stream}
+            phase={voice.dictation.phase}
+            onDone={voice.dictation.done}
+            onCancel={voice.dictation.cancel}
+          />
+        </div>
+      ) : null}
+      <textarea
+        ref={input}
+        aria-label="Feedback on the plan"
+        hidden={voice.dictating}
+        value={value}
+        placeholder="Optional: tell the agent what to change in the plan (Enter to send)"
+        className="min-h-14 flex-1 resize-y border-0 bg-transparent p-2 font-sans text-sm text-fg-1 outline-none focus-visible:shadow-none"
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={onKeyDown}
+      />
+      <div className="p-1">
+        <DictationButton
+          status={voice.status}
+          phase={voice.dictation.phase}
+          onToggle={voice.toggle}
+        />
+      </div>
+      {voice.setupDialog}
+    </div>
+  );
+}
+
 export interface PlanReviewProps {
   plan: string;
   showPlan: boolean;
@@ -178,12 +243,10 @@ export function PlanReview({
       {here ? (
         <LaneList here={here} drafts={drafts} onChange={setDrafts} />
       ) : null}
-      <textarea
-        aria-label="Feedback on the plan"
+      <FeedbackInput
         value={feedback}
-        placeholder="Optional: tell the agent what to change in the plan"
-        className="mb-2 min-h-14 w-full resize-y rounded-md border border-border-2 bg-inset p-2 font-sans text-sm text-fg-1 outline-none focus:border-accent-border"
-        onChange={(event) => setFeedback(event.target.value)}
+        onChange={setFeedback}
+        onSubmit={() => feedback.trim() && onKeepPlanning(feedback)}
       />
       <div className="flex gap-2">
         {split.length ? (
