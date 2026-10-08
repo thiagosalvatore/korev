@@ -1,14 +1,8 @@
-import { Download as DownloadIcon } from 'lucide-react';
 import { LinkButton } from '@/components/ds/Button';
 import { GithubMark } from '@/components/ds/GithubMark';
 import { Logo } from '@/components/ds/Logo';
-import {
-  DOCS_URL,
-  GITHUB_URL,
-  RELEASES_URL,
-  ROADMAP_URL,
-  SHORTCUTS_URL,
-} from './links';
+import { DOCS_URL, GITHUB_URL, ROADMAP_URL, SHORTCUTS_URL } from './links';
+import { MacDownloadButton, OtherMacDownload } from './MacDownload';
 import { ThemeToggle } from './ThemeToggle';
 
 export function Nav() {
@@ -25,14 +19,7 @@ export function Nav() {
             GitHub
           </a>
           <ThemeToggle />
-          <LinkButton
-            href={RELEASES_URL}
-            size="sm"
-            variant="primary"
-            icon={DownloadIcon}
-          >
-            Download
-          </LinkButton>
+          <MacDownloadButton size="sm">Download</MacDownloadButton>
         </div>
       </div>
     </nav>
@@ -43,19 +30,13 @@ export function Download({ withNote = true }: { withNote?: boolean }) {
   return (
     <div className="lp-dl">
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <LinkButton
-          href={RELEASES_URL}
-          size="lg"
-          variant="primary"
-          icon={DownloadIcon}
-        >
-          Download for Mac
-        </LinkButton>
+        <MacDownloadButton size="lg">Download for Mac</MacDownloadButton>
         <LinkButton href={GITHUB_URL} size="lg" variant="secondary">
           <GithubMark size={16} />
           View source
         </LinkButton>
       </div>
+      <OtherMacDownload />
       {withNote && (
         <span className="note">
           Free and open source · macOS · Needs the <code>claude</code> or{' '}

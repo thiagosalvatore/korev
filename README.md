@@ -56,7 +56,7 @@ make run           # quits the packaged Korev if it is running, then opens the b
 make package-run   # both
 ```
 
-To build what a release ships, run `make dist`. It writes a DMG and a zip for Apple silicon (`arm64`) and Intel (`x64`) under `korev-desktop/out/make/`.
+To build what a release ships, run `make dist`. It writes a DMG and a zip for Apple silicon (`arm64`) and Intel (`x64`) under `korev-desktop/out/make/`. The DMGs are named `Korev-arm64.dmg` and `Korev-x64.dmg`, with no version, so the landing page can link to `releases/latest/download/Korev-<arch>.dmg`.
 
 To sign the build with a Developer ID and notarize it, set `APPLE_API_KEY` (the path to an App Store Connect API key `.p8`), `APPLE_API_KEY_ID` and `APPLE_API_ISSUER` first. The "Developer ID Application" certificate must be in your keychain. The release workflow does this. Without these variables the build is signed ad hoc, so Gatekeeper blocks it on other Macs. To open an ad hoc build there, open it once, then go to System Settings → Privacy & Security and click Open Anyway. Or run `xattr -dr com.apple.quarantine /Applications/Korev.app`.
 
