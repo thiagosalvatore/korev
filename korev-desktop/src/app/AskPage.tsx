@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Button, cn, Icon, IconButton } from '../design-system';
 import type { AppState, AskChat } from '../shared/model';
-import { deleteAsk, startAsk, startFromAsk } from './actions';
+import { deleteAsk, openAsk, startAsk, startFromAsk } from './actions';
 import { ChatView } from './chat/ChatView';
 import { Composer } from './chat/Composer';
-import { loadoutChoices, modelChoices } from '../shared/format';
+import { askRepoNames, loadoutChoices, modelChoices } from '../shared/format';
 import { useModelChoice } from './hooks';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { RepoPicker } from './RepoPicker';
@@ -12,14 +12,17 @@ import { useUi } from './ui-store';
 
 const NEW_ASK_DRAFT = 'new-ask';
 
-function NewAsk({
+export function AskForm({
   state,
   initialRepoIds,
+  autoFocus,
+  onStarted,
 }: {
   state: AppState;
   initialRepoIds: string[];
+  autoFocus: boolean;
+  onStarted(ask: AskChat): void;
 }) {
-  const sidebar = useUi((ui) => ui.sidebar);
   const [repoIds, setRepoIds] = useState(
     initialRepoIds.length
       ? initialRepoIds
@@ -29,6 +32,61 @@ function NewAsk({
     state.settings,
   );
   const [fast, setFast] = useState(false);
+
+  return (
+    <>
+      <RepoPicker state={state} selected={repoIds} onChange={setRepoIds} />
+      <Composer
+        draftKey={NEW_ASK_DRAFT}
+        agent={agent}
+        models={modelChoices(state, agent)}
+        loadout={loadoutChoices(state, agent)}
+        snippets={state.settings.snippets}
+        fast={fast}
+        repoId={repoIds[0] ?? null}
+        onFastChange={setFast}
+        model={model}
+        effort={effort}
+        planMode={false}
+        running={false}
+        workspaceId={null}
+        autoFocus={autoFocus}
+        placeholder={
+          repoIds.length
+            ? 'Ask a question. Enter sends it.'
+            : 'Pick at least one repository first.'
+        }
+        onModelChange={choose}
+        onEffortChange={setEffort}
+        onPlanModeChange={() => undefined}
+        onSend={async (text) =>
+          repoIds.length > 0 &&
+          startAsk(
+            repoIds,
+            {
+              text,
+              agent,
+              model,
+              effort,
+              planMode: false,
+              fast,
+            },
+            onStarted,
+          )
+        }
+      />
+    </>
+  );
+}
+
+function NewAsk({
+  state,
+  initialRepoIds,
+}: {
+  state: AppState;
+  initialRepoIds: string[];
+}) {
+  const sidebar = useUi((ui) => ui.sidebar);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -46,41 +104,11 @@ function NewAsk({
             Ask about one or more repositories without creating a workspace. The
             agent reads the latest default branch and cannot change anything.
           </p>
-          <RepoPicker state={state} selected={repoIds} onChange={setRepoIds} />
-          <Composer
-            draftKey={NEW_ASK_DRAFT}
-            agent={agent}
-            models={modelChoices(state, agent)}
-            loadout={loadoutChoices(state, agent)}
-            snippets={state.settings.snippets}
-            fast={fast}
-            repoId={repoIds[0] ?? null}
-            onFastChange={setFast}
-            model={model}
-            effort={effort}
-            planMode={false}
-            running={false}
-            workspaceId={null}
+          <AskForm
+            state={state}
+            initialRepoIds={initialRepoIds}
             autoFocus
-            placeholder={
-              repoIds.length
-                ? 'Ask a question. Enter sends it.'
-                : 'Pick at least one repository first.'
-            }
-            onModelChange={choose}
-            onEffortChange={setEffort}
-            onPlanModeChange={() => undefined}
-            onSend={async (text) =>
-              repoIds.length > 0 &&
-              startAsk(repoIds, {
-                text,
-                agent,
-                model,
-                effort,
-                planMode: false,
-                fast,
-              })
-            }
+            onStarted={(ask) => openAsk(ask.id)}
           />
         </div>
       </div>
@@ -92,9 +120,7 @@ function AskChatView({ state, ask }: { state: AppState; ask: AskChat }) {
   const sidebar = useUi((ui) => ui.sidebar);
   const running = state.runningSessions.includes(ask.session.id);
   const [starting, setStarting] = useState(false);
-  const repoNames = ask.repoIds
-    .map((repoId) => state.repos.find((repo) => repo.id === repoId)?.name)
-    .join(', ');
+  const repoNames = askRepoNames(state, ask);
   return (
     <div className="flex min-w-0 flex-1 flex-col bg-app">
       <header

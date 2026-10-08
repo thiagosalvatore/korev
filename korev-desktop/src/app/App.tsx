@@ -6,7 +6,7 @@ import { openNewWorkspace, selectWorkspace } from './actions';
 import { AskPage } from './AskPage';
 import { api } from './bridge';
 import { CommandPalette } from './CommandPalette';
-import { paneCount } from './grid';
+import { paneCount, paneWorkspaceId } from './grid';
 import { GridView } from './GridView';
 import { useAppState, useMediaQuery } from './hooks';
 import { DRAG_REGION } from './layout';
@@ -38,7 +38,7 @@ function visibleWorkspaceIds(ui: UiState): string {
   if (ui.page.kind !== 'grid') return '';
   return ui.grid.panes
     .slice(0, paneCount(ui.grid.layout))
-    .flatMap((pane) => (pane ? [pane.workspaceId] : []))
+    .flatMap((pane) => paneWorkspaceId(pane) ?? [])
     .join(',');
 }
 

@@ -425,6 +425,32 @@ test('shows chats from two workspaces side by side in the grid', async () => {
     ).toBeVisible();
     await sidebar.getByRole('button', { name: /^Grid/ }).click();
     await expect(second.getByText('I added agent-note.txt.')).toBeVisible();
+
+    const third = window.getByRole('region', { name: 'Pane 3' });
+    await third.getByRole('button', { name: 'Ask', exact: true }).click();
+    await window.getByRole('menuitem', { name: 'New ask' }).click();
+    await third
+      .getByRole('textbox', { name: 'Message' })
+      .fill('Where is the README?');
+    await snap(window, '10b-grid-new-ask');
+    await third.getByRole('textbox', { name: 'Message' }).press('Enter');
+    await expect(third.getByText('I added agent-note.txt.')).toBeVisible();
+    await expect(third.getByText('Finding the README')).toBeVisible();
+    await snap(window, '10c-grid-ask');
+    await waitForAgentsToFinish(window);
+
+    const fourth = window.getByRole('region', { name: 'Pane 4' });
+    await sidebar
+      .getByRole('button', { name: 'Ask Finding the README' })
+      .hover();
+    await window.mouse.down();
+    await fourth.hover();
+    await fourth.hover({ position: { x: 20, y: 20 } });
+    await window.mouse.up();
+    await expect(fourth.getByText('I added agent-note.txt.')).toBeVisible();
+    await expect(
+      third.getByRole('button', { name: 'Choose workspace' }),
+    ).toBeVisible();
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });

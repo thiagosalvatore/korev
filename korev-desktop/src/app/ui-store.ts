@@ -27,10 +27,16 @@ export type Page =
 
 export type GridLayout = '2x1' | '1x2' | '2x2';
 
-export interface GridPane {
+export interface WorkspacePane {
   workspaceId: string;
   tabKey: string;
 }
+
+export interface AskPane {
+  askChatId: string | null;
+}
+
+export type GridPane = WorkspacePane | AskPane;
 
 export const GRID_PANES = 4;
 

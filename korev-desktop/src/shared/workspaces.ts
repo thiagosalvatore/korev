@@ -1,4 +1,4 @@
-import type { AppState, Repo, RepoFolder, Workspace } from './model';
+import type { AppState, AskChat, Repo, RepoFolder, Workspace } from './model';
 
 export interface RepoSection {
   folder: RepoFolder | null;
@@ -17,6 +17,12 @@ export function repoSections(state: AppState): RepoSection[] {
     const repo = state.repos.find((entry) => entry.id === id);
     return repo ? [{ folder: null, repos: [repo] }] : [];
   });
+}
+
+export function asksNewestFirst(state: AppState): AskChat[] {
+  return [...state.askChats].sort((a, b) =>
+    b.lastMessageAt.localeCompare(a.lastMessageAt),
+  );
 }
 
 export function activeWorkspaces(state: AppState): Workspace[] {

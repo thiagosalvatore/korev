@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AppState, Workspace } from '../shared/model';
+import type { AppState, AskChat, Workspace } from '../shared/model';
 import { freeTab, placeInPane, resolvePane } from './grid';
 import type { WorkspaceUi } from './ui-store';
 
@@ -10,8 +10,14 @@ const workspace = {
   sessions: [{ id: 's1', title: 'Chat', agent: 'claude' }],
 } as unknown as Workspace;
 
-function stateWith(workspaces: Workspace[]): AppState {
-  return { workspaces } as unknown as AppState;
+const ask = {
+  id: 'a1',
+  repoIds: ['r1'],
+  session: { id: 'as1', title: 'How does login work?', agent: 'claude' },
+} as unknown as AskChat;
+
+function stateWith(workspaces: Workspace[], askChats = [ask]): AppState {
+  return { workspaces, askChats } as unknown as AppState;
 }
 
 const chat = { workspaceId: 'w1', tabKey: 'chat:s1' };
@@ -35,6 +41,16 @@ describe('placeInPane', () => {
       null,
       null,
       chat,
+      null,
+    ]);
+  });
+
+  it('lets the new ask form show in one pane at most', () => {
+    const newAsk = { askChatId: null };
+    expect(placeInPane([newAsk, chat, null, null], 2, newAsk)).toEqual([
+      null,
+      chat,
+      newAsk,
       null,
     ]);
   });
@@ -82,6 +98,17 @@ describe('resolvePane', () => {
     expect(
       resolvePane(stateWith([{ ...workspace, sessions: [] }]), {}, chat),
     ).toBeNull();
+  });
+
+  it('finds the ask chat a pane points at', () => {
+    expect(resolvePane(stateWith([]), {}, { askChatId: 'a1' })).toEqual({
+      kind: 'ask',
+      ask,
+    });
+  });
+
+  it('is empty once the ask chat is deleted', () => {
+    expect(resolvePane(stateWith([], []), {}, { askChatId: 'a1' })).toBeNull();
   });
 
   it('is empty once the workspace is archived', () => {

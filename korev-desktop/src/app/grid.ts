@@ -1,10 +1,17 @@
-import type { AppState, ChatSession, Workspace } from '../shared/model';
+import type {
+  AppState,
+  AskChat,
+  ChatSession,
+  Workspace,
+} from '../shared/model';
 import {
   GRID_PANES,
   tabKey,
+  type AskPane,
   type GridLayout,
   type GridPane,
   type MainTab,
+  type WorkspacePane,
   type WorkspaceUi,
 } from './ui-store';
 
@@ -19,14 +26,26 @@ export type TerminalTab = Extract<MainTab, { kind: 'terminal' }>;
 
 export type PaneContent =
   | { kind: 'chat'; workspace: Workspace; session: ChatSession }
-  | { kind: 'terminal'; workspace: Workspace; terminal: TerminalTab };
+  | { kind: 'terminal'; workspace: Workspace; terminal: TerminalTab }
+  | { kind: 'ask'; ask: AskChat }
+  | { kind: 'new-ask' };
 
 export function paneCount(layout: GridLayout): number {
   const { cols, rows } = GRID_LAYOUTS[layout];
   return cols * rows;
 }
 
+export function isAskPane(pane: GridPane): pane is AskPane {
+  return 'askChatId' in pane;
+}
+
+export function paneWorkspaceId(pane: GridPane | null): string | null {
+  return pane && !isAskPane(pane) ? pane.workspaceId : null;
+}
+
 function samePane(a: GridPane, b: GridPane): boolean {
+  if (isAskPane(a) || isAskPane(b))
+    return isAskPane(a) && isAskPane(b) && a.askChatId === b.askChatId;
   return a.workspaceId === b.workspaceId && a.tabKey === b.tabKey;
 }
 
@@ -45,8 +64,8 @@ export function placeInPane(
 export function freeTab(
   panes: (GridPane | null)[],
   index: number,
-  candidates: GridPane[],
-): GridPane | null {
+  candidates: WorkspacePane[],
+): WorkspacePane | null {
   const shownElsewhere = (candidate: GridPane) =>
     panes.some(
       (pane, slot) => slot !== index && pane && samePane(pane, candidate),
@@ -69,6 +88,7 @@ export function resolvePane(
   pane: GridPane | null,
 ): PaneContent | null {
   if (!pane) return null;
+  if (isAskPane(pane)) return resolveAskPane(state, pane);
   const workspace = state.workspaces.find(
     (entry) => entry.id === pane.workspaceId && !entry.archivedAt,
   );
@@ -81,4 +101,10 @@ export function resolvePane(
     (tab) => tabKey(tab) === pane.tabKey,
   );
   return terminal ? { kind: 'terminal', workspace, terminal } : null;
+}
+
+function resolveAskPane(state: AppState, pane: AskPane): PaneContent | null {
+  if (pane.askChatId === null) return { kind: 'new-ask' };
+  const ask = state.askChats.find((entry) => entry.id === pane.askChatId);
+  return ask ? { kind: 'ask', ask } : null;
 }

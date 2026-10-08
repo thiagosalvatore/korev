@@ -28,6 +28,7 @@ import {
   toggleRunScript,
 } from './actions';
 import { api, on } from './bridge';
+import { paneWorkspaceId } from './grid';
 import { toast } from './ui/toast';
 import { EMPTY_WORKSPACE_UI, getUi, setUi } from './ui-store';
 
@@ -41,7 +42,7 @@ const THEME_CYCLE = { dark: 'light', light: 'dark', system: 'light' } as const;
 
 function currentWorkspaceId(): string | null {
   const ui = getUi();
-  if (ui.page.kind === 'grid') return focusedPane()?.workspaceId ?? null;
+  if (ui.page.kind === 'grid') return paneWorkspaceId(focusedPane());
   if (ui.page.kind === 'workspace') return ui.workspaceId;
   return null;
 }
@@ -116,22 +117,21 @@ export function runCommand(state: AppState, command: AppCommand) {
     default:
       break;
   }
+  const { page, grid } = getUi();
+  if (page.kind === 'grid' && command === 'close-tab')
+    return clearPane(grid.focused);
   if (!workspace || workspace.archivedAt) return;
   const pr = primaryPr(
     workspace,
     state.runtime[workspace.id],
     getUi().workspaces[workspace.id]?.prUrl,
   );
-  const { page, grid } = getUi();
-  if (page.kind === 'grid') {
-    if (command === 'new-chat')
-      return void newChatInPane(
-        grid.focused,
-        workspace,
-        state.settings.defaultAgent,
-      );
-    if (command === 'close-tab') return clearPane(grid.focused);
-  }
+  if (page.kind === 'grid' && command === 'new-chat')
+    return void newChatInPane(
+      grid.focused,
+      workspace,
+      state.settings.defaultAgent,
+    );
   switch (command) {
     case 'new-chat':
       return void newChat(workspace, state.settings.defaultAgent);

@@ -21,7 +21,11 @@ import {
   type Workspace,
   type WorkspaceRuntime,
 } from '../shared/model';
-import { activeWorkspaces, repoSections } from '../shared/workspaces';
+import {
+  activeWorkspaces,
+  asksNewestFirst,
+  repoSections,
+} from '../shared/workspaces';
 import {
   archiveWorkspace,
   deleteAsk,
@@ -34,8 +38,13 @@ import {
   selectWorkspace,
 } from './actions';
 import { api } from './bridge';
-import { timeAgo } from '../shared/format';
-import { draggable, useDropTarget, WORKSPACE_DRAG_TYPE } from './dnd';
+import { askRepoNames, timeAgo } from '../shared/format';
+import {
+  ASK_DRAG_TYPE,
+  draggable,
+  useDropTarget,
+  WORKSPACE_DRAG_TYPE,
+} from './dnd';
 import { DRAG_REGION, NO_DRAG } from './layout';
 import { RemoteDevices } from './RemoteDevices';
 import { Menu, type MenuItem } from './ui/Menu';
@@ -686,10 +695,7 @@ function AskChats({ state }: { state: AppState }) {
   );
   const open = useUi((ui) => ui.askOpen);
   if (!state.askChats.length) return null;
-  const repoNames = new Map(state.repos.map((repo) => [repo.id, repo.name]));
-  const newestFirst = [...state.askChats].sort((a, b) =>
-    b.lastMessageAt.localeCompare(a.lastMessageAt),
-  );
+  const newestFirst = asksNewestFirst(state);
   return (
     <section aria-label="Ask" className="border-b border-border-1 px-2 py-1.5">
       <button
@@ -718,6 +724,7 @@ function AskChats({ state }: { state: AppState }) {
                 tabIndex={0}
                 aria-current={ask.id === selectedId ? 'page' : undefined}
                 aria-label={`Ask ${ask.session.title}`}
+                {...draggable(ASK_DRAG_TYPE, ask.id)}
                 onClick={() => openAsk(ask.id)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') openAsk(ask.id);
@@ -740,7 +747,7 @@ function AskChats({ state }: { state: AppState }) {
                     {ask.session.title}
                   </span>
                   <span className="block truncate text-xs text-fg-3">
-                    {ask.repoIds.map((id) => repoNames.get(id)).join(', ')}
+                    {askRepoNames(state, ask)}
                   </span>
                 </span>
                 <span className="text-2xs text-fg-4 group-hover:hidden">

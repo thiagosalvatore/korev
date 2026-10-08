@@ -14,7 +14,13 @@ import type {
 } from '../shared/model';
 import { activeWorkspaces } from '../shared/workspaces';
 import { api } from './bridge';
-import { freeTab, paneCount, placeInPane, terminalTabs } from './grid';
+import {
+  freeTab,
+  isAskPane,
+  paneCount,
+  placeInPane,
+  terminalTabs,
+} from './grid';
 import { reportFailure, toast } from './ui/toast';
 import {
   EMPTY_WORKSPACE_UI,
@@ -25,6 +31,7 @@ import {
   type GridLayout,
   type GridPane,
   type MainTab,
+  type WorkspacePane,
 } from './ui-store';
 
 export function selectWorkspace(workspaceId: string) {
@@ -42,9 +49,13 @@ export function openAsk(askChatId: string | null, repoIds: string[] = []) {
   void api.focusWorkspaces([]);
 }
 
-export async function startAsk(repoIds: string[], question: SendOptions) {
+export async function startAsk(
+  repoIds: string[],
+  question: SendOptions,
+  onStarted: (ask: AskChat) => void,
+) {
   const ask = await api.createAskChat(repoIds);
-  openAsk(ask.id);
+  onStarted(ask);
   return reportFailure(
     await api.send(ask.session.id, {
       ...question,
@@ -309,6 +320,7 @@ export function focusedPane(): GridPane | null {
 }
 
 export function expandPane(pane: GridPane) {
+  if (isAskPane(pane)) return openAsk(pane.askChatId);
   selectWorkspace(pane.workspaceId);
   activateTab(pane.workspaceId, pane.tabKey);
 }
@@ -323,7 +335,11 @@ export function toggleGrid() {
 export function focusPane(index: number) {
   setUi((ui) => ({ grid: { ...ui.grid, focused: index } }));
   const pane = getUi().grid.panes[index];
-  if (pane) activateTab(pane.workspaceId, pane.tabKey);
+  if (pane) activatePaneTab(pane);
+}
+
+function activatePaneTab(pane: GridPane) {
+  if (!isAskPane(pane)) activateTab(pane.workspaceId, pane.tabKey);
 }
 
 export function showInPane(index: number, pane: GridPane | null) {
@@ -335,11 +351,14 @@ export function showInPane(index: number, pane: GridPane | null) {
     },
   }));
   if (!pane) return;
-  activateTab(pane.workspaceId, pane.tabKey);
+  activatePaneTab(pane);
   requestAnimationFrame(focusComposer);
 }
 
-export function chatPane(workspaceId: string, sessionId: string): GridPane {
+export function chatPane(
+  workspaceId: string,
+  sessionId: string,
+): WorkspacePane {
   return { workspaceId, tabKey: tabKey({ kind: 'chat', sessionId }) };
 }
 
@@ -347,13 +366,16 @@ export function clearPane(index: number) {
   showInPane(index, null);
 }
 
-function panesByLastUse(workspace: Workspace): GridPane[] {
+function panesByLastUse(workspace: Workspace): WorkspacePane[] {
   const { workspaces } = getUi();
   const chats = [...workspace.sessions]
     .reverse()
     .map((session) => chatPane(workspace.id, session.id));
   const terminals = terminalTabs(workspaces, workspace.id).map(
-    (tab): GridPane => ({ workspaceId: workspace.id, tabKey: tabKey(tab) }),
+    (tab): WorkspacePane => ({
+      workspaceId: workspace.id,
+      tabKey: tabKey(tab),
+    }),
   );
   const tabs = [...chats, ...terminals];
   const activeKey = workspaces[workspace.id]?.activeKey;

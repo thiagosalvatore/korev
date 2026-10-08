@@ -1,12 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Button, cn, Icon, IconButton, type IconName } from '../design-system';
+import { askRepoNames } from '../shared/format';
 import {
   hasWorktree,
   type AgentKind,
   type AppState,
+  type AskChat,
   type Workspace,
 } from '../shared/model';
-import { activeWorkspaces } from '../shared/workspaces';
+import { activeWorkspaces, asksNewestFirst } from '../shared/workspaces';
 import {
   chatPane,
   clearPane,
@@ -20,8 +22,9 @@ import {
   showInPane,
   terminalTabRef,
 } from './actions';
+import { AskForm } from './AskPage';
 import { ChatView } from './chat/ChatView';
-import { useDropTarget, WORKSPACE_DRAG_TYPE } from './dnd';
+import { ASK_DRAG_TYPE, useDropTarget, WORKSPACE_DRAG_TYPE } from './dnd';
 import {
   GRID_LAYOUTS,
   resolvePane,
@@ -94,7 +97,7 @@ function paneTabItems(
   state: AppState,
   workspacesUi: Record<string, WorkspaceUi>,
   index: number,
-  pane: GridPane,
+  currentKey: string,
   workspace: Workspace,
 ): MenuItem[] {
   const showItem = (
@@ -103,7 +106,7 @@ function paneTabItems(
   ): MenuItem => ({
     ...item,
     id: key,
-    checked: key === pane.tabKey,
+    checked: key === currentKey,
     onSelect: () =>
       showInPane(index, { workspaceId: workspace.id, tabKey: key }),
   });
@@ -146,7 +149,18 @@ function paneTabItems(
   ];
 }
 
-function paneTitle(content: PaneContent): { label: string; icon: IconName } {
+type WorkspaceContent = Extract<PaneContent, { workspace: Workspace }>;
+
+function contentTabKey(content: WorkspaceContent): string {
+  return content.kind === 'terminal'
+    ? tabKey(content.terminal)
+    : tabKey({ kind: 'chat', sessionId: content.session.id });
+}
+
+function paneTitle(content: WorkspaceContent): {
+  label: string;
+  icon: IconName;
+} {
   if (content.kind === 'terminal')
     return {
       label: PRESET_LABELS[content.terminal.preset],
@@ -159,23 +173,18 @@ function paneTitle(content: PaneContent): { label: string; icon: IconName } {
 }
 
 function PaneHeader({
-  state,
-  workspacesUi,
   index,
   pane,
-  content,
+  icon,
+  running,
+  children,
 }: {
-  state: AppState;
-  workspacesUi: Record<string, WorkspaceUi>;
   index: number;
   pane: GridPane;
-  content: PaneContent;
+  icon: IconName;
+  running: boolean;
+  children: ReactNode;
 }) {
-  const { workspace } = content;
-  const { label, icon } = paneTitle(content);
-  const running =
-    content.kind === 'chat' &&
-    state.runningSessions.includes(content.session.id);
   return (
     <div className="flex h-9 flex-none items-center gap-2 border-b border-border-1 bg-surface pr-1 pl-3 text-sm">
       {running ? (
@@ -187,31 +196,7 @@ function PaneHeader({
       ) : (
         <Icon name={icon} size={13} className="text-fg-3" />
       )}
-      <span
-        className="min-w-0 truncate font-medium text-fg-1"
-        title={workspace.branch}
-      >
-        {workspace.branch}
-      </span>
-      <span className="min-w-0 flex-1 truncate text-xs text-fg-3">
-        {workspace.name}
-      </span>
-      <Menu
-        label={`${workspace.name} tabs`}
-        align="right"
-        items={paneTabItems(state, workspacesUi, index, pane, workspace)}
-        trigger={({ toggle }) => (
-          <Button
-            size="sm"
-            variant="ghost"
-            iconRight="chevron-down"
-            className="min-w-0 max-w-48"
-            onClick={toggle}
-          >
-            <span className="truncate">{label}</span>
-          </Button>
-        )}
-      />
+      {children}
       <IconButton
         icon="maximize-2"
         label="Open in full view"
@@ -228,12 +213,96 @@ function PaneHeader({
   );
 }
 
-function PaneBody({
+function WorkspacePaneHeader({
+  state,
+  workspacesUi,
+  index,
+  pane,
+  content,
+}: {
+  state: AppState;
+  workspacesUi: Record<string, WorkspaceUi>;
+  index: number;
+  pane: GridPane;
+  content: WorkspaceContent;
+}) {
+  const { workspace } = content;
+  const { label, icon } = paneTitle(content);
+  const running =
+    content.kind === 'chat' &&
+    state.runningSessions.includes(content.session.id);
+  return (
+    <PaneHeader index={index} pane={pane} icon={icon} running={running}>
+      <span
+        className="min-w-0 truncate font-medium text-fg-1"
+        title={workspace.branch}
+      >
+        {workspace.branch}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-xs text-fg-3">
+        {workspace.name}
+      </span>
+      <Menu
+        label={`${workspace.name} tabs`}
+        align="right"
+        items={paneTabItems(
+          state,
+          workspacesUi,
+          index,
+          contentTabKey(content),
+          workspace,
+        )}
+        trigger={({ toggle }) => (
+          <Button
+            size="sm"
+            variant="ghost"
+            iconRight="chevron-down"
+            className="min-w-0 max-w-48"
+            onClick={toggle}
+          >
+            <span className="truncate">{label}</span>
+          </Button>
+        )}
+      />
+    </PaneHeader>
+  );
+}
+
+function AskPaneHeader({
+  state,
+  index,
+  pane,
+  ask,
+}: {
+  state: AppState;
+  index: number;
+  pane: GridPane;
+  ask: AskChat | null;
+}) {
+  const running = !!ask && state.runningSessions.includes(ask.session.id);
+  return (
+    <PaneHeader
+      index={index}
+      pane={pane}
+      icon="message-circle-question"
+      running={running}
+    >
+      <span className="min-w-0 truncate font-medium text-fg-1">
+        {ask ? ask.session.title : 'New ask'}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-xs text-fg-3">
+        {ask ? `${askRepoNames(state, ask)} · read-only` : null}
+      </span>
+    </PaneHeader>
+  );
+}
+
+function WorkspacePaneBody({
   state,
   content,
 }: {
   state: AppState;
-  content: PaneContent;
+  content: WorkspaceContent;
 }) {
   const { workspace } = content;
   const runtime = state.runtime[workspace.id];
@@ -263,8 +332,90 @@ function PaneBody({
   );
 }
 
+function NewAskPane({ state, index }: { state: AppState; index: number }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col justify-center gap-4 overflow-y-auto px-6">
+      <AskForm
+        state={state}
+        initialRepoIds={[]}
+        autoFocus={false}
+        onStarted={(ask) => showInPane(index, { askChatId: ask.id })}
+      />
+    </div>
+  );
+}
+
+function PaneContents({
+  state,
+  workspacesUi,
+  index,
+  pane,
+  content,
+}: {
+  state: AppState;
+  workspacesUi: Record<string, WorkspaceUi>;
+  index: number;
+  pane: GridPane;
+  content: PaneContent;
+}) {
+  if (content.kind === 'ask' || content.kind === 'new-ask') {
+    const ask = content.kind === 'ask' ? content.ask : null;
+    return (
+      <>
+        <AskPaneHeader state={state} index={index} pane={pane} ask={ask} />
+        {ask ? (
+          <ChatView
+            key={ask.session.id}
+            state={state}
+            workspace={null}
+            repoId={ask.repoIds[0] ?? null}
+            session={ask.session}
+            placeholder="Ask a follow-up"
+            autoFocus={false}
+          />
+        ) : (
+          <NewAskPane state={state} index={index} />
+        )}
+      </>
+    );
+  }
+  return (
+    <>
+      <WorkspacePaneHeader
+        state={state}
+        workspacesUi={workspacesUi}
+        index={index}
+        pane={pane}
+        content={content}
+      />
+      <WorkspacePaneBody state={state} content={content} />
+    </>
+  );
+}
+
 function repoName(state: AppState, workspace: Workspace): string {
   return state.repos.find((repo) => repo.id === workspace.repoId)?.name ?? '';
+}
+
+function askItems(state: AppState, index: number): MenuItem[] {
+  const recent = asksNewestFirst(state).map(
+    (ask): MenuItem => ({
+      id: ask.id,
+      label: ask.session.title,
+      icon: 'message-circle-question',
+      section: 'Recent',
+      onSelect: () => showInPane(index, { askChatId: ask.id }),
+    }),
+  );
+  return [
+    {
+      id: 'new-ask',
+      label: 'New ask',
+      icon: 'message-circle-plus',
+      onSelect: () => showInPane(index, { askChatId: null }),
+    },
+    ...recent,
+  ];
 }
 
 function EmptyPane({ state, index }: { state: AppState; index: number }) {
@@ -297,6 +448,20 @@ function EmptyPane({ state, index }: { state: AppState; index: number }) {
           </Button>
         )}
       />
+      <Menu
+        label="Ask"
+        items={askItems(state, index)}
+        trigger={({ toggle }) => (
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="message-circle-question"
+            onClick={toggle}
+          >
+            Ask
+          </Button>
+        )}
+      />
     </div>
   );
 }
@@ -321,6 +486,7 @@ function Pane({
       );
       if (workspace) fillPane(index, workspace, state.settings.defaultAgent);
     },
+    [ASK_DRAG_TYPE]: (askChatId) => showInPane(index, { askChatId }),
   });
   const focus = () => {
     if (!focused) focusPane(index);
@@ -335,16 +501,13 @@ function Pane({
       {...drop.props}
     >
       {pane && content ? (
-        <>
-          <PaneHeader
-            state={state}
-            workspacesUi={workspacesUi}
-            index={index}
-            pane={pane}
-            content={content}
-          />
-          <PaneBody state={state} content={content} />
-        </>
+        <PaneContents
+          state={state}
+          workspacesUi={workspacesUi}
+          index={index}
+          pane={pane}
+          content={content}
+        />
       ) : (
         <EmptyPane state={state} index={index} />
       )}

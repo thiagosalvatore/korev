@@ -1,6 +1,7 @@
 import { useState, type DragEvent } from 'react';
 
 export const WORKSPACE_DRAG_TYPE = 'application/x-korev-workspace';
+export const ASK_DRAG_TYPE = 'application/x-korev-ask';
 
 export type DropHandlers = Partial<Record<string, (draggedId: string) => void>>;
 
