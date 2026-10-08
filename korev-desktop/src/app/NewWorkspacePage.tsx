@@ -21,9 +21,11 @@ import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { RepoPicker } from './RepoPicker';
 import { AddRepositoryMenu } from './Sidebar';
 import { Menu } from './ui/Menu';
+import { toast } from './ui/toast';
 import { useUi } from './ui-store';
 
 const RECENT_LIMIT = 5;
+const NEW_WORKSPACE_DRAFT_KEY = 'new-workspace';
 
 function workspaceSource(
   from: CreateFrom | null,
@@ -103,11 +105,8 @@ export function NewWorkspacePage({
   repoId: string | null;
 }) {
   const sidebar = useUi((ui) => ui.sidebar);
-  const lastRepoId = useUi(
-    (ui) =>
-      state.workspaces.find((ws) => ws.id === ui.workspaceId)?.repoId ?? null,
-  );
-  const initialRepoId = repoId ?? lastRepoId ?? state.repos[0]?.id;
+  const onlyRepoId = state.repos.length === 1 ? state.repos[0].id : null;
+  const initialRepoId = repoId ?? onlyRepoId;
   const [repoIds, setRepoIds] = useState(initialRepoId ? [initialRepoId] : []);
   const repos = state.repos.filter((entry) => repoIds.includes(entry.id));
   const singleRepo = repos.length === 1 ? repos[0] : null;
@@ -135,7 +134,10 @@ export function NewWorkspacePage({
     .slice(0, RECENT_LIMIT);
 
   async function create(text: string | null) {
-    if (!repos.length) return false;
+    if (!repos.length) {
+      toast('Choose a repository first');
+      return false;
+    }
     setCreating(true);
     const prompt =
       from?.kind === 'issue' ? issuePrompt(from.issue, text ?? '') : text;
@@ -243,7 +245,7 @@ export function NewWorkspacePage({
             />
           ) : null}
           <Composer
-            draftKey={`new-workspace:${repoIds.join(',') || 'none'}`}
+            draftKey={NEW_WORKSPACE_DRAFT_KEY}
             agent={agent}
             models={modelChoices(state, agent)}
             loadout={loadoutChoices(state, agent)}

@@ -67,7 +67,7 @@ export function runCommand(state: AppState, command: AppCommand) {
   }
   switch (command) {
     case 'new-workspace':
-      return openNewWorkspace(workspace?.repoId ?? null);
+      return openNewWorkspace(null);
     case 'show-settings':
       return openSettings();
     case 'check-updates':

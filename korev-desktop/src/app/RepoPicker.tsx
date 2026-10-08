@@ -40,7 +40,12 @@ export function RepoPicker({
         type="button"
         aria-label="Repositories"
         aria-expanded={open}
-        className="flex h-7 cursor-pointer items-center gap-1.5 rounded-sm border border-border-2 bg-transparent px-2 text-sm text-fg-2 hover:bg-hover"
+        className={cn(
+          'flex h-7 cursor-pointer items-center gap-1.5 rounded-sm border bg-transparent px-2 text-sm hover:bg-hover',
+          picked.length
+            ? 'border-border-2 text-fg-2'
+            : 'border-accent-border text-fg-1',
+        )}
         onClick={() => setOpen((value) => !value)}
       >
         <Icon name="folder-git-2" size={13} />
