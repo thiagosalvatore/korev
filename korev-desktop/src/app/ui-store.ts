@@ -58,6 +58,7 @@ export interface UiState {
   terminal: boolean;
   gitTab: GitPanelTab;
   collapsedRepos: string[];
+  expandedRepos: string[];
   collapsedFolders: string[];
   historyOpen: boolean;
   askOpen: boolean;
@@ -78,6 +79,7 @@ const INITIAL: UiState = {
   terminal: true,
   gitTab: 'changes',
   collapsedRepos: [],
+  expandedRepos: [],
   collapsedFolders: [],
   historyOpen: false,
   askOpen: true,

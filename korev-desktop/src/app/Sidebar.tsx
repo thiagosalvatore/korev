@@ -367,15 +367,18 @@ function useDropTarget(handlers: DropHandlers) {
   };
 }
 
-function useCollapsed(key: 'collapsedRepos' | 'collapsedFolders', id: string) {
-  const collapsed = useUi((ui) => ui[key].includes(id));
+function useCollapsed(
+  key: 'collapsedRepos' | 'expandedRepos' | 'collapsedFolders',
+  id: string,
+) {
+  const listed = useUi((ui) => ui[key].includes(id));
   const toggle = () =>
     setUi((ui) => ({
-      [key]: collapsed
+      [key]: listed
         ? ui[key].filter((entry) => entry !== id)
         : [...ui[key], id],
     }));
-  return [collapsed, toggle] as const;
+  return [key === 'expandedRepos' ? !listed : listed, toggle] as const;
 }
 
 function FolderNameDialog({
@@ -484,7 +487,10 @@ function RepoGroup({
   selectedId: string | null;
   indexOf: (workspace: Workspace) => number;
 }) {
-  const [collapsed, toggle] = useCollapsed('collapsedRepos', repo.id);
+  const [collapsed, toggle] = useCollapsed(
+    workspaces.length > 0 ? 'collapsedRepos' : 'expandedRepos',
+    repo.id,
+  );
   const [naming, setNaming] = useState(false);
   const drop = useDropTarget({
     [REPO_DRAG_TYPE]: (draggedId) =>
