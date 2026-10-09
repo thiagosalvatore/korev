@@ -234,6 +234,7 @@ export interface Chats {
   seed(sessionId: string, history: ChatItem[]): Promise<void>;
   stop(sessionId: string): void;
   stopWorkspace(workspace: Workspace): void;
+  refreshWorkspaceStatus(workspace: Workspace): void;
   respondPermission(
     sessionId: string,
     itemId: string,
@@ -960,6 +961,8 @@ export function createChats(
     stop,
     stopWorkspace: (workspace) =>
       workspace.sessions.forEach((session) => stop(session.id)),
+    refreshWorkspaceStatus: (workspace) =>
+      refreshStatus({ kind: 'workspace', workspace }),
     respondPermission,
     handoffPlan,
     revert,

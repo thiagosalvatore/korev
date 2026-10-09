@@ -33,6 +33,9 @@ case "$message" in
       *'"allow"'*) touch approved.txt ;;
     esac
     ;;
+  *hold-turn*)
+    IFS= read -r _
+    ;;
   *share-plan*)
     echo '{"type":"stream_event","event":{"type":"message_start","message":{"id":"m0"}}}'
     echo '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"The plan is in ~/.claude/plans/crab.md."}}}'

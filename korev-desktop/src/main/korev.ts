@@ -319,7 +319,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       },
       onExit: (ref, exitCode) => {
         deps.emit('terminal-exit', { ref, exitCode });
-        void onScriptExit(ctx, ref, exitCode);
+        void onScriptExit(ctx, ref, exitCode, (workspace) =>
+          chats.refreshWorkspaceStatus(workspace),
+        );
       },
     }),
     runningSessions: new Set(),

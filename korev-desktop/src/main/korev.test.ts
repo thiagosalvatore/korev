@@ -116,9 +116,13 @@ const noPty = (_file: string, args: string[], options: { cwd: string }) => {
   return fakePty();
 };
 
+const ptyExits: ((event: { exitCode: number }) => void)[] = [];
+
 const fakePty = () => ({
   onData: () => undefined,
-  onExit: () => undefined,
+  onExit: (listener: (event: { exitCode: number }) => void) => {
+    ptyExits.push(listener);
+  },
   write: () => undefined,
   resize: () => undefined,
   kill: () => undefined,
@@ -1311,6 +1315,38 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toContain('"behavior":"deny"');
     const started = await korev.api.startFromAsk(ask.id);
     expect(started.ok).toBe(true);
+  });
+
+  it('keeps the workspace working when its setup script finishes during a turn', async () => {
+    const repo = await addRepo();
+    await korev.api.updateRepoScripts(repo.id, {
+      ...repo.scripts,
+      setup: 'npm ci',
+    });
+    ptyExits.length = 0;
+    const created = await korev.api.createWorkspaces([repo.id], {
+      text: 'hold-turn',
+      agent: 'claude',
+      model: 'claude-sonnet-5-5',
+      effort: 'high',
+      planMode: false,
+      fast: false,
+    });
+    if (!created.ok) throw new Error(created.message);
+    const [workspace] = created.value;
+    const [session] = workspace.sessions;
+    await waitFor(async () =>
+      (await korev.api.getState()).runningSessions.includes(session.id),
+    );
+
+    ptyExits[0]({ exitCode: 0 });
+
+    await waitFor(
+      async () =>
+        (await workspaceState(workspace.id)).runtime.status !== 'setting-up',
+    );
+    expect((await workspaceState(workspace.id)).runtime.status).toBe('working');
+    await korev.api.stop(session.id);
   });
 
   it('waits for the user to approve a tool call when approvals are on', async () => {

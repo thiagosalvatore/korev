@@ -325,6 +325,7 @@ export async function onScriptExit(
   ctx: Context,
   ref: string,
   exitCode: number,
+  refreshStatus: (workspace: Workspace) => void,
 ) {
   const [workspaceId, kind] = ref.split(':');
   const runtime = ctx.runtime(workspaceId);
@@ -333,17 +334,19 @@ export async function onScriptExit(
     ctx.emitState();
     return;
   }
-  if (exitCode === 0) ctx.setStatus(workspaceId, 'idle');
-  else
+  const workspace = ctx.store.state.workspaces.find(
+    (ws) => ws.id === workspaceId,
+  );
+  if (exitCode === 0) {
+    ctx.setStatus(workspaceId, 'idle');
+    if (workspace) refreshStatus(workspace);
+  } else
     ctx.setStatus(
       workspaceId,
       'error',
       `Setup script failed (exit ${exitCode})`,
     );
   ctx.emitState();
-  const workspace = ctx.store.state.workspaces.find(
-    (ws) => ws.id === workspaceId,
-  );
   if (exitCode !== 0 || !workspace || workspace.archivedAt) return;
   const config = await workspaceConfig(ctx, workspace);
   if (config.autoRunAfterSetup) await startScript(ctx, workspace, 'run');
