@@ -553,7 +553,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
           branch: pr.headRefName,
           baseBranch,
         }
-      : { kind: 'pr', number: pr.number, baseBranch };
+      : {
+          kind: 'pr',
+          number: pr.number,
+          branch: pr.headRefName,
+          baseBranch,
+        };
   }
 
   function chatThatOpened(workspace: Workspace, url: string) {

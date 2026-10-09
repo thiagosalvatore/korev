@@ -540,6 +540,22 @@ async function checkOutPullRequest(
   return branch;
 }
 
+async function adoptWorktree(
+  ctx: Context,
+  repo: Repo,
+  workspace: Workspace,
+  branch: string,
+): Promise<boolean> {
+  const existing = (await untrackedWorktrees(ctx, repo)).find(
+    (worktree) => worktree.branch === branch,
+  );
+  if (!existing) return false;
+  workspace.path = existing.path;
+  workspace.branch = branch;
+  await prepareWorktree(ctx.git, workspace.path);
+  return true;
+}
+
 async function checkOutSource(
   ctx: Context,
   repo: Repo,
@@ -547,14 +563,7 @@ async function checkOutSource(
   source: CheckoutSource,
 ) {
   if (source.kind === 'branch') {
-    const existing = (await untrackedWorktrees(ctx, repo)).find(
-      (worktree) => worktree.branch === source.branch,
-    );
-    if (existing) {
-      workspace.path = existing.path;
-      await prepareWorktree(ctx.git, workspace.path);
-      return;
-    }
+    if (await adoptWorktree(ctx, repo, workspace, source.branch)) return;
     await addBranchWorktree(ctx.git, repo.path, workspace.path, source.branch);
     return;
   }
@@ -563,6 +572,7 @@ async function checkOutSource(
     return;
   }
   if (source.kind === 'pr') {
+    if (await adoptWorktree(ctx, repo, workspace, source.branch)) return;
     workspace.branch = await checkOutPullRequest(
       ctx,
       repo,

@@ -37,6 +37,7 @@ function workspaceSource(
     return {
       kind: 'pr',
       number: from.pr.number,
+      branch: from.pr.headRefName,
       baseBranch: from.pr.baseRefName,
     };
   }

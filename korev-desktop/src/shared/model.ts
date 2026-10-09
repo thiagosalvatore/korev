@@ -156,7 +156,7 @@ export type WorkspaceSource =
   | { kind: 'new'; baseBranch: string | null }
   | { kind: 'branch'; branch: string }
   | { kind: 'worktree'; path: string; branch: string; baseBranch: string }
-  | { kind: 'pr'; number: number; baseBranch: string }
+  | { kind: 'pr'; number: number; branch: string; baseBranch: string }
   | { kind: 'issue'; number: number; title: string };
 
 export interface PullRequestSummary {

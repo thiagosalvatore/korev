@@ -1213,6 +1213,25 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     );
   });
 
+  it('adopts the worktree that already has the PR branch checked out', async () => {
+    const elsewhere = path.join(home, 'elsewhere');
+    git(repoPath, 'worktree', 'add', elsewhere, '-b', 'feature/login');
+
+    const workspace = await createWorkspace(null, {
+      kind: 'pr',
+      number: 7,
+      branch: 'feature/login',
+      baseBranch: 'main',
+    });
+
+    const { runtime } = await workspaceState(workspace.id);
+    expect(runtime.status).toBe('idle');
+    expect(workspace).toMatchObject({
+      path: realpathSync(elsewhere),
+      branch: 'feature/login',
+    });
+  });
+
   it('does not adopt the main checkout', async () => {
     const workspace = await createWorkspace(null, {
       kind: 'branch',
