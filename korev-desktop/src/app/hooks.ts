@@ -84,3 +84,29 @@ export function useMediaQuery(query: string): boolean {
   }, [query]);
   return matches;
 }
+
+const repoGithubUrls = new Map<string, Promise<string | null>>();
+
+function repoGithubUrl(repoId: string): Promise<string | null> {
+  const cached = repoGithubUrls.get(repoId);
+  if (cached) return cached;
+  const url = api.repoGithubUrl(repoId).catch(() => null);
+  repoGithubUrls.set(repoId, url);
+  return url;
+}
+
+export function useRepoGithubUrl(repoId: string | null): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setUrl(null);
+    if (!repoId) return;
+    let current = true;
+    void repoGithubUrl(repoId).then((found) => {
+      if (current) setUrl(found);
+    });
+    return () => {
+      current = false;
+    };
+  }, [repoId]);
+  return url;
+}

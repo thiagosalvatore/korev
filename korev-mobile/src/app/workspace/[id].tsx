@@ -160,6 +160,7 @@ export default function WorkspaceScreen() {
           key={session.id}
           state={state}
           session={session}
+          repoId={workspace.repoId}
           onHandoff={setSelectedId}
         />
       ) : (

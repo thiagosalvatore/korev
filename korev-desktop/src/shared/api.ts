@@ -83,6 +83,7 @@ export interface KorevApi {
   repoConfig(repoId: string): Promise<RepoConfig>;
   listSkills(repoId: string): Promise<Skill[]>;
   repoIcon(repoId: string): Promise<string | null>;
+  repoGithubUrl(repoId: string): Promise<string | null>;
   startReview(workspaceId: string): Promise<Result<string>>;
   archiveWorkspace(workspaceId: string): Promise<Result>;
   restoreWorkspace(workspaceId: string): Promise<Result>;
@@ -218,6 +219,7 @@ export const REMOTE_METHODS = [
   'resolveConflicts',
   'mergePr',
   'repoIcon',
+  'repoGithubUrl',
   'createAskChat',
   'registerPushToken',
   'unregisterPushToken',

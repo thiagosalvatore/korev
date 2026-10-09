@@ -1,7 +1,8 @@
-import { Marked } from 'marked';
+import { Marked, type Token } from 'marked';
 import { useMemo, type MouseEvent } from 'react';
 import { cn } from '../../design-system';
 import { imageType } from '../../shared/format';
+import { isPrUrl, splitPrRefs } from '../../shared/pr-links';
 import { api } from '../bridge';
 
 const HTML_ESCAPES: Record<string, string> = {
@@ -66,29 +67,71 @@ const markdownOptions = {
 
 const markdown = new Marked(markdownOptions);
 
-const markdownWithFileLinks = new Marked(markdownOptions, {
-  renderer: {
-    codespan({ text }) {
-      const ref = parseFileRef(text);
-      return ref ? fileLink(ref, `<code>${escapeHtml(text)}</code>`) : false;
-    },
-    link({ href, tokens }) {
-      const ref = parseFileRef(href);
-      return ref ? fileLink(ref, this.parser.parseInline(tokens)) : false;
-    },
-    text(token) {
-      if ('tokens' in token && token.tokens) return false;
-      const escaped =
-        'escaped' in token && token.escaped
-          ? token.text
-          : escapeHtml(token.text);
-      return linkBarePaths(escaped);
-    },
-  },
-});
+function linkPrRefs(escapedText: string, repoUrl: string | null): string {
+  return splitPrRefs(escapedText, repoUrl)
+    .map((part) =>
+      typeof part === 'string'
+        ? part
+        : `<a href="${escapeHtml(part.url)}">${part.label}</a>`,
+    )
+    .join('');
+}
 
-export function renderMarkdown(text: string, linkFiles = false): string {
-  return (linkFiles ? markdownWithFileLinks : markdown).parse(text, {
+const linkLabels = new WeakSet<Token>();
+
+function markInnerTokens(token: Token) {
+  if (!('tokens' in token)) return;
+  for (const inner of token.tokens ?? []) {
+    linkLabels.add(inner);
+    markInnerTokens(inner);
+  }
+}
+
+function createLinkingMarkdown(repoUrl: string | null): Marked {
+  return new Marked(markdownOptions, {
+    walkTokens(token) {
+      if (token.type === 'link') markInnerTokens(token);
+    },
+    renderer: {
+      codespan({ text }) {
+        const code = `<code>${escapeHtml(text)}</code>`;
+        if (isPrUrl(text)) return `<a href="${escapeHtml(text)}">${code}</a>`;
+        const ref = parseFileRef(text);
+        return ref ? fileLink(ref, code) : false;
+      },
+      link({ href, tokens }) {
+        const ref = parseFileRef(href);
+        return ref ? fileLink(ref, this.parser.parseInline(tokens)) : false;
+      },
+      text(token) {
+        if ('tokens' in token && token.tokens) return false;
+        const escaped =
+          'escaped' in token && token.escaped
+            ? token.text
+            : escapeHtml(token.text);
+        if (linkLabels.has(token)) return escaped;
+        return linkPrRefs(linkBarePaths(escaped), repoUrl);
+      },
+    },
+  });
+}
+
+const linkingMarkdownByRepo = new Map<string | null, Marked>();
+
+function linkingMarkdown(repoUrl: string | null): Marked {
+  const cached = linkingMarkdownByRepo.get(repoUrl);
+  if (cached) return cached;
+  const instance = createLinkingMarkdown(repoUrl);
+  linkingMarkdownByRepo.set(repoUrl, instance);
+  return instance;
+}
+
+export function renderMarkdown(
+  text: string,
+  linkFiles = false,
+  repoUrl: string | null = null,
+): string {
+  return (linkFiles ? linkingMarkdown(repoUrl) : markdown).parse(text, {
     async: false,
   });
 }
@@ -119,16 +162,18 @@ export function Markdown({
   className,
   onOpenFile,
   onOpenImage,
+  repoUrl = null,
 }: {
   text: string;
   className?: string;
   onOpenFile?: OpenFile;
   onOpenImage?: OpenImage;
+  repoUrl?: string | null;
 }) {
   const linkFiles = Boolean(onOpenFile || onOpenImage);
   const html = useMemo(
-    () => renderMarkdown(text, linkFiles),
-    [text, linkFiles],
+    () => renderMarkdown(text, linkFiles, repoUrl),
+    [text, linkFiles, repoUrl],
   );
   return (
     <div

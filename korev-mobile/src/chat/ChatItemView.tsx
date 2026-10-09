@@ -181,14 +181,20 @@ function ToolLine({
 function AssistantMessage({
   item,
   sessionId,
+  repoUrl,
 }: {
   item: ItemOf<'assistant'>;
   sessionId: string;
+  repoUrl: string | null;
 }) {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   return (
     <>
-      <MarkdownView value={item.text} onOpenImage={setPreviewImage} />
+      <MarkdownView
+        value={item.text}
+        onOpenImage={setPreviewImage}
+        repoUrl={repoUrl}
+      />
       <ImagePreview
         sessionId={sessionId}
         path={previewImage}
@@ -231,12 +237,14 @@ function ResultLine({ item }: { item: ItemOf<'result'> }) {
 export function ChatItemView({
   item,
   sessionId,
+  repoUrl,
   running,
   onRespond,
   onHandoff,
 }: {
   item: ChatItem;
   sessionId: string;
+  repoUrl: string | null;
   running: boolean;
   onRespond(itemId: string, response: PermissionResponse): Promise<boolean>;
   onHandoff?(): Promise<boolean>;
@@ -246,7 +254,9 @@ export function ChatItemView({
     case 'user':
       return <UserMessage item={item} sessionId={sessionId} />;
     case 'assistant':
-      return <AssistantMessage item={item} sessionId={sessionId} />;
+      return (
+        <AssistantMessage item={item} sessionId={sessionId} repoUrl={repoUrl} />
+      );
     case 'thinking':
       return <Expandable header="Thinking…" body={item.text} />;
     case 'tool':

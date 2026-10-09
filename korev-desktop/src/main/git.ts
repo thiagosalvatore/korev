@@ -19,7 +19,7 @@ const CHECKPOINT_REF_PREFIX = 'refs/korev/checkpoints/';
 const WORKTREE_LINE = 'worktree ';
 const BRANCH_LINE = 'branch refs/heads/';
 const GITHUB_REMOTE =
-  /^(?:(?:https?|ssh|git):\/\/)?(?:[^@/]+@)?github\.com[:/]([^/]+)\//;
+  /^(?:(?:https?|ssh|git):\/\/)?(?:[^@/]+@)?github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 
 export class GitError extends Error {
   constructor(args: readonly string[], stderr: string) {
@@ -89,12 +89,29 @@ export function githubOwner(remoteUrl: string): string | null {
   return GITHUB_REMOTE.exec(remoteUrl.trim())?.[1] ?? null;
 }
 
+export function githubRepoUrl(remoteUrl: string): string | null {
+  const match = GITHUB_REMOTE.exec(remoteUrl.trim());
+  return match ? `https://github.com/${match[1]}/${match[2]}` : null;
+}
+
+function originRemote(git: Git, repo: string): Promise<string | null> {
+  return git.tryRun(repo, ['remote', 'get-url', 'origin']);
+}
+
 export async function originOwner(
   git: Git,
   repo: string,
 ): Promise<string | null> {
-  const url = await git.tryRun(repo, ['remote', 'get-url', 'origin']);
+  const url = await originRemote(git, repo);
   return url ? githubOwner(url) : null;
+}
+
+export async function originGithubUrl(
+  git: Git,
+  repo: string,
+): Promise<string | null> {
+  const url = await originRemote(git, repo);
+  return url ? githubRepoUrl(url) : null;
 }
 
 export async function cloneRepo(

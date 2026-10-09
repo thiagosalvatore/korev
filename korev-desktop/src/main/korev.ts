@@ -54,6 +54,7 @@ import {
   listFiles,
   removeWorktree,
   listBranches,
+  originGithubUrl,
   originOwner,
   repoRoot,
 } from './git';
@@ -1070,6 +1071,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       const owner = await originOwner(git, repoPath);
       return owner ? githubAvatar(owner) : null;
     },
+    repoGithubUrl: (repoId) => originGithubUrl(git, ctx.repo(repoId).path),
     async startReview(workspaceId) {
       const workspace = workspacePath(workspaceId);
       const { reviewModel, defaultAgent } = store.state.settings;

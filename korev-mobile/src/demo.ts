@@ -23,6 +23,7 @@ import {
   DEMO_REPLY,
   DENIED_REPLY,
   demoPullRequest,
+  demoRepoUrl,
   demoRuntime,
   demoSession,
   demoWorkspace,
@@ -505,6 +506,10 @@ export function createDemoConnection(): Connection {
     },
     async repoIcon() {
       return null;
+    },
+    async repoGithubUrl(repoId) {
+      const repo = state.repos.find((entry) => entry.id === repoId);
+      return repo ? demoRepoUrl(repo) : null;
     },
     async createAskChat(repoIds) {
       const ask = {

@@ -141,3 +141,27 @@ export function usePendingAction({ holdOnSuccess = false } = {}) {
   }
   return { pending, run };
 }
+
+const repoGithubUrls = new Map<string, Promise<string | null>>();
+
+export function useRepoGithubUrl(repoId: string | null): string | null {
+  const { api } = useConnection();
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setUrl(null);
+    if (!repoId) return;
+    let current = true;
+    let lookup = repoGithubUrls.get(repoId);
+    if (!lookup) {
+      lookup = api.repoGithubUrl(repoId).catch(() => null);
+      repoGithubUrls.set(repoId, lookup);
+    }
+    void lookup.then((found) => {
+      if (current) setUrl(found);
+    });
+    return () => {
+      current = false;
+    };
+  }, [api, repoId]);
+  return url;
+}

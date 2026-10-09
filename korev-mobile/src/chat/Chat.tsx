@@ -24,7 +24,7 @@ import {
 } from '../../../korev-desktop/src/shared/model';
 import { attempt } from '../attempt';
 import { succeeded, warned } from '../haptics';
-import { useTranscript } from '../hooks';
+import { useRepoGithubUrl, useTranscript } from '../hooks';
 import { Loading } from '../Offline';
 import { useConnection } from '../korev';
 import { useTheme, type Theme } from '../theme';
@@ -65,14 +65,17 @@ function JumpToLatest({ onPress }: { onPress: () => void }) {
 export function Chat({
   state,
   session,
+  repoId,
   onHandoff,
 }: {
   state: AppState;
   session: ChatSession;
+  repoId: string | null;
   onHandoff?(sessionId: string): void;
 }) {
   const { api } = useConnection();
   const items = useTranscript(session.id);
+  const repoUrl = useRepoGithubUrl(repoId);
   const headerHeight = useHeaderHeight();
   const styles = makeStyles(useTheme());
   const list = useRef<FlatList<ChatItem>>(null);
@@ -145,6 +148,7 @@ export function Chat({
               <ChatItemView
                 item={item}
                 sessionId={session.id}
+                repoUrl={repoUrl}
                 running={running}
                 onRespond={respond}
                 onHandoff={handoff}
