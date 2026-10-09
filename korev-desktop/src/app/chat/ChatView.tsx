@@ -14,7 +14,7 @@ import {
 import { handoffPlan, openDiff, openFile } from '../actions';
 import { api } from '../bridge';
 import { loadoutChoices, modelChoices } from '../../shared/format';
-import { useTranscript } from '../hooks';
+import { useRepoGithubUrl, useTranscript } from '../hooks';
 import { reportFailure, toast } from '../ui/toast';
 import {
   EMPTY_WORKSPACE_UI,
@@ -96,6 +96,8 @@ export function ChatView({
   const [draftVersion, setDraftVersion] = useState(0);
   const agent = state.agents.find((entry) => entry.agent === session.agent);
   const archived = Boolean(workspace?.archivedAt);
+  const chatRepoId = workspace?.repoId ?? repoId ?? null;
+  const repoUrl = useRepoGithubUrl(chatRepoId);
 
   function changeModel(choice: ModelChoice) {
     if (choice.agent === session.agent)
@@ -169,6 +171,7 @@ export function ChatView({
           }
           onRetry={(text) => void send(text)}
           onHandoff={handoff}
+          repoUrl={repoUrl}
           footer={
             codexPlan ? (
               <PlanReview
@@ -202,7 +205,7 @@ export function ChatView({
             loadout={loadoutChoices(state, session.agent)}
             snippets={state.settings.snippets}
             fast={session.fast}
-            repoId={workspace?.repoId ?? repoId ?? null}
+            repoId={chatRepoId}
             onFastChange={(fast) =>
               void api.updateSession(session.id, { fast })
             }

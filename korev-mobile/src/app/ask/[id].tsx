@@ -63,7 +63,11 @@ export default function AskScreen() {
       <Text style={styles.repos} numberOfLines={1}>
         {repoNames(state, ask)}
       </Text>
-      <Chat state={state} session={ask.session} />
+      <Chat
+        state={state}
+        session={ask.session}
+        repoId={ask.repoIds[0] ?? null}
+      />
     </>
   );
 }

@@ -476,6 +476,7 @@ export interface TranscriptProps {
   onRetry: (text: string) => void;
   onOpenTurnFile: (file: string, range: TurnRange) => void;
   onOpenFile?: (file: string, line: number | null) => void;
+  repoUrl?: string | null;
 }
 
 const STICK_THRESHOLD_PX = 80;
@@ -492,6 +493,7 @@ export function Transcript({
   onRetry,
   onOpenTurnFile,
   onOpenFile,
+  repoUrl,
 }: TranscriptProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -558,6 +560,7 @@ export function Transcript({
                   className="px-1.5"
                   onOpenFile={onOpenFile}
                   onOpenImage={setPreviewImage}
+                  repoUrl={repoUrl}
                 />
               );
             case 'thinking':

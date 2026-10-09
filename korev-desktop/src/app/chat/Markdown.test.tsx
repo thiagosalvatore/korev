@@ -43,4 +43,31 @@ describe('Markdown', () => {
 
     expect(screen.queryByRole('link')).toBeNull();
   });
+
+  it('links a PR number to the repo', () => {
+    render(
+      <Markdown
+        text="Merged #239 and [#12](https://example.com/12)."
+        onOpenFile={vi.fn()}
+        repoUrl="https://github.com/posthog/korev"
+      />,
+    );
+
+    expect(
+      screen.getByRole('link', { name: '#239' }).getAttribute('href'),
+    ).toBe('https://github.com/posthog/korev/pull/239');
+    expect(screen.getByRole('link', { name: '#12' }).getAttribute('href')).toBe(
+      'https://example.com/12',
+    );
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+  });
+
+  it('links a PR url written as inline code', () => {
+    const url = 'https://github.com/posthog/korev/pull/239';
+    render(<Markdown text={`Opened \`${url}\`.`} onOpenFile={vi.fn()} />);
+
+    expect(screen.getByRole('link', { name: url }).getAttribute('href')).toBe(
+      url,
+    );
+  });
 });

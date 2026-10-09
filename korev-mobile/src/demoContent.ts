@@ -155,6 +155,10 @@ export function demoRuntime(
   };
 }
 
+export function demoRepoUrl(repo: Pick<Repo, 'name'>): string {
+  return `https://github.com/acme/${repo.name}`;
+}
+
 export function demoPullRequest(
   repo: Pick<Repo, 'name'>,
   number: number,
@@ -165,7 +169,7 @@ export function demoPullRequest(
 ): PrStatus {
   return {
     number,
-    url: `https://github.com/acme/${repo.name}/pull/${number}`,
+    url: `${demoRepoUrl(repo)}/pull/${number}`,
     title,
     state: 'OPEN',
     isDraft: false,
