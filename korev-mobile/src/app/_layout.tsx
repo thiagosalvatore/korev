@@ -2,6 +2,7 @@ import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KorevProvider, useKorev } from '../korev';
 import { OfflineBanner } from '../Offline';
 import { useTheme } from '../theme';
@@ -51,8 +52,10 @@ function Screens() {
 
 export default function RootLayout() {
   return (
-    <KorevProvider>
-      <Screens />
-    </KorevProvider>
+    <GestureHandlerRootView style={FILL}>
+      <KorevProvider>
+        <Screens />
+      </KorevProvider>
+    </GestureHandlerRootView>
   );
 }
