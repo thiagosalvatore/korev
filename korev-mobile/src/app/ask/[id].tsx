@@ -1,12 +1,6 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-} from 'react-native';
+import { Alert, Pressable, StyleSheet, Text } from 'react-native';
 import type {
   AppState,
   AskChat,
@@ -14,6 +8,7 @@ import type {
 import { attempt } from '../../attempt';
 import { Chat } from '../../chat/Chat';
 import { useAppState } from '../../hooks';
+import { Loading } from '../../Offline';
 import { useConnection } from '../../korev';
 import { useTheme, type Theme } from '../../theme';
 
@@ -31,7 +26,7 @@ export default function AskScreen() {
   const theme = useTheme();
   const styles = makeStyles(theme);
 
-  if (!state) return <ActivityIndicator style={styles.loading} />;
+  if (!state) return <Loading style={styles.loading} />;
   const ask = state.askChats.find((entry) => entry.id === id);
   if (!ask) return <Text style={styles.empty}>This Ask chat was deleted.</Text>;
 

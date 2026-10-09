@@ -52,6 +52,8 @@ const REMOTE_EVENTS: ReadonlySet<keyof KorevEvents> = new Set([
 ]);
 
 export const DEFAULT_REMOTE_PORT = 7420;
+export const HEARTBEAT_MS = 15_000;
+const HEARTBEAT = ': ping\n\n';
 export const LOOPBACK_HOST = '127.0.0.1';
 const MAX_BODY_BYTES = 10 * 1024 * 1024;
 const DEVICE_HEADER = 'x-korev-device';
@@ -170,7 +172,7 @@ function openEventStream(
     'cache-control': 'no-cache',
     connection: 'keep-alive',
   });
-  response.flushHeaders();
+  response.write(HEARTBEAT);
   subscribers.set(response, deviceName(request));
   onDevicesChange();
   response.on('close', () => {
@@ -203,6 +205,10 @@ export function startRemoteServer(
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(options.port, options.host, () => {
+      const heartbeat = setInterval(() => {
+        for (const subscriber of subscribers.keys())
+          subscriber.write(HEARTBEAT);
+      }, HEARTBEAT_MS);
       resolve({
         port: (server.address() as AddressInfo).port,
         broadcast(event, payload) {
@@ -213,6 +219,7 @@ export function startRemoteServer(
         },
         devices: () => [...subscribers.values()],
         close() {
+          clearInterval(heartbeat);
           for (const subscriber of subscribers.keys()) subscriber.end();
           server.closeAllConnections();
           return new Promise((done) => server.close(() => done()));

@@ -16,6 +16,7 @@ import {
 import { attempt } from '../../attempt';
 import { Chat } from '../../chat/Chat';
 import { useAppState, usePendingAction } from '../../hooks';
+import { Loading } from '../../Offline';
 import { useConnection } from '../../korev';
 import { PrBar } from '../../PrBar';
 import { useTheme, type Theme } from '../../theme';
@@ -126,7 +127,7 @@ export default function WorkspaceScreen() {
   const styles = makeStyles(useTheme());
   const [selectedId, setSelectedId] = useState<string>();
 
-  if (!state) return <ActivityIndicator style={styles.fill} />;
+  if (!state) return <Loading style={styles.fill} />;
   const workspace = state.workspaces.find((entry) => entry.id === id);
   if (!workspace)
     return <Text style={styles.empty}>This workspace no longer exists.</Text>;

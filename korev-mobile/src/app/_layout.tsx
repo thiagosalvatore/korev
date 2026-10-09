@@ -1,10 +1,13 @@
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { View } from 'react-native';
 import { KorevProvider, useKorev } from '../korev';
+import { OfflineBanner } from '../Offline';
 import { useTheme } from '../theme';
 
 void SplashScreen.preventAutoHideAsync();
+const FILL = { flex: 1 };
 
 function Screens() {
   const { loading, connection } = useKorev();
@@ -14,7 +17,7 @@ function Screens() {
   }, [loading]);
   if (loading) return null;
   return (
-    <>
+    <View style={FILL}>
       <StatusBar style="auto" />
       <Stack
         screenOptions={{
@@ -41,7 +44,8 @@ function Screens() {
           <Stack.Screen name="pair" options={{ title: 'Pair with Korev' }} />
         </Stack.Protected>
       </Stack>
-    </>
+      {connection ? <OfflineBanner /> : null}
+    </View>
   );
 }
 

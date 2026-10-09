@@ -66,6 +66,17 @@ PR, Fix errors and Resolve conflicts send a prompt to the active chat; Merge cal
 
 ## Phone app
 
+- **Tokens.** `korev-mobile/src/theme.ts` mirrors the desktop tokens for dark and light. Use
+  its names, never a hex value, in phone code.
+- **Can't reach the Mac.** A screen with no data yet shows the offline panel in place of its
+  spinner: a WifiOff icon, "Can't reach Korev on your Mac", what to check (Korev open on the
+  Mac, Tailscale on the phone, the Mac awake and on Tailscale), **Try again** and **Unpair this
+  phone**. It is left-aligned like the pair screen. A screen that already shows data keeps it
+  and gets a pill over the header title, "Not connected to your Mac", in `warningText` on
+  `bgRaised`. Tapping the pill lists what to check. The pill fades out when the Mac answers
+  again, with no "Connected" message.
+- **Pending buttons.** A button whose request is running shows a spinner in place of its
+  label and keeps its size. Its siblings are disabled until the request ends.
 - **Waiting chats.** A workspace opens on the chat that waits for an answer. Its tab shows an
   amber `warning` dot next to the running spinner.
 - **Jump to latest.** After one screen of scrolling back, a 36 pt round button with a down

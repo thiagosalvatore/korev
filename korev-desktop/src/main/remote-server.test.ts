@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { startRemoteServer, type RemoteServer } from './remote-server';
+import {
+  HEARTBEAT_MS,
+  startRemoteServer,
+  type RemoteServer,
+} from './remote-server';
 
 const TOKEN = 'secret-token';
 const LOOPBACK = '127.0.0.1';
 const ANY_FREE_PORT = 0;
+const PING = ': ping\n\n';
 
 let server: RemoteServer | null = null;
 
@@ -87,19 +92,49 @@ describe('remote server', () => {
     expect(saveAttachment).toHaveBeenCalledWith('ws-1', 'photo.jpg', photo);
   });
 
-  it('streams remote events and leaves out the rest', async () => {
-    const base = await start({});
+  async function openEventStream(base: string) {
     const response = await fetch(`${base}/events`, {
       headers: { authorization: `Bearer ${TOKEN}` },
     });
-    const reader = response.body!.getReader();
+    return response.body!.getReader();
+  }
+
+  async function nextChunk(reader: ReadableStreamDefaultReader<Uint8Array>) {
+    const { value } = await reader.read();
+    return new TextDecoder().decode(value);
+  }
+
+  it('pings a new event stream at once so the phone sees it open', async () => {
+    const base = await start({});
+    const reader = await openEventStream(base);
+    expect(await nextChunk(reader)).toBe(PING);
+    await reader.cancel();
+  });
+
+  it('streams remote events and leaves out the rest', async () => {
+    const base = await start({});
+    const reader = await openEventStream(base);
+    await nextChunk(reader);
     server!.broadcast('terminal-output', { ref: 't', data: 'ls' });
     server!.broadcast('toast', { title: 'Merged', tone: 'success' });
-    const { value } = await reader.read();
-    expect(new TextDecoder().decode(value)).toBe(
+    expect(await nextChunk(reader)).toBe(
       'event: toast\ndata: {"title":"Merged","tone":"success"}\n\n',
     );
     await reader.cancel();
+  });
+
+  it('pings open event streams so the phone can tell a dead link from a quiet one', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      const base = await start({});
+      const reader = await openEventStream(base);
+      await nextChunk(reader);
+      vi.advanceTimersByTime(HEARTBEAT_MS);
+      expect(await nextChunk(reader)).toBe(PING);
+      await reader.cancel();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

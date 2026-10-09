@@ -2,7 +2,6 @@ import { useHeaderHeight } from 'expo-router/react-navigation';
 import { ChevronDown } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   StyleSheet,
@@ -26,6 +25,7 @@ import {
 import { attempt } from '../attempt';
 import { succeeded, warned } from '../haptics';
 import { useTranscript } from '../hooks';
+import { Loading } from '../Offline';
 import { useConnection } from '../korev';
 import { useTheme, type Theme } from '../theme';
 import { ICON_BUTTON_ICON_SIZE, ICON_BUTTON_SIZE, IconButton } from '../ui';
@@ -183,7 +183,7 @@ export function Chat({
           {scrolledBack ? <JumpToLatest onPress={jumpToLatest} /> : null}
         </View>
       ) : (
-        <ActivityIndicator style={styles.fill} />
+        <Loading style={styles.fill} />
       )}
       <Composer
         state={state}

@@ -6,27 +6,17 @@ import {
   Plus,
   Settings,
 } from 'lucide-react-native';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAppState } from '../../hooks';
 import { useKorev } from '../../korev';
 import { openNewAsk, openNewWorkspace } from '../../navigation';
+import { confirmUnpair } from '../../Offline';
 import { useTheme, type Theme } from '../../theme';
 import { CHROME_FONT_SCALE } from '../../ui';
 
 const LOGO = require('../../../assets/icon.png');
 const HEADER_ICON_SIZE = 22;
 const CENTER_BUTTON_SIZE = 56;
-
-function confirmUnpair(unpair: () => Promise<void>) {
-  Alert.alert(
-    'Unpair this phone?',
-    'You will need to scan the code in Korev again.',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Unpair', style: 'destructive', onPress: () => void unpair() },
-    ],
-  );
-}
 
 function Brand({ styles }: { styles: Styles }) {
   return (

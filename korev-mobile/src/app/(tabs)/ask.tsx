@@ -14,6 +14,7 @@ import type {
 } from '../../../../korev-desktop/src/shared/model';
 import { NewAskForm } from '../../ask/NewAskForm';
 import { useAppState, useReconnect } from '../../hooks';
+import { Loading } from '../../Offline';
 import { ListRow, ROW_ICON_SIZE } from '../../ListRow';
 import { useTheme, type Theme } from '../../theme';
 
@@ -54,7 +55,7 @@ export default function AskChatsScreen() {
   const state = useAppState();
   const styles = makeStyles(useTheme());
   const { refreshing, refresh } = useReconnect();
-  if (!state) return <ActivityIndicator style={styles.loading} />;
+  if (!state) return <Loading style={styles.loading} />;
   if (!state.askChats.length)
     return <NewAskForm state={state} autoFocus={false} onAsked={openAskChat} />;
   const newestFirst = [...state.askChats].sort((a, b) =>

@@ -38,6 +38,7 @@ import {
 } from '../../../../korev-desktop/src/shared/workspaces';
 import { useAppState, useReconnect } from '../../hooks';
 import { ListRow, ROW_ICON_SIZE } from '../../ListRow';
+import { Loading } from '../../Offline';
 import { openNewWorkspace } from '../../navigation';
 import { RepoAvatar } from '../../RepoAvatar';
 import { MONO_FONT, useTheme, type Theme } from '../../theme';
@@ -262,7 +263,7 @@ export default function WorkspacesScreen() {
   const toggle = (id: string) => setCollapsed(toggled(collapsed, id));
   const { refreshing, refresh } = useReconnect();
 
-  if (!state) return <ActivityIndicator style={styles.loading} />;
+  if (!state) return <Loading style={styles.loading} />;
 
   const workspaces = activeWorkspaces(state);
   const sections = repoSections(state);

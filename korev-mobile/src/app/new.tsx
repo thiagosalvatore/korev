@@ -22,6 +22,7 @@ import { succeeded } from '../haptics';
 import { MicButton, RecordingBar } from '../VoiceInput';
 import { useDictation } from '../dictation';
 import { useAppState, useModelChoice } from '../hooks';
+import { Loading } from '../Offline';
 import { useConnection } from '../korev';
 import { ModelPicker } from '../ModelPicker';
 import { RepoPicker } from '../RepoPicker';
@@ -146,7 +147,7 @@ function NewWorkspaceForm({
 export default function NewWorkspaceScreen() {
   const { repoId } = useLocalSearchParams<{ repoId?: string }>();
   const state = useAppState();
-  if (!state) return <ActivityIndicator style={LOADING_STYLE} />;
+  if (!state) return <Loading style={LOADING_STYLE} />;
   return <NewWorkspaceForm state={state} initialRepoId={repoId} />;
 }
 

@@ -16,12 +16,24 @@ const DEVICE_HEADER = 'X-Korev-Device';
 const FALLBACK_DEVICE_NAME = 'Phone';
 const HTTP_UNAUTHORIZED = 401;
 const RECONNECT_DELAY_MS = 2000;
+export const CONNECT_TIMEOUT_MS = 8000;
+export const IDLE_TIMEOUT_MS = 40_000;
+const OFFLINE_MESSAGE = 'Not connected to Korev on your Mac.';
 
 export class UnauthorizedError extends Error {}
+
+export type ConnectionState = 'connecting' | 'online' | 'offline';
+
+export interface ConnectionStatus {
+  state: ConnectionState;
+  attempting: boolean;
+}
 
 export interface Connection extends KorevBridge {
   api: KorevApi;
   onConnect(listener: () => void): Unsubscribe;
+  status(): ConnectionStatus;
+  onStatus(listener: () => void): Unsubscribe;
   open(): void;
   close(): void;
 }
@@ -64,6 +76,21 @@ export async function call(
   return body.result;
 }
 
+function createWatchdog(onTimeout: () => void) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return {
+    arm(ms: number) {
+      clearTimeout(timer);
+      timer = setTimeout(onTimeout, ms);
+    },
+    stop() {
+      clearTimeout(timer);
+    },
+  };
+}
+
+type Watchdog = ReturnType<typeof createWatchdog>;
+
 function apiFor(bridge: KorevBridge): KorevApi {
   return new Proxy({} as KorevApi, {
     get:
@@ -79,6 +106,8 @@ export function connect(
 ): Connection {
   const listeners = new Map<string, Set<(payload: unknown) => void>>();
   const connectListeners = new Set<() => void>();
+  const statusListeners = new Set<() => void>();
+  let current: ConnectionStatus = { state: 'connecting', attempting: false };
   let controller: AbortController | null = null;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let generation = 0;
@@ -89,18 +118,36 @@ export function connect(
     listeners.get(event)?.forEach((listener) => listener(payload));
   }
 
-  async function readEvents(signal: AbortSignal) {
+  function setStatus(next: Partial<ConnectionStatus>) {
+    const updated = { ...current, ...next };
+    if (
+      updated.state === current.state &&
+      updated.attempting === current.attempting
+    )
+      return;
+    current = updated;
+    statusListeners.forEach((listener) => listener());
+  }
+
+  async function readEvents(
+    signal: AbortSignal,
+    watchdog: Watchdog,
+    onReached: () => void,
+  ) {
+    watchdog.arm(CONNECT_TIMEOUT_MS);
     const response = await streamingFetch(`${pairing.url}/events`, {
       headers: headers(pairing),
       signal,
     });
     if (response.status === HTTP_UNAUTHORIZED) throw new UnauthorizedError();
     if (!response.ok || !response.body) return;
+    onReached();
     connectListeners.forEach((listener) => listener());
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     const feed = createSseParser(dispatch);
     for (;;) {
+      watchdog.arm(IDLE_TIMEOUT_MS);
       const { done, value } = await reader.read();
       if (done) return;
       feed(decoder.decode(value, { stream: true }));
@@ -122,19 +169,34 @@ export function connect(
   function open() {
     closed = false;
     const attempt = ++generation;
+    const isCurrent = () => attempt === generation && !closed;
     clearTimeout(retryTimer);
     controller?.abort();
-    controller = new AbortController();
-    void readEvents(controller.signal)
+    const attemptController = new AbortController();
+    controller = attemptController;
+    const watchdog = createWatchdog(() => attemptController.abort());
+    let reached = false;
+    setStatus({ attempting: true });
+    void readEvents(attemptController.signal, watchdog, () => {
+      reached = true;
+      if (isCurrent()) setStatus({ state: 'online', attempting: false });
+    })
       .catch(handleFailure)
       .finally(() => {
-        if (closed || attempt !== generation) return;
+        watchdog.stop();
+        if (!isCurrent()) return;
+        setStatus(
+          reached
+            ? { attempting: false }
+            : { state: 'offline', attempting: false },
+        );
         retryTimer = setTimeout(open, RECONNECT_DELAY_MS);
       });
   }
 
   const bridge: KorevBridge = {
     async call(method, args) {
+      if (current.state === 'offline') throw new Error(OFFLINE_MESSAGE);
       try {
         return await call(pairing, method, args);
       } catch (error) {
@@ -160,6 +222,11 @@ export function connect(
     onConnect(listener) {
       connectListeners.add(listener);
       return () => connectListeners.delete(listener);
+    },
+    status: () => current,
+    onStatus(listener) {
+      statusListeners.add(listener);
+      return () => statusListeners.delete(listener);
     },
     open,
     close,

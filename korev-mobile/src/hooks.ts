@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Keyboard, Platform } from 'react-native';
 import {
   upsertChatItem,
@@ -7,7 +7,13 @@ import {
   type ModelChoice,
   type Settings,
 } from '../../korev-desktop/src/shared/model';
+import type { ConnectionStatus } from './connection';
 import { useConnection } from './korev';
+
+export function useConnectionStatus(): ConnectionStatus {
+  const connection = useConnection();
+  return useSyncExternalStore(connection.onStatus, connection.status);
+}
 
 export function useAppState(): AppState | null {
   const connection = useConnection();
