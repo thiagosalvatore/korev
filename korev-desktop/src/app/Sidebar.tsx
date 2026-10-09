@@ -59,15 +59,26 @@ function NavRow({
   icon,
   label,
   hint,
+  active = false,
   onClick,
 }: {
   icon: IconName;
   label: string;
   hint?: string;
+  active?: boolean;
   onClick: () => void;
 }) {
   return (
-    <button type="button" className={cn(ROW, 'h-7')} onClick={onClick}>
+    <button
+      type="button"
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        ROW,
+        'h-7',
+        active && 'bg-active text-fg-1 hover:bg-active',
+      )}
+      onClick={onClick}
+    >
       <Icon name={icon} size={15} className="text-fg-3" />
       <span className="flex-1">{label}</span>
       {hint ? (
@@ -932,6 +943,8 @@ export function Sidebar({ state }: { state: AppState }) {
       return paneWorkspaceId(focusedGridPane(ui.grid));
     return ui.page.kind === 'workspace' ? ui.workspaceId : null;
   });
+  const pageKind = useUi((ui) => ui.page.kind);
+  const paletteOpen = useUi((ui) => ui.palette !== false);
   const active = activeWorkspaces(state);
   const indexOf = (workspace: Workspace) => active.indexOf(workspace);
   return (
@@ -958,20 +971,29 @@ export function Sidebar({ state }: { state: AppState }) {
           icon="search"
           label="Search"
           hint="⌘K"
+          active={paletteOpen}
           onClick={() => setUi({ palette: 'all' })}
         />
         <NavRow
           icon="square-pen"
           label="New workspace"
           hint="⌘N"
+          active={pageKind === 'new-workspace'}
           onClick={() => openNewWorkspace(null)}
         />
         <NavRow
           icon="message-circle-question"
           label="Ask"
+          active={pageKind === 'ask'}
           onClick={() => openAsk(null)}
         />
-        <NavRow icon="layout-grid" label="Grid" hint="⌘G" onClick={openGrid} />
+        <NavRow
+          icon="layout-grid"
+          label="Grid"
+          hint="⌘G"
+          active={pageKind === 'grid'}
+          onClick={openGrid}
+        />
       </div>
       <AskChats state={state} />
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-1">

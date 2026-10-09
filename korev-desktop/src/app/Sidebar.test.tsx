@@ -115,6 +115,19 @@ describe('Sidebar on the grid page', () => {
     }));
   }
 
+  it('marks the Grid nav row', () => {
+    showGrid({ workspaceId: 'w1', tabKey: 'chat:s1' });
+    render(<Sidebar state={state} />);
+    expect(
+      screen
+        .getByRole('button', { name: /^Grid/ })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+    expect(
+      screen.getByRole('button', { name: 'Ask' }).getAttribute('aria-current'),
+    ).toBeNull();
+  });
+
   it('marks the workspace of the focused pane', () => {
     showGrid({ workspaceId: 'w1', tabKey: 'chat:s1' });
     render(<Sidebar state={state} />);
