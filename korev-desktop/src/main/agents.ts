@@ -100,8 +100,16 @@ function codexArgs(request: TurnRequest): string[] {
     '-c',
     `sandbox_mode="${request.planMode || request.readOnly ? 'read-only' : 'workspace-write'}"`,
     '-c',
+    'sandbox_workspace_write.network_access=true',
+    '-c',
     `model_reasoning_effort="${request.effort}"`,
     ...(request.fast ? ['-c', 'service_tier="fast"'] : []),
+    ...(request.addDirs.length
+      ? [
+          '-c',
+          `sandbox_workspace_write.writable_roots=${JSON.stringify(request.addDirs)}`,
+        ]
+      : []),
     ...model,
   ];
   if (request.resumeId) {

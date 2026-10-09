@@ -42,6 +42,29 @@ describe('forking a chat', () => {
   });
 });
 
+describe('codex sandbox', () => {
+  it('lets workspace chats reach the network', () => {
+    expect(AGENTS.codex.args(REQUEST)).toContain(
+      'sandbox_workspace_write.network_access=true',
+    );
+  });
+
+  it.each([null, 'chat-1'])(
+    'lets workspace chats write the extra dirs (resume: %s)',
+    (resumeId) => {
+      const args = AGENTS.codex.args({
+        ...REQUEST,
+        resumeId,
+        addDirs: ['/repo/.git', '/attachments'],
+      });
+
+      expect(args).toContain(
+        'sandbox_workspace_write.writable_roots=["/repo/.git","/attachments"]',
+      );
+    },
+  );
+});
+
 type Responses = Record<string, Partial<CommandResult>>;
 
 function runnerWith(responses: Responses): CommandRunner {
