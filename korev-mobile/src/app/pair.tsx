@@ -6,6 +6,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,7 +22,10 @@ import { useTheme, type Theme } from '../theme';
 import { Welcome } from '../Welcome';
 import { Button } from '../ui';
 
-const TAILSCALE_APP_STORE = 'https://apps.apple.com/app/tailscale/id1470499037';
+const TAILSCALE_STORE_URL = Platform.select({
+  ios: 'https://apps.apple.com/app/tailscale/id1470499037',
+  default: 'https://play.google.com/store/apps/details?id=com.tailscale.ipn',
+});
 const NOT_A_PAIRING_CODE =
   'That is not a Korev pairing code. Use the code in Settings → Remote access.';
 const CAMERA_BLOCKED = 'Korev needs the camera to scan the pairing code.';
@@ -249,7 +253,7 @@ export default function PairScreen() {
             <Pressable
               accessibilityRole="link"
               hitSlop={8}
-              onPress={() => void Linking.openURL(TAILSCALE_APP_STORE)}
+              onPress={() => void Linking.openURL(TAILSCALE_STORE_URL)}
             >
               <Text style={styles.link}>Get Tailscale</Text>
             </Pressable>
