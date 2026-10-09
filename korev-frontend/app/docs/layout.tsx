@@ -4,7 +4,11 @@ import { RootProvider } from 'fumadocs-ui/provider/next';
 import { fontVariables } from '@/app/fonts';
 import { GithubMark } from '@/components/ds/GithubMark';
 import { Logo } from '@/components/ds/Logo';
-import { GITHUB_URL, RELEASES_URL } from '@/components/landing/links';
+import {
+  CHANGELOG_URL,
+  GITHUB_URL,
+  RELEASES_URL,
+} from '@/components/landing/links';
 import { THEME_STORAGE_KEY } from '@/components/landing/theme';
 import { source } from '@/lib/source';
 import '../styles/docs.css';
@@ -49,6 +53,7 @@ export default function Layout({ children }: LayoutProps<'/docs'>) {
                 url: GITHUB_URL,
                 external: true,
               },
+              { text: 'Changelog', url: CHANGELOG_URL },
               { text: 'Download', url: RELEASES_URL, external: true },
             ]}
           >
