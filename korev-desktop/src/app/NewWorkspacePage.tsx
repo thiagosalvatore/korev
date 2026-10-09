@@ -169,6 +169,7 @@ export function NewWorkspacePage({
               state={state}
               selected={repoIds}
               onChange={setRepoIds}
+              defaultOpen={!initialRepoId}
             />
             {singleRepo && !from ? (
               <TargetBranchMenu
@@ -259,7 +260,7 @@ export function NewWorkspacePage({
             planMode={planMode}
             running={creating}
             workspaceId={null}
-            autoFocus
+            autoFocus={Boolean(initialRepoId)}
             placeholder={`Describe a task for ${AGENT_LABELS[agent]}. Enter creates the workspace and starts it.`}
             onModelChange={choose}
             onEffortChange={setEffort}

@@ -41,4 +41,42 @@ describe('RepoPicker', () => {
     expect(onChange).toHaveBeenCalledWith(['korev', 'posthog-js']);
     expect(screen.getByRole('checkbox', { name: 'posthog' })).toBeTruthy();
   });
+
+  it('toggles the highlighted repository with Space and keeps the list open', () => {
+    const onChange = vi.fn();
+    const state = { repos: [repo('posthog'), repo('korev')] } as AppState;
+    render(<RepoPicker state={state} selected={[]} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Repositories' }));
+    const search = screen.getByRole('textbox', { name: 'Search repositories' });
+    fireEvent.keyDown(search, { key: 'ArrowDown' });
+    fireEvent.keyDown(search, { key: ' ' });
+
+    expect(onChange).toHaveBeenCalledWith(['korev']);
+    expect(
+      screen.getByRole('dialog', { name: 'Choose repositories' }),
+    ).toBeTruthy();
+  });
+
+  it('picks the first match and closes on Enter when nothing is chosen', () => {
+    const onChange = vi.fn();
+    const state = { repos: [repo('posthog'), repo('korev')] } as AppState;
+    render(
+      <RepoPicker
+        state={state}
+        selected={[]}
+        onChange={onChange}
+        defaultOpen
+      />,
+    );
+
+    const search = screen.getByRole('textbox', { name: 'Search repositories' });
+    fireEvent.change(search, { target: { value: 'kor' } });
+    fireEvent.keyDown(search, { key: 'Enter' });
+
+    expect(onChange).toHaveBeenCalledWith(['korev']);
+    expect(
+      screen.queryByRole('dialog', { name: 'Choose repositories' }),
+    ).toBeNull();
+  });
 });

@@ -48,7 +48,7 @@ function repoPicker() {
 }
 
 describe('NewWorkspacePage', () => {
-  it('starts with no repository chosen when several exist', () => {
+  it('starts with no repository chosen and the repository search focused when several exist', () => {
     render(
       <NewWorkspacePage
         state={stateWith([repo('korev'), repo('posthog')])}
@@ -56,13 +56,22 @@ describe('NewWorkspacePage', () => {
       />,
     );
     expect(repoPicker().textContent).toBe('Choose repositories');
+    expect(document.activeElement).toBe(
+      screen.getByRole('textbox', { name: 'Search repositories' }),
+    );
   });
 
-  it('preselects the only repository', () => {
+  it('preselects the only repository and focuses the message', () => {
     render(
       <NewWorkspacePage state={stateWith([repo('korev')])} repoId={null} />,
     );
     expect(repoPicker().textContent).toBe('korev');
+    expect(
+      screen.queryByRole('textbox', { name: 'Search repositories' }),
+    ).toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole('textbox', { name: 'Message' }),
+    );
   });
 
   it('keeps the typed task when a repository is picked afterwards', async () => {
@@ -75,7 +84,6 @@ describe('NewWorkspacePage', () => {
     const message = screen.getByRole('textbox', { name: 'Message' });
     fireEvent.change(message, { target: { value: 'Add a note' } });
     fireEvent.keyDown(message, { key: 'Enter' });
-    fireEvent.click(repoPicker());
     fireEvent.click(screen.getByRole('checkbox', { name: 'posthog' }));
     expect(await screen.findByDisplayValue('Add a note')).toBe(
       screen.getByRole('textbox', { name: 'Message' }),

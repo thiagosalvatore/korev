@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type KeyboardEvent } from 'react';
 import { cn, Icon, Input } from '../design-system';
 import { pickerLabel } from '../shared/format';
 import type { AppState, Repo } from '../shared/model';
+import { focusComposer } from './actions';
 import { PANEL, useDismiss } from './ui/Menu';
 
 function matching(repos: Repo[], query: string): Repo[] {
@@ -13,13 +14,16 @@ export function RepoPicker({
   state,
   selected,
   onChange,
+  defaultOpen = false,
 }: {
   state: AppState;
   selected: string[];
   onChange(repoIds: string[]): void;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [query, setQuery] = useState('');
+  const [active, setActive] = useState(0);
   const root = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useDismiss(root, open, close);
@@ -32,6 +36,31 @@ export function RepoPicker({
         ? selected.filter((id) => id !== repoId)
         : [...selected, repoId],
     );
+  }
+
+  function proceed() {
+    if (!selected.length && visible[active]) toggle(visible[active].id);
+    close();
+    focusComposer();
+  }
+
+  function onSearchKey(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      setActive(
+        (value) =>
+          (value + step + visible.length) % Math.max(visible.length, 1),
+      );
+    }
+    if (event.key === ' ' && visible[active]) {
+      event.preventDefault();
+      toggle(visible[active].id);
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      proceed();
+    }
   }
 
   return (
@@ -64,13 +93,21 @@ export function RepoPicker({
             placeholder="Search repositories"
             autoFocus
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setActive(0);
+            }}
+            onKeyDown={onSearchKey}
           />
           <div className="mt-1">
-            {visible.map((repo) => (
+            {visible.map((repo, index) => (
               <label
                 key={repo.id}
-                className="flex h-7 cursor-pointer items-center gap-2 rounded-sm px-2 text-sm text-fg-1 hover:bg-hover"
+                className={cn(
+                  'flex h-7 cursor-pointer items-center gap-2 rounded-sm px-2 text-sm text-fg-1',
+                  index === active && 'bg-active',
+                )}
+                onMouseMove={() => setActive(index)}
               >
                 <input
                   type="checkbox"
