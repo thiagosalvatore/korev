@@ -18,6 +18,7 @@ import {
 import { insertDictation } from '../../../korev-desktop/src/shared/dictation';
 import { repoSections } from '../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../attempt';
+import { succeeded } from '../haptics';
 import { MicButton, RecordingBar } from '../VoiceInput';
 import { useDictation } from '../dictation';
 import { useAppState, useModelChoice } from '../hooks';
@@ -25,7 +26,7 @@ import { useConnection } from '../korev';
 import { ModelPicker } from '../ModelPicker';
 import { RepoPicker } from '../RepoPicker';
 import { useTheme, type Theme } from '../theme';
-import { Button } from '../ui';
+import { Button, CHROME_FONT_SCALE } from '../ui';
 
 const LOADING_STYLE = { marginTop: 40 };
 
@@ -74,7 +75,7 @@ function NewWorkspaceForm({
       );
       if (created.ok && created.value[0]) openWorkspace(created.value[0]);
       return created;
-    });
+    }).then(succeeded);
     setCreating(false);
   }
 
@@ -82,8 +83,11 @@ function NewWorkspaceForm({
     <ScrollView
       contentContainerStyle={styles.page}
       keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
     >
-      <Text style={styles.label}>Repository</Text>
+      <Text maxFontSizeMultiplier={CHROME_FONT_SCALE} style={styles.label}>
+        Repository
+      </Text>
       <RepoPicker
         repos={repos}
         selected={repoId ? [repoId] : []}
@@ -112,7 +116,12 @@ function NewWorkspaceForm({
           hitSlop={8}
           onPress={() => setPlanMode(!planMode)}
         >
-          <Text style={planMode ? styles.planOn : styles.meta}>Plan</Text>
+          <Text
+            maxFontSizeMultiplier={CHROME_FONT_SCALE}
+            style={planMode ? styles.planOn : styles.meta}
+          >
+            Plan
+          </Text>
         </Pressable>
         <View style={styles.model}>
           <ModelPicker

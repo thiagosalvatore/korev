@@ -14,7 +14,7 @@ import { useConnection } from '../korev';
 import { ModelPicker } from '../ModelPicker';
 import { RepoPicker } from '../RepoPicker';
 import { useTheme, type Theme } from '../theme';
-import { Button } from '../ui';
+import { Button, CHROME_FONT_SCALE } from '../ui';
 
 function toggled(list: string[], id: string): string[] {
   return list.includes(id)
@@ -70,8 +70,11 @@ export function NewAskForm({
     <ScrollView
       contentContainerStyle={styles.page}
       keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
     >
-      <Text style={styles.label}>Repositories</Text>
+      <Text maxFontSizeMultiplier={CHROME_FONT_SCALE} style={styles.label}>
+        Repositories
+      </Text>
       <RepoPicker
         repos={repos}
         selected={repoIds}

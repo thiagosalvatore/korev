@@ -41,6 +41,9 @@ import { ListRow, ROW_ICON_SIZE } from '../../ListRow';
 import { openNewWorkspace } from '../../navigation';
 import { RepoAvatar } from '../../RepoAvatar';
 import { MONO_FONT, useTheme, type Theme } from '../../theme';
+import { CHROME_FONT_SCALE, touchSlop } from '../../ui';
+
+const REPO_ADD_ICON_SIZE = ROW_ICON_SIZE + 2;
 
 const BUSY_STATUSES: ReadonlySet<WorkspaceStatus> = new Set([
   'creating',
@@ -132,7 +135,10 @@ function WorkspaceRow({
       end={
         <>
           {hasStats ? (
-            <Text style={styles.stats}>
+            <Text
+              maxFontSizeMultiplier={CHROME_FONT_SCALE}
+              style={styles.stats}
+            >
               <Text style={styles.additions}>+{stats.additions}</Text>{' '}
               <Text style={styles.deletions}>−{stats.deletions}</Text>
             </Text>
@@ -182,7 +188,11 @@ function RepoGroup({
           onPress={onToggle}
         >
           <RepoAvatar repo={repo} />
-          <Text style={styles.repoName} numberOfLines={1}>
+          <Text
+            maxFontSizeMultiplier={CHROME_FONT_SCALE}
+            style={styles.repoName}
+            numberOfLines={1}
+          >
             {repo.name}
           </Text>
           <Chevron collapsed={collapsed} />
@@ -190,10 +200,10 @@ function RepoGroup({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`New workspace in ${repo.name}`}
-          hitSlop={8}
+          hitSlop={touchSlop(REPO_ADD_ICON_SIZE)}
           onPress={() => openNewWorkspace(repo.id)}
         >
-          <Plus size={ROW_ICON_SIZE + 2} color={theme.fg3} />
+          <Plus size={REPO_ADD_ICON_SIZE} color={theme.fg3} />
         </Pressable>
       </View>
       {collapsed
@@ -231,7 +241,11 @@ function FolderGroup({
         style={styles.folderHeader}
         onPress={onToggle}
       >
-        <Text style={styles.folderName} numberOfLines={1}>
+        <Text
+          maxFontSizeMultiplier={CHROME_FONT_SCALE}
+          style={styles.folderName}
+          numberOfLines={1}
+        >
           {folder.name}
         </Text>
         <Chevron collapsed={collapsed} />

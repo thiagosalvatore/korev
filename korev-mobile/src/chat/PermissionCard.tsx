@@ -23,7 +23,7 @@ import {
 } from '../../../korev-desktop/src/shared/model';
 import { usePendingAction } from '../hooks';
 import { MONO_FONT, useTheme, type Theme } from '../theme';
-import { Button } from '../ui';
+import { Button, switchTrack } from '../ui';
 import { MarkdownView } from './MarkdownView';
 
 type PermissionItem = Extract<ChatItem, { kind: 'permission' }>;
@@ -115,7 +115,12 @@ function LaneList({
         Lanes: each ticked lane gets its own linked workspace
       </Text>
       <View style={styles.lane}>
-        <Switch value disabled accessibilityLabel={here.name} />
+        <Switch
+          value
+          disabled
+          accessibilityLabel={here.name}
+          trackColor={switchTrack(theme)}
+        />
         <Text style={styles.optionLabel}>{here.name}</Text>
         <Text style={styles.optionDescription}>This workspace</Text>
       </View>
@@ -124,7 +129,7 @@ function LaneList({
           <Switch
             value={draft.split}
             accessibilityLabel={`Split off ${draft.name}`}
-            trackColor={{ true: theme.accent, false: theme.border2 }}
+            trackColor={switchTrack(theme)}
             onValueChange={(split) => update(index, { split })}
           />
           <TextInput

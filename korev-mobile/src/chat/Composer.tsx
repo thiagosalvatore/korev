@@ -13,12 +13,13 @@ import {
 } from '../../../korev-desktop/src/shared/model';
 import { insertDictation } from '../../../korev-desktop/src/shared/dictation';
 import { attempt } from '../attempt';
+import { succeeded } from '../haptics';
 import { MicButton, RecordingBar } from '../VoiceInput';
 import { useDictation } from '../dictation';
 import { useKeyboardShown, usePendingAction } from '../hooks';
 import { useConnection } from '../korev';
 import { useTheme, type Theme } from '../theme';
-import { ICON_BUTTON_ICON_SIZE, IconButton } from '../ui';
+import { CHROME_FONT_SCALE, ICON_BUTTON_ICON_SIZE, IconButton } from '../ui';
 import { composerAction } from './composerAction';
 import { COMPOSER_ROW_GAP, ComposerChips } from './ComposerChips';
 import { ComposerOptions, type SessionPatch } from './ComposerOptions';
@@ -89,6 +90,7 @@ export function Composer({
         fast: session.fast,
       }),
     );
+    succeeded(sent);
     if (sent) return;
     onSendFailed();
     setText(typed);
@@ -189,6 +191,7 @@ export function Composer({
           ) : (
             <>
               <TextInput
+                maxFontSizeMultiplier={CHROME_FONT_SCALE}
                 style={styles.input}
                 value={text}
                 onChangeText={setText}

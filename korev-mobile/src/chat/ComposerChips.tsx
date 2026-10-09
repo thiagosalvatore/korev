@@ -2,6 +2,7 @@ import { ListChecks, Paperclip, X } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -11,7 +12,7 @@ import { fileName } from '../../../korev-desktop/src/shared/format';
 import { planFileName } from '../../../korev-desktop/src/shared/message';
 import type { ChatSession } from '../../../korev-desktop/src/shared/model';
 import { useTheme, type Theme } from '../theme';
-import { ICON_BUTTON_SIZE } from '../ui';
+import { CHROME_FONT_SCALE, ICON_BUTTON_SIZE, touchSlop } from '../ui';
 import { PlanChip } from './PlanChip';
 
 const CHIP_ICON_SIZE = 14;
@@ -29,11 +30,22 @@ function RemoveButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      hitSlop={8}
+      hitSlop={touchSlop(CHIP_ICON_SIZE)}
       onPress={onPress}
     >
       <X size={CHIP_ICON_SIZE} color={theme.accentText} />
     </Pressable>
+  );
+}
+
+function confirmDiscardPlan(onDiscard: () => void) {
+  Alert.alert(
+    'Remove the handed-off plan?',
+    'Your next message will go without it.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: onDiscard },
+    ],
   );
 }
 
@@ -66,20 +78,26 @@ export function ComposerChips({
           style={styles.chipBody}
         >
           <ListChecks size={CHIP_ICON_SIZE} color={theme.accentText} />
-          <Text style={styles.label} numberOfLines={1}>
+          <Text
+            maxFontSizeMultiplier={CHROME_FONT_SCALE}
+            style={styles.label}
+            numberOfLines={1}
+          >
             Plan · {pendingPlan.from}
           </Text>
         </PlanChip>
         <RemoveButton
           label="Remove the handed-off plan"
-          onPress={onDiscardPlan}
+          onPress={() => confirmDiscardPlan(onDiscardPlan)}
         />
       </View>,
     );
   if (planMode)
     chips.push(
       <View key="plan-mode" style={styles.chip}>
-        <Text style={styles.label}>Plan mode</Text>
+        <Text maxFontSizeMultiplier={CHROME_FONT_SCALE} style={styles.label}>
+          Plan mode
+        </Text>
         <RemoveButton label="Turn off plan mode" onPress={onTurnOffPlanMode} />
       </View>,
     );
@@ -87,7 +105,11 @@ export function ComposerChips({
     chips.push(
       <View key={file} style={styles.chip}>
         <Paperclip size={CHIP_ICON_SIZE} color={theme.accentText} />
-        <Text style={styles.label} numberOfLines={1}>
+        <Text
+          maxFontSizeMultiplier={CHROME_FONT_SCALE}
+          style={styles.label}
+          numberOfLines={1}
+        >
           {fileName(file)}
         </Text>
         <RemoveButton
@@ -100,7 +122,9 @@ export function ComposerChips({
     chips.push(
       <View key="uploading" style={styles.chip}>
         <ActivityIndicator size="small" color={theme.accentText} />
-        <Text style={styles.label}>Attaching…</Text>
+        <Text maxFontSizeMultiplier={CHROME_FONT_SCALE} style={styles.label}>
+          Attaching…
+        </Text>
       </View>,
     );
   if (!chips.length) return null;

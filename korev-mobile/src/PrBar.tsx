@@ -22,9 +22,10 @@ import {
 } from '../../korev-desktop/src/shared/model';
 import { attempt } from './attempt';
 import { usePendingAction } from './hooks';
+import { succeeded } from './haptics';
 import { useConnection } from './korev';
 import { useTheme, type Theme } from './theme';
-import { Button } from './ui';
+import { Button, CHROME_FONT_SCALE, MIN_TOUCH_TARGET } from './ui';
 
 const PROMPT_STEPS: ReadonlySet<PrStep> = new Set([
   'create',
@@ -39,9 +40,13 @@ const CHECK_MARKS: Record<CheckState, string> = {
   skipped: '–',
 };
 
-function confirm(title: string, action: string): Promise<boolean> {
+function confirm(
+  title: string,
+  message: string | undefined,
+  action: string,
+): Promise<boolean> {
   return new Promise((resolve) =>
-    Alert.alert(title, undefined, [
+    Alert.alert(title, message, [
       { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
       { text: action, onPress: () => resolve(true) },
     ]),
@@ -50,12 +55,15 @@ function confirm(title: string, action: string): Promise<boolean> {
 
 async function confirmThenLeave(
   title: string,
+  message: string | undefined,
   action: string,
   failure: string,
   run: () => Promise<unknown>,
 ) {
-  if (!(await confirm(title, action))) return;
-  if (await attempt(failure, run)) router.back();
+  if (!(await confirm(title, message, action))) return;
+  const done = await attempt(failure, run);
+  succeeded(done);
+  if (done) router.back();
 }
 
 function runStep(
@@ -68,7 +76,9 @@ function runStep(
   const label = PR_STEPS[step].label;
   const failure = `Korev could not ${label.toLowerCase()}`;
   if (!pr || step === 'create')
-    return attempt(failure, () => api.createPr(workspace.id, sessionId));
+    return attempt(failure, () => api.createPr(workspace.id, sessionId)).then(
+      succeeded,
+    );
   if (step === 'fix-errors')
     return attempt(failure, () =>
       api.fixChecks(workspace.id, sessionId, pr.number),
@@ -78,12 +88,20 @@ function runStep(
       api.resolveConflicts(workspace.id, sessionId, pr.number),
     );
   if (MERGE_STEPS.has(step))
-    return confirmThenLeave(`Merge #${pr.number}?`, label, failure, () =>
-      api.mergePr(workspace.id, pr.number),
+    return confirmThenLeave(
+      `Merge #${pr.number}?`,
+      `Squash merge "${pr.title}" into ${pr.baseRefName}.`,
+      label,
+      failure,
+      () => api.mergePr(workspace.id, pr.number),
     );
   if (step === 'archive')
-    return confirmThenLeave(`Archive ${workspace.name}?`, label, failure, () =>
-      api.archiveWorkspace(workspace.id),
+    return confirmThenLeave(
+      `Archive ${workspace.name}?`,
+      undefined,
+      label,
+      failure,
+      () => api.archiveWorkspace(workspace.id),
     );
   return Linking.openURL(pr.url);
 }
@@ -117,14 +135,27 @@ export function PrBar({
     <View style={styles.panel}>
       <View style={styles.bar}>
         <Pressable
+          accessibilityRole="button"
+          accessibilityState={{
+            expanded: showChecks,
+            disabled: !pr?.checks.length,
+          }}
           style={styles.info}
           disabled={!pr?.checks.length}
           onPress={() => setShowChecks(!showChecks)}
         >
-          <Text style={styles.title} numberOfLines={1}>
+          <Text
+            maxFontSizeMultiplier={CHROME_FONT_SCALE}
+            style={styles.title}
+            numberOfLines={1}
+          >
             {pr ? `#${pr.number} ${pr.title}` : 'No pull request'}
           </Text>
-          <Text style={styles.meta} numberOfLines={1}>
+          <Text
+            maxFontSizeMultiplier={CHROME_FONT_SCALE}
+            style={styles.meta}
+            numberOfLines={1}
+          >
             {workspace.branch} → {workspace.baseBranch}
             {pr?.checks.length ? ` · ${pr.checks.length} checks` : ''}
           </Text>
@@ -148,6 +179,8 @@ export function PrBar({
         pr?.checks.map((check) => (
           <Pressable
             key={check.name}
+            accessibilityRole="link"
+            style={styles.checkRow}
             disabled={!check.url}
             onPress={() => check.url && void Linking.openURL(check.url)}
           >
@@ -176,7 +209,8 @@ function makeStyles(theme: Theme) {
     info: { flex: 1, gap: 2 },
     title: { color: theme.fg1, fontSize: 14, fontWeight: '600' },
     meta: { color: theme.fg3, fontSize: 12 },
-    check: { fontSize: 13, paddingVertical: 2 },
+    checkRow: { minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' },
+    check: { fontSize: 13 },
     message: { color: theme.dangerText, fontSize: 13, lineHeight: 19 },
   });
 }

@@ -11,7 +11,7 @@ import {
 import { ModelPicker } from '../ModelPicker';
 import { PickerButton, Sheet, SheetRow } from '../PickerSheet';
 import { useTheme } from '../theme';
-import { ICON_BUTTON_ICON_SIZE, IconButton } from '../ui';
+import { ICON_BUTTON_ICON_SIZE, IconButton, switchTrack } from '../ui';
 
 export type SessionPatch = Parameters<KorevApi['updateSession']>[1];
 
@@ -66,6 +66,7 @@ export function ComposerOptions({
           <Switch
             accessibilityLabel="Plan mode"
             value={session.planMode}
+            trackColor={switchTrack(theme)}
             onValueChange={(planMode) => onUpdate({ planMode })}
           />
         </SheetRow>
@@ -73,6 +74,7 @@ export function ComposerOptions({
           <Switch
             accessibilityLabel="Fast mode"
             value={session.fast}
+            trackColor={switchTrack(theme)}
             onValueChange={(fast) => onUpdate({ fast })}
           />
         </SheetRow>

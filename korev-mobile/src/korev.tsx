@@ -15,6 +15,7 @@ import {
   savePairing,
   type Connection,
 } from './connection';
+import { succeeded } from './haptics';
 
 interface KorevContextValue {
   loading: boolean;
@@ -42,6 +43,7 @@ export function KorevProvider({ children }: { children: ReactNode }) {
     await call(pairing, 'getState', []);
     await savePairing(pairing);
     open(pairing);
+    succeeded();
   }
 
   useEffect(() => {

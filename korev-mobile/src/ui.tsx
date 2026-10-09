@@ -43,6 +43,7 @@ export function Button({
       ]}
     >
       <Text
+        maxFontSizeMultiplier={CHROME_FONT_SCALE}
         style={[styles.label, { color: colors.text }, pending && styles.hidden]}
       >
         {label}
@@ -56,6 +57,18 @@ export function Button({
       ) : null}
     </Pressable>
   );
+}
+
+export function switchTrack(theme: Theme) {
+  return { true: theme.accent, false: theme.border2 };
+}
+
+export const CHROME_FONT_SCALE = 1.4;
+
+export const MIN_TOUCH_TARGET = 44;
+
+export function touchSlop(size: number): number {
+  return Math.max(0, (MIN_TOUCH_TARGET - size) / 2);
 }
 
 export const ICON_BUTTON_SIZE = 36;

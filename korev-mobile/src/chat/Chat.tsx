@@ -24,6 +24,7 @@ import {
   type PlanLane,
 } from '../../../korev-desktop/src/shared/model';
 import { attempt } from '../attempt';
+import { succeeded, warned } from '../haptics';
 import { useTranscript } from '../hooks';
 import { useConnection } from '../korev';
 import { useTheme, type Theme } from '../theme';
@@ -91,7 +92,7 @@ export function Chat({
   const respond = (itemId: string, response: PermissionResponse) =>
     attempt('Korev could not send your answer', () =>
       api.respondPermission(session.id, itemId, response),
-    );
+    ).then(response.allow ? succeeded : warned);
 
   const codexPlan = finishedCodexPlan(session, items, running);
 
@@ -104,7 +105,7 @@ export function Chat({
   const approvePlan = (lanes: PlanLane[]) =>
     attempt('Korev could not approve the plan', () =>
       api.approvePlan(session.id, lanes),
-    );
+    ).then(succeeded);
 
   const handoff = onHandoff
     ? () =>

@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ROW_ICON_SIZE } from './ListRow';
 import { useTheme, type Theme } from './theme';
+import { CHROME_FONT_SCALE } from './ui';
 
 const MAX_SHEET_HEIGHT = '70%';
 
@@ -103,7 +104,7 @@ export function PickerSheet({
 
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
-    backdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+    backdrop: { flex: 1, backgroundColor: theme.bgOverlay },
     sheet: {
       maxHeight: MAX_SHEET_HEIGHT,
       paddingTop: 12,
@@ -191,7 +192,11 @@ export function PickerButton({
         style={styles.pickerButton}
         onPress={() => setOpen(true)}
       >
-        <Text style={styles.pickerValue} numberOfLines={1}>
+        <Text
+          maxFontSizeMultiplier={CHROME_FONT_SCALE}
+          style={styles.pickerValue}
+          numberOfLines={1}
+        >
           {value}
         </Text>
         <ChevronDown size={ROW_ICON_SIZE} color={theme.fg4} />

@@ -7,6 +7,7 @@ import { ROW_ICON_SIZE } from './ListRow';
 import { PickerSheet } from './PickerSheet';
 import { RepoAvatar } from './RepoAvatar';
 import { useTheme, type Theme } from './theme';
+import { CHROME_FONT_SCALE } from './ui';
 
 export function RepoPicker({
   repos,
@@ -38,7 +39,11 @@ export function RepoPicker({
         onPress={() => setOpen(true)}
       >
         {picked[0] ? <RepoAvatar repo={picked[0]} /> : null}
-        <Text style={styles.label} numberOfLines={1}>
+        <Text
+          maxFontSizeMultiplier={CHROME_FONT_SCALE}
+          style={styles.label}
+          numberOfLines={1}
+        >
           {pickerLabel(picked)}
         </Text>
         <ChevronDown size={ROW_ICON_SIZE} color={theme.fg4} />

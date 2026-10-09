@@ -19,9 +19,12 @@ import { useAppState, usePendingAction } from '../../hooks';
 import { useConnection } from '../../korev';
 import { PrBar } from '../../PrBar';
 import { useTheme, type Theme } from '../../theme';
+import { CHROME_FONT_SCALE, touchSlop } from '../../ui';
 import { WorktreePending } from '../../WorktreePending';
 
 type Styles = ReturnType<typeof makeStyles>;
+
+const TAB_HEIGHT = 32;
 
 function waitingSessionIds(state: AppState): ReadonlySet<string> {
   return new Set(state.waitingSessions ?? []);
@@ -73,6 +76,7 @@ function SessionTabs({
         <Pressable
           key={session.id}
           accessibilityRole="tab"
+          hitSlop={touchSlop(TAB_HEIGHT)}
           accessibilityState={{ selected: session.id === selectedId }}
           accessibilityHint={
             waiting.has(session.id) ? 'Needs your input' : undefined
@@ -84,7 +88,11 @@ function SessionTabs({
             <ActivityIndicator size="small" color={theme.accentText} />
           ) : null}
           {waiting.has(session.id) ? <View style={styles.waitingDot} /> : null}
-          <Text style={styles.tabText} numberOfLines={1}>
+          <Text
+            maxFontSizeMultiplier={CHROME_FONT_SCALE}
+            style={styles.tabText}
+            numberOfLines={1}
+          >
             {session.title}
           </Text>
         </Pressable>
@@ -93,6 +101,7 @@ function SessionTabs({
         accessibilityRole="button"
         accessibilityState={{ busy: creating }}
         disabled={creating}
+        hitSlop={touchSlop(TAB_HEIGHT)}
         style={styles.tab}
         onPress={() =>
           void run('new-chat', () =>
@@ -103,7 +112,9 @@ function SessionTabs({
         {creating ? (
           <ActivityIndicator size="small" color={theme.accentText} />
         ) : null}
-        <Text style={styles.tabText}>+ New chat</Text>
+        <Text maxFontSizeMultiplier={CHROME_FONT_SCALE} style={styles.tabText}>
+          + New chat
+        </Text>
       </Pressable>
     </ScrollView>
   );
@@ -171,7 +182,7 @@ function makeStyles(theme: Theme) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      minHeight: 32,
+      minHeight: TAB_HEIGHT,
       maxWidth: 180,
       paddingHorizontal: 10,
       paddingVertical: 6,

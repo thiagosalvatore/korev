@@ -11,6 +11,7 @@ import { useAppState } from '../../hooks';
 import { useKorev } from '../../korev';
 import { openNewAsk, openNewWorkspace } from '../../navigation';
 import { useTheme, type Theme } from '../../theme';
+import { CHROME_FONT_SCALE } from '../../ui';
 
 const LOGO = require('../../../assets/icon.png');
 const HEADER_ICON_SIZE = 22;
@@ -31,7 +32,9 @@ function Brand({ styles }: { styles: Styles }) {
   return (
     <View style={styles.brand}>
       <Image source={LOGO} style={styles.logo} />
-      <Text style={styles.brandName}>Korev</Text>
+      <Text maxFontSizeMultiplier={CHROME_FONT_SCALE} style={styles.brandName}>
+        Korev
+      </Text>
     </View>
   );
 }
@@ -95,6 +98,7 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: theme.bgSurface },
         headerTintColor: theme.fg1,
         headerShadowVisible: false,
+        headerTitleAllowFontScaling: false,
         sceneStyle: { backgroundColor: theme.bgApp },
         tabBarStyle: {
           backgroundColor: theme.bgSurface,
@@ -122,7 +126,10 @@ export default function TabsLayout() {
             <FolderGit2 size={size} color={color} />
           ),
           tabBarBadge: waiting || undefined,
-          tabBarBadgeStyle: { backgroundColor: theme.warning },
+          tabBarBadgeStyle: {
+            backgroundColor: theme.warning,
+            color: theme.fgOnWarning,
+          },
         }}
       />
       <Tabs.Screen

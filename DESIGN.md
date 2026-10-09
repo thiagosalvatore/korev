@@ -73,3 +73,9 @@ PR, Fix errors and Resolve conflicts send a prompt to the active chat; Merge cal
   right edge. It fades in and out over 150 ms.
 - **Empty chat.** One centred `fg3` line names the agent and model: "Message Claude Code ·
   Opus 5.5".
+- **Touch targets.** Every control takes taps over at least 44 × 44 pt. A smaller control gets
+  `hitSlop` from `touchSlop(size)` in `ui.tsx` instead of growing.
+- **Text size.** Text follows the iOS text size. Controls and headers (buttons, tabs, chips,
+  pickers, the composer, the PR bar) stop growing at 1.4× (`CHROME_FONT_SCALE`), so they never
+  push the chat off the screen. Chat text and list rows scale fully.
+- **On amber.** Text on a `warning` fill, like the tab badge, uses `fgOnWarning`.

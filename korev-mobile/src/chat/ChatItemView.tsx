@@ -126,7 +126,11 @@ function Expandable({
   const styles = useStyles();
   const [open, setOpen] = useState(false);
   return (
-    <Pressable onPress={() => setOpen(!open)}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      onPress={() => setOpen(!open)}
+    >
       <Text style={[styles.dim, headerStyle]} numberOfLines={open ? 0 : 1}>
         {header}
       </Text>
