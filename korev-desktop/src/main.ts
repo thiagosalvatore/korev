@@ -142,6 +142,8 @@ function installAppMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+const shownNotices = new Set<Notification>();
+
 function showNotice(korev: () => Korev | null, notice: Notice) {
   if (!korev()?.settings().notifications || !Notification.isSupported()) return;
   const notification = new Notification({
@@ -149,9 +151,13 @@ function showNotice(korev: () => Korev | null, notice: Notice) {
     body: notice.body,
     silent: true,
   });
+  shownNotices.add(notification);
+  notification.on('close', () => shownNotices.delete(notification));
   notification.on('click', () => {
+    shownNotices.delete(notification);
     const [window] = BrowserWindow.getAllWindows();
     if (!window) return;
+    if (window.isMinimized()) window.restore();
     window.show();
     window.focus();
     window.webContents.send(
