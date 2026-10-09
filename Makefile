@@ -11,7 +11,7 @@ WHISPER_VERSION = $(shell node -p "require('./$(APP_DIR)/package-lock.json').pac
 WHISPER_BINARIES := $(DIST_ARCHS:%=$(APP_DIR)/node_modules/@fugood/node-whisper-darwin-%)
 RELEASE_NOTES = awk -v heading='\#\# [$(VERSION)]' 'index($$0, "\#\# ") == 1 { printing = index($$0, heading) == 1; next } printing' CHANGELOG.md
 
-.PHONY: package stop run package-run dist release-notes bump release testflight android-apk
+.PHONY: package stop run package-run dist release-notes bump release testflight play-internal android-apk
 
 $(APP_DIR)/node_modules: $(APP_DIR)/package-lock.json
 	cd $(APP_DIR) && npm ci
@@ -61,6 +61,9 @@ release:
 
 testflight:
 	cd korev-mobile && npx eas-cli@latest build -p ios --profile production --auto-submit --non-interactive
+
+play-internal:
+	cd korev-mobile && npx eas-cli@latest build -p android --profile production --auto-submit --non-interactive
 
 android-apk:
 	cd korev-mobile && npx eas-cli@latest build -p android --profile preview --non-interactive

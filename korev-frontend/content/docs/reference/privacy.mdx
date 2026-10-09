@@ -1,0 +1,31 @@
+---
+title: Privacy
+description: 'Korev collects no data about you. This page lists what leaves your devices and where it goes.'
+---
+
+Korev has no server and no accounts. We do not collect, store or sell data about you. Korev for Mac and the Korev phone app contain no analytics, no advertising and no crash reporting.
+
+## The phone app
+
+The phone app talks only to Korev on your own Mac. It reaches the Mac through your own [Tailscale](https://tailscale.com) network, and Tailscale encrypts this traffic. See [Remote access](./remote-access.mdx).
+
+- **Camera.** The app uses the camera only to scan the pairing code that Korev shows on your Mac. It does not keep or send the image.
+- **Microphone.** When you tap the microphone, the app records what you say and sends the recording to your Mac. The Mac turns it into text by itself, with no online service, and then deletes the recording. See [Voice input](./composer.mdx#voice-input).
+- **Photos.** When you attach a photo to a message, the app sends it to your Mac for your agent.
+- **Pairing code.** The app keeps the address of your Mac and its access token in the phone's secure storage.
+- **Notifications.** If you allow notifications, the phone gives your Mac a push token. When an agent needs you, your Mac sends the alert through Expo's push service, which passes it to Apple or Google to show on the phone. The alert contains the workspace name and the chat title or an error message. Korev does not run this service and keeps no copy.
+- **Demo.** The demo runs inside the app and sends nothing anywhere.
+
+## Korev for Mac
+
+Your code, chats and settings stay on your Mac. Korev for Mac connects to these services, under your own accounts:
+
+- The coding agents you use, such as Claude Code or Codex. They send your prompts and code to their providers, under the providers' own privacy policies.
+- GitHub, through `git` and `gh`, for branches and pull requests.
+- GitHub releases, to check for updates.
+- Tailscale, when you turn on remote access.
+- Expo, or the [ntfy](https://ntfy.sh) topic you set, when Korev sends an alert to your phone.
+
+## Contact
+
+For questions about privacy, [open an issue on GitHub](https://github.com/thiagosalvatore/korev/issues).

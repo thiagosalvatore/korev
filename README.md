@@ -38,6 +38,8 @@ Open the app with Expo Go on your phone, then pair it from Settings → Remote a
 
 `make testflight` builds the iOS app with [EAS](https://expo.dev/eas) and uploads it to TestFlight. The first time, run `npx eas-cli@latest login`, then run the same build without `--non-interactive` from `korev-mobile`, so EAS can sign in to Apple and create the signing certificate and provisioning profile.
 
+`make play-internal` builds the Android app bundle and uploads it to the internal testing track on Google Play. Before the first run, upload one bundle by hand in the Play Console, because Google Play accepts uploads from the API only for an app that already has a release. Then add a Google service account key with `npx eas-cli@latest credentials -p android`, under **Google Service Account**, so EAS can upload for you.
+
 `make android-apk` builds an Android APK and prints a link to install it. The first time, run the same build without `--non-interactive`, so EAS can create the Android keystore.
 
 ## Run the landing page
