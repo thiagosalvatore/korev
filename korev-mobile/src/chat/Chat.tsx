@@ -93,6 +93,7 @@ export function Chat({
             <ChatItemView
               item={item}
               sessionId={session.id}
+              running={running}
               onRespond={respond}
               onHandoff={handoff}
             />

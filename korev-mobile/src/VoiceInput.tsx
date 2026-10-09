@@ -15,6 +15,7 @@ import { attempt } from './attempt';
 import type { Dictation } from './dictation';
 import { useConnection } from './korev';
 import { useTheme, type Theme } from './theme';
+import { ICON_BUTTON_SIZE, IconButton } from './ui';
 
 const BAR_COUNT = 48;
 const SILENT_DB = -60;
@@ -60,30 +61,35 @@ export function MicButton({
 
   if (!status) return null;
   if (status.status === 'downloading')
-    return <Text style={styles.progress}>{status.progress}%</Text>;
-  if (dictation.phase === 'transcribing') return <ActivityIndicator />;
+    return (
+      <View style={styles.slot}>
+        <Text style={styles.progress}>{status.progress}%</Text>
+      </View>
+    );
+  if (dictation.phase === 'transcribing')
+    return (
+      <View style={styles.slot}>
+        <ActivityIndicator />
+      </View>
+    );
   if (dictation.phase === 'recording')
     return (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Stop and insert text"
-        style={styles.done}
+      <IconButton
+        label="Stop and insert text"
+        icon={<Check size={ICON_SIZE} color={theme.fgOnAccent} />}
+        background={theme.danger}
         onPress={dictation.done}
-      >
-        <Check size={ICON_SIZE} color={theme.fgOnAccent} />
-      </Pressable>
+      />
     );
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Voice input"
-      hitSlop={8}
+    <IconButton
+      label="Voice input"
+      icon={<Mic size={ICON_SIZE} color={theme.fg2} />}
+      background={theme.bgActive}
       onPress={
         status.status === 'ready' ? dictation.start : () => void downloadModel()
       }
-    >
-      <Mic size={ICON_SIZE} color={theme.fg2} />
-    </Pressable>
+    />
   );
 }
 
@@ -166,13 +172,11 @@ function makeStyles(theme: Theme) {
     },
     waveBar: { width: 3, borderRadius: 2, backgroundColor: theme.fg3 },
     progress: { color: theme.fg3, fontSize: 13 },
-    done: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+    slot: {
+      width: ICON_BUTTON_SIZE,
+      height: ICON_BUTTON_SIZE,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.danger,
     },
   });
 }

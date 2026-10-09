@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Keyboard, Platform } from 'react-native';
 import {
   upsertChatItem,
   type AppState,
@@ -86,4 +87,22 @@ export function useModelChoice(settings: Settings) {
     setModel(choice.id);
   }
   return { agent, model, effort, choose };
+}
+
+const KEYBOARD_SHOW =
+  Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+const KEYBOARD_HIDE =
+  Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+export function useKeyboardShown(): boolean {
+  const [shown, setShown] = useState(Keyboard.isVisible());
+  useEffect(() => {
+    const show = Keyboard.addListener(KEYBOARD_SHOW, () => setShown(true));
+    const hide = Keyboard.addListener(KEYBOARD_HIDE, () => setShown(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return shown;
 }

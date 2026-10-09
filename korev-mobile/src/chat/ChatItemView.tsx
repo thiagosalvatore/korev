@@ -1,6 +1,7 @@
 import { FileText, Paperclip } from 'lucide-react-native';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -141,20 +142,31 @@ function Expandable({
 function ToolLine({
   item,
   sessionId,
+  running,
 }: {
   item: ItemOf<'tool'>;
   sessionId: string;
+  running: boolean;
 }) {
-  const styles = useStyles();
+  const theme = useTheme();
+  const styles = makeStyles(theme);
   const body = [item.detail, item.output].filter(Boolean).join('\n\n');
   const readsImage = item.name === READ_TOOL && imageType(item.summary);
+  const pending = running && item.output === null;
   return (
     <View style={styles.tool}>
-      <Expandable
-        header={`${item.name}  ${item.summary}`}
-        body={body}
-        headerStyle={item.failed ? styles.failed : undefined}
-      />
+      <View style={styles.toolHeader}>
+        {pending ? (
+          <ActivityIndicator size="small" color={theme.accentText} />
+        ) : null}
+        <View style={styles.toolBody}>
+          <Expandable
+            header={`${item.name}  ${item.summary}`}
+            body={body}
+            headerStyle={item.failed ? styles.failed : undefined}
+          />
+        </View>
+      </View>
       {readsImage && item.output !== null ? (
         <ImageThumbnail sessionId={sessionId} path={item.summary} />
       ) : null}
@@ -215,11 +227,13 @@ function ResultLine({ item }: { item: ItemOf<'result'> }) {
 export function ChatItemView({
   item,
   sessionId,
+  running,
   onRespond,
   onHandoff,
 }: {
   item: ChatItem;
   sessionId: string;
+  running: boolean;
   onRespond(itemId: string, response: PermissionResponse): void;
   onHandoff?(): void;
 }) {
@@ -232,7 +246,7 @@ export function ChatItemView({
     case 'thinking':
       return <Expandable header="Thinking…" body={item.text} />;
     case 'tool':
-      return <ToolLine item={item} sessionId={sessionId} />;
+      return <ToolLine item={item} sessionId={sessionId} running={running} />;
     case 'todos':
       return <TodoList item={item} />;
     case 'result':
@@ -265,6 +279,8 @@ function makeStyles(theme: Theme) {
       fontSize: 12,
     },
     tool: { gap: 6 },
+    toolHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    toolBody: { flex: 1 },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     chip: {
       flexDirection: 'row',

@@ -1,4 +1,4 @@
-import { ListChecks, X } from 'lucide-react-native';
+import { ArrowUp, ListChecks, Square, X } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   Alert,
@@ -21,11 +21,15 @@ import { planFileName } from '../../../korev-desktop/src/shared/message';
 import { attempt } from '../attempt';
 import { MicButton, RecordingBar } from '../VoiceInput';
 import { useDictation } from '../dictation';
+import { useKeyboardShown } from '../hooks';
 import { useConnection } from '../korev';
-import { ModelPicker } from '../ModelPicker';
 import { useTheme, type Theme } from '../theme';
-import { Button } from '../ui';
+import { ICON_BUTTON_ICON_SIZE, IconButton } from '../ui';
+import { composerAction } from './composerAction';
+import { ComposerOptions } from './ComposerOptions';
 import { PlanChip } from './PlanChip';
+
+const BAR_PADDING = 8;
 
 export function Composer({
   state,
@@ -42,6 +46,10 @@ export function Composer({
   const theme = useTheme();
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
+  const keyboardShown = useKeyboardShown();
+  const bottomPadding = keyboardShown
+    ? BAR_PADDING
+    : Math.max(insets.bottom, BAR_PADDING);
   const [text, setText] = useState('');
   const running = state.runningSessions.includes(session.id);
   const { pendingPlan } = session;
@@ -50,6 +58,12 @@ export function Composer({
   );
   const dictating = dictation.phase !== 'idle';
   const canSend = Boolean(text.trim() || pendingPlan) && !dictating;
+  const action = composerAction({
+    canSend,
+    running,
+    dictating,
+    voice: Boolean(state.dictation),
+  });
 
   async function send() {
     const message = text.trim();
@@ -92,71 +106,103 @@ export function Composer({
   const stop = () =>
     void attempt('Korev could not stop the agent', () => api.stop(session.id));
 
+  function actionButton() {
+    if (action === 'mic')
+      return <MicButton status={state.dictation} dictation={dictation} />;
+    if (action === 'stop')
+      return (
+        <IconButton
+          label="Stop the agent"
+          icon={
+            <Square
+              size={ICON_BUTTON_ICON_SIZE / 2}
+              color={theme.bgApp}
+              fill={theme.bgApp}
+            />
+          }
+          background={theme.fg1}
+          onPress={stop}
+        />
+      );
+    return (
+      <IconButton
+        label="Send"
+        icon={<ArrowUp size={ICON_BUTTON_ICON_SIZE} color={theme.fgOnAccent} />}
+        background={theme.accent}
+        disabled={!canSend}
+        onPress={() => void send()}
+      />
+    );
+  }
+
   return (
-    <View
-      style={[
-        styles.composer,
-        session.planMode && styles.planMode,
-        { marginBottom: insets.bottom + 8 },
-      ]}
-    >
-      {pendingPlan ? (
-        <View style={styles.chip}>
-          <PlanChip
-            name={planFileName(pendingPlan.plan)}
-            markdown={pendingPlan.plan}
-            style={styles.chipPreview}
-          >
-            <ListChecks size={14} color={theme.accentText} />
-            <Text style={styles.chipLabel} numberOfLines={1}>
-              Plan · {pendingPlan.from}
-            </Text>
-          </PlanChip>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Remove the handed-off plan"
-            hitSlop={8}
-            onPress={discardPendingPlan}
-          >
-            <X size={14} color={theme.accentText} />
-          </Pressable>
+    <View style={[styles.composer, { paddingBottom: bottomPadding }]}>
+      {pendingPlan || session.planMode ? (
+        <View style={styles.chips}>
+          {pendingPlan ? (
+            <View style={styles.chip}>
+              <PlanChip
+                name={planFileName(pendingPlan.plan)}
+                markdown={pendingPlan.plan}
+                style={styles.chipPreview}
+              >
+                <ListChecks size={14} color={theme.accentText} />
+                <Text style={styles.chipLabel} numberOfLines={1}>
+                  Plan · {pendingPlan.from}
+                </Text>
+              </PlanChip>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Remove the handed-off plan"
+                hitSlop={8}
+                onPress={discardPendingPlan}
+              >
+                <X size={14} color={theme.accentText} />
+              </Pressable>
+            </View>
+          ) : null}
+          {session.planMode ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Turn off plan mode"
+              hitSlop={8}
+              style={styles.chip}
+              onPress={togglePlanMode}
+            >
+              <Text style={styles.chipLabel}>Plan mode</Text>
+              <X size={14} color={theme.accentText} />
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
-      {dictating ? (
-        <RecordingBar dictation={dictation} />
-      ) : (
-        <TextInput
-          style={styles.input}
-          value={text}
-          onChangeText={setText}
-          placeholder={placeholder(running, Boolean(pendingPlan))}
-          placeholderTextColor={theme.fg4}
-          multiline
+      <View style={styles.row}>
+        <ComposerOptions
+          state={state}
+          session={session}
+          onTogglePlanMode={togglePlanMode}
+          onChangeModel={changeModel}
         />
-      )}
-      <View style={styles.toolbar}>
-        <Pressable
-          accessibilityRole="switch"
-          accessibilityState={{ checked: session.planMode }}
-          onPress={togglePlanMode}
+        <View
+          style={[
+            styles.pill,
+            dictating && styles.pillRecording,
+            session.planMode && styles.planMode,
+          ]}
         >
-          <Text style={session.planMode ? styles.planOn : styles.meta}>
-            Plan
-          </Text>
-        </Pressable>
-        <View style={styles.model}>
-          <ModelPicker
-            state={state}
-            agent={session.agent}
-            model={session.model}
-            onChange={changeModel}
-          />
+          {dictating ? (
+            <RecordingBar dictation={dictation} />
+          ) : (
+            <TextInput
+              style={styles.input}
+              value={text}
+              onChangeText={setText}
+              placeholder={placeholder(running, Boolean(pendingPlan))}
+              placeholderTextColor={theme.fg4}
+              multiline
+            />
+          )}
         </View>
-        {running ? (
-          <Button label="Stop" variant="secondary" onPress={stop} />
-        ) : null}
-        <MicButton status={state.dictation} dictation={dictation} />
-        <Button label="Send" disabled={!canSend} onPress={() => void send()} />
+        {actionButton()}
       </View>
     </View>
   );
@@ -164,25 +210,23 @@ export function Composer({
 
 function placeholder(running: boolean, hasPendingPlan: boolean): string {
   if (hasPendingPlan) return PENDING_PLAN_PLACEHOLDER;
-  return running ? 'Steer the agent or queue a message' : 'Ask';
+  return running ? 'Steer or queue a message' : 'Message';
 }
 
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
     composer: {
-      marginHorizontal: 12,
-      padding: 10,
-      gap: 8,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.border2,
+      gap: 6,
+      paddingTop: BAR_PADDING,
+      paddingHorizontal: BAR_PADDING,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.border1,
       backgroundColor: theme.bgSurface,
     },
-    planMode: { borderColor: theme.accent, borderStyle: 'dashed' },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 44 },
     chip: {
       flexDirection: 'row',
       alignItems: 'center',
-      alignSelf: 'flex-start',
       gap: 6,
       maxWidth: '100%',
       paddingHorizontal: 8,
@@ -197,10 +241,26 @@ function makeStyles(theme: Theme) {
       gap: 6,
     },
     chipLabel: { flexShrink: 1, color: theme.accentText, fontSize: 13 },
-    input: { maxHeight: 160, color: theme.fg1, fontSize: 15 },
-    toolbar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    meta: { color: theme.fg3, fontSize: 13 },
-    planOn: { color: theme.accentText, fontSize: 13, fontWeight: '600' },
-    model: { flex: 1 },
+    row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+    pill: {
+      flex: 1,
+      minHeight: 36,
+      justifyContent: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.border2,
+      backgroundColor: theme.bgApp,
+    },
+    pillRecording: { paddingVertical: 1 },
+    planMode: { borderColor: theme.accent, borderStyle: 'dashed' },
+    input: {
+      maxHeight: 140,
+      padding: 0,
+      color: theme.fg1,
+      fontSize: 15,
+      lineHeight: 20,
+    },
   });
 }

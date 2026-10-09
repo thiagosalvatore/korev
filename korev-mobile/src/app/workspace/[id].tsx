@@ -36,6 +36,7 @@ function SessionTabs({
   styles: Styles;
 }) {
   const { api } = useConnection();
+  const theme = useTheme();
 
   async function newChat() {
     const session = await api.newSession(
@@ -60,6 +61,9 @@ function SessionTabs({
           style={[styles.tab, session.id === selectedId && styles.tabSelected]}
           onPress={() => onSelect(session.id)}
         >
+          {state.runningSessions.includes(session.id) ? (
+            <ActivityIndicator size="small" color={theme.accentText} />
+          ) : null}
           <Text style={styles.tabText} numberOfLines={1}>
             {session.title}
           </Text>
@@ -136,12 +140,16 @@ function makeStyles(theme: Theme) {
     },
     tabs: { paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
     tab: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      minHeight: 32,
       maxWidth: 180,
       paddingHorizontal: 10,
       paddingVertical: 6,
       borderRadius: 6,
     },
     tabSelected: { backgroundColor: theme.bgActive },
-    tabText: { color: theme.fg2, fontSize: 13 },
+    tabText: { flexShrink: 1, color: theme.fg2, fontSize: 13 },
   });
 }
