@@ -1,6 +1,3 @@
-import { ChevronDown } from 'lucide-react-native';
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
 import {
   modelChoices,
   modelLabel,
@@ -12,9 +9,7 @@ import {
   type AppState,
   type ModelChoice,
 } from '../../korev-desktop/src/shared/model';
-import { ROW_ICON_SIZE } from './ListRow';
-import { PickerSheet } from './PickerSheet';
-import { useTheme, type Theme } from './theme';
+import { PickerButton } from './PickerSheet';
 
 export function ModelPicker({
   state,
@@ -27,61 +22,31 @@ export function ModelPicker({
   model: string;
   onChange: (choice: ModelChoice) => void;
 }) {
-  const theme = useTheme();
-  const styles = makeStyles(theme);
-  const [open, setOpen] = useState(false);
   const choices = modelChoices(state, agent);
   const currentKey = loadoutKey(agent, model);
 
   function pick(key: string) {
-    setOpen(false);
     const choice = choices.find(
       (entry) => loadoutKey(entry.agent, entry.id) === key,
     );
-    if (choice && key !== currentKey) onChange(choice);
+    if (choice) onChange(choice);
   }
 
   return (
-    <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Model"
-        hitSlop={8}
-        style={styles.button}
-        onPress={() => setOpen(true)}
-      >
-        <Text style={styles.label} numberOfLines={1}>
-          {modelLabel(state, { agent, model })}
-        </Text>
-        <ChevronDown size={ROW_ICON_SIZE} color={theme.fg4} />
-      </Pressable>
-      <PickerSheet
-        title="Choose a model"
-        visible={open}
-        options={choices.map((choice) => {
-          const key = loadoutKey(choice.agent, choice.id);
-          return {
-            key,
-            label: choice.label,
-            detail: AGENT_LABELS[choice.agent],
-            selected: key === currentKey,
-          };
-        })}
-        onSelect={pick}
-        onClose={() => setOpen(false)}
-      />
-    </>
+    <PickerButton
+      label="Model"
+      value={modelLabel(state, { agent, model })}
+      title="Choose a model"
+      options={choices.map((choice) => {
+        const key = loadoutKey(choice.agent, choice.id);
+        return {
+          key,
+          label: choice.label,
+          detail: AGENT_LABELS[choice.agent],
+          selected: key === currentKey,
+        };
+      })}
+      onSelect={pick}
+    />
   );
-}
-
-function makeStyles(theme: Theme) {
-  return StyleSheet.create({
-    button: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flexShrink: 1,
-      gap: 4,
-    },
-    label: { flexShrink: 1, color: theme.fg3, fontSize: 13 },
-  });
 }

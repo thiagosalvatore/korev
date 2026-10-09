@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { useTheme, type Theme } from './theme';
 
@@ -42,7 +43,48 @@ export function Button({
   );
 }
 
+export const ICON_BUTTON_SIZE = 36;
+export const ICON_BUTTON_ICON_SIZE = 20;
+
+export function IconButton({
+  label,
+  icon,
+  background,
+  onPress,
+  disabled = false,
+}: {
+  label: string;
+  icon: ReactNode;
+  background: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      disabled={disabled}
+      hitSlop={6}
+      onPress={onPress}
+      style={[
+        styles.iconButton,
+        { backgroundColor: background },
+        disabled && styles.disabled,
+      ]}
+    >
+      {icon}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  iconButton: {
+    width: ICON_BUTTON_SIZE,
+    height: ICON_BUTTON_SIZE,
+    borderRadius: ICON_BUTTON_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   button: {
     alignItems: 'center',
     paddingHorizontal: 14,

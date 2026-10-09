@@ -31,6 +31,7 @@ export const REMOTE_METHODS = [
   'listFiles',
   'readFile',
   'readImage',
+  'saveAttachment',
   'prStatuses',
   'prThreads',
   'createPr',

@@ -4,10 +4,17 @@ Korev shows the section of each version in its "What's new" window, so write for
 
 ## [Unreleased]
 
+- You can choose repositories for a new workspace with the keyboard. When you press ⌘N and no repository is chosen, the repository list opens with the search box ready. Type to filter, use ↑ and ↓ to move, and press Space to check or uncheck a repository. Enter closes the list and moves you to the message box. If no repository is checked yet, Enter chooses the highlighted one.
+
+## [0.8.0] - 2026-10-09
+
+The grid view shows chats and terminals from several workspaces side by side.
+
 - The new grid view shows chats and terminals from different workspaces side by side, in a 2×1, 1×2 or 2×2 layout. Click **Grid** in the sidebar or press ⌘G. Drag a workspace from the sidebar onto a pane, or click **Choose workspace** in an empty pane. The menu in the pane header switches the pane to another chat or terminal, or opens a new one. **Open in full view** on a pane opens that tab in its workspace, and ⌘G brings you back to the grid. The sidebar highlights the workspace of the pane you work in.
 - A grid pane can show an Ask chat. Drag one from the sidebar onto a pane, or click **Ask** in an empty pane and start a new ask or pick a recent one.
 - You can ask a question without a repository. Clear all repositories in the Ask picker, and the agent answers in an empty folder.
-- You can choose repositories for a new workspace with the keyboard. When you press ⌘N and no repository is chosen, the repository list opens with the search box ready. Type to filter, use ↑ and ↓ to move, and press Space to check or uncheck a repository. Enter closes the list and moves you to the message box. If no repository is checked yet, Enter chooses the highlighted one.
+- When you create a workspace from a pull request whose branch is already checked out in another worktree, Korev uses that worktree. Before, this failed with git's "already used by worktree" error.
+- The **Pair a device** dialog closes when your phone connects, and Korev shows the name of the new device.
 
 ## [0.7.0] - 2026-10-08
 

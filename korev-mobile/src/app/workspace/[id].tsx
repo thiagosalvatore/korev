@@ -7,9 +7,10 @@ import {
   StyleSheet,
   Text,
 } from 'react-native';
-import type {
-  AppState,
-  Workspace,
+import {
+  hasWorktree,
+  type AppState,
+  type Workspace,
 } from '../../../../korev-desktop/src/shared/model';
 import { attempt } from '../../attempt';
 import { Chat } from '../../chat/Chat';
@@ -17,6 +18,7 @@ import { useAppState } from '../../hooks';
 import { useConnection } from '../../korev';
 import { PrBar } from '../../PrBar';
 import { useTheme, type Theme } from '../../theme';
+import { WorktreePending } from '../../WorktreePending';
 
 type Styles = ReturnType<typeof makeStyles>;
 
@@ -34,6 +36,7 @@ function SessionTabs({
   styles: Styles;
 }) {
   const { api } = useConnection();
+  const theme = useTheme();
 
   async function newChat() {
     const session = await api.newSession(
@@ -58,6 +61,9 @@ function SessionTabs({
           style={[styles.tab, session.id === selectedId && styles.tabSelected]}
           onPress={() => onSelect(session.id)}
         >
+          {state.runningSessions.includes(session.id) ? (
+            <ActivityIndicator size="small" color={theme.accentText} />
+          ) : null}
           <Text style={styles.tabText} numberOfLines={1}>
             {session.title}
           </Text>
@@ -86,6 +92,14 @@ export default function WorkspaceScreen() {
   const workspace = state.workspaces.find((entry) => entry.id === id);
   if (!workspace)
     return <Text style={styles.empty}>This workspace no longer exists.</Text>;
+  const runtime = state.runtime[workspace.id];
+  if (runtime && !hasWorktree(runtime))
+    return (
+      <>
+        <Stack.Screen options={{ title: workspace.name }} />
+        <WorktreePending workspace={workspace} runtime={runtime} />
+      </>
+    );
   const session =
     workspace.sessions.find((entry) => entry.id === selectedId) ??
     workspace.sessions.at(-1);
@@ -93,11 +107,7 @@ export default function WorkspaceScreen() {
   return (
     <>
       <Stack.Screen options={{ title: workspace.name }} />
-      <PrBar
-        workspace={workspace}
-        runtime={state.runtime[workspace.id]}
-        sessionId={session?.id}
-      />
+      <PrBar workspace={workspace} runtime={runtime} sessionId={session?.id} />
       <SessionTabs
         state={state}
         workspace={workspace}
@@ -130,12 +140,16 @@ function makeStyles(theme: Theme) {
     },
     tabs: { paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
     tab: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      minHeight: 32,
       maxWidth: 180,
       paddingHorizontal: 10,
       paddingVertical: 6,
       borderRadius: 6,
     },
     tabSelected: { backgroundColor: theme.bgActive },
-    tabText: { color: theme.fg2, fontSize: 13 },
+    tabText: { flexShrink: 1, color: theme.fg2, fontSize: 13 },
   });
 }

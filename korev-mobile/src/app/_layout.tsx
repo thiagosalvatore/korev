@@ -14,6 +14,7 @@ function Screens() {
         screenOptions={{
           headerStyle: { backgroundColor: theme.bgSurface },
           headerTintColor: theme.fg1,
+          headerBackButtonDisplayMode: 'minimal',
           contentStyle: { backgroundColor: theme.bgApp },
         }}
       >

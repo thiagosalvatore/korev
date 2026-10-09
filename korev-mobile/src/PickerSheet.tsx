@@ -1,5 +1,5 @@
-import { Check } from 'lucide-react-native';
-import type { ReactNode } from 'react';
+import { Check, ChevronDown } from 'lucide-react-native';
+import { useState, type ReactNode } from 'react';
 import {
   Modal,
   Pressable,
@@ -22,21 +22,18 @@ export interface PickerOption {
   selected: boolean;
 }
 
-export function PickerSheet({
+export function Sheet({
   title,
   visible,
-  options,
-  onSelect,
   onClose,
+  children,
 }: {
   title: string;
   visible: boolean;
-  options: PickerOption[];
-  onSelect: (key: string) => void;
   onClose: () => void;
+  children: ReactNode;
 }) {
-  const theme = useTheme();
-  const styles = makeStyles(theme);
+  const styles = makeStyles(useTheme());
   const insets = useSafeAreaInsets();
   return (
     <Modal
@@ -52,33 +49,55 @@ export function PickerSheet({
       />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + 8 }]}>
         <Text style={styles.title}>{title}</Text>
-        <ScrollView>
-          {options.map((option) => (
-            <Pressable
-              key={option.key}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: option.selected }}
-              accessibilityLabel={option.label}
-              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-              onPress={() => onSelect(option.key)}
-            >
-              {option.icon}
-              <Text style={styles.label} numberOfLines={1}>
-                {option.label}
-              </Text>
-              {option.detail ? (
-                <Text style={styles.detail}>{option.detail}</Text>
-              ) : null}
-              <View style={styles.check}>
-                {option.selected ? (
-                  <Check size={ROW_ICON_SIZE} color={theme.accentText} />
-                ) : null}
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
+        {children}
       </View>
     </Modal>
+  );
+}
+
+export function PickerSheet({
+  title,
+  visible,
+  options,
+  onSelect,
+  onClose,
+}: {
+  title: string;
+  visible: boolean;
+  options: PickerOption[];
+  onSelect: (key: string) => void;
+  onClose: () => void;
+}) {
+  const theme = useTheme();
+  const styles = makeStyles(theme);
+  return (
+    <Sheet title={title} visible={visible} onClose={onClose}>
+      <ScrollView>
+        {options.map((option) => (
+          <Pressable
+            key={option.key}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: option.selected }}
+            accessibilityLabel={option.label}
+            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+            onPress={() => onSelect(option.key)}
+          >
+            {option.icon}
+            <Text style={styles.label} numberOfLines={1}>
+              {option.label}
+            </Text>
+            {option.detail ? (
+              <Text style={styles.detail}>{option.detail}</Text>
+            ) : null}
+            <View style={styles.check}>
+              {option.selected ? (
+                <Check size={ROW_ICON_SIZE} color={theme.accentText} />
+              ) : null}
+            </View>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </Sheet>
   );
 }
 
@@ -112,5 +131,78 @@ function makeStyles(theme: Theme) {
     label: { flex: 1, color: theme.fg1, fontSize: 15 },
     detail: { color: theme.fg4, fontSize: 13 },
     check: { width: ROW_ICON_SIZE },
+    pickerButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 1,
+      gap: 4,
+    },
+    pickerValue: { flexShrink: 1, color: theme.fg3, fontSize: 13 },
   });
+}
+
+export function SheetRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  const styles = makeStyles(useTheme());
+  return (
+    <View style={styles.row}>
+      <Text style={styles.label} numberOfLines={1}>
+        {label}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+export function PickerButton({
+  label,
+  value,
+  title,
+  options,
+  onSelect,
+}: {
+  label: string;
+  value: string;
+  title: string;
+  options: PickerOption[];
+  onSelect: (key: string) => void;
+}) {
+  const theme = useTheme();
+  const styles = makeStyles(theme);
+  const [open, setOpen] = useState(false);
+
+  function pick(key: string) {
+    setOpen(false);
+    const current = options.find((option) => option.selected);
+    if (key !== current?.key) onSelect(key);
+  }
+
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        hitSlop={8}
+        style={styles.pickerButton}
+        onPress={() => setOpen(true)}
+      >
+        <Text style={styles.pickerValue} numberOfLines={1}>
+          {value}
+        </Text>
+        <ChevronDown size={ROW_ICON_SIZE} color={theme.fg4} />
+      </Pressable>
+      <PickerSheet
+        title={title}
+        visible={open}
+        options={options}
+        onSelect={pick}
+        onClose={() => setOpen(false)}
+      />
+    </>
+  );
 }

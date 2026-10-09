@@ -71,6 +71,22 @@ describe('remote server', () => {
     expect(transcribe).toHaveBeenCalledWith(recording);
   });
 
+  it('accepts a photo attached on the phone', async () => {
+    const saveAttachment = vi.fn(() => ({ ok: true, value: 'photo.jpg' }));
+    const base = await start({ saveAttachment });
+    const photo = 'a'.repeat(6 * 1024 * 1024);
+    const response = await fetch(`${base}/call`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({
+        method: 'saveAttachment',
+        args: ['ws-1', 'photo.jpg', photo],
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(saveAttachment).toHaveBeenCalledWith('ws-1', 'photo.jpg', photo);
+  });
+
   it('streams remote events and leaves out the rest', async () => {
     const base = await start({});
     const response = await fetch(`${base}/events`, {
