@@ -4,10 +4,10 @@ import * as SecureStore from 'expo-secure-store';
 import type {
   KorevApi,
   KorevBridge,
-  KorevEvents,
   Unsubscribe,
 } from '../../korev-desktop/src/shared/api';
 import type { RemotePairing } from '../../korev-desktop/src/shared/model';
+import { apiFor, createEventListeners } from './bridge';
 import { parsePairing } from './pairing';
 import { createSseParser, type ServerEvent } from './sse';
 
@@ -93,20 +93,11 @@ function createWatchdog(onTimeout: () => void) {
 
 type Watchdog = ReturnType<typeof createWatchdog>;
 
-function apiFor(bridge: KorevBridge): KorevApi {
-  return new Proxy({} as KorevApi, {
-    get:
-      (_target, method: string) =>
-      (...args: unknown[]) =>
-        bridge.call(method, args),
-  });
-}
-
 export function connect(
   pairing: RemotePairing,
   onUnauthorized: () => void,
 ): Connection {
-  const listeners = new Map<string, Set<(payload: unknown) => void>>();
+  const events = createEventListeners();
   const connectListeners = new Set<() => void>();
   const statusListeners = new Set<() => void>();
   let current: ConnectionStatus = { state: 'connecting', attempting: false };
@@ -116,8 +107,7 @@ export function connect(
   let closed = false;
 
   function dispatch({ event, data }: ServerEvent) {
-    const payload: unknown = JSON.parse(data);
-    listeners.get(event)?.forEach((listener) => listener(payload));
+    events.emit(event, JSON.parse(data));
   }
 
   function setStatus(next: Partial<ConnectionStatus>) {
@@ -206,16 +196,7 @@ export function connect(
         throw error;
       }
     },
-    on<E extends keyof KorevEvents>(
-      event: E,
-      listener: (payload: KorevEvents[E]) => void,
-    ) {
-      const set = listeners.get(event) ?? new Set();
-      listeners.set(event, set);
-      const untyped = listener as (payload: unknown) => void;
-      set.add(untyped);
-      return () => set.delete(untyped);
-    },
+    on: events.on,
   };
 
   return {

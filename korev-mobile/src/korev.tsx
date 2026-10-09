@@ -15,6 +15,7 @@ import {
   savePairing,
   type Connection,
 } from './connection';
+import { createDemoConnection } from './demo';
 import { succeeded } from './haptics';
 import { registerForPush, unregisterFromPush } from './push';
 
@@ -25,8 +26,10 @@ interface KorevContextValue {
   loading: boolean;
   connection: Connection | null;
   pairing: RemotePairing | null;
+  demo: boolean;
   unpairReason: string | null;
   pair(pairing: RemotePairing, signal?: AbortSignal): Promise<void>;
+  startDemo(): void;
   unpair(): Promise<void>;
 }
 
@@ -37,6 +40,7 @@ export function KorevProvider({ children }: { children: ReactNode }) {
   const [connection, setConnection] = useState<Connection | null>(null);
   const [pairing, setPairing] = useState<RemotePairing | null>(null);
   const [unpairReason, setUnpairReason] = useState<string | null>(null);
+  const [demo, setDemo] = useState(false);
 
   async function unpair() {
     const saved = await loadPairing();
@@ -44,6 +48,13 @@ export function KorevProvider({ children }: { children: ReactNode }) {
     await clearPairing();
     setConnection(null);
     setPairing(null);
+    setDemo(false);
+  }
+
+  function startDemo() {
+    setUnpairReason(null);
+    setDemo(true);
+    setConnection(createDemoConnection());
   }
 
   async function revoked() {
@@ -85,7 +96,16 @@ export function KorevProvider({ children }: { children: ReactNode }) {
 
   return (
     <KorevContext.Provider
-      value={{ loading, connection, pairing, unpairReason, pair, unpair }}
+      value={{
+        loading,
+        connection,
+        pairing,
+        demo,
+        unpairReason,
+        pair,
+        startDemo,
+        unpair,
+      }}
     >
       {children}
     </KorevContext.Provider>

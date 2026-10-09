@@ -138,7 +138,7 @@ function Scanner({
 }
 
 export default function PairScreen() {
-  const { pair, unpairReason } = useKorev();
+  const { pair, startDemo, unpairReason } = useKorev();
   const theme = useTheme();
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
@@ -214,7 +214,13 @@ export default function PairScreen() {
   const message = error ?? unpairReason;
 
   if (mode === 'welcome')
-    return <Welcome message={message} onStart={() => setMode('setup')} />;
+    return (
+      <Welcome
+        message={message}
+        onStart={() => setMode('setup')}
+        onTryDemo={startDemo}
+      />
+    );
 
   return (
     <KeyboardAvoidingView

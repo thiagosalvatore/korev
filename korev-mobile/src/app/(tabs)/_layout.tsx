@@ -32,17 +32,36 @@ function showPairing(
   ]);
 }
 
+function showDemo(leave: () => Promise<void>) {
+  Alert.alert(
+    'This is the demo',
+    'Nothing here runs on a real Mac. Pair your Mac to see your own agents.',
+    [
+      { text: 'Pair your Mac', onPress: () => void leave() },
+      { text: 'Keep exploring', style: 'cancel' },
+    ],
+  );
+}
+
 const LOGO = require('../../../assets/icon.png');
 const HEADER_ICON_SIZE = 22;
 const CENTER_BUTTON_SIZE = 56;
 
-function Brand({ styles }: { styles: Styles }) {
+function Brand({ demo, styles }: { demo: boolean; styles: Styles }) {
   return (
     <View style={styles.brand}>
       <Image source={LOGO} style={styles.logo} />
       <Text maxFontSizeMultiplier={CHROME_FONT_SCALE} style={styles.brandName}>
         Korev
       </Text>
+      {demo ? (
+        <Text
+          maxFontSizeMultiplier={CHROME_FONT_SCALE}
+          style={styles.demoBadge}
+        >
+          Demo
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -93,7 +112,7 @@ function NewWorkspaceButton({ styles }: { styles: Styles }) {
 export default function TabsLayout() {
   const theme = useTheme();
   const styles = makeStyles(theme);
-  const { pairing, unpair } = useKorev();
+  const { pairing, demo, unpair } = useKorev();
   const state = useAppState();
   useOpenTappedWorkspace();
   const waiting = state
@@ -121,11 +140,13 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Workspaces',
-          headerTitle: () => <Brand styles={styles} />,
+          headerTitle: () => <Brand demo={demo} styles={styles} />,
           headerRight: () => (
             <HeaderButton
               label="Settings"
-              onPress={() => showPairing(pairing, unpair)}
+              onPress={() =>
+                demo ? showDemo(unpair) : showPairing(pairing, unpair)
+              }
               styles={styles}
             >
               <Settings size={HEADER_ICON_SIZE} color={theme.fg2} />
@@ -177,6 +198,17 @@ function makeStyles(theme: Theme) {
     brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     logo: { width: 24, height: 24, borderRadius: 6 },
     brandName: { color: theme.fg1, fontSize: 17, fontWeight: '700' },
+    demoBadge: {
+      overflow: 'hidden',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+      backgroundColor: theme.accentSubtle,
+      color: theme.accentText,
+      fontSize: 11,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+    },
     headerButton: { paddingHorizontal: 16 },
     centerSlot: { flex: 1, alignItems: 'center' },
     centerButton: {

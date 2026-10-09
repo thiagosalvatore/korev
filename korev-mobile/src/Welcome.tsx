@@ -134,9 +134,11 @@ function ProductPreview({ styles }: { styles: Styles }) {
 export function Welcome({
   message,
   onStart,
+  onTryDemo,
 }: {
   message: string | null;
   onStart: () => void;
+  onTryDemo: () => void;
 }) {
   const theme = useTheme();
   const styles = makeStyles(theme);
@@ -160,6 +162,12 @@ export function Welcome({
         {message ? <Text style={styles.message}>{message}</Text> : null}
         <View style={styles.cta}>
           <Button label="Pair with your Mac" large onPress={onStart} />
+          <Button
+            label="Try the demo"
+            variant="secondary"
+            large
+            onPress={onTryDemo}
+          />
         </View>
       </View>
     </View>
@@ -232,7 +240,7 @@ function makeStyles(theme: Theme) {
       letterSpacing: -0.5,
     },
     subtitle: { color: theme.fg2, fontSize: 16, lineHeight: 23 },
-    cta: { marginTop: 12 },
+    cta: { marginTop: 12, gap: 10 },
     message: { color: theme.dangerText, fontSize: 14, lineHeight: 20 },
   });
 }

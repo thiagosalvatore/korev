@@ -5,47 +5,8 @@ import {
   type ServerResponse,
 } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { KorevApi, KorevEvents } from '../shared/api';
+import { REMOTE_METHODS, type KorevApi, type KorevEvents } from '../shared/api';
 import { callHandler, UnknownMethodError, type IpcHandlers } from './ipc';
-
-export const REMOTE_METHODS = [
-  'getState',
-  'transcript',
-  'send',
-  'stop',
-  'respondPermission',
-  'approvePlan',
-  'handoffPlan',
-  'newSession',
-  'closeSession',
-  'updateSession',
-  'createWorkspaces',
-  'archiveWorkspace',
-  'listBranches',
-  'listPullRequests',
-  'listIssues',
-  'slashCommands',
-  'changes',
-  'fileDiff',
-  'rangeChanges',
-  'listFiles',
-  'readFile',
-  'readImage',
-  'saveAttachment',
-  'prStatuses',
-  'prThreads',
-  'createPr',
-  'fixChecks',
-  'resolveConflicts',
-  'mergePr',
-  'repoIcon',
-  'createAskChat',
-  'registerPushToken',
-  'unregisterPushToken',
-  'deleteAskChat',
-  'prepareDictation',
-  'transcribe',
-] as const satisfies readonly (keyof KorevApi)[];
 
 const REMOTE_EVENTS: ReadonlySet<keyof KorevEvents> = new Set([
   'state',
