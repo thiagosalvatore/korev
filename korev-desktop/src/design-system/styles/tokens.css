@@ -51,6 +51,7 @@
   --syn-plain: #dde1e8;
 
   /* Semantic — surfaces (dark is the default theme) */
+  color-scheme: dark;
   --bg-app: var(--gray-0);
   --bg-surface: var(--gray-50);
   --bg-raised: var(--gray-100);
@@ -156,6 +157,7 @@
 }
 
 [data-theme='light'] {
+  color-scheme: light;
   --bg-app: #f7f8fa;
   --bg-surface: #ffffff;
   --bg-raised: #ffffff;

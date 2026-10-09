@@ -145,7 +145,7 @@ function TabStrip({
       <div
         role="tablist"
         aria-label="Tabs"
-        className="flex min-w-0 items-stretch overflow-x-auto"
+        className="flex min-w-0 items-stretch overflow-hidden"
       >
         {tabs.map((entry) => {
           const selected = entry.key === activeKey;

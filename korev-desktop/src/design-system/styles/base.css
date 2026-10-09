@@ -3,6 +3,12 @@
   body {
     margin: 0;
   }
+  html {
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  * {
+    scrollbar-width: thin;
+  }
   body {
     background: var(--bg-app);
     color: var(--fg-1);
