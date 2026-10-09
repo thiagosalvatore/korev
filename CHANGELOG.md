@@ -4,12 +4,20 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-09
+
+Your phone gets a notification when an agent finishes or needs your input.
+
 ### New
 
+- **Notifications on your phone.** A phone that is paired with the Korev app gets a notification when an agent finishes or needs your input while the Korev window is not in focus. Tap the notification to open its workspace. The message holds the workspace name and the chat title, and it passes through Expo and Apple or Google. **Revoke all** in **Settings → Remote access** stops the notifications too.
+- **Works with the new phone app.** The newest Korev phone app needs this version on your Mac. With an older version, the phone app shows that it cannot reach your Mac.
 - **Choose repositories with the keyboard.** When you press ⌘N and no repository is chosen, the repository list opens with the search box ready. Type to filter, use ↑ and ↓ to move, and press Space to check or uncheck a repository. Enter closes the list and moves you to the message box. If no repository is checked yet, Enter chooses the highlighted one.
+- **New and Fixed in What's new.** The "What's new" window splits each version into new features and fixes, and links to every version on korev.ai/changelog.
 
 ### Fixed
 
+- When you click a Mac notification, Korev opens its workspace. Before, the click sometimes only brought Korev to the front.
 - The spinner next to a workspace stays on while its agent works. Before, it went off when the repository's setup script finished, even if the agent was still working.
 
 ## [0.8.0] - 2026-10-09
