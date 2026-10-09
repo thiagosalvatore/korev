@@ -41,7 +41,7 @@ function Screens() {
           <Stack.Screen name="ask/[id]" options={{ title: '' }} />
         </Stack.Protected>
         <Stack.Protected guard={connection === null}>
-          <Stack.Screen name="pair" options={{ title: 'Pair with Korev' }} />
+          <Stack.Screen name="pair" options={{ headerShown: false }} />
         </Stack.Protected>
       </Stack>
       {connection ? <OfflineBanner /> : null}

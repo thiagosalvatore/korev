@@ -21,12 +21,14 @@ export function Button({
   variant = 'primary',
   disabled = false,
   pending = false,
+  large = false,
 }: {
   label: string;
   onPress: () => void;
   variant?: ButtonVariant;
   disabled?: boolean;
   pending?: boolean;
+  large?: boolean;
 }) {
   const colors = variantColors(useTheme(), variant);
   return (
@@ -38,13 +40,19 @@ export function Button({
       onPress={onPress}
       style={[
         styles.button,
+        large && styles.buttonLarge,
         { backgroundColor: colors.background },
         disabled && !pending && styles.disabled,
       ]}
     >
       <Text
         maxFontSizeMultiplier={CHROME_FONT_SCALE}
-        style={[styles.label, { color: colors.text }, pending && styles.hidden]}
+        style={[
+          styles.label,
+          large && styles.labelLarge,
+          { color: colors.text },
+          pending && styles.hidden,
+        ]}
       >
         {label}
       </Text>
@@ -121,5 +129,7 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.4 },
   hidden: { opacity: 0 },
+  buttonLarge: { paddingVertical: 15, borderRadius: 12 },
   label: { fontSize: 15, fontWeight: '600' },
+  labelLarge: { fontSize: 17 },
 });

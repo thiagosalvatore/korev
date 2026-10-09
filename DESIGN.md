@@ -75,6 +75,10 @@ PR, Fix errors and Resolve conflicts send a prompt to the active chat; Merge cal
   and gets a pill over the header title, "Not connected to your Mac", in `warningText` on
   `bgRaised`. Tapping the pill lists what to check. The pill fades out when the Mac answers
   again, with no "Connected" message.
+- **Welcome.** An unpaired phone opens on a welcome screen: a tilted preview of the
+  workspace list (one agent working, one waiting, one ready to merge) under a slide-in
+  notification, then "Your agents, in your pocket." and **Pair with your Mac**. The pairing
+  steps and the full-screen scanner come after that tap.
 - **Pending buttons.** A button whose request is running shows a spinner in place of its
   label and keeps its size. Its siblings are disabled until the request ends.
 - **Waiting chats.** A workspace opens on the chat that waits for an answer. Its tab shows an
