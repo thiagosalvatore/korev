@@ -25,6 +25,7 @@ const state = {
   ],
   askChats: [{ id: 'a1', session: session('s3', 'Where is the README?') }],
   runningSessions: ['s1', 's3'],
+  waitingSessions: [],
 } as unknown as AppState;
 
 function renderQuit() {

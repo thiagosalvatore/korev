@@ -77,6 +77,20 @@ export function useTranscript(sessionId: string): ChatItem[] | null {
   return items;
 }
 
+export function useReconnect() {
+  const connection = useConnection();
+  const [refreshing, setRefreshing] = useState(false);
+  useEffect(
+    () => connection.onConnect(() => setRefreshing(false)),
+    [connection],
+  );
+  function refresh() {
+    setRefreshing(true);
+    connection.open();
+  }
+  return { refreshing, refresh };
+}
+
 export function useModelChoice(settings: Settings) {
   const [agent, setAgent] = useState(settings.defaultAgent);
   const [model, setModel] = useState(settings.defaultModels[agent]);

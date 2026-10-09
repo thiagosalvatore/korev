@@ -229,6 +229,7 @@ function turnResult(items: ChatItem[], turn: ActiveTurn): ResultItem | null {
 export interface Chats {
   transcript(sessionId: string): Promise<ChatItem[]>;
   isRunning(sessionId: string): boolean;
+  waitingSessions(): string[];
   send(sessionId: string, options: SendOptions): Promise<Result>;
   seed(sessionId: string, history: ChatItem[]): Promise<void>;
   stop(sessionId: string): void;
@@ -952,6 +953,8 @@ export function createChats(
   return {
     transcript,
     isRunning: (sessionId) => turns.has(sessionId),
+    waitingSessions: () =>
+      [...turns].filter(([, turn]) => turn.permissions.size).map(([id]) => id),
     send,
     seed,
     stop,

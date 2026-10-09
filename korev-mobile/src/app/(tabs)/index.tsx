@@ -16,6 +16,7 @@ import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -35,7 +36,7 @@ import {
   activeWorkspaces,
   repoSections,
 } from '../../../../korev-desktop/src/shared/workspaces';
-import { useAppState } from '../../hooks';
+import { useAppState, useReconnect } from '../../hooks';
 import { ListRow, ROW_ICON_SIZE } from '../../ListRow';
 import { openNewWorkspace } from '../../navigation';
 import { RepoAvatar } from '../../RepoAvatar';
@@ -245,6 +246,7 @@ export default function WorkspacesScreen() {
   const styles = makeStyles(useTheme());
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const toggle = (id: string) => setCollapsed(toggled(collapsed, id));
+  const { refreshing, refresh } = useReconnect();
 
   if (!state) return <ActivityIndicator style={styles.loading} />;
 
@@ -263,7 +265,12 @@ export default function WorkspacesScreen() {
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.page}>
+    <ScrollView
+      contentContainerStyle={styles.page}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={refresh} />
+      }
+    >
       {sections.map(({ folder, repos }) =>
         folder ? (
           <FolderGroup

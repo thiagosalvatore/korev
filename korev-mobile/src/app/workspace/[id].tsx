@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  View,
 } from 'react-native';
 import {
   hasWorktree,
@@ -21,6 +22,18 @@ import { useTheme, type Theme } from '../../theme';
 import { WorktreePending } from '../../WorktreePending';
 
 type Styles = ReturnType<typeof makeStyles>;
+
+function waitingSessionIds(state: AppState): ReadonlySet<string> {
+  return new Set(state.waitingSessions ?? []);
+}
+
+function defaultSession(state: AppState, workspace: Workspace) {
+  const waiting = waitingSessionIds(state);
+  return (
+    workspace.sessions.find((entry) => waiting.has(entry.id)) ??
+    workspace.sessions.at(-1)
+  );
+}
 
 function SessionTabs({
   state,
@@ -39,6 +52,7 @@ function SessionTabs({
   const theme = useTheme();
   const { pending, run } = usePendingAction();
   const creating = pending !== null;
+  const waiting = waitingSessionIds(state);
 
   async function newChat() {
     const session = await api.newSession(
@@ -60,12 +74,16 @@ function SessionTabs({
           key={session.id}
           accessibilityRole="tab"
           accessibilityState={{ selected: session.id === selectedId }}
+          accessibilityHint={
+            waiting.has(session.id) ? 'Needs your input' : undefined
+          }
           style={[styles.tab, session.id === selectedId && styles.tabSelected]}
           onPress={() => onSelect(session.id)}
         >
           {state.runningSessions.includes(session.id) ? (
             <ActivityIndicator size="small" color={theme.accentText} />
           ) : null}
+          {waiting.has(session.id) ? <View style={styles.waitingDot} /> : null}
           <Text style={styles.tabText} numberOfLines={1}>
             {session.title}
           </Text>
@@ -111,7 +129,8 @@ export default function WorkspaceScreen() {
     );
   const session =
     workspace.sessions.find((entry) => entry.id === selectedId) ??
-    workspace.sessions.at(-1);
+    defaultSession(state, workspace);
+  if (session && session.id !== selectedId) setSelectedId(session.id);
 
   return (
     <>
@@ -160,5 +179,11 @@ function makeStyles(theme: Theme) {
     },
     tabSelected: { backgroundColor: theme.bgActive },
     tabText: { flexShrink: 1, color: theme.fg2, fontSize: 13 },
+    waitingDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+      backgroundColor: theme.warning,
+    },
   });
 }

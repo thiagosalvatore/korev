@@ -63,3 +63,13 @@ PR, Fix errors and Resolve conflicts send a prompt to the active chat; Merge cal
 - The ring next to Send shows how full the chat's context window is after the last turn.
   Clicking it opens a popover with the token counts and the agent's plan limits (5-hour
   and weekly).
+
+## Phone app
+
+- **Waiting chats.** A workspace opens on the chat that waits for an answer. Its tab shows an
+  amber `warning` dot next to the running spinner.
+- **Jump to latest.** After one screen of scrolling back, a 36 pt round button with a down
+  chevron (`bgRaised`, `border2` hairline) shows 12 pt above the composer and 12 pt from the
+  right edge. It fades in and out over 150 ms.
+- **Empty chat.** One centred `fg3` line names the agent and model: "Message Claude Code ·
+  Opus 5.5".

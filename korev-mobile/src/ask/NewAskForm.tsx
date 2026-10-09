@@ -25,10 +25,12 @@ function toggled(list: string[], id: string): string[] {
 export function NewAskForm({
   state,
   initialRepoId,
+  autoFocus = true,
   onAsked,
 }: {
   state: AppState;
   initialRepoId?: string;
+  autoFocus?: boolean;
   onAsked: (ask: AskChat) => void;
 }) {
   const { api } = useConnection();
@@ -86,7 +88,7 @@ export function NewAskForm({
           placeholder="Ask a question about the code. The agent reads it and changes nothing."
           placeholderTextColor={theme.fg4}
           multiline
-          autoFocus
+          autoFocus={autoFocus}
         />
       )}
       <View style={styles.toolbar}>

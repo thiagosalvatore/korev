@@ -1333,15 +1333,16 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       permissionId = pending?.id ?? '';
       return Boolean(pending);
     });
-    expect((await korev.api.getState()).runtime[workspace.id].status).toBe(
-      'waiting',
-    );
+    const waitingState = await korev.api.getState();
+    expect(waitingState.runtime[workspace.id].status).toBe('waiting');
+    expect(waitingState.waitingSessions).toEqual([session.id]);
 
     expect(
       await korev.api.respondPermission(session.id, permissionId, {
         allow: true,
       }),
     ).toEqual({ ok: true, value: undefined });
+    expect((await korev.api.getState()).waitingSessions).toEqual([]);
     await waitFor(
       async () => (await korev.api.getState()).runningSessions.length === 0,
     );

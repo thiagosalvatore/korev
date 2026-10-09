@@ -141,6 +141,9 @@ export function PrBar({
           }
         />
       </View>
+      {runtime?.message ? (
+        <Text style={styles.message}>{runtime.message}</Text>
+      ) : null}
       {showChecks &&
         pr?.checks.map((check) => (
           <Pressable
@@ -174,5 +177,6 @@ function makeStyles(theme: Theme) {
     title: { color: theme.fg1, fontSize: 14, fontWeight: '600' },
     meta: { color: theme.fg3, fontSize: 12 },
     check: { fontSize: 13, paddingVertical: 2 },
+    message: { color: theme.dangerText, fontSize: 13, lineHeight: 19 },
   });
 }

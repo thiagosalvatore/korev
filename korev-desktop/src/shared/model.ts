@@ -498,6 +498,7 @@ export interface AppState {
   settings: Settings;
   runtime: Record<string, WorkspaceRuntime>;
   runningSessions: string[];
+  waitingSessions: string[];
   runningTerminals: string[];
   planLimits: PlanLimits;
   spotlights: Record<string, string>;

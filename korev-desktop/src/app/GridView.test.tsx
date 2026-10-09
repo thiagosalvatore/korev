@@ -56,6 +56,7 @@ const state = {
   askChats: [ask],
   agents: [],
   runningSessions: [],
+  waitingSessions: [],
   runtime: {},
   planLimits: {},
   settings: {

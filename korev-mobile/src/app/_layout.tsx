@@ -1,11 +1,17 @@
-import { Stack } from 'expo-router';
+import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { KorevProvider, useKorev } from '../korev';
 import { useTheme } from '../theme';
+
+void SplashScreen.preventAutoHideAsync();
 
 function Screens() {
   const { loading, connection } = useKorev();
   const theme = useTheme();
+  useEffect(() => {
+    if (!loading) SplashScreen.hide();
+  }, [loading]);
   if (loading) return null;
   return (
     <>

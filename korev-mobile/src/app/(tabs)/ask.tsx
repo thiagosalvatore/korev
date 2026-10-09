@@ -1,13 +1,19 @@
 import { router } from 'expo-router';
 import { MessageCircleQuestion } from 'lucide-react-native';
-import { ActivityIndicator, ScrollView, StyleSheet, Text } from 'react-native';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+} from 'react-native';
 import { timeAgo } from '../../../../korev-desktop/src/shared/format';
 import type {
   AppState,
   AskChat,
 } from '../../../../korev-desktop/src/shared/model';
 import { NewAskForm } from '../../ask/NewAskForm';
-import { useAppState } from '../../hooks';
+import { useAppState, useReconnect } from '../../hooks';
 import { ListRow, ROW_ICON_SIZE } from '../../ListRow';
 import { useTheme, type Theme } from '../../theme';
 
@@ -47,14 +53,20 @@ function AskChatRow({ state, ask }: { state: AppState; ask: AskChat }) {
 export default function AskChatsScreen() {
   const state = useAppState();
   const styles = makeStyles(useTheme());
+  const { refreshing, refresh } = useReconnect();
   if (!state) return <ActivityIndicator style={styles.loading} />;
   if (!state.askChats.length)
-    return <NewAskForm state={state} onAsked={openAskChat} />;
+    return <NewAskForm state={state} autoFocus={false} onAsked={openAskChat} />;
   const newestFirst = [...state.askChats].sort((a, b) =>
     b.lastMessageAt.localeCompare(a.lastMessageAt),
   );
   return (
-    <ScrollView contentContainerStyle={styles.page}>
+    <ScrollView
+      contentContainerStyle={styles.page}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={refresh} />
+      }
+    >
       {newestFirst.map((ask) => (
         <AskChatRow key={ask.id} state={state} ask={ask} />
       ))}

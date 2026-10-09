@@ -410,6 +410,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         workspaces.map((ws) => [ws.id, ctx.runtime(ws.id)]),
       ),
       runningSessions: [...ctx.runningSessions],
+      waitingSessions: chats.waitingSessions(),
       runningTerminals: ctx.terminals.running(),
       planLimits: ctx.planLimits,
       spotlights: spotlight.active(),
