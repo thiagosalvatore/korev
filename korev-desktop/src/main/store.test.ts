@@ -30,6 +30,15 @@ describe('openStore', () => {
     ]);
   });
 
+  it('treats a workspace saved before linked lanes as not awaiting one', async () => {
+    const store = await openStore(
+      fileSystemWith({ workspaces: [{ sessions: [] }] }),
+      '/user-data',
+      '/home',
+    );
+    expect(store.state.workspaces[0].awaitsLane).toBe(false);
+  });
+
   it('has not seen any version yet on a fresh install', async () => {
     const store = await openStore(fileSystemWith({}), '/user-data', '/home');
     expect(store.state.settings.lastSeenVersion).toBeNull();

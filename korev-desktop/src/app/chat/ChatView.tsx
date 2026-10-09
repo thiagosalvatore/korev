@@ -16,6 +16,7 @@ import { api } from '../bridge';
 import { loadoutChoices, modelChoices } from '../../shared/format';
 import { useRepoGithubUrl, useTranscript } from '../hooks';
 import { reportFailure, toast } from '../ui/toast';
+import { laneRepos } from '../../shared/workspaces';
 import {
   EMPTY_WORKSPACE_UI,
   updateWorkspaceUi,
@@ -129,6 +130,7 @@ export function ChatView({
   const handoff = workspace
     ? () => void handoffPlan(workspace, session.id)
     : undefined;
+  const repos = workspace ? laneRepos(state, workspace) : [];
 
   async function revert(itemId: string) {
     const result = await api.revert(session.id, itemId);
@@ -171,6 +173,7 @@ export function ChatView({
           }
           onRetry={(text) => void send(text)}
           onHandoff={handoff}
+          laneRepos={repos}
           repoUrl={repoUrl}
           footer={
             codexPlan ? (
@@ -178,6 +181,7 @@ export function ChatView({
                 key={codexPlan.id}
                 plan={codexPlan.plan}
                 showPlan={false}
+                laneRepos={repos}
                 onApprove={(lanes) =>
                   void api.approvePlan(session.id, lanes).then(reportFailure)
                 }

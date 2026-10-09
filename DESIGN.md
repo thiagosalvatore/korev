@@ -60,6 +60,9 @@ PR, Fix errors and Resolve conflicts send a prompt to the active chat; Merge cal
 - Agent text is markdown. Tool calls are one line each (icon, tool, target) and expand to
   show input and output. More than three in a row collapse into "N tool calls".
 - The composer border turns dashed accent in plan mode (⇧Tab).
+- A plan's Lanes card lists each lane with a checkbox and its name. In a workspace linked across
+  repositories, each lane also has a repository picker, preset to the repository its name matches.
+  A task across several repositories always starts in plan mode.
 - The ring next to Send shows how full the chat's context window is after the last turn.
   Clicking it opens a popover with the token counts and the agent's plan limits (5-hour
   and weekly).

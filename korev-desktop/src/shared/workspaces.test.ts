@@ -5,7 +5,7 @@ import {
   type Repo,
   type Workspace,
 } from './model';
-import { activeWorkspaces, repoSections } from './workspaces';
+import { activeWorkspaces, laneRepos, repoSections } from './workspaces';
 
 function repo(id: string, folderId: string | null = null): Repo {
   return {
@@ -90,5 +90,36 @@ describe('activeWorkspaces', () => {
       'lane-2',
       'other',
     ]);
+  });
+});
+
+describe('laneRepos', () => {
+  const group = {
+    ...state,
+    workspaces: [
+      workspace('web-lead', 'web', '2026-01-01', 'billing'),
+      workspace('api-member', 'api', '2026-01-01', 'billing'),
+      workspace('web-lane', 'web', '2026-01-02', 'billing'),
+      workspace('alone', 'blog', '2026-01-03'),
+    ],
+  } as AppState;
+
+  it('lists each repository of the group once, its own first', () => {
+    const [, apiMember] = group.workspaces;
+    expect(laneRepos(group, apiMember).map((repo) => repo.id)).toEqual([
+      'api',
+      'web',
+    ]);
+  });
+
+  it('offers no repositories outside a group across repositories', () => {
+    const [, , webLane, alone] = group.workspaces;
+    expect(laneRepos(group, alone)).toEqual([]);
+    expect(
+      laneRepos(
+        { ...group, workspaces: [group.workspaces[0], webLane] },
+        webLane,
+      ),
+    ).toEqual([]);
   });
 });

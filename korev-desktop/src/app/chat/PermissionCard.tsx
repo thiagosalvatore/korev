@@ -1,15 +1,17 @@
 import { useRef, useState, type KeyboardEvent } from 'react';
-import { Button, cn, Icon, Input } from '../../design-system';
+import { Button, cn, Icon, Input, Select } from '../../design-system';
 import {
   answerQuestions,
   DISMISS_QUESTION,
   laneDrafts,
+  laneHere,
   lanesToSplit,
   planLanes,
   splitLabel,
   type AgentQuestion,
   type ChatItem,
   type LaneDraft,
+  type LaneRepo,
   type PermissionResponse,
   type PermissionStatus,
   type PlanLane,
@@ -25,6 +27,7 @@ type PermissionItem = Extract<ChatItem, { kind: 'permission' }>;
 
 export interface PermissionCardProps {
   item: PermissionItem;
+  laneRepos?: LaneRepo[];
   onRespond(response: PermissionResponse): void;
   onHandoff?(): void;
 }
@@ -131,12 +134,18 @@ function ToolApproval({ item, onRespond }: PermissionCardProps) {
 function LaneList({
   here,
   drafts,
+  repos,
   onChange,
 }: {
-  here: PlanLane;
+  here: PlanLane | undefined;
   drafts: LaneDraft[];
+  repos: LaneRepo[];
   onChange(drafts: LaneDraft[]): void;
 }) {
+  const repoOptions = repos.map((repo) => ({
+    value: repo.id,
+    label: repo.name,
+  }));
   const update = (index: number, change: Partial<LaneDraft>) =>
     onChange(
       drafts.map((draft, at) =>
@@ -148,11 +157,17 @@ function LaneList({
       <legend className="mb-1.5 text-sm font-medium text-fg-1">
         Lanes: each ticked lane gets its own linked workspace
       </legend>
-      <div className="flex items-center gap-2 text-sm text-fg-2">
-        <input type="checkbox" checked disabled aria-label={here.name} />
-        <span className="font-medium text-fg-1">{here.name}</span>
-        <span className="text-xs text-fg-3">This workspace</span>
-      </div>
+      {here ? (
+        <div className="flex items-center gap-2 text-sm text-fg-2">
+          <input type="checkbox" checked disabled aria-label={here.name} />
+          <span className="font-medium text-fg-1">{here.name}</span>
+          <span className="text-xs text-fg-3">
+            {repos.length
+              ? `This workspace · ${repos[0].name}`
+              : 'This workspace'}
+          </span>
+        </div>
+      ) : null}
       {drafts.map((draft, index) => (
         <div key={index} className="flex items-center gap-2">
           <input
@@ -168,6 +183,15 @@ function LaneList({
             className="flex-1"
             onChange={(event) => update(index, { name: event.target.value })}
           />
+          {draft.repoId ? (
+            <Select
+              ariaLabel={`Repository for ${draft.name}`}
+              options={repoOptions}
+              value={draft.repoId}
+              disabled={!draft.split}
+              onChange={(repoId) => update(index, { repoId })}
+            />
+          ) : null}
         </div>
       ))}
     </fieldset>
@@ -239,6 +263,7 @@ function FeedbackInput({
 export interface PlanReviewProps {
   plan: string;
   showPlan: boolean;
+  laneRepos?: LaneRepo[];
   onApprove(lanes: PlanLane[]): void;
   onKeepPlanning(feedback: string): void;
   onHandoff?(): void;
@@ -247,13 +272,15 @@ export interface PlanReviewProps {
 export function PlanReview({
   plan,
   showPlan,
+  laneRepos = [],
   onApprove,
   onKeepPlanning,
   onHandoff,
 }: PlanReviewProps) {
   const [feedback, setFeedback] = useState('');
-  const [here, ...others] = planLanes(plan);
-  const [drafts, setDrafts] = useState(() => laneDrafts(others));
+  const lanes = planLanes(plan, laneRepos.length ? 1 : 2);
+  const { here, others } = laneHere(lanes, laneRepos);
+  const [drafts, setDrafts] = useState(() => laneDrafts(others, laneRepos));
   const split = lanesToSplit(drafts);
   return (
     <Shell title="Plan ready for review" icon="list-checks">
@@ -262,8 +289,13 @@ export function PlanReview({
           <Markdown text={plan} />
         </div>
       ) : null}
-      {here ? (
-        <LaneList here={here} drafts={drafts} onChange={setDrafts} />
+      {lanes.length ? (
+        <LaneList
+          here={here}
+          drafts={drafts}
+          repos={laneRepos}
+          onChange={setDrafts}
+        />
       ) : null}
       <FeedbackInput
         value={feedback}
@@ -287,7 +319,7 @@ export function PlanReview({
           icon="check"
           onClick={() => onApprove([])}
         >
-          {here ? 'Approve here' : 'Approve plan'}
+          {lanes.length ? 'Approve here' : 'Approve plan'}
         </Button>
         {onHandoff ? (
           <Button
@@ -313,11 +345,17 @@ export function PlanReview({
   );
 }
 
-function PlanApproval({ item, onRespond, onHandoff }: PermissionCardProps) {
+function PlanApproval({
+  item,
+  laneRepos,
+  onRespond,
+  onHandoff,
+}: PermissionCardProps) {
   return (
     <PlanReview
       plan={item.plan ?? ''}
       showPlan
+      laneRepos={laneRepos}
       onHandoff={onHandoff}
       onApprove={(lanes) => onRespond({ allow: true, lanes })}
       onKeepPlanning={(message) => onRespond({ allow: false, message })}
@@ -424,13 +462,19 @@ function QuestionForm({ item, onRespond }: PermissionCardProps) {
 
 export function PermissionCard({
   item,
+  laneRepos,
   onRespond,
   onHandoff,
 }: PermissionCardProps) {
   if (item.status !== 'pending') return <Resolved item={item} />;
   if (item.plan !== null)
     return (
-      <PlanApproval item={item} onRespond={onRespond} onHandoff={onHandoff} />
+      <PlanApproval
+        item={item}
+        laneRepos={laneRepos}
+        onRespond={onRespond}
+        onHandoff={onHandoff}
+      />
     );
   if (item.questions) return <QuestionForm item={item} onRespond={onRespond} />;
   return <ToolApproval item={item} onRespond={onRespond} />;

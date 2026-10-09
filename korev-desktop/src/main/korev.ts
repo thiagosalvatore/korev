@@ -86,6 +86,7 @@ import { isNewer, type Release } from './updates';
 import {
   archiveWorkspace,
   createLaneWorkspaces,
+  stopWaitingForLanes,
   createWorkspaces,
   forkChatSession,
   strayWorktrees,
@@ -622,7 +623,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     };
   }
 
-  async function splitIntoLanes(
+  async function startApprovedPlan(
     sessionId: string,
     itemId: string,
     lanes: PlanLane[],
@@ -631,7 +632,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     const history = await chats.transcript(sessionId);
     const item = history.find((entry) => entry.id === itemId);
     if (!chat || item?.kind !== 'permission' || !item.plan)
-      return fail('Only a plan in a workspace can be split into lanes');
+      return lanes.length
+        ? fail('Only a plan in a workspace can be split into lanes')
+        : ok(undefined);
     startLanes(chat.workspace, chat.session, item.plan, history, lanes);
     return ok(undefined);
   }
@@ -643,14 +646,16 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     history: ChatItem[],
     lanes: PlanLane[],
   ) {
-    createLaneWorkspaces(
-      ctx,
-      origin,
-      lanes,
-      implementOptions(session, ''),
-      plan,
-      sendWithHistory(history),
-    );
+    if (lanes.length)
+      createLaneWorkspaces(
+        ctx,
+        origin,
+        lanes,
+        implementOptions(session, ''),
+        plan,
+        sendWithHistory(history),
+      );
+    stopWaitingForLanes(ctx, origin);
   }
 
   async function approvePlan(
@@ -663,8 +668,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     const history = await chats.transcript(sessionId);
     const plan = latestPlan(history);
     if (!plan) return fail('There is no plan to approve');
-    if (lanes.length)
-      startLanes(chat.workspace, chat.session, plan, history, lanes);
+    startLanes(chat.workspace, chat.session, plan, history, lanes);
     const text = lanes.length
       ? `${IMPLEMENT_APPROVED_PLAN}\n\n${lanesElsewhereNote(lanes)}`
       : IMPLEMENT_APPROVED_PLAN;
@@ -1164,9 +1168,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     stop: async (sessionId) => chats.stop(sessionId),
     async respondPermission(sessionId, itemId, response) {
       const answered = chats.respondPermission(sessionId, itemId, response);
-      if (!answered.ok || !response.allow || !response.lanes?.length)
-        return answered;
-      return splitIntoLanes(sessionId, itemId, response.lanes);
+      if (!answered.ok || !response.allow) return answered;
+      return startApprovedPlan(sessionId, itemId, response.lanes ?? []);
     },
     approvePlan,
     handoffPlan,

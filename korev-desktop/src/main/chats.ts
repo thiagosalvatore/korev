@@ -769,6 +769,7 @@ export function createChats(
       : null;
     if (checkpoint) upsert(sessionId, items, { ...message, checkpoint });
     touch(owner);
+    if (workspace) workspace.awaitsLane = false;
     if (isUntitled(session)) session.title = titleFrom(options.text);
     switchAgent(session, options.agent);
     session.model = options.model;

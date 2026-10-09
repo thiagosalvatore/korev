@@ -26,6 +26,7 @@ import { useUi } from './ui-store';
 
 const RECENT_LIMIT = 5;
 const NEW_WORKSPACE_DRAFT_KEY = 'new-workspace';
+const PLAN_ACROSS_REPOS = 'Several repositories start with a plan';
 
 function workspaceSource(
   from: CreateFrom | null,
@@ -111,10 +112,14 @@ export function NewWorkspacePage({
   const [repoIds, setRepoIds] = useState(initialRepoId ? [initialRepoId] : []);
   const repos = state.repos.filter((entry) => repoIds.includes(entry.id));
   const singleRepo = repos.length === 1 ? repos[0] : null;
+  const acrossRepos = repos.length > 1;
   const { agent, model, effort, setEffort, choose } = useModelChoice(
     state.settings,
   );
-  const [planMode, setPlanMode] = useState(state.settings.defaultPlanMode);
+  const [chosenPlanMode, setPlanMode] = useState(
+    state.settings.defaultPlanMode,
+  );
+  const planMode = chosenPlanMode || acrossRepos;
   const [fast, setFast] = useState(false);
   const [creating, setCreating] = useState(false);
   const [from, setFrom] = useState<CreateFrom | null>(null);
@@ -229,11 +234,11 @@ export function NewWorkspacePage({
               )}
             />
           </div>
-          {repos.length > 1 ? (
+          {acrossRepos ? (
             <p className="m-0 text-xs text-fg-3">
-              Creates one linked workspace per repository with the same branch
-              name. Each agent works in its own repository and can read the
-              others.
+              Creates a linked workspace in each repository. One agent reads
+              them all and plans. Approving its plan starts each repository's
+              lane in its own workspace.
             </p>
           ) : null}
           {picking && singleRepo ? (
@@ -264,7 +269,9 @@ export function NewWorkspacePage({
             placeholder={`Describe a task for ${AGENT_LABELS[agent]}. Enter creates the workspace and starts it.`}
             onModelChange={choose}
             onEffortChange={setEffort}
-            onPlanModeChange={setPlanMode}
+            onPlanModeChange={
+              acrossRepos ? () => toast(PLAN_ACROSS_REPOS) : setPlanMode
+            }
             onSend={(text) => create(text)}
           />
           <div className="flex items-center gap-2">

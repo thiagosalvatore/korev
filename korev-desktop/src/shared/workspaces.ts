@@ -1,6 +1,7 @@
 import type {
   AppState,
   AskChat,
+  LaneRepo,
   Repo,
   RepoFolder,
   Workspace,
@@ -73,4 +74,20 @@ export function worktreeProgress(
     title: `Creating ${workspace.name}`,
     detail: `Fetching origin/${workspace.baseBranch} and adding a worktree. You can keep working elsewhere.`,
   };
+}
+
+export function laneRepos(state: AppState, workspace: Workspace): LaneRepo[] {
+  const members = state.workspaces.filter(
+    (ws) =>
+      ws.groupId !== null && ws.groupId === workspace.groupId && !ws.archivedAt,
+  );
+  const repoIds = new Set([
+    workspace.repoId,
+    ...members.map((member) => member.repoId),
+  ]);
+  if (repoIds.size < 2) return [];
+  return [...repoIds].flatMap((repoId) => {
+    const repo = state.repos.find((entry) => entry.id === repoId);
+    return repo ? [{ id: repo.id, name: repo.name }] : [];
+  });
 }

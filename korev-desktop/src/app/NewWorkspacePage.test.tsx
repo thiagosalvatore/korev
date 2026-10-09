@@ -89,4 +89,26 @@ describe('NewWorkspacePage', () => {
       screen.getByRole('textbox', { name: 'Message' }),
     );
   });
+
+  it('starts in plan mode while several repositories are picked', () => {
+    render(
+      <NewWorkspacePage
+        state={stateWith([repo('korev'), repo('posthog')])}
+        repoId={null}
+      />,
+    );
+    const planChip = () => screen.queryByRole('button', { name: 'Plan mode' });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'korev' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'posthog' }));
+    expect(planChip()).not.toBeNull();
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Message' }), {
+      key: 'Tab',
+      shiftKey: true,
+    });
+    expect(planChip()).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'posthog' }));
+    expect(planChip()).toBeNull();
+  });
 });

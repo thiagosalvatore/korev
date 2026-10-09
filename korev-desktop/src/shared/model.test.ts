@@ -4,6 +4,7 @@ import {
   conversationText,
   finishedCodexPlan,
   planLanes,
+  presetLaneRepo,
   planOf,
   PLAN_TOOL,
   prBadge,
@@ -91,6 +92,23 @@ describe('planLanes', () => {
   it('finds no lanes in a plan without a Lanes section or with one lane', () => {
     expect(planLanes('# Plan\n### api\nDo it.')).toEqual([]);
     expect(planLanes('## Lanes\n### api\nDo it.')).toEqual([]);
+  });
+});
+
+describe('presetLaneRepo', () => {
+  const repos = [
+    { id: 'desktop', name: 'korev-desktop' },
+    { id: 'api', name: 'korev-api' },
+  ];
+
+  it.each([
+    ['korev-api', 'api'],
+    ['KOREV-API', 'api'],
+    ['API', 'api'],
+    ['korev-api: billing endpoint', 'api'],
+    ['Docs', 'desktop'],
+  ])('sends the %s lane to %s', (lane, repoId) => {
+    expect(presetLaneRepo(lane, repos)).toBe(repoId);
   });
 });
 
