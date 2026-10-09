@@ -46,6 +46,12 @@
       ],
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Korev lets you attach photos to a message for your coding agent."
+        }
+      ],
+      [
         "expo-audio",
         {
           "microphonePermission": "Korev uses the microphone to turn what you say into text."
