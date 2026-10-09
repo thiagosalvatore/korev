@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type PressableProps,
+} from 'react-native';
 import { useTheme, type Theme } from './theme';
 
 export const ROW_ICON_SIZE = 16;
@@ -11,8 +17,10 @@ export function ListRow({
   end,
   highlighted = false,
   accessibilityLabel,
+  accessibilityActions,
+  onAccessibilityAction,
   onPress,
-}: {
+}: Pick<PressableProps, 'accessibilityActions' | 'onAccessibilityAction'> & {
   icon: ReactNode;
   title: string;
   subtitle: ReactNode;
@@ -26,6 +34,8 @@ export function ListRow({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       onPress={onPress}
     >

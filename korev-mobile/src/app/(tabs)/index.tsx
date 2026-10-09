@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import {
+  Archive,
   ChevronDown,
   ChevronRight,
   GitBranch,
@@ -22,6 +23,9 @@ import {
   Text,
   View,
 } from 'react-native';
+import ReanimatedSwipeable, {
+  type SwipeableMethods,
+} from 'react-native-gesture-handler/ReanimatedSwipeable';
 import {
   prBadge,
   primaryPr,
@@ -36,7 +40,10 @@ import {
   activeWorkspaces,
   repoSections,
 } from '../../../../korev-desktop/src/shared/workspaces';
+import { attempt } from '../../attempt';
+import { succeeded } from '../../haptics';
 import { useAppState, useReconnect } from '../../hooks';
+import { useConnection } from '../../korev';
 import { ListRow, ROW_ICON_SIZE } from '../../ListRow';
 import { Loading } from '../../Offline';
 import { openNewWorkspace } from '../../navigation';
@@ -106,6 +113,34 @@ function StatusIcon({
   return <Badge size={ROW_ICON_SIZE} color={badgeColor(theme, badge)} />;
 }
 
+const ARCHIVE_ACTION = 'archive';
+
+function ArchiveAction({
+  onPress,
+  styles,
+}: {
+  onPress: () => void;
+  styles: Styles;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={styles.archiveAction}
+      onPress={onPress}
+    >
+      <Archive size={ROW_ICON_SIZE} color={theme.fgOnWarning} />
+      <Text
+        maxFontSizeMultiplier={CHROME_FONT_SCALE}
+        style={styles.archiveLabel}
+      >
+        Archive
+      </Text>
+    </Pressable>
+  );
+}
+
 function WorkspaceRow({
   workspace,
   runtime,
@@ -115,45 +150,72 @@ function WorkspaceRow({
   runtime: WorkspaceRuntime | undefined;
   styles: Styles;
 }) {
+  const { api } = useConnection();
   const stats = runtime?.stats;
   const hasStats = stats && (stats.additions > 0 || stats.deletions > 0);
+  const archive = async () =>
+    succeeded(
+      await attempt('Korev could not archive', () =>
+        api.archiveWorkspace(workspace.id),
+      ),
+    );
+  const archiveFromSwipe = async (swipeable: SwipeableMethods) => {
+    if (!(await archive())) swipeable.close();
+  };
   return (
-    <ListRow
-      accessibilityLabel={`Workspace ${workspace.name}`}
-      icon={
-        runtime ? <StatusIcon workspace={workspace} runtime={runtime} /> : null
-      }
-      title={workspace.branch}
-      highlighted={runtime?.unread || runtime?.status === 'waiting'}
-      subtitle={
-        <>
-          {workspace.name}
-          {runtime?.message ? (
-            <Text style={styles.error}> · {runtime.message}</Text>
-          ) : null}
-        </>
-      }
-      end={
-        <>
-          {hasStats ? (
-            <Text
-              maxFontSizeMultiplier={CHROME_FONT_SCALE}
-              style={styles.stats}
-            >
-              <Text style={styles.additions}>+{stats.additions}</Text>{' '}
-              <Text style={styles.deletions}>−{stats.deletions}</Text>
-            </Text>
-          ) : null}
-          {runtime?.unread ? <View style={styles.dot} /> : null}
-        </>
-      }
-      onPress={() =>
-        router.push({
-          pathname: '/workspace/[id]',
-          params: { id: workspace.id },
-        })
-      }
-    />
+    <ReanimatedSwipeable
+      overshootRight={false}
+      childrenContainerStyle={styles.swipeableRow}
+      renderRightActions={(_progress, _translation, swipeable) => (
+        <ArchiveAction
+          onPress={() => void archiveFromSwipe(swipeable)}
+          styles={styles}
+        />
+      )}
+    >
+      <ListRow
+        accessibilityLabel={`Workspace ${workspace.name}`}
+        accessibilityActions={[{ name: ARCHIVE_ACTION, label: 'Archive' }]}
+        onAccessibilityAction={({ nativeEvent }) => {
+          if (nativeEvent.actionName === ARCHIVE_ACTION) void archive();
+        }}
+        icon={
+          runtime ? (
+            <StatusIcon workspace={workspace} runtime={runtime} />
+          ) : null
+        }
+        title={workspace.branch}
+        highlighted={runtime?.unread || runtime?.status === 'waiting'}
+        subtitle={
+          <>
+            {workspace.name}
+            {runtime?.message ? (
+              <Text style={styles.error}> · {runtime.message}</Text>
+            ) : null}
+          </>
+        }
+        end={
+          <>
+            {hasStats ? (
+              <Text
+                maxFontSizeMultiplier={CHROME_FONT_SCALE}
+                style={styles.stats}
+              >
+                <Text style={styles.additions}>+{stats.additions}</Text>{' '}
+                <Text style={styles.deletions}>−{stats.deletions}</Text>
+              </Text>
+            ) : null}
+            {runtime?.unread ? <View style={styles.dot} /> : null}
+          </>
+        }
+        onPress={() =>
+          router.push({
+            pathname: '/workspace/[id]',
+            params: { id: workspace.id },
+          })
+        }
+      />
+    </ReanimatedSwipeable>
   );
 }
 
@@ -357,6 +419,20 @@ function makeStyles(theme: Theme) {
       height: 7,
       borderRadius: 4,
       backgroundColor: theme.accent,
+    },
+    swipeableRow: { backgroundColor: theme.bgApp },
+    archiveAction: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 2,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      backgroundColor: theme.warning,
+    },
+    archiveLabel: {
+      color: theme.fgOnWarning,
+      fontSize: 12,
+      fontWeight: '600',
     },
     empty: { padding: 24, color: theme.fg3, textAlign: 'center' },
   });
