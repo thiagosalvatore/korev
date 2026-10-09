@@ -8,7 +8,11 @@ import {
   type AskChat,
   type Workspace,
 } from '../shared/model';
-import { activeWorkspaces, asksNewestFirst } from '../shared/workspaces';
+import {
+  activeWorkspaces,
+  asksNewestFirst,
+  groupRepoName,
+} from '../shared/workspaces';
 import {
   chatPane,
   clearPane,
@@ -228,6 +232,7 @@ function WorkspacePaneHeader({
 }) {
   const { workspace } = content;
   const { label, icon } = paneTitle(content);
+  const repoName = groupRepoName(state, workspace);
   const running =
     content.kind === 'chat' &&
     state.runningSessions.includes(content.session.id);
@@ -240,7 +245,7 @@ function WorkspacePaneHeader({
         {workspace.branch}
       </span>
       <span className="min-w-0 flex-1 truncate text-xs text-fg-3">
-        {workspace.name}
+        {repoName ? `${repoName} · ${workspace.name}` : workspace.name}
       </span>
       <Menu
         label={`${workspace.name} tabs`}

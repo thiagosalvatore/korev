@@ -5,7 +5,13 @@ import {
   type Repo,
   type Workspace,
 } from './model';
-import { activeWorkspaces, laneRepos, repoSections } from './workspaces';
+import {
+  activeWorkspaces,
+  crossRepoLead,
+  laneRepos,
+  repoSections,
+  waitsForLane,
+} from './workspaces';
 
 function repo(id: string, folderId: string | null = null): Repo {
   return {
@@ -24,7 +30,14 @@ function workspace(
   createdAt: string,
   groupId: string | null = null,
 ): Workspace {
-  return { id, repoId, createdAt, groupId, archivedAt: null } as Workspace;
+  return {
+    id,
+    repoId,
+    createdAt,
+    groupId,
+    archivedAt: null,
+    awaitsLane: false,
+  } as Workspace;
 }
 
 const state = {
@@ -121,5 +134,61 @@ describe('laneRepos', () => {
         webLane,
       ),
     ).toEqual([]);
+  });
+});
+
+describe('a group across repositories', () => {
+  const lead = workspace('web-lead', 'web', '2026-01-05', 'billing');
+  const apiMember = {
+    ...workspace('api-member', 'api', '2026-01-05', 'billing'),
+    awaitsLane: true,
+  };
+  const scratchMember = {
+    ...workspace('scratch-member', 'scratch', '2026-01-05', 'billing'),
+    awaitsLane: true,
+  };
+  const group = {
+    ...state,
+    runtime: {},
+    workspaces: [
+      lead,
+      apiMember,
+      scratchMember,
+      workspace('api-1', 'api', '2026-01-02'),
+    ],
+  } as unknown as AppState;
+  const withoutLead = {
+    ...group,
+    workspaces: [
+      { ...lead, archivedAt: '2026-01-06' },
+      ...group.workspaces.slice(1),
+    ],
+  } as AppState;
+
+  it('sorts all its members under the lead repository', () => {
+    expect(activeWorkspaces(group).map((ws) => ws.id)).toEqual([
+      'api-1',
+      'web-lead',
+      'api-member',
+      'scratch-member',
+    ]);
+  });
+
+  it('hands the lead to the next member when the lead is archived', () => {
+    expect(crossRepoLead(withoutLead, apiMember)?.id).toBe('api-member');
+    expect(activeWorkspaces(withoutLead).map((ws) => ws.id)).toEqual([
+      'api-1',
+      'api-member',
+      'scratch-member',
+    ]);
+  });
+
+  it('waits for a lane only in members other than the lead', () => {
+    expect(waitsForLane(group, apiMember)).toBe(true);
+    expect(waitsForLane(group, lead)).toBe(false);
+    expect(waitsForLane(withoutLead, apiMember)).toBe(false);
+    expect(waitsForLane(group, { ...apiMember, awaitsLane: false })).toBe(
+      false,
+    );
   });
 });

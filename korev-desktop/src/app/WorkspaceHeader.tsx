@@ -20,6 +20,7 @@ import {
   resolveConflicts,
 } from './actions';
 import { api } from './bridge';
+import { groupRepoName } from '../shared/workspaces';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { prIcon } from './Sidebar';
 import { Menu } from './ui/Menu';
@@ -180,6 +181,7 @@ export function WorkspaceHeader({
   const panel = useUi((ui) => ui.panel);
   const prUrl = useUi((ui) => ui.workspaces[workspace.id]?.prUrl);
   const runtime = state.runtime[workspace.id];
+  const repoName = groupRepoName(state, workspace);
   const pr = primaryPr(workspace, runtime, prUrl);
   const action = nextAction(state, workspace, pr);
   const editor =
@@ -203,6 +205,12 @@ export function WorkspaceHeader({
         />
       )}
       <div className={cn('flex min-w-0 items-center gap-2', NO_DRAG)}>
+        {repoName ? (
+          <>
+            <span className="text-sm text-fg-3">{repoName}</span>
+            <Icon name="chevron-right" size={13} className="text-fg-4" />
+          </>
+        ) : null}
         <span className="text-sm font-semibold text-fg-1">
           {workspace.name}
         </span>

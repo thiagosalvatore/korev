@@ -107,6 +107,57 @@ describe('Sidebar repo groups', () => {
   });
 });
 
+describe('Sidebar group across repositories', () => {
+  const member = (id: string, repoId: string, awaitsLane: boolean) => ({
+    id,
+    repoId,
+    groupId: 'billing',
+    name: 'add-billing',
+    branch: 'dev/add-billing',
+    createdAt: '2026-01-01T00:00:00Z',
+    archivedAt: null,
+    awaitsLane,
+    sessions: [],
+    prs: [],
+  });
+  const grouped = {
+    ...state,
+    workspaces: [member('lead', 'busy', false), member('api', 'idle', true)],
+  } as unknown as AppState;
+
+  it('shows the group once, under the lead repository', () => {
+    render(<Sidebar state={grouped} />);
+
+    const busy = screen.getByRole('region', { name: 'busy-repo' });
+    const group = within(busy).getByRole('group', {
+      name: 'Linked workspace add-billing',
+    });
+    expect(
+      within(group)
+        .getAllByRole('button', { name: /^Workspace add-billing/ })
+        .map((row) => row.getAttribute('aria-label')),
+    ).toEqual([
+      'Workspace add-billing in busy-repo',
+      'Workspace add-billing in idle-repo',
+    ]);
+    expect(
+      within(screen.getByRole('region', { name: 'idle-repo' })).queryAllByRole(
+        'button',
+        { name: /^Workspace add-billing/ },
+      ),
+    ).toEqual([]);
+  });
+
+  it('says which repository a member waits on', () => {
+    render(<Sidebar state={grouped} />);
+
+    const waiting = screen.getByRole('button', {
+      name: 'Workspace add-billing in idle-repo',
+    });
+    expect(waiting.textContent).toContain('Waits for the plan in busy-repo');
+  });
+});
+
 describe('Sidebar on the grid page', () => {
   function showGrid(focusedPane: GridPane) {
     setUi((ui) => ({
