@@ -6,13 +6,30 @@ import {
   Plus,
   Settings,
 } from 'lucide-react-native';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import type { RemotePairing } from '../../../../korev-desktop/src/shared/model';
 import { useAppState } from '../../hooks';
 import { useKorev } from '../../korev';
 import { openNewAsk, openNewWorkspace } from '../../navigation';
 import { confirmUnpair } from '../../Offline';
 import { useTheme, type Theme } from '../../theme';
 import { CHROME_FONT_SCALE } from '../../ui';
+
+const URL_SCHEME = /^[a-z]+:\/\//i;
+
+function showPairing(
+  pairing: RemotePairing | null,
+  unpair: () => Promise<void>,
+) {
+  Alert.alert('Paired with Korev', pairing?.url.replace(URL_SCHEME, ''), [
+    {
+      text: 'Unpair',
+      style: 'destructive',
+      onPress: () => confirmUnpair(unpair),
+    },
+    { text: 'Done', style: 'cancel' },
+  ]);
+}
 
 const LOGO = require('../../../assets/icon.png');
 const HEADER_ICON_SIZE = 22;
@@ -75,7 +92,7 @@ function NewWorkspaceButton({ styles }: { styles: Styles }) {
 export default function TabsLayout() {
   const theme = useTheme();
   const styles = makeStyles(theme);
-  const { unpair } = useKorev();
+  const { pairing, unpair } = useKorev();
   const state = useAppState();
   const waiting = state
     ? Object.values(state.runtime).filter((entry) => entry.status === 'waiting')
@@ -106,7 +123,7 @@ export default function TabsLayout() {
           headerRight: () => (
             <HeaderButton
               label="Settings"
-              onPress={() => confirmUnpair(unpair)}
+              onPress={() => showPairing(pairing, unpair)}
               styles={styles}
             >
               <Settings size={HEADER_ICON_SIZE} color={theme.fg2} />

@@ -62,9 +62,11 @@ export async function call(
   pairing: RemotePairing,
   method: string,
   args: unknown[],
+  signal?: AbortSignal,
 ): Promise<unknown> {
   const response = await fetch(`${pairing.url}/call`, {
     method: 'POST',
+    signal,
     headers: { ...headers(pairing), 'content-type': 'application/json' },
     body: JSON.stringify({ method, args }),
   });

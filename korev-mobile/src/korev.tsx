@@ -17,10 +17,15 @@ import {
 } from './connection';
 import { succeeded } from './haptics';
 
+const REVOKED =
+  'Korev on your Mac no longer accepts this phone. Scan a new code.';
+
 interface KorevContextValue {
   loading: boolean;
   connection: Connection | null;
-  pair(pairing: RemotePairing): Promise<void>;
+  pairing: RemotePairing | null;
+  unpairReason: string | null;
+  pair(pairing: RemotePairing, signal?: AbortSignal): Promise<void>;
   unpair(): Promise<void>;
 }
 
@@ -29,20 +34,30 @@ const KorevContext = createContext<KorevContextValue | null>(null);
 export function KorevProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [connection, setConnection] = useState<Connection | null>(null);
+  const [pairing, setPairing] = useState<RemotePairing | null>(null);
+  const [unpairReason, setUnpairReason] = useState<string | null>(null);
 
   async function unpair() {
     await clearPairing();
     setConnection(null);
+    setPairing(null);
   }
 
-  function open(pairing: RemotePairing) {
-    setConnection(connect(pairing, () => void unpair()));
+  async function revoked() {
+    setUnpairReason(REVOKED);
+    await unpair();
   }
 
-  async function pair(pairing: RemotePairing) {
-    await call(pairing, 'getState', []);
-    await savePairing(pairing);
-    open(pairing);
+  function open(saved: RemotePairing) {
+    setPairing(saved);
+    setConnection(connect(saved, () => void revoked()));
+  }
+
+  async function pair(next: RemotePairing, signal?: AbortSignal) {
+    await call(next, 'getState', [], signal);
+    await savePairing(next);
+    setUnpairReason(null);
+    open(next);
     succeeded();
   }
 
@@ -65,7 +80,9 @@ export function KorevProvider({ children }: { children: ReactNode }) {
   }, [connection]);
 
   return (
-    <KorevContext.Provider value={{ loading, connection, pair, unpair }}>
+    <KorevContext.Provider
+      value={{ loading, connection, pairing, unpairReason, pair, unpair }}
+    >
       {children}
     </KorevContext.Provider>
   );
