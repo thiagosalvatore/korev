@@ -528,11 +528,11 @@ async function checkOutPullRequest(
     workspace.path,
     await startPoint(ctx.git, repo.path, workspace.baseBranch),
   );
-  const result = await ctx.deps.run('gh', ['pr', 'checkout', String(number)], {
-    cwd: workspace.path,
-    env: ctx.deps.env,
-    timeoutMs: GH_TIMEOUT_MS,
-  });
+  const result = await ctx.deps.run(
+    'gh',
+    ['pr', 'checkout', String(number), '--force'],
+    { cwd: workspace.path, env: ctx.deps.env, timeoutMs: GH_TIMEOUT_MS },
+  );
   const branch = await currentBranch(ctx.git, workspace.path);
   if (result.exitCode !== 0 || !branch) {
     await removeWorktree(ctx.git, repo.path, workspace.path);
