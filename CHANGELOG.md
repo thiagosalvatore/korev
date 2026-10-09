@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Clearer notifications.** The title of a notification now says what happened: "Agent finished", "Agent failed" or "Agent needs your input". The text under it names the workspace. When an agent fails, the text also shows the error. Before, the title and the text often said nearly the same thing.
+
 ## [0.9.0] - 2026-10-09
 
 Your phone gets a notification when an agent finishes or needs your input.

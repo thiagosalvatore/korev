@@ -14,6 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { runProcess, type CommandRunner } from './command-runner';
+import type { Notice } from './context';
 import { nodeFileSystem } from './file-system';
 import {
   DEFAULT_EFFORT,
@@ -134,6 +135,8 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   let chosenDirectory: string;
   let korev: Korev;
   let playSound: Mock<() => void>;
+  let notify: Mock<(notice: Notice) => void>;
+  let windowFocused: boolean;
   let keepAwake: Mock<(on: boolean) => void>;
   let applyRemote: Mock<(settings: RemoteSettings) => Promise<void>>;
   let emit: Mock<(event: string, payload: unknown) => void>;
@@ -163,9 +166,9 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       fs: nodeFileSystem,
       spawnPty: noPty,
       emit,
-      notify: () => undefined,
+      notify,
       playSound,
-      isWindowFocused: () => true,
+      isWindowFocused: () => windowFocused,
       setBadge: () => undefined,
       keepAwake,
       now: () => new Date(),
@@ -203,6 +206,8 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     repoPath = await initRepo('acme');
     chosenDirectory = repoPath;
     playSound = vi.fn();
+    notify = vi.fn();
+    windowFocused = true;
     keepAwake = vi.fn();
     applyRemote = vi.fn(async () => undefined);
     emit = vi.fn();
@@ -662,6 +667,19 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     await sendAndWait(workspace.sessions[0].id, 'Add a note');
 
     expect(playSound).toHaveBeenCalledOnce();
+  });
+
+  it('notifies that the agent finished, naming the workspace, when Korev is not in focus', async () => {
+    const workspace = await createWorkspace();
+    windowFocused = false;
+
+    await sendAndWait(workspace.sessions[0].id, 'Add a note');
+
+    expect(notify).toHaveBeenCalledWith({
+      title: 'Agent finished',
+      body: workspace.name,
+      workspaceId: workspace.id,
+    });
   });
 
   it('keeps the Mac awake only while a turn is running', async () => {

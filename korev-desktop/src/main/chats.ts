@@ -68,6 +68,9 @@ const REPLAY_TOTAL_CHARS = 24_000;
 const DENIED_MESSAGE = 'The user denied this request.';
 const NOT_WAITING_MESSAGE = 'This request is no longer waiting for an answer';
 const NO_PLAN_WAITING_MESSAGE = 'No plan is waiting for an answer';
+const AGENT_FINISHED_TITLE = 'Agent finished';
+const AGENT_FAILED_TITLE = 'Agent failed';
+const AGENT_NEEDS_INPUT_TITLE = 'Agent needs your input';
 const HANDOFF_MESSAGE =
   'The user handed this plan off to a new chat tab, where another agent will implement it. Do not implement it here. End your turn.';
 const ASK_PLAN_MESSAGE =
@@ -349,10 +352,11 @@ export function createChats(
       urls: turnPrUrls(items, turn),
     });
     const last = items.findLast((item) => item.kind === 'result');
+    const failure = last?.kind === 'result' && !last.ok ? last.text : null;
     alertUser(
       { kind: 'workspace', workspace },
-      `${workspace.name} finished`,
-      last?.kind === 'result' && !last.ok ? last.text : session.title,
+      failure ? AGENT_FAILED_TITLE : AGENT_FINISHED_TITLE,
+      failure ? `${workspace.name}: ${failure}` : workspace.name,
     );
   }
 
@@ -492,7 +496,7 @@ export function createChats(
     ctx.emitState();
     const name =
       turn.owner.kind === 'workspace' ? turn.owner.workspace.name : 'Ask';
-    alertUser(turn.owner, `${name} needs your input`, session.title);
+    alertUser(turn.owner, AGENT_NEEDS_INPUT_TITLE, name);
   }
 
   function handleLine(
