@@ -4,6 +4,20 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-09
+
+Pull request numbers in agent replies open the pull request, and Codex can commit in a workspace.
+
+### New
+
+- **Clickable pull requests.** When an agent reply mentions a pull request as "#239", "owner/repo#5" or a link, click it to open the pull request. This works on your Mac and in the phone app. "#239" links only when the repository is on GitHub.
+
+### Fixed
+
+- Codex can commit in a workspace. Before, `git add` failed with an error about `index.lock`.
+- You can create a workspace from a pull request when a local branch with the same name already exists. Before, this failed with "Not possible to fast-forward" if the pull request had changed since you last worked on it.
+- Search, New workspace, Ask and Grid in the sidebar stay highlighted while they are open.
+
 ## [0.9.1] - 2026-10-09
 
 Notifications say what happened and in which workspace.
