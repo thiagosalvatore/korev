@@ -1,4 +1,5 @@
-import type { MenuItemConstructorOptions } from 'electron';
+import { shell, type MenuItemConstructorOptions } from 'electron';
+import { CHANGELOG_URL } from '../shared/links';
 import type { AppCommand } from '../shared/model';
 
 export interface AppMenuOptions {
@@ -116,5 +117,14 @@ export function appMenuTemplate(
     { label: 'Workspace', submenu: items(WORKSPACE_ENTRIES, send) },
     { label: 'Chat', submenu: items(CHAT_ENTRIES, send) },
     { role: 'windowMenu' },
+    {
+      role: 'help',
+      submenu: [
+        {
+          label: 'Korev Release Notes',
+          click: () => void shell.openExternal(CHANGELOG_URL),
+        },
+      ],
+    },
   ];
 }

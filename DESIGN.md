@@ -64,6 +64,15 @@ PR, Fix errors and Resolve conflicts send a prompt to the active chat; Merge cal
   Clicking it opens a popover with the token counts and the agent's plan limits (5-hour
   and weekly).
 
+## Release notes
+
+"What's new" (after an update) and "Korev X is available" share one 560 px dialog. The title is
+the release's one-sentence summary, with "What's new in Korev X" or "Korev X is available"
+under it. The body has a **New** group (sparkles icon on `accent-subtle`) and a **Fixed** group
+(wrench icon in `fg-3`), each with its count. Fixed items use smaller `fg-2` text. **All
+releases** in the footer opens korev.ai/changelog at that version; **Help → Korev Release
+Notes** opens the same page.
+
 ## Phone app
 
 - **Tokens.** `korev-mobile/src/theme.ts` mirrors the desktop tokens for dark and light. Use
