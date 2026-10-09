@@ -282,16 +282,14 @@ export function createDemoConnection(): Connection {
     number: number,
   ) {
     const repo = state.repos.find((entry) => entry.id === workspace.repoId);
-    const pr = {
-      ...demoPullRequest(
-        { name: repo?.name ?? workspace.repoId },
-        number,
-        workspace.name,
-        workspace.branch,
-        now(),
-      ),
-      reviewDecision: null,
-    };
+    const pr = demoPullRequest(
+      { name: repo?.name ?? workspace.repoId },
+      number,
+      workspace.name,
+      workspace.branch,
+      now(),
+      { reviewDecision: null },
+    );
     const withTrackedPr = withWorkspace(state, workspace.id, (entry) => ({
       ...entry,
       prs: [...entry.prs, { url: pr.url, sessionId }],

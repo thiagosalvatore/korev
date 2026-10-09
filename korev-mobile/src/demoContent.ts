@@ -6,6 +6,7 @@ import {
   type AppState,
   type AskChat,
   type ChatItem,
+  type CheckState,
   type ChatSession,
   type PrStatus,
   type Repo,
@@ -160,6 +161,7 @@ export function demoPullRequest(
   title: string,
   branch: string,
   createdAt: string,
+  patch: Partial<PrStatus> = {},
 ): PrStatus {
   return {
     number,
@@ -173,14 +175,44 @@ export function demoPullRequest(
     headRefName: branch,
     baseRefName: DEMO_BASE_BRANCH,
     createdAt,
-    checks: ['test', 'lint', 'typecheck'].map((name) => ({
-      name,
-      state: 'success',
-      url: null,
-      required: true,
-    })),
+    checks: demoChecks({
+      test: 'success',
+      lint: 'success',
+      typecheck: 'success',
+    }),
     stack: null,
+    ...patch,
   };
+}
+
+function demoChecks(states: Record<string, CheckState>): PrStatus['checks'] {
+  return Object.entries(states).map(([name, state]) => ({
+    name,
+    state,
+    url: null,
+    required: true,
+  }));
+}
+
+function withTrackedPr(workspace: Workspace, pr: PrStatus): Workspace {
+  return {
+    ...workspace,
+    prs: [{ url: pr.url, sessionId: workspace.sessions[0].id }],
+  };
+}
+
+function conversation(
+  idPrefix: string,
+  task: string,
+  at: string,
+  reply: string,
+  minutes: number,
+): ChatItem[] {
+  return [
+    user(`${idPrefix}-1`, task, at),
+    { id: `${idPrefix}-2`, kind: 'assistant', text: reply },
+    finished(`${idPrefix}-3`, minutes),
+  ];
 }
 
 function user(id: string, text: string, at: string): ChatItem {
@@ -198,14 +230,19 @@ function finished(id: string, minutes: number): ChatItem {
   };
 }
 
-function tool(id: string, name: string, summary: string): ChatItem {
+function tool(
+  id: string,
+  name: string,
+  summary: string,
+  output: string | null = '',
+): ChatItem {
   return {
     id,
     kind: 'tool',
     name,
     summary,
     detail: '',
-    output: null,
+    output,
     failed: false,
   };
 }
@@ -241,16 +278,76 @@ export function demoWorld(now: number): DemoWorld {
     'speed-up-search',
     ago(50),
   );
-  const search = {
-    ...demoWorkspace(
+  const search = withTrackedPr(
+    demoWorkspace(
       'demo-ws-search',
       API,
       'speed-up-search',
       'Speed up search',
       demoSession('demo-session-search', 'Speed up search', ago(70)),
     ),
-    prs: [{ url: searchPr.url, sessionId: 'demo-session-search' }],
-  };
+    searchPr,
+  );
+  const onboardingPr = demoPullRequest(
+    WEB,
+    79,
+    'Rewrite the onboarding copy',
+    'onboarding-copy',
+    ago(95),
+    { state: 'MERGED', mergedAt: ago(30) },
+  );
+  const onboarding = withTrackedPr(
+    demoWorkspace(
+      'demo-ws-onboarding',
+      WEB,
+      'onboarding-copy',
+      'Onboarding copy',
+      demoSession('demo-session-onboarding', 'Onboarding copy', ago(100)),
+    ),
+    onboardingPr,
+  );
+  const webhooksPr = demoPullRequest(
+    API,
+    91,
+    'Retry failed webhooks with backoff',
+    'webhook-retries',
+    ago(12),
+    {
+      reviewDecision: null,
+      checks: demoChecks({ test: 'pending', lint: 'success' }),
+    },
+  );
+  const webhooks = withTrackedPr(
+    demoWorkspace(
+      'demo-ws-webhooks',
+      API,
+      'webhook-retries',
+      'Webhook retries',
+      demoSession('demo-session-webhooks', 'Webhook retries', ago(90)),
+    ),
+    webhooksPr,
+  );
+  const checkoutPr = demoPullRequest(
+    API,
+    90,
+    'Fix the flaky checkout test',
+    'fix-flaky-checkout',
+    ago(20),
+    {
+      reviewDecision: null,
+      checks: demoChecks({ e2e: 'failure', test: 'success', lint: 'success' }),
+    },
+  );
+  const checkout = withTrackedPr(
+    demoWorkspace(
+      'demo-ws-checkout',
+      API,
+      'fix-flaky-checkout',
+      'Fix flaky checkout',
+      demoSession('demo-session-checkout', 'Fix flaky checkout', ago(40)),
+    ),
+    checkoutPr,
+  );
   const darkMode = demoWorkspace(
     'demo-ws-dark',
     WEB,
@@ -274,7 +371,15 @@ export function demoWorld(now: number): DemoWorld {
     repos: [WEB, API],
     folders: [],
     rootOrder: [WEB.id, API.id],
-    workspaces: [login, billing, search, darkMode],
+    workspaces: [
+      login,
+      billing,
+      onboarding,
+      webhooks,
+      search,
+      checkout,
+      darkMode,
+    ],
     askChats: [ask],
     settings: SETTINGS,
     runtime: {
@@ -283,6 +388,18 @@ export function demoWorld(now: number): DemoWorld {
       [search.id]: demoRuntime({
         stats: { additions: 128, deletions: 14 },
         prs: [searchPr],
+      }),
+      [onboarding.id]: demoRuntime({
+        stats: { additions: 64, deletions: 41 },
+        prs: [onboardingPr],
+      }),
+      [webhooks.id]: demoRuntime({
+        stats: { additions: 96, deletions: 14 },
+        prs: [webhooksPr],
+      }),
+      [checkout.id]: demoRuntime({
+        stats: { additions: 23, deletions: 9 },
+        prs: [checkoutPr],
       }),
       [darkMode.id]: demoRuntime({ stats: { additions: 210, deletions: 38 } }),
     },
@@ -315,8 +432,20 @@ export function demoWorld(now: number): DemoWorld {
           'After signing in, people land on /home instead of the page they came from. Fix it.',
           ago(6),
         ),
+        {
+          id: 'demo-login-5',
+          kind: 'assistant',
+          text: 'I will find where the return URL is lost between the sign-in page and the callback.',
+        },
         tool('demo-login-2', 'Grep', '"returnTo" in src/auth'),
         tool('demo-login-3', 'Read', 'src/auth/callback.ts'),
+        tool('demo-login-6', 'Read', 'src/auth/state.ts'),
+        {
+          id: 'demo-login-7',
+          kind: 'assistant',
+          text: 'Found it. The sign-in state keeps only the CSRF token, so the callback has nowhere to send people back to.',
+        },
+        tool('demo-login-8', 'Edit', 'src/auth/state.ts', null),
         {
           id: 'demo-login-4',
           kind: 'todos',
@@ -408,6 +537,36 @@ export function demoWorld(now: number): DemoWorld {
         },
         finished('demo-dark-4', 3),
       ],
+    ],
+    [
+      onboarding.sessions[0].id,
+      conversation(
+        'demo-onboarding',
+        'Rewrite the onboarding copy so each step says what the person gets, not what they must do.',
+        ago(100),
+        'Rewrote the five onboarding steps. Each title now names the result, and the buttons use the same verbs as the steps. #79 is merged.',
+        6,
+      ),
+    ],
+    [
+      webhooks.sessions[0].id,
+      conversation(
+        'demo-webhooks',
+        'Retry failed webhook deliveries with exponential backoff, up to 5 times.',
+        ago(90),
+        'Failed deliveries now retry after 1, 2, 4, 8 and 16 minutes. After the fifth failure the delivery is marked as dead and shows in the dashboard. I opened #91.',
+        9,
+      ),
+    ],
+    [
+      checkout.sessions[0].id,
+      conversation(
+        'demo-checkout',
+        'The checkout e2e test fails about one run in five. Find out why and fix it.',
+        ago(40),
+        'The test clicked Pay before the card form finished loading. It now waits for the form to be ready. I opened #90, but e2e still fails on CI, so there is one more cause to find.',
+        7,
+      ),
     ],
     [
       ask.session.id,
