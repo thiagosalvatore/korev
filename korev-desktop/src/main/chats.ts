@@ -40,6 +40,7 @@ import { errorMessage, NotFoundError, type Context } from './context';
 import {
   branchExists,
   createCheckpoint,
+  gitDirs,
   hasUpstream,
   renameBranch,
   restoreCheckpoint,
@@ -445,6 +446,10 @@ export function createChats(
     const repo = ctx.repo(workspace.repoId);
     const linked = linkedWorkspaces(workspace);
     const config = await workspaceConfig(ctx, workspace);
+    const linkedPaths = linked.map((entry) => entry.workspace.path);
+    const gitDirsPerCheckout = await Promise.all(
+      [workspace.path, ...linkedPaths].map((dir) => gitDirs(ctx.git, dir)),
+    );
     return {
       cwd: workspace.path,
       env: await scriptEnv(ctx, repo, workspace),
@@ -456,7 +461,8 @@ export function createChats(
       ),
       readOnly: false,
       addDirs: [
-        ...linked.map((entry) => entry.workspace.path),
+        ...linkedPaths,
+        ...gitDirsPerCheckout.flat(),
         await readableAttachments(),
       ],
     };

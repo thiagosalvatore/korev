@@ -121,11 +121,19 @@ export async function startPoint(git: Git, repo: string, base: string) {
   return (await hasRemoteBranch(git, repo, base)) ? `origin/${base}` : base;
 }
 
+export async function gitDirs(git: Git, worktree: string): Promise<string[]> {
+  const output = await git.run(worktree, [
+    'rev-parse',
+    '--path-format=absolute',
+    '--git-common-dir',
+    '--absolute-git-dir',
+  ]);
+  return [...new Set(output.trim().split('\n'))];
+}
+
 async function excludeContextDir(git: Git, worktree: string): Promise<void> {
-  const commonDir = (
-    await git.run(worktree, ['rev-parse', '--git-common-dir'])
-  ).trim();
-  const excludeFile = path.resolve(worktree, commonDir, 'info', 'exclude');
+  const [commonDir] = await gitDirs(git, worktree);
+  const excludeFile = path.join(commonDir, 'info', 'exclude');
   const existing = await readFile(excludeFile, 'utf8').catch(() => '');
   const entry = `/${CONTEXT_DIR}/`;
   if (existing.split('\n').includes(entry)) return;
