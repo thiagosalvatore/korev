@@ -46,20 +46,20 @@ export function Chat({
     );
 
   const respond = (itemId: string, response: PermissionResponse) =>
-    void attempt('Korev could not send your answer', () =>
+    attempt('Korev could not send your answer', () =>
       api.respondPermission(session.id, itemId, response),
     );
 
   const codexPlan = finishedCodexPlan(session, items, running);
 
   const approvePlan = (lanes: PlanLane[]) =>
-    void attempt('Korev could not approve the plan', () =>
+    attempt('Korev could not approve the plan', () =>
       api.approvePlan(session.id, lanes),
     );
 
   const handoff = onHandoff
     ? () =>
-        void attempt('Korev could not hand off the plan', async () => {
+        attempt('Korev could not hand off the plan', async () => {
           const result = await api.handoffPlan(session.id);
           if (result.ok) onHandoff(result.value);
           return result;
@@ -67,7 +67,7 @@ export function Chat({
     : undefined;
 
   const keepPlanning = (feedback: string) =>
-    void attempt('Korev could not send your feedback', () =>
+    attempt('Korev could not send your feedback', () =>
       api.send(session.id, {
         text: feedback,
         agent: session.agent,
@@ -117,6 +117,7 @@ export function Chat({
           }
           contentContainerStyle={styles.transcript}
           keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
         />
       ) : (
         <ActivityIndicator style={styles.fill} />

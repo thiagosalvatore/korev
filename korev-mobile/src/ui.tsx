@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 import { useTheme, type Theme } from './theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger';
@@ -20,25 +20,40 @@ export function Button({
   onPress,
   variant = 'primary',
   disabled = false,
+  pending = false,
 }: {
   label: string;
   onPress: () => void;
   variant?: ButtonVariant;
   disabled?: boolean;
+  pending?: boolean;
 }) {
   const colors = variantColors(useTheme(), variant);
   return (
     <Pressable
       accessibilityRole="button"
-      disabled={disabled}
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: disabled || pending, busy: pending }}
+      disabled={disabled || pending}
       onPress={onPress}
       style={[
         styles.button,
         { backgroundColor: colors.background },
-        disabled && styles.disabled,
+        disabled && !pending && styles.disabled,
       ]}
     >
-      <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
+      <Text
+        style={[styles.label, { color: colors.text }, pending && styles.hidden]}
+      >
+        {label}
+      </Text>
+      {pending ? (
+        <ActivityIndicator
+          size="small"
+          color={colors.text}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
     </Pressable>
   );
 }
@@ -92,5 +107,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   disabled: { opacity: 0.4 },
+  hidden: { opacity: 0 },
   label: { fontSize: 15, fontWeight: '600' },
 });

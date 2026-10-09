@@ -14,7 +14,7 @@ import {
 } from '../../../../korev-desktop/src/shared/model';
 import { attempt } from '../../attempt';
 import { Chat } from '../../chat/Chat';
-import { useAppState } from '../../hooks';
+import { useAppState, usePendingAction } from '../../hooks';
 import { useConnection } from '../../korev';
 import { PrBar } from '../../PrBar';
 import { useTheme, type Theme } from '../../theme';
@@ -37,6 +37,8 @@ function SessionTabs({
 }) {
   const { api } = useConnection();
   const theme = useTheme();
+  const { pending, run } = usePendingAction();
+  const creating = pending !== null;
 
   async function newChat() {
     const session = await api.newSession(
@@ -71,11 +73,18 @@ function SessionTabs({
       ))}
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ busy: creating }}
+        disabled={creating}
         style={styles.tab}
         onPress={() =>
-          void attempt('Korev could not start a chat', () => newChat())
+          void run('new-chat', () =>
+            attempt('Korev could not start a chat', newChat),
+          )
         }
       >
+        {creating ? (
+          <ActivityIndicator size="small" color={theme.accentText} />
+        ) : null}
         <Text style={styles.tabText}>+ New chat</Text>
       </Pressable>
     </ScrollView>

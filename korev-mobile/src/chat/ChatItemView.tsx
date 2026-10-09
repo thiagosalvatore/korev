@@ -234,8 +234,8 @@ export function ChatItemView({
   item: ChatItem;
   sessionId: string;
   running: boolean;
-  onRespond(itemId: string, response: PermissionResponse): void;
-  onHandoff?(): void;
+  onRespond(itemId: string, response: PermissionResponse): Promise<boolean>;
+  onHandoff?(): Promise<boolean>;
 }) {
   const styles = useStyles();
   switch (item.kind) {

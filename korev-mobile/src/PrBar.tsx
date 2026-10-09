@@ -21,6 +21,7 @@ import {
   type WorkspaceRuntime,
 } from '../../korev-desktop/src/shared/model';
 import { attempt } from './attempt';
+import { usePendingAction } from './hooks';
 import { useConnection } from './korev';
 import { useTheme, type Theme } from './theme';
 import { Button } from './ui';
@@ -38,24 +39,23 @@ const CHECK_MARKS: Record<CheckState, string> = {
   skipped: '–',
 };
 
-function confirm(title: string, action: string, onConfirm: () => void) {
-  Alert.alert(title, undefined, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: action, onPress: onConfirm },
-  ]);
+function confirm(title: string, action: string): Promise<boolean> {
+  return new Promise((resolve) =>
+    Alert.alert(title, undefined, [
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+      { text: action, onPress: () => resolve(true) },
+    ]),
+  );
 }
 
-function confirmThenLeave(
+async function confirmThenLeave(
   title: string,
   action: string,
   failure: string,
   run: () => Promise<unknown>,
 ) {
-  confirm(
-    title,
-    action,
-    () => void attempt(failure, run).then((done) => done && router.back()),
-  );
+  if (!(await confirm(title, action))) return;
+  if (await attempt(failure, run)) router.back();
 }
 
 function runStep(
@@ -68,13 +68,13 @@ function runStep(
   const label = PR_STEPS[step].label;
   const failure = `Korev could not ${label.toLowerCase()}`;
   if (!pr || step === 'create')
-    return void attempt(failure, () => api.createPr(workspace.id, sessionId));
+    return attempt(failure, () => api.createPr(workspace.id, sessionId));
   if (step === 'fix-errors')
-    return void attempt(failure, () =>
+    return attempt(failure, () =>
       api.fixChecks(workspace.id, sessionId, pr.number),
     );
   if (step === 'resolve-conflicts')
-    return void attempt(failure, () =>
+    return attempt(failure, () =>
       api.resolveConflicts(workspace.id, sessionId, pr.number),
     );
   if (MERGE_STEPS.has(step))
@@ -85,7 +85,7 @@ function runStep(
     return confirmThenLeave(`Archive ${workspace.name}?`, label, failure, () =>
       api.archiveWorkspace(workspace.id),
     );
-  void Linking.openURL(pr.url);
+  return Linking.openURL(pr.url);
 }
 
 function checkColor(theme: Theme, state: CheckState): string {
@@ -108,6 +108,7 @@ export function PrBar({
   const theme = useTheme();
   const styles = makeStyles(theme);
   const [showChecks, setShowChecks] = useState(false);
+  const { pending, run } = usePendingAction();
   const pr = primaryPr(workspace, runtime);
   const step = nextPrStep(pr);
   const needsChat = PROMPT_STEPS.has(step);
@@ -131,8 +132,13 @@ export function PrBar({
         <Button
           label={PR_STEPS[step].label}
           variant={PR_STEPS[step].tone}
+          pending={pending !== null}
           disabled={needsChat && !sessionId}
-          onPress={() => runStep(api, step, workspace, pr, sessionId ?? '')}
+          onPress={() =>
+            void run(step, () =>
+              runStep(api, step, workspace, pr, sessionId ?? ''),
+            )
+          }
         />
       </View>
       {showChecks &&

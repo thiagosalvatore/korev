@@ -1,12 +1,5 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type {
   AppState,
   AskChat,
@@ -16,7 +9,7 @@ import { repoSections } from '../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../attempt';
 import { MicButton, RecordingBar } from '../VoiceInput';
 import { useDictation } from '../dictation';
-import { useModelChoice } from '../hooks';
+import { useModelChoice, usePendingAction } from '../hooks';
 import { useConnection } from '../korev';
 import { ModelPicker } from '../ModelPicker';
 import { RepoPicker } from '../RepoPicker';
@@ -45,7 +38,7 @@ export function NewAskForm({
   const firstRepoId = initialRepoId ?? repos[0]?.id;
   const [repoIds, setRepoIds] = useState(firstRepoId ? [firstRepoId] : []);
   const [question, setQuestion] = useState('');
-  const [asking, setAsking] = useState(false);
+  const asking = usePendingAction();
   const { agent, model, effort, choose } = useModelChoice(state.settings);
   const dictation = useDictation((spoken) =>
     setQuestion(
@@ -56,10 +49,10 @@ export function NewAskForm({
   const text = question.trim();
 
   async function ask() {
-    setAsking(true);
+    let created: AskChat | undefined;
     await attempt('Korev could not ask the question', async () => {
-      const created = await api.createAskChat(repoIds);
-      const sent = await api.send(created.session.id, {
+      created = await api.createAskChat(repoIds);
+      return api.send(created.session.id, {
         text,
         agent,
         model: model || created.session.model,
@@ -67,10 +60,8 @@ export function NewAskForm({
         planMode: false,
         fast: false,
       });
-      onAsked(created);
-      return sent;
     });
-    setAsking(false);
+    if (created) onAsked(created);
   }
 
   return (
@@ -107,12 +98,12 @@ export function NewAskForm({
             onChange={choose}
           />
         </View>
-        {asking ? <ActivityIndicator /> : null}
         <MicButton status={state.dictation} dictation={dictation} />
         <Button
           label="Ask"
-          disabled={asking || !text || !repoIds.length || dictating}
-          onPress={() => void ask()}
+          pending={asking.pending !== null}
+          disabled={!text || !repoIds.length || dictating}
+          onPress={() => void asking.run('ask', ask)}
         />
       </View>
     </ScrollView>

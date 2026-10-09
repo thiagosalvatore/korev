@@ -21,6 +21,7 @@ import {
   type PermissionStatus,
   type PlanLane,
 } from '../../../korev-desktop/src/shared/model';
+import { usePendingAction } from '../hooks';
 import { MONO_FONT, useTheme, type Theme } from '../theme';
 import { Button } from '../ui';
 import { MarkdownView } from './MarkdownView';
@@ -29,8 +30,8 @@ type PermissionItem = Extract<ChatItem, { kind: 'permission' }>;
 
 interface PermissionCardProps {
   item: PermissionItem;
-  onRespond(response: PermissionResponse): void;
-  onHandoff?(): void;
+  onRespond(response: PermissionResponse): Promise<boolean>;
+  onHandoff?(): Promise<boolean>;
 }
 
 const STATUS_LABELS: Record<Exclude<PermissionStatus, 'pending'>, string> = {
@@ -61,6 +62,9 @@ function Resolved({ item }: { item: PermissionItem }) {
 
 function ToolApproval({ item, onRespond }: PermissionCardProps) {
   const styles = useStyles();
+  const { pending, run } = usePendingAction({ holdOnSuccess: true });
+  const respond = (key: string, response: PermissionResponse) =>
+    void run(key, () => onRespond(response));
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Allow {item.tool}?</Text>
@@ -70,11 +74,18 @@ function ToolApproval({ item, onRespond }: PermissionCardProps) {
         </Text>
       ) : null}
       <View style={styles.actions}>
-        <Button label="Allow" onPress={() => onRespond({ allow: true })} />
+        <Button
+          label="Allow"
+          pending={pending === 'allow'}
+          disabled={pending !== null}
+          onPress={() => respond('allow', { allow: true })}
+        />
         <Button
           label="Deny"
           variant="secondary"
-          onPress={() => onRespond({ allow: false })}
+          pending={pending === 'deny'}
+          disabled={pending !== null}
+          onPress={() => respond('deny', { allow: false })}
         />
       </View>
     </View>
@@ -132,9 +143,9 @@ function LaneList({
 export interface PlanReviewProps {
   plan: string;
   showPlan: boolean;
-  onApprove(lanes: PlanLane[]): void;
-  onKeepPlanning(feedback: string): void;
-  onHandoff?(): void;
+  onApprove(lanes: PlanLane[]): Promise<boolean>;
+  onKeepPlanning(feedback: string): Promise<boolean>;
+  onHandoff?(): Promise<boolean>;
 }
 
 export function PlanReview({
@@ -150,6 +161,7 @@ export function PlanReview({
   const [here, ...others] = planLanes(plan);
   const [drafts, setDrafts] = useState(() => laneDrafts(others));
   const split = lanesToSplit(drafts);
+  const { pending, run } = usePendingAction({ holdOnSuccess: true });
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Plan ready for review</Text>
@@ -169,22 +181,35 @@ export function PlanReview({
         {split.length ? (
           <Button
             label={splitLabel(split.length)}
-            onPress={() => onApprove(split)}
+            pending={pending === 'split'}
+            disabled={pending !== null}
+            onPress={() => void run('split', () => onApprove(split))}
           />
         ) : null}
         <Button
           label={here ? 'Approve here' : 'Approve plan'}
           variant={split.length ? 'secondary' : 'primary'}
-          onPress={() => onApprove([])}
+          pending={pending === 'approve'}
+          disabled={pending !== null}
+          onPress={() => void run('approve', () => onApprove([]))}
         />
         {onHandoff ? (
-          <Button label="Hand off" variant="secondary" onPress={onHandoff} />
+          <Button
+            label="Hand off"
+            variant="secondary"
+            pending={pending === 'handoff'}
+            disabled={pending !== null}
+            onPress={() => void run('handoff', onHandoff)}
+          />
         ) : null}
         <Button
           label="Keep planning"
           variant="secondary"
-          disabled={!feedback.trim()}
-          onPress={() => onKeepPlanning(feedback)}
+          pending={pending === 'keep-planning'}
+          disabled={pending !== null || !feedback.trim()}
+          onPress={() =>
+            void run('keep-planning', () => onKeepPlanning(feedback))
+          }
         />
       </View>
     </View>
@@ -216,11 +241,13 @@ function QuestionField({
   const theme = useTheme();
   const [other, setOther] = useState('');
   const toggle = (label: string) => {
+    const chosen = other ? [] : value;
+    setOther('');
     if (!question.multiSelect) return onChange([label]);
     return onChange(
-      value.includes(label)
-        ? value.filter((entry) => entry !== label)
-        : [...value, label],
+      chosen.includes(label)
+        ? chosen.filter((entry) => entry !== label)
+        : [...chosen, label],
     );
   };
   return (
@@ -262,6 +289,7 @@ function QuestionForm({ item, onRespond }: PermissionCardProps) {
   const questions = item.questions ?? [];
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const response = answerQuestions(questions, answers);
+  const { pending, run } = usePendingAction({ holdOnSuccess: true });
   return (
     <View style={styles.card}>
       <Text style={styles.title}>The agent has a question</Text>
@@ -281,13 +309,18 @@ function QuestionForm({ item, onRespond }: PermissionCardProps) {
       <View style={styles.actions}>
         <Button
           label="Answer"
-          disabled={!response}
-          onPress={() => response && onRespond(response)}
+          pending={pending === 'answer'}
+          disabled={pending !== null || !response}
+          onPress={() =>
+            response && void run('answer', () => onRespond(response))
+          }
         />
         <Button
           label="Dismiss"
           variant="secondary"
-          onPress={() => onRespond(DISMISS_QUESTION)}
+          pending={pending === 'dismiss'}
+          disabled={pending !== null}
+          onPress={() => void run('dismiss', () => onRespond(DISMISS_QUESTION))}
         />
       </View>
     </View>

@@ -15,7 +15,7 @@ import { insertDictation } from '../../../korev-desktop/src/shared/dictation';
 import { attempt } from '../attempt';
 import { MicButton, RecordingBar } from '../VoiceInput';
 import { useDictation } from '../dictation';
-import { useKeyboardShown } from '../hooks';
+import { useKeyboardShown, usePendingAction } from '../hooks';
 import { useConnection } from '../korev';
 import { useTheme, type Theme } from '../theme';
 import { ICON_BUTTON_ICON_SIZE, IconButton } from '../ui';
@@ -58,10 +58,12 @@ export function Composer({
     setText((current) => insertDictation(current, current.length, spoken).text),
   );
   const dictating = dictation.phase !== 'idle';
+  const sending = usePendingAction();
   const canSend =
     Boolean(text.trim() || pendingPlan || attachments.length) &&
     !dictating &&
-    !uploading;
+    !uploading &&
+    sending.pending === null;
   const action = composerAction({
     canSend,
     running,
@@ -150,7 +152,7 @@ export function Composer({
         icon={<ArrowUp size={ICON_BUTTON_ICON_SIZE} color={theme.fgOnAccent} />}
         background={theme.accent}
         disabled={!canSend}
-        onPress={() => void send()}
+        onPress={() => void sending.run('send', send)}
       />
     );
   }

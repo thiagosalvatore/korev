@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Keyboard, Platform } from 'react-native';
 import {
   upsertChatItem,
@@ -105,4 +105,19 @@ export function useKeyboardShown(): boolean {
     };
   }, []);
   return shown;
+}
+
+export function usePendingAction({ holdOnSuccess = false } = {}) {
+  const running = useRef(false);
+  const [pending, setPending] = useState<string | null>(null);
+  async function run(key: string, action: () => Promise<boolean | void>) {
+    if (running.current) return;
+    running.current = true;
+    setPending(key);
+    const succeeded = await action();
+    if (holdOnSuccess && succeeded) return;
+    running.current = false;
+    setPending(null);
+  }
+  return { pending, run };
 }
