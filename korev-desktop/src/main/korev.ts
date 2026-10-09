@@ -193,7 +193,15 @@ export interface KorevDeps extends CoreDeps {
   openPath(target: string): Promise<void>;
   openExternal(url: string): Promise<void>;
   applyTheme(theme: Settings['theme']): void;
-  remote: Pick<RemoteAccess, 'status' | 'pairing' | 'apply' | 'revoke'>;
+  remote: Pick<
+    RemoteAccess,
+    | 'status'
+    | 'pairing'
+    | 'apply'
+    | 'revoke'
+    | 'registerPushToken'
+    | 'unregisterPushToken'
+  >;
   dictation: Pick<Dictation, 'status' | 'prepare' | 'transcribe'>;
   appVersion: string;
   fetchRelease(which: 'latest' | string): Promise<Release | null>;
@@ -1317,6 +1325,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     updateSettings,
     remotePairing: () => deps.remote.pairing(),
     revokeRemoteDevices: () => deps.remote.revoke(),
+    registerPushToken: (token) => deps.remote.registerPushToken(token),
+    unregisterPushToken: (token) => deps.remote.unregisterPushToken(token),
     prepareDictation: async () => deps.dictation.prepare(),
     transcribe: (audioBase64) =>
       deps.dictation.transcribe(

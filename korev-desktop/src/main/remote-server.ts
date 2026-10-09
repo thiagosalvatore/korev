@@ -40,6 +40,8 @@ export const REMOTE_METHODS = [
   'mergePr',
   'repoIcon',
   'createAskChat',
+  'registerPushToken',
+  'unregisterPushToken',
   'deleteAskChat',
   'prepareDictation',
   'transcribe',

@@ -184,6 +184,8 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
         pairing: async () => null,
         apply: applyRemote,
         revoke: async () => undefined,
+        registerPushToken: async () => undefined,
+        unregisterPushToken: async () => undefined,
       },
       dictation: {
         status: () => ({ status: 'missing' }),

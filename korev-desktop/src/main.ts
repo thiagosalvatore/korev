@@ -33,7 +33,10 @@ import { nodeFileSystem } from './main/file-system';
 import { registerIpcHandlers } from './main/ipc';
 import { createKorev, type Korev } from './main/korev';
 import { childEnv, resolveLoginPath } from './main/login-path';
-import { sendPhoneNotification } from './main/phone-notifications';
+import {
+  sendPhoneNotification,
+  sendPushNotifications,
+} from './main/phone-notifications';
 import { createQuitGate, type QuitGate } from './main/quit-gate';
 import { createDictation, WHISPER_MODELS } from './main/dictation';
 import { createRemoteAccess } from './main/remote-access';
@@ -55,6 +58,7 @@ const DEV_USER_DATA_DIR = 'Korev Dev';
 const COMMAND_EVENT = 'command';
 const FINISHED_SOUND = '/System/Library/Sounds/Glass.aiff';
 const REMOTE_TOKEN_FILE = 'remote-token';
+const PUSH_TOKENS_FILE = 'push-tokens.json';
 const TAILNET_STATE_DIR = 'tailscale';
 const TAILNET_BINARY = 'korev-tailnet';
 const TAILNET_BIN_DIR = 'tailnet/bin';
@@ -101,6 +105,7 @@ function tailnetBinary(): string {
 
 const remote = createRemoteAccess({
   tokenPath: path.join(app.getPath('userData'), REMOTE_TOKEN_FILE),
+  pushTokensPath: path.join(app.getPath('userData'), PUSH_TOKENS_FILE),
   api: () => korevApp?.api ?? {},
   startTailnet: tailnetStarter({
     binary: tailnetBinary(),
@@ -166,6 +171,11 @@ function showNotice(korev: () => Korev | null, notice: Notice) {
     );
   });
   notification.show();
+}
+
+async function pushToPairedPhones(notice: Notice) {
+  const stale = await sendPushNotifications(await remote.pushTokens(), notice);
+  for (const token of stale) await remote.unregisterPushToken(token);
 }
 
 function playSound() {
@@ -265,6 +275,7 @@ async function createKorevApp(): Promise<Korev> {
         korevApp?.settings().phoneNotificationsUrl ?? '',
         notice,
       );
+      void pushToPairedPhones(notice);
     },
     playSound,
     isWindowFocused: () => BrowserWindow.getFocusedWindow() !== null,

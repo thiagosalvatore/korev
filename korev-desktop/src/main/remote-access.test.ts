@@ -49,13 +49,18 @@ let tailnet: FakeTailnet | null;
 beforeEach(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'korev-remote-'));
   onChange = vi.fn();
-  remote = createRemoteAccess({
+  remote = openRemoteAccess();
+});
+
+function openRemoteAccess() {
+  return createRemoteAccess({
     tokenPath: path.join(dir, 'remote-token'),
+    pushTokensPath: path.join(dir, 'push-tokens.json'),
     api: () => ({ getState: async () => ({}) as never }),
     startTailnet: (_port, changed) => (tailnet = fakeTailnet(changed)),
     onChange,
   });
-});
+}
 
 async function applySignedIn() {
   await remote.apply(ON);
@@ -112,6 +117,27 @@ describe('remote access', () => {
     expect(after.token).not.toBe(before.token);
     expect((await getState(after.url, before.token)).status).toBe(401);
     expect((await getState(after.url, after.token)).status).toBe(200);
+  });
+
+  it('remembers push tokens until devices are revoked', async () => {
+    await remote.registerPushToken('ExponentPushToken[phone]');
+    await remote.registerPushToken('ExponentPushToken[phone]');
+    await expect(
+      remote.registerPushToken('not a push token'),
+    ).rejects.toThrow();
+    expect(await openRemoteAccess().pushTokens()).toEqual([
+      'ExponentPushToken[phone]',
+    ]);
+
+    await remote.revoke();
+    expect(await openRemoteAccess().pushTokens()).toEqual([]);
+  });
+
+  it('forgets a push token the phone unregisters', async () => {
+    await remote.registerPushToken('ExponentPushToken[phone]');
+    await remote.registerPushToken('ExponentPushToken[tablet]');
+    await remote.unregisterPushToken('ExponentPushToken[phone]');
+    expect(await remote.pushTokens()).toEqual(['ExponentPushToken[tablet]']);
   });
 
   it('reports why the server did not start', async () => {
