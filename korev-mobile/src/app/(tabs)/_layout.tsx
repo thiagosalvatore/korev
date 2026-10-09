@@ -12,6 +12,7 @@ import { useAppState } from '../../hooks';
 import { useKorev } from '../../korev';
 import { openNewAsk, openNewWorkspace } from '../../navigation';
 import { confirmUnpair } from '../../Offline';
+import { useOpenTappedWorkspace } from '../../push';
 import { useTheme, type Theme } from '../../theme';
 import { CHROME_FONT_SCALE } from '../../ui';
 
@@ -94,6 +95,7 @@ export default function TabsLayout() {
   const styles = makeStyles(theme);
   const { pairing, unpair } = useKorev();
   const state = useAppState();
+  useOpenTappedWorkspace();
   const waiting = state
     ? Object.values(state.runtime).filter((entry) => entry.status === 'waiting')
         .length

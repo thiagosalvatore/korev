@@ -16,6 +16,7 @@ import {
   type Connection,
 } from './connection';
 import { succeeded } from './haptics';
+import { registerForPush, unregisterFromPush } from './push';
 
 const REVOKED =
   'Korev on your Mac no longer accepts this phone. Scan a new code.';
@@ -38,6 +39,8 @@ export function KorevProvider({ children }: { children: ReactNode }) {
   const [unpairReason, setUnpairReason] = useState<string | null>(null);
 
   async function unpair() {
+    const saved = await loadPairing();
+    if (saved) await unregisterFromPush(saved);
     await clearPairing();
     setConnection(null);
     setPairing(null);
@@ -51,6 +54,7 @@ export function KorevProvider({ children }: { children: ReactNode }) {
   function open(saved: RemotePairing) {
     setPairing(saved);
     setConnection(connect(saved, () => void revoked()));
+    void registerForPush(saved);
   }
 
   async function pair(next: RemotePairing, signal?: AbortSignal) {

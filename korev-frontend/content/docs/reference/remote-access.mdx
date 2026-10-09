@@ -97,7 +97,19 @@ An agent waits for an answer to a permission prompt, a question or a plan only w
 
 ## Phone notifications
 
-Korev can send its notifications to your phone through [ntfy](https://ntfy.sh). Korev sends one when an agent finishes or needs your input while the Korev window is not in focus. This is the same rule as for Mac notifications.
+Korev sends a notification to your phone when an agent finishes or needs your input while the Korev window is not in focus. This is the same rule as for Mac notifications.
+
+### Korev phone app
+
+A phone that is paired with the Korev app gets these notifications with no setup. The app asks for permission to show notifications the first time it connects. Tap a notification to open its workspace.
+
+The Mac sends each notification through Expo's push service, which passes it to Apple or Google. The message holds the workspace name and the chat title. When you click **Revoke all**, Korev also stops sending notifications to all paired phones.
+
+To make a client of your own get these notifications, send `registerPushToken` with an Expo push token (`ExponentPushToken[...]`) to `/call`. Send `unregisterPushToken` with the same token to stop them.
+
+### ntfy
+
+Without the Korev app, Korev can send its notifications to your phone through [ntfy](https://ntfy.sh).
 
 1. Install the ntfy app on your phone and subscribe to a topic. Pick a long topic name that nobody can guess.
 2. In **Settings → General → Phone notifications**, enter the topic URL, for example `https://ntfy.sh/<topic>`.
