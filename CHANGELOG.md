@@ -4,20 +4,24 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
-### Fixed
+## [0.10.0] - 2026-10-10
 
-- Codex can reach GitHub in Plan mode and Ask chats. Before, commands such as `gh pr view` failed with "error connecting to api.github.com".
-
-## [0.10.0] - 2026-10-09
-
-Pull request numbers in agent replies open the pull request, and Codex can commit in a workspace.
+A task in several repositories gets one plan, and each repository gets its own part of it.
 
 ### New
 
+- **One plan for several repositories.** When you pick more than one repository for a new workspace, only the agent in the first repository starts. It reads every repository and writes one plan, with one lane for each repository that needs changes. The other workspaces wait. When you approve the plan, each lane goes to the workspace of its repository. On the lanes card, you can choose the repository of each lane.
+- **One sidebar entry for linked workspaces.** Workspaces that are linked across repositories show once in the sidebar, under the repository of the first workspace. Each row shows its repository name. A workspace that waits shows "Waits for the plan in" and the name of that repository. The next version of the phone app shows the same entry.
+- **Reorder from your phone.** In the next version of the phone app, long-press a repository or folder on the Workspaces tab, then drag the grips to change the order. The phone app needs this version on your Mac to do this.
+- **Review your pull requests.** The Review button gives the agent the open pull requests of the workspace. The agent reviews each pull request against its own base branch, so a stack of pull requests gets a correct review.
 - **Clickable pull requests.** When an agent reply mentions a pull request as "#239", "owner/repo#5" or a link, click it to open the pull request. This works on your Mac and in the phone app. "#239" links only when the repository is on GitHub.
+- **Shorter names.** Branch names that the AI makes have 1 to 3 words, and chat titles have 2 to 4 words.
 
 ### Fixed
 
+- Codex can reach GitHub in Plan mode and Ask chats. Before, commands such as `gh pr view` failed with "error connecting to api.github.com".
+- Scrollbars are thin and dark in dark mode. Before, when macOS always showed scrollbars, they were wide and light, and the tab strip had a white scrollbar.
+- Korev saves its state correctly when you quit. Before, the save could fail if Korev was already saving at that time.
 - Codex can commit in a workspace. Before, `git add` failed with an error about `index.lock`.
 - You can create a workspace from a pull request when a local branch with the same name already exists. Before, this failed with "Not possible to fast-forward" if the pull request had changed since you last worked on it.
 - Search, New workspace, Ask and Grid in the sidebar stay highlighted while they are open.
