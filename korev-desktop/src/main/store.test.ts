@@ -1,5 +1,8 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { FileSystem } from './file-system';
+import { nodeFileSystem, type FileSystem } from './file-system';
 import { openStore } from './store';
 
 function fileSystemWith(state: unknown): FileSystem {
@@ -55,5 +58,22 @@ describe('openStore', () => {
     );
     expect(store.state.settings.defaultModels.codex).toBe('');
     expect(store.state.workspaces[0].sessions[0].model).toBe('');
+  });
+
+  it('saves the state when two flushes overlap', async () => {
+    const userData = await mkdtemp(path.join(tmpdir(), 'korev-store-'));
+    try {
+      const store = await openStore(nodeFileSystem, userData, '/home');
+
+      await Promise.all([store.flush(), store.flush()]);
+
+      const saved = await readFile(
+        path.join(userData, 'korev-state.json'),
+        'utf8',
+      );
+      expect(JSON.parse(saved).workspaces).toEqual([]);
+    } finally {
+      await rm(userData, { recursive: true, force: true });
+    }
   });
 });

@@ -184,11 +184,15 @@ export async function openStore(
   }
   const state = sanitize(parsed, home);
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let lastWrite: Promise<void> = Promise.resolve();
 
-  async function flush() {
+  function flush() {
     if (timer) clearTimeout(timer);
     timer = null;
-    await fs.writeAtomic(statePath, JSON.stringify(state, null, 2));
+    const write = () =>
+      fs.writeAtomic(statePath, JSON.stringify(state, null, 2));
+    lastWrite = lastWrite.catch(() => undefined).then(write);
+    return lastWrite;
   }
 
   return {
