@@ -85,6 +85,7 @@ const SETTINGS: Settings = {
   notifications: true,
   notificationSound: true,
   keepAwake: true,
+  signAgentCommits: false,
   remoteAccess: true,
   remotePort: 0,
   phoneNotificationsUrl: '',
