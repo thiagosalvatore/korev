@@ -1157,6 +1157,23 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect((await workspaceState(member.id)).workspace.awaitsLane).toBe(false);
   });
 
+  it('sends a lane without a repository to the repository its name matches', async () => {
+    const { lead, member } = await createAcrossRepos('make-plan billing');
+    await waitUntilCreated(member.id);
+    const permissionId = await waitForPermission(lead.sessions[0].id);
+
+    await korev.api.respondPermission(lead.sessions[0].id, permissionId, {
+      allow: true,
+      lanes: [{ name: 'API', body: 'Add it.' }],
+    });
+
+    await waitFor(
+      async () => (await userMessages(member.sessions[0].id)).length === 2,
+    );
+    const { workspaces } = await korev.api.getState();
+    expect(workspaces.map((ws) => ws.id)).toEqual([lead.id, member.id]);
+  });
+
   it('stops a linked workspace waiting when the approved plan has no lane for it', async () => {
     const { lead, member } = await createAcrossRepos('make-plan billing');
     await waitUntilCreated(member.id);
