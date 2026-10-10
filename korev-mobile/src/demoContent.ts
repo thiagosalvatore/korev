@@ -134,6 +134,7 @@ export function demoWorkspace(
     restoredAt: null,
     archiveSnapshot: null,
     keepAfterMerge: false,
+    awaitsLane: false,
     sessions: [session],
     prs: [],
   };
