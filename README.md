@@ -11,7 +11,7 @@ Each task gets a git worktree with its own chats, terminal, diff and pull reques
 
 [![Latest release](https://img.shields.io/github/v/release/thiagosalvatore/korev?label=release)](https://github.com/thiagosalvatore/korev/releases/latest)
 [![macOS](https://img.shields.io/badge/platform-macOS-lightgrey?logo=apple)](https://github.com/thiagosalvatore/korev/releases/latest)
-[![License: FSL-1.1-MIT](https://img.shields.io/badge/license-FSL--1.1--MIT-blue)](LICENSE.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE.md)
 
 [**Download**](https://github.com/thiagosalvatore/korev/releases/latest) · [Docs](https://korev.ai/docs) · [Website](https://korev.ai) · [Changelog](CHANGELOG.md)
 
@@ -70,4 +70,4 @@ Bug reports and pull requests are welcome. [`CONTRIBUTING.md`](CONTRIBUTING.md) 
 
 ## License
 
-Korev is under the [Functional Source License 1.1, MIT Future License](LICENSE.md) (FSL-1.1-MIT). Each version becomes available under the MIT license two years after its release.
+Korev is under the [MIT License](LICENSE.md).
