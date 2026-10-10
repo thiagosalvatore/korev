@@ -8,7 +8,7 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { execFile } from 'node:child_process';
-import { cp } from 'node:fs/promises';
+import { cp, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { version } from './package.json';
@@ -24,6 +24,13 @@ const TAILNET_DIR = 'tailnet';
 const TAILNET_BIN_DIR = `${TAILNET_DIR}/bin`;
 const TAILNET_BINARY = 'korev-tailnet';
 const GO_ARCH: Record<string, string> = { arm64: 'arm64', x64: 'amd64' };
+const SIGNER_DIR = 'signer';
+const SIGNER_BIN_DIR = `${SIGNER_DIR}/bin`;
+const SIGNER_BINARY = 'korev-sign';
+const SIGNER_SOURCE = 'main.swift';
+const SWIFT_ARCH: Record<string, string> = { arm64: 'arm64', x64: 'x86_64' };
+const SWIFT_MIN_MACOS = 'macos12';
+const DARWIN = 'darwin';
 
 interface NativePackage {
   dir: string;
@@ -51,6 +58,11 @@ const NATIVE_PACKAGES: NativePackage[] = [
     dir: TAILNET_BIN_DIR,
     runtimeFiles: (platform, arch) => [`${platform}-${arch}`],
   },
+  {
+    dir: SIGNER_BIN_DIR,
+    runtimeFiles: (platform, arch) =>
+      platform === DARWIN ? [`${platform}-${arch}`] : [],
+  },
 ];
 
 async function buildTailnet(platform: string, arch: string) {
@@ -68,6 +80,25 @@ async function buildTailnet(platform: string, arch: string) {
       cwd: TAILNET_DIR,
       env: { ...process.env, GOOS: platform, GOARCH: GO_ARCH[arch] ?? arch },
     },
+  );
+}
+
+async function buildSigner(platform: string, arch: string) {
+  if (platform !== DARWIN) return;
+  const outputDir = path.join('bin', `${platform}-${arch}`);
+  await mkdir(path.join(SIGNER_DIR, outputDir), { recursive: true });
+  await promisify(execFile)(
+    'xcrun',
+    [
+      'swiftc',
+      '-O',
+      '-target',
+      `${SWIFT_ARCH[arch] ?? arch}-apple-${SWIFT_MIN_MACOS}`,
+      '-o',
+      path.join(outputDir, SIGNER_BINARY),
+      SIGNER_SOURCE,
+    ],
+    { cwd: SIGNER_DIR },
   );
 }
 
@@ -120,7 +151,10 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   hooks: {
-    generateAssets: (_config, platform, arch) => buildTailnet(platform, arch),
+    generateAssets: async (_config, platform, arch) => {
+      await buildTailnet(platform, arch);
+      await buildSigner(platform, arch);
+    },
     packageAfterCopy: (_config, buildPath, _electronVersion, platform, arch) =>
       copyNativePackages(buildPath, platform, arch),
     postPackage: async (_config, { platform, outputPaths }) => {
