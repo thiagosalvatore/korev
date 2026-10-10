@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Icon, Spinner } from '../../design-system';
+import { Button, Icon, Spinner } from '../../design-system';
 import {
   AGENT_LABELS,
   finishedCodexPlan,
@@ -11,12 +11,17 @@ import {
   type ModelChoice,
   type Workspace,
 } from '../../shared/model';
-import { handoffPlan, openDiff, openFile } from '../actions';
+import { handoffPlan, openDiff, openFile, selectWorkspace } from '../actions';
 import { api } from '../bridge';
 import { loadoutChoices, modelChoices } from '../../shared/format';
 import { useRepoGithubUrl, useTranscript } from '../hooks';
 import { reportFailure, toast } from '../ui/toast';
-import { laneRepos } from '../../shared/workspaces';
+import {
+  crossRepoLead,
+  groupRepoName,
+  laneRepos,
+  waitsForLane,
+} from '../../shared/workspaces';
 import {
   EMPTY_WORKSPACE_UI,
   updateWorkspaceUi,
@@ -53,13 +58,40 @@ function latestContext(items: ChatItem[] | null): ContextUsage | null {
   return result?.kind === 'result' ? (result.context ?? null) : null;
 }
 
+function WaitingForLane({ lead, repo }: { lead: Workspace; repo: string }) {
+  return (
+    <div className="flex max-w-md flex-col items-center gap-3 text-center">
+      <Icon name="link" size={22} className="text-fg-3" />
+      <p className="m-0 text-sm text-fg-2">
+        This workspace's agent starts when you approve the plan in {repo}.
+      </p>
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={() => selectWorkspace(lead.id)}
+      >
+        Open {repo}
+      </Button>
+    </div>
+  );
+}
+
 function EmptyChat({
+  state,
   session,
   workspace,
 }: {
+  state: AppState;
   session: ChatSession;
   workspace: Workspace;
 }) {
+  const lead = waitsForLane(state, workspace)
+    ? crossRepoLead(state, workspace)
+    : null;
+  if (lead)
+    return (
+      <WaitingForLane lead={lead} repo={groupRepoName(state, lead) ?? ''} />
+    );
   return (
     <div className="flex max-w-md flex-col items-center gap-2 text-center">
       <Icon
@@ -149,7 +181,11 @@ export function ChatView({
           empty={
             empty ??
             (workspace ? (
-              <EmptyChat session={session} workspace={workspace} />
+              <EmptyChat
+                state={state}
+                session={session}
+                workspace={workspace}
+              />
             ) : null)
           }
           onRevert={(itemId) => void revert(itemId)}

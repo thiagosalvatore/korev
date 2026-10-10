@@ -117,14 +117,68 @@ export function activeWorkspaces(state: AppState): Workspace[] {
   );
   const active = state.workspaces.filter((ws) => !ws.archivedAt);
   const groupStart = groupStartTimes(active);
+  const leads = crossRepoLeads(state);
   const startOf = (ws: Workspace) =>
     (ws.groupId && groupStart.get(ws.groupId)) || ws.createdAt;
+  const orderOf = (ws: Workspace) =>
+    repoOrder.get(sidebarRepoId(leads, ws)) ?? 0;
   return active.sort(
     (a, b) =>
-      (repoOrder.get(a.repoId) ?? 0) - (repoOrder.get(b.repoId) ?? 0) ||
+      orderOf(a) - orderOf(b) ||
       startOf(a).localeCompare(startOf(b)) ||
+      (a.groupId ?? a.id).localeCompare(b.groupId ?? b.id) ||
       a.createdAt.localeCompare(b.createdAt),
   );
+}
+
+function activeGroups(state: AppState): Map<string, Workspace[]> {
+  const groups = new Map<string, Workspace[]>();
+  for (const ws of state.workspaces) {
+    if (!ws.groupId || ws.archivedAt) continue;
+    groups.set(ws.groupId, [...(groups.get(ws.groupId) ?? []), ws]);
+  }
+  return groups;
+}
+
+export function crossRepoLeads(state: AppState): Map<string, Workspace> {
+  const leads = new Map<string, Workspace>();
+  for (const [groupId, members] of activeGroups(state)) {
+    if (new Set(members.map((ws) => ws.repoId)).size < 2) continue;
+    const created = members.find(
+      (ws) => state.runtime[ws.id]?.status !== 'failed',
+    );
+    leads.set(groupId, created ?? members[0]);
+  }
+  return leads;
+}
+
+export function sidebarRepoId(
+  leads: Map<string, Workspace>,
+  workspace: Workspace,
+): string {
+  const lead = workspace.groupId ? leads.get(workspace.groupId) : undefined;
+  return lead?.repoId ?? workspace.repoId;
+}
+
+export function crossRepoLead(
+  state: AppState,
+  workspace: Workspace,
+): Workspace | null {
+  if (!workspace.groupId) return null;
+  return crossRepoLeads(state).get(workspace.groupId) ?? null;
+}
+
+export function groupRepoName(
+  state: AppState,
+  workspace: Workspace,
+): string | null {
+  if (!crossRepoLead(state, workspace)) return null;
+  return state.repos.find((repo) => repo.id === workspace.repoId)?.name ?? null;
+}
+
+export function waitsForLane(state: AppState, workspace: Workspace): boolean {
+  const lead = crossRepoLead(state, workspace);
+  return workspace.awaitsLane && lead !== null && lead.id !== workspace.id;
 }
 
 function groupStartTimes(workspaces: Workspace[]): Map<string, string> {

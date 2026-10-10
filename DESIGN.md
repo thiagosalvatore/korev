@@ -22,7 +22,8 @@ Three columns:
 
 - **Left sidebar** (`--sidebar-w`): Search (⌘K), New workspace (⌘N), Ask, then the Ask
   chats, then one group per repository with its workspaces, then History (archived
-  workspaces), then Add repository and Settings.
+  workspaces), then Add repository and Settings. A workspace linked across repositories
+  shows once, under the repository of its lead workspace (see Linked group).
 - **Centre**: the workspace header (workspace name, branch, target branch, Open in, PR number,
   the next git action), a tab strip (chats, Changes, open files) and the active tab.
 - **Right panel** (`--panel-w`): the git panel (All files / Changes / Checks) on top and
@@ -44,6 +45,21 @@ as the current row.
   (green open, red failing checks, amber conflicts or running checks, purple merged);
   otherwise a branch icon.
 - Right: `+N −M` against the target branch, and the unread dot.
+
+## Linked group
+
+Workspaces linked across repositories share one name and one branch, so the sidebar shows them
+as one entry under the lead's repository:
+
+- A label line that you cannot click: a link icon and the shared name, in `text-xs fg-3`.
+- One indented row per member. Line 1 is the repository name, not the branch. Line 2 is the
+  branch, or "Waits for the plan in <lead repository>" while the member waits for its lane.
+- Each row keeps its own status icon, unread dot and ⌘N.
+- A waiting member's empty chat says its agent starts when the plan is approved, with
+  **Open <lead repository>**.
+- The workspace header and the Grid pane header put the repository name before the workspace
+  name.
+- When the lead is archived or fails, the next member becomes the lead.
 
 ## Next git action
 

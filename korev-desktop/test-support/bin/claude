@@ -10,6 +10,14 @@ IFS= read -r message
 echo '{"type":"system","subtype":"init","session_id":"fake-session"}'
 echo '{"type":"user","message":{"role":"user","content":"ack"}}'
 case "$message" in
+  *make-lanes*"lane of the plan below"*)
+    echo "written by the fake agent" > agent-note.txt
+    ;;
+  *make-lanes*)
+    printf '%s\n' '{"type":"assistant","message":{"id":"p2","content":[{"type":"tool_use","id":"plan-2","name":"ExitPlanMode","input":{"plan":"# Billing\n\n## Lanes\n### acme-web\nBuild the page.\n### acme-api\nAdd the endpoint."}}]}}'
+    printf '%s\n' '{"type":"control_request","request_id":"req-lanes","request":{"subtype":"can_use_tool","tool_name":"ExitPlanMode","input":{"plan":"# Billing\n\n## Lanes\n### acme-web\nBuild the page.\n### acme-api\nAdd the endpoint."},"requires_user_interaction":true}}'
+    IFS= read -r answer
+    ;;
   *make-plan*)
     echo '{"type":"assistant","message":{"id":"p1","content":[{"type":"tool_use","id":"plan-1","name":"ExitPlanMode","input":{"plan":"1. Add the login page"}}]}}'
     echo '{"type":"control_request","request_id":"req-plan","request":{"subtype":"can_use_tool","tool_name":"ExitPlanMode","input":{"plan":"1. Add the login page"},"requires_user_interaction":true}}'

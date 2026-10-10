@@ -23,8 +23,8 @@ function git(cwd: string, ...args: string[]) {
   execFileSync('git', args, { cwd });
 }
 
-async function createRepo(home: string): Promise<string> {
-  const repo = path.join(home, 'acme-web');
+async function createRepo(home: string, name = 'acme-web'): Promise<string> {
+  const repo = path.join(home, name);
   execFileSync('git', ['init', '-q', '-b', 'main', repo]);
   git(repo, 'config', 'user.email', 'dev@example.com');
   git(repo, 'config', 'user.name', 'Dev Person');
@@ -52,6 +52,14 @@ async function runningAgents(window: Page): Promise<number> {
 
 async function waitForAgentsToFinish(window: Page) {
   await expect.poll(() => runningAgents(window)).toBe(0);
+}
+
+async function pickRepositories(window: Page, names: string[]) {
+  const first = window.getByRole('checkbox', { name: names[0] });
+  if (!(await first.isVisible()))
+    await window.getByRole('button', { name: 'Repositories' }).click();
+  for (const name of names)
+    await window.getByRole('checkbox', { name }).check();
 }
 
 function launchApp(home: string) {
@@ -130,6 +138,72 @@ test('creates a workspace, runs an agent turn, shows the diff and archives it', 
       window.getByRole('heading', { name: 'New workspace' }),
     ).toBeVisible();
     await expect(window.getByRole('region', { name: 'History' })).toBeVisible();
+    await waitForAgentsToFinish(window);
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('plans a task across two repositories once and hands each its lane', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const web = await createRepo(home);
+  const api = await createRepo(home, 'acme-api');
+  const { app, window } = await launch(home, web);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await expect(
+      window.getByRole('heading', { name: 'New workspace' }),
+    ).toBeVisible();
+    await app.evaluate(({ dialog }, repoPath) => {
+      dialog.showOpenDialog = (async () => ({
+        canceled: false,
+        filePaths: [repoPath],
+      })) as typeof dialog.showOpenDialog;
+    }, api);
+    await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'addRepo',
+        [],
+      ),
+    );
+    const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
+    await expect(
+      sidebar.getByRole('region', { name: 'acme-api' }),
+    ).toBeVisible();
+    await pickRepositories(window, ['acme-web', 'acme-api']);
+    await expect(
+      window.getByRole('button', { name: 'Plan mode' }),
+    ).toBeVisible();
+    await window
+      .getByRole('textbox', { name: 'Message' })
+      .fill('make-lanes for billing');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+
+    const group = sidebar.getByRole('group', { name: /^Linked workspace / });
+    const member = group.getByRole('button', { name: /in acme-api$/ });
+    await expect(member).toContainText('Waits for the plan in acme-web');
+    await member.click();
+    await expect(
+      window.getByText(/starts when you approve the plan in acme-web/),
+    ).toBeVisible();
+    await window.getByRole('button', { name: 'Open acme-web' }).click();
+    await expect(
+      window.getByRole('combobox', { name: 'Repository for acme-api' }),
+    ).toBeVisible();
+    await snap(window, '07-lanes-across-repositories');
+    await window
+      .getByRole('button', { name: 'Approve and split off 1 lane' })
+      .click();
+
+    await expect(member).not.toContainText('Waits for the plan');
+    await member.click();
+    await expect(
+      window.getByRole('main').getByText('I added agent-note.txt.'),
+    ).toBeVisible();
+    await expect(
+      sidebar.getByRole('button', { name: /^Workspace .+ in acme-/ }),
+    ).toHaveCount(2);
     await waitForAgentsToFinish(window);
   } finally {
     await app.close();

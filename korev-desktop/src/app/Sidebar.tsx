@@ -24,7 +24,10 @@ import {
 import {
   activeWorkspaces,
   asksNewestFirst,
+  crossRepoLeads,
   repoSections,
+  sidebarRepoId,
+  waitsForLane,
 } from '../shared/workspaces';
 import {
   archiveWorkspace,
@@ -197,26 +200,38 @@ function LinkedIcon({
   );
 }
 
+interface GroupMember {
+  repo: string;
+  waitsOn: string | null;
+}
+
 function WorkspaceRow({
   state,
   workspace,
   selected,
   index,
+  member,
 }: {
   state: AppState;
   workspace: Workspace;
   selected: boolean;
   index: number;
+  member?: GroupMember;
 }) {
   const runtime = state.runtime[workspace.id];
   const stats = runtime?.stats;
   const hasStats = stats && (stats.additions > 0 || stats.deletions > 0);
+  const title = member ? member.repo : workspace.branch;
   return (
     <div
       role="button"
       tabIndex={0}
       aria-current={selected ? 'page' : undefined}
-      aria-label={`Workspace ${workspace.name}`}
+      aria-label={
+        member
+          ? `Workspace ${workspace.name} in ${member.repo}`
+          : `Workspace ${workspace.name}`
+      }
       {...draggable(WORKSPACE_DRAG_TYPE, workspace.id)}
       onClick={() => selectWorkspace(workspace.id)}
       onKeyDown={(event) => {
@@ -240,13 +255,23 @@ function WorkspaceRow({
               ? 'font-semibold text-fg-1'
               : 'font-medium',
           )}
-          title={workspace.branch}
+          title={title}
         >
-          {workspace.branch}
+          {title}
         </span>
         <span className="flex items-center gap-1.5 text-xs text-fg-3">
-          <LinkedIcon state={state} workspace={workspace} />
-          <span className="truncate">{workspace.name}</span>
+          {member ? (
+            <span className="truncate">
+              {member.waitsOn
+                ? `Waits for the plan in ${member.waitsOn}`
+                : workspace.branch}
+            </span>
+          ) : (
+            <>
+              <LinkedIcon state={state} workspace={workspace} />
+              <span className="truncate">{workspace.name}</span>
+            </>
+          )}
           {runtime?.message ? (
             <span className="truncate text-danger-text">
               · {runtime.message}
@@ -462,11 +487,71 @@ function moveToFolderItems(
   ];
 }
 
+function sidebarEntries(
+  workspaces: Workspace[],
+  leads: Map<string, Workspace>,
+): Workspace[][] {
+  const entries: Workspace[][] = [];
+  for (const workspace of workspaces) {
+    const last = entries.at(-1);
+    const grouped = workspace.groupId !== null && leads.has(workspace.groupId);
+    if (grouped && last?.[0].groupId === workspace.groupId)
+      last.push(workspace);
+    else entries.push([workspace]);
+  }
+  return entries;
+}
+
+function LinkedGroup({
+  state,
+  lead,
+  members,
+  selectedId,
+  indexOf,
+}: {
+  state: AppState;
+  lead: Workspace;
+  members: Workspace[];
+  selectedId: string | null;
+  indexOf: (workspace: Workspace) => number;
+}) {
+  const repoName = (workspace: Workspace) =>
+    state.repos.find((repo) => repo.id === workspace.repoId)?.name ?? '';
+  return (
+    <div
+      role="group"
+      aria-label={`Linked workspace ${lead.name}`}
+      className="flex flex-col gap-0.5"
+    >
+      <div className="flex h-6 items-center gap-1.5 px-2 text-xs text-fg-3">
+        <Icon name="link" size={11} />
+        <span className="truncate">{lead.name}</span>
+      </div>
+      <div className="flex flex-col gap-0.5 pl-3">
+        {members.map((workspace) => (
+          <WorkspaceRow
+            key={workspace.id}
+            state={state}
+            workspace={workspace}
+            selected={workspace.id === selectedId}
+            index={indexOf(workspace)}
+            member={{
+              repo: repoName(workspace),
+              waitsOn: waitsForLane(state, workspace) ? repoName(lead) : null,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RepoGroup({
   state,
   repo,
   folderId,
   workspaces,
+  leads,
   selectedId,
   indexOf,
 }: {
@@ -474,6 +559,7 @@ function RepoGroup({
   repo: Repo;
   folderId: string | null;
   workspaces: Workspace[];
+  leads: Map<string, Workspace>;
   selectedId: string | null;
   indexOf: (workspace: Workspace) => number;
 }) {
@@ -569,15 +655,27 @@ function RepoGroup({
       ) : null}
       {collapsed ? null : (
         <div className="mt-0.5 flex flex-col gap-0.5">
-          {workspaces.map((workspace) => (
-            <WorkspaceRow
-              key={workspace.id}
-              state={state}
-              workspace={workspace}
-              selected={workspace.id === selectedId}
-              index={indexOf(workspace)}
-            />
-          ))}
+          {sidebarEntries(workspaces, leads).map(([first, ...rest]) => {
+            const lead = first.groupId ? leads.get(first.groupId) : undefined;
+            return lead ? (
+              <LinkedGroup
+                key={first.id}
+                state={state}
+                lead={lead}
+                members={[first, ...rest]}
+                selectedId={selectedId}
+                indexOf={indexOf}
+              />
+            ) : (
+              <WorkspaceRow
+                key={first.id}
+                state={state}
+                workspace={first}
+                selected={first.id === selectedId}
+                index={indexOf(first)}
+              />
+            );
+          })}
           {workspaces.length === 0 ? (
             <button
               type="button"
@@ -946,6 +1044,7 @@ export function Sidebar({ state }: { state: AppState }) {
   const pageKind = useUi((ui) => ui.page.kind);
   const paletteOpen = useUi((ui) => ui.palette !== false);
   const active = activeWorkspaces(state);
+  const leads = crossRepoLeads(state);
   const indexOf = (workspace: Workspace) => active.indexOf(workspace);
   return (
     <nav
@@ -1004,7 +1103,10 @@ export function Sidebar({ state }: { state: AppState }) {
               state={state}
               repo={repo}
               folderId={folder?.id ?? null}
-              workspaces={active.filter((ws) => ws.repoId === repo.id)}
+              workspaces={active.filter(
+                (ws) => sidebarRepoId(leads, ws) === repo.id,
+              )}
+              leads={leads}
               selectedId={selectedId}
               indexOf={indexOf}
             />
