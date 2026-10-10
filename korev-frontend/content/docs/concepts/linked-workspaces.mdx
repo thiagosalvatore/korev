@@ -12,12 +12,19 @@ All of them use the same workspace name and branch name.
 
 **Create from…** (branch, pull request or issue) works with one repository only.
 
+## One agent plans across the repositories
+
+When you create linked workspaces from the New workspace page, only the agent in the first repository starts. It starts in plan mode, reads every linked repository, and writes one plan. The plan ends with a **Lanes** section that has one lane per repository that needs changes. The other workspaces wait, and their agents start when you approve the plan. A workspace whose repository gets no lane stops waiting when you approve.
+
+When you start workspaces from an Ask chat that already has a plan, every agent starts at once, with that plan.
+
 ## Lanes from a plan
 
 A plan can have parts that can be built at the same time. The agent, Claude Code or Codex, ends such a plan with a **Lanes** section. The plan card then lists the lanes:
 
 - The first lane stays in this workspace.
 - Every ticked lane gets its own linked workspace in the same repository, branched from the same target branch. You can rename a lane before you approve.
+- In a workspace linked across repositories, each lane also has a repository picker. It is preset to the repository that the lane name matches. A lane goes to the waiting linked workspace of its repository. If that repository has no waiting workspace, the lane gets a new linked workspace there. The lane that stays in this workspace is the one for its own repository, and a plan can have just one lane, for example when only another repository needs changes.
 - An unticked lane stays in this workspace too.
 
 Press **Approve and split off N lanes**. Each new workspace gets the planning conversation and the plan, and its agent builds only its lane. The agent in this workspace is told which lanes are built elsewhere. **Approve here** builds every lane in this workspace.

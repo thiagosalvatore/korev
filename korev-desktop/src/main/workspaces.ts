@@ -2,9 +2,11 @@ import { realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
+  presetLaneRepo,
   type AgentKind,
   type ChatSession,
   type GitWorktree,
+  type LaneRepo,
   type PlanLane,
   type Repo,
   type RepoConfig,
@@ -376,19 +378,26 @@ export async function refreshStats(ctx: Context, workspace: Workspace) {
   }
 }
 
+function ownPartNote(repo: Repo): string {
+  return `This task spans several repositories. Each one has its own linked workspace and agent. You own the ${repo.name} part: change files in this workspace only. Your system prompt lists the linked workspaces, which you can read.`;
+}
+
+function leadNote(repo: Repo): string {
+  return `This task spans several repositories. Your system prompt lists their linked workspaces. Read all of them to explore and plan, and change files in this workspace only. End the plan with a "## Lanes" section that has one lane per repository that needs changes, each headed with the repository name. Leave out any repository that needs no changes. If ${repo.name} needs changes, put its lane first: this workspace builds only the ${repo.name} lane. The agent in each repository's linked workspace builds that repository's lane once the user approves the plan.`;
+}
+
+function leadsAlone(repos: Repo[], plan: string | null): boolean {
+  return repos.length > 1 && !plan;
+}
+
 export function firstPrompt(
   task: string,
   plan: string | null,
   repo: Repo,
   linked: boolean,
 ): string {
-  return [
-    task,
-    plan ? planBlock(plan) : null,
-    linked
-      ? `This task spans several repositories. Each one has its own linked workspace and agent. You own the ${repo.name} part: change files in this workspace only. Your system prompt lists the linked workspaces, which you can read.`
-      : null,
-  ]
+  const acrossRepos = plan ? ownPartNote(repo) : leadNote(repo);
+  return [task, plan ? planBlock(plan) : null, linked ? acrossRepos : null]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -448,6 +457,7 @@ function firstMessage(
   return {
     ...task,
     text: firstPrompt(task.text, plan, repo, acrossRepos),
+    planMode: task.planMode || (acrossRepos && !plan),
     model: task.model || session.model,
     effort: task.effort || session.effort,
   };
@@ -468,7 +478,7 @@ async function startCreated(
     workspaces.map(async (workspace, index) => {
       if (!created[index]) return;
       void startScript(ctx, workspace, 'setup');
-      if (task)
+      if (task && !workspace.awaitsLane)
         await send(
           workspace.sessions[0].id,
           firstMessage(task, plan, repos[index], workspace, repos.length > 1),
@@ -660,6 +670,7 @@ function addDraftWorkspace(
     restoredAt: null,
     archiveSnapshot: null,
     keepAfterMerge: false,
+    awaitsLane: false,
     sessions: [newChatSession(ctx, ctx.store.state.settings.defaultAgent)],
     prs: [],
   };
@@ -690,9 +701,21 @@ export function createWorkspaces(
     repos.flatMap((repo) => [...workspaceNames(ctx, repo.id)]),
   );
   const name = uniqueName(sourceName(source, task) || 'workspace', taken);
-  const workspaces = repos.map((repo) =>
-    addDraftWorkspace(ctx, repo, name, groupId, task, source),
-  );
+  const membersAwaitLane = leadsAlone(repos, plan);
+  const workspaces = repos.map((repo, index) => {
+    const awaitsLane = membersAwaitLane && index > 0;
+    const draftTask = awaitsLane ? null : task;
+    const workspace = addDraftWorkspace(
+      ctx,
+      repo,
+      name,
+      groupId,
+      draftTask,
+      source,
+    );
+    workspace.awaitsLane = awaitsLane;
+    return workspace;
+  });
   ctx.store.save();
   ctx.emitState();
   if (source.kind === 'new') {
@@ -711,6 +734,93 @@ function laneTask(lane: PlanLane): string {
   return `Implement the ${lane.name} lane of the plan below. The other lanes are built at the same time in linked workspaces, which your system prompt lists. Build only your lane.`;
 }
 
+function awaitingMember(ctx: Context, groupId: string, repoId: string) {
+  return ctx.store.state.workspaces.find(
+    (ws) =>
+      ws.groupId === groupId &&
+      ws.repoId === repoId &&
+      ws.awaitsLane &&
+      !ws.archivedAt &&
+      ctx.runtime(ws.id).status !== 'failed',
+  );
+}
+
+function sendLane(
+  ctx: Context,
+  member: Workspace,
+  laneOptions: SendOptions,
+  plan: string,
+  send: SendTask,
+) {
+  member.awaitsLane = false;
+  const repo = ctx.repo(member.repoId);
+  const message = firstMessage(laneOptions, plan, repo, member, false);
+  ctx.background(send(member.sessions[0].id, message));
+}
+
+function addLaneWorkspace(
+  ctx: Context,
+  origin: Workspace,
+  lane: PlanLane,
+  laneOptions: SendOptions,
+): Workspace {
+  const repo = ctx.repo(lane.repoId ?? origin.repoId);
+  const baseBranch =
+    repo.id === origin.repoId ? origin.baseBranch : repo.defaultBranch;
+  const name = uniqueName(
+    nameFromTask(lane.name),
+    workspaceNames(ctx, repo.id),
+  );
+  return addDraftWorkspace(ctx, repo, name, origin.groupId, laneOptions, {
+    kind: 'new',
+    baseBranch,
+  });
+}
+
+function leadsGroup(ctx: Context, workspace: Workspace): boolean {
+  const lead = ctx.store.state.workspaces.find(
+    (ws) =>
+      ws.groupId === workspace.groupId &&
+      !ws.archivedAt &&
+      ctx.runtime(ws.id).status !== 'failed',
+  );
+  return lead === workspace;
+}
+
+export function stopWaitingForLanes(ctx: Context, origin: Workspace) {
+  if (!origin.groupId || !leadsGroup(ctx, origin)) return;
+  const waiting = ctx.store.state.workspaces.filter(
+    (ws) => ws.groupId === origin.groupId && ws.awaitsLane,
+  );
+  for (const ws of waiting) ws.awaitsLane = false;
+  ctx.store.save();
+  ctx.emitState();
+}
+
+function groupRepos(ctx: Context, origin: Workspace): LaneRepo[] {
+  const repoIds = new Set([
+    origin.repoId,
+    ...ctx.store.state.workspaces
+      .filter((ws) => ws.groupId === origin.groupId && !ws.archivedAt)
+      .map((ws) => ws.repoId),
+  ]);
+  return [...repoIds].map((repoId) => {
+    const { id, name } = ctx.repo(repoId);
+    return { id, name };
+  });
+}
+
+function withLaneRepo(
+  ctx: Context,
+  origin: Workspace,
+  lane: PlanLane,
+): PlanLane {
+  if (lane.repoId) return lane;
+  const repos = groupRepos(ctx, origin);
+  if (repos.length < 2) return lane;
+  return { ...lane, repoId: presetLaneRepo(lane.name, repos) };
+}
+
 export function createLaneWorkspaces(
   ctx: Context,
   origin: Workspace,
@@ -719,34 +829,24 @@ export function createLaneWorkspaces(
   plan: string,
   send: SendTask,
 ) {
-  const repo = ctx.repo(origin.repoId);
   const groupId = (origin.groupId ??= ctx.deps.newId());
-  const source: WorkspaceSource = {
-    kind: 'new',
-    baseBranch: origin.baseBranch,
-  };
-  const taken = workspaceNames(ctx, repo.id);
-  const created = lanes.map((lane) => {
-    const name = uniqueName(nameFromTask(lane.name), taken);
-    taken.add(name);
+  const drafts: { workspace: Workspace; laneOptions: SendOptions }[] = [];
+  for (const lane of lanes.map((entry) => withLaneRepo(ctx, origin, entry))) {
     const laneOptions = { ...options, text: laneTask(lane) };
-    const workspace = addDraftWorkspace(
-      ctx,
-      repo,
-      name,
-      groupId,
-      laneOptions,
-      source,
-    );
-    return { workspace, laneOptions };
-  });
+    const member = lane.repoId && awaitingMember(ctx, groupId, lane.repoId);
+    if (member) sendLane(ctx, member, laneOptions, plan, send);
+    else {
+      const workspace = addLaneWorkspace(ctx, origin, lane, laneOptions);
+      drafts.push({ workspace, laneOptions });
+    }
+  }
   ctx.store.save();
   ctx.emitState();
-  for (const { workspace, laneOptions } of created) {
+  for (const { workspace, laneOptions } of drafts) {
     ctx.background(
       prepareNamedWorkspaces(
         ctx,
-        [repo],
+        [ctx.repo(workspace.repoId)],
         [workspace],
         Promise.resolve(workspace.name),
         laneOptions,

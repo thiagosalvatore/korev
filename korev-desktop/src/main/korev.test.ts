@@ -1076,19 +1076,46 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     );
   }
 
-  it('creates linked workspaces with one branch name across repositories', async () => {
-    await korev.api.updateSettings({ autoRenameBranches: true });
+  async function createAcrossRepos(text: string) {
     const acme = await addRepo();
     chosenDirectory = await initRepo('api');
     const api = await addRepo();
-
     const created = await korev.api.createWorkspaces(
       [acme.id, api.id],
-      task('Add a note'),
+      task(text),
     );
-
     if (!created.ok) throw new Error(created.message);
-    const [front, back] = await waitForLinkedTurns(created.value);
+    const [lead, member] = created.value;
+    return { api, lead, member };
+  }
+
+  async function waitForPermission(sessionId: string) {
+    let permissionId = '';
+    await waitFor(async () => {
+      const pending = (await korev.api.transcript(sessionId)).find(
+        (item) => item.kind === 'permission',
+      );
+      permissionId = pending?.id ?? '';
+      return Boolean(pending);
+    });
+    return permissionId;
+  }
+
+  it('starts only the lead agent, in plan mode, for a task across repositories', async () => {
+    await korev.api.updateSettings({ autoRenameBranches: true });
+    const { lead, member } = await createAcrossRepos('Add a note');
+    const drafts = (await korev.api.getState()).runtime;
+    expect([
+      drafts[lead.id].pendingPrompt,
+      drafts[member.id].pendingPrompt,
+    ]).toEqual(['Add a note', null]);
+
+    await waitUntilCreated(member.id);
+    await waitUntilCreated(lead.id);
+    await waitForTurn(lead.sessions[0].id);
+
+    const front = (await workspaceState(lead.id)).workspace;
+    const back = (await workspaceState(member.id)).workspace;
     expect(front.groupId).not.toBeNull();
     expect(back.groupId).toBe(front.groupId);
     expect([front.branch, back.branch]).toEqual([
@@ -1098,9 +1125,121 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(
       await readFile(path.join(front.path, '.context', 'claude-args'), 'utf8'),
     ).toContain(`--add-dir ${back.path}`);
+    expect(front.sessions[0].planMode).toBe(true);
     expect(await userMessages(front.sessions[0].id)).toEqual([
-      expect.stringContaining('You own the acme part'),
+      expect.stringContaining('Read all of them to explore and plan'),
     ]);
+    expect(await userMessages(back.sessions[0].id)).toEqual([]);
+    expect([front.awaitsLane, back.awaitsLane]).toEqual([false, true]);
+
+    await sendAndWait(back.sessions[0].id, 'Start here');
+    expect((await workspaceState(member.id)).workspace.awaitsLane).toBe(false);
+  });
+
+  it('sends a lane to the linked workspace of its repository', async () => {
+    const { api, lead, member } = await createAcrossRepos('make-plan billing');
+    await waitUntilCreated(member.id);
+    const permissionId = await waitForPermission(lead.sessions[0].id);
+
+    await korev.api.respondPermission(lead.sessions[0].id, permissionId, {
+      allow: true,
+      lanes: [{ name: 'Billing API', body: 'Add it.', repoId: api.id }],
+    });
+
+    await waitFor(
+      async () => (await userMessages(member.sessions[0].id)).length === 2,
+    );
+    const { workspaces } = await korev.api.getState();
+    expect(workspaces.map((ws) => ws.id)).toEqual([lead.id, member.id]);
+    const lanePrompt = (await userMessages(member.sessions[0].id)).at(-1);
+    expect(lanePrompt).toContain('Implement the Billing API lane');
+    expect(lanePrompt).toContain('<plan>\n1. Add the login page\n</plan>');
+    expect((await workspaceState(member.id)).workspace.awaitsLane).toBe(false);
+  });
+
+  it('sends a lane without a repository to the repository its name matches', async () => {
+    const { lead, member } = await createAcrossRepos('make-plan billing');
+    await waitUntilCreated(member.id);
+    const permissionId = await waitForPermission(lead.sessions[0].id);
+
+    await korev.api.respondPermission(lead.sessions[0].id, permissionId, {
+      allow: true,
+      lanes: [{ name: 'API', body: 'Add it.' }],
+    });
+
+    await waitFor(
+      async () => (await userMessages(member.sessions[0].id)).length === 2,
+    );
+    const { workspaces } = await korev.api.getState();
+    expect(workspaces.map((ws) => ws.id)).toEqual([lead.id, member.id]);
+  });
+
+  it('stops a linked workspace waiting when the approved plan has no lane for it', async () => {
+    const { lead, member } = await createAcrossRepos('make-plan billing');
+    await waitUntilCreated(member.id);
+    const permissionId = await waitForPermission(lead.sessions[0].id);
+
+    await korev.api.respondPermission(lead.sessions[0].id, permissionId, {
+      allow: true,
+    });
+
+    await waitFor(
+      async () => !(await workspaceState(member.id)).workspace.awaitsLane,
+    );
+    expect(await userMessages(member.sessions[0].id)).toEqual([]);
+  });
+
+  it('starts a new workspace for a second lane in the same repository', async () => {
+    const { api, lead, member } = await createAcrossRepos('make-plan billing');
+    await waitUntilCreated(member.id);
+    const permissionId = await waitForPermission(lead.sessions[0].id);
+
+    await korev.api.respondPermission(lead.sessions[0].id, permissionId, {
+      allow: true,
+      lanes: [
+        { name: 'Billing API', body: 'Add it.', repoId: api.id },
+        { name: 'Billing jobs', body: 'Add them.', repoId: api.id },
+      ],
+    });
+
+    const { workspaces } = await korev.api.getState();
+    const added = workspaces.filter(
+      (ws) => ws.id !== lead.id && ws.id !== member.id,
+    );
+    expect(added.map((ws) => [ws.repoId, ws.groupId])).toEqual([
+      [api.id, lead.groupId],
+    ]);
+    await waitFor(
+      async () => (await userMessages(member.sessions[0].id)).length === 2,
+    );
+    await waitFor(
+      async () => (await userMessages(added[0].sessions[0].id)).length === 2,
+    );
+    expect((await userMessages(member.sessions[0].id)).at(-1)).toContain(
+      'Implement the Billing API lane',
+    );
+    expect((await userMessages(added[0].sessions[0].id)).at(-1)).toContain(
+      'Implement the Billing jobs lane',
+    );
+  });
+
+  it('starts a new workspace for a lane whose linked workspace is archived', async () => {
+    const { api, lead, member } = await createAcrossRepos('make-plan billing');
+    await waitUntilCreated(member.id);
+    const permissionId = await waitForPermission(lead.sessions[0].id);
+    await korev.api.archiveWorkspace(member.id);
+
+    await korev.api.respondPermission(lead.sessions[0].id, permissionId, {
+      allow: true,
+      lanes: [{ name: 'Billing API', body: 'Add it.', repoId: api.id }],
+    });
+
+    const { workspaces } = await korev.api.getState();
+    const lane = workspaces.find(
+      (ws) => ws.id !== lead.id && ws.id !== member.id,
+    );
+    expect(lane?.repoId).toBe(api.id);
+    expect(lane?.groupId).toBe(lead.groupId);
   });
 
   it('starts linked workspaces from the plan in an Ask chat', async () => {

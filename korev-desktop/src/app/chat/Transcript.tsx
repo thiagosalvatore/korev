@@ -15,6 +15,7 @@ import {
 } from '../../design-system';
 import type {
   ChatItem,
+  LaneRepo,
   PermissionResponse,
   Todo,
   TurnChanges,
@@ -473,6 +474,7 @@ export interface TranscriptProps {
   onRevert: (itemId: string) => void;
   onRespond: (itemId: string, response: PermissionResponse) => void;
   onHandoff?: () => void;
+  laneRepos?: LaneRepo[];
   onRetry: (text: string) => void;
   onOpenTurnFile: (file: string, range: TurnRange) => void;
   onOpenFile?: (file: string, line: number | null) => void;
@@ -490,6 +492,7 @@ export function Transcript({
   onRevert,
   onRespond,
   onHandoff,
+  laneRepos,
   onRetry,
   onOpenTurnFile,
   onOpenFile,
@@ -585,6 +588,7 @@ export function Transcript({
                 <PermissionCard
                   key={item.id}
                   item={item}
+                  laneRepos={laneRepos}
                   onRespond={(response) => onRespond(item.id, response)}
                   onHandoff={onHandoff}
                 />

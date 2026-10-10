@@ -208,6 +208,7 @@ export interface Workspace {
   restoredAt: string | null;
   archiveSnapshot: Checkpoint | null;
   keepAfterMerge: boolean;
+  awaitsLane: boolean;
   sessions: ChatSession[];
   prs: TrackedPr[];
 }
@@ -672,20 +673,55 @@ export function latestPlan(items: ChatItem[]): string | null {
 export interface PlanLane {
   name: string;
   body: string;
+  repoId?: string;
 }
 
 export interface LaneDraft extends PlanLane {
   split: boolean;
 }
 
-export function laneDrafts(lanes: PlanLane[]): LaneDraft[] {
-  return lanes.map((lane) => ({ ...lane, split: true }));
+export interface LaneRepo {
+  id: string;
+  name: string;
+}
+
+export function presetLaneRepo(laneName: string, repos: LaneRepo[]): string {
+  const lane = laneName.toLowerCase();
+  const nameOf = (repo: LaneRepo) => repo.name.toLowerCase();
+  const exact = repos.find((repo) => nameOf(repo) === lane);
+  const partial = repos.find(
+    (repo) => nameOf(repo).includes(lane) || lane.includes(nameOf(repo)),
+  );
+  return (exact ?? partial ?? repos[0]).id;
+}
+
+export function laneHere(
+  lanes: PlanLane[],
+  repos: LaneRepo[],
+): { here: PlanLane | undefined; others: PlanLane[] } {
+  const index = repos.length
+    ? lanes.findIndex(
+        (lane) => presetLaneRepo(lane.name, repos) === repos[0].id,
+      )
+    : 0;
+  return { here: lanes[index], others: lanes.filter((_, at) => at !== index) };
+}
+
+export function laneDrafts(
+  lanes: PlanLane[],
+  repos: LaneRepo[] = [],
+): LaneDraft[] {
+  return lanes.map((lane) => ({
+    ...lane,
+    split: true,
+    repoId: repos.length ? presetLaneRepo(lane.name, repos) : undefined,
+  }));
 }
 
 export function lanesToSplit(drafts: LaneDraft[]): PlanLane[] {
   return drafts
     .filter((draft) => draft.split && draft.name.trim())
-    .map(({ name, body }) => ({ name: name.trim(), body }));
+    .map(({ name, body, repoId }) => ({ name: name.trim(), body, repoId }));
 }
 
 export function splitLabel(count: number): string {
@@ -709,7 +745,7 @@ const LANES_HEADING = '## Lanes';
 const LANE_PREFIX = '### ';
 const SECTION_PREFIX = '## ';
 
-export function planLanes(plan: string): PlanLane[] {
+export function planLanes(plan: string, minimum = 2): PlanLane[] {
   const lines = plan.split('\n');
   const start = lines.findIndex((line) => line.trim() === LANES_HEADING);
   if (start === -1) return [];
@@ -720,7 +756,7 @@ export function planLanes(plan: string): PlanLane[] {
       lanes.push({ name: line.slice(LANE_PREFIX.length).trim(), body: '' });
     else if (lanes.length) lanes.at(-1)!.body += `${line}\n`;
   }
-  if (lanes.length < 2) return [];
+  if (lanes.length < minimum) return [];
   return lanes.map((lane) => ({ ...lane, body: lane.body.trim() }));
 }
 
