@@ -41,6 +41,7 @@ import { loadRepoConfig, withPrompt } from './repo-config';
 import {
   allocatePort,
   copyIncludedFiles,
+  firstWords,
   includePatterns,
   nameFromTask,
   truncateName,
@@ -54,10 +55,11 @@ const NEW_CHAT_TITLE = 'New chat';
 const NAMING_TIMEOUT_MS = 60_000;
 const NAMING_MODEL = 'claude-haiku-4-5';
 const NAMING_TASK_CHARS = 4_000;
+const SUGGESTED_NAME_WORDS = 3;
 const NAMING_SYSTEM_PROMPT =
-  'You name git branches. Given a task, reply with a 2 to 4 word lowercase kebab-case branch name and nothing else.';
+  'You name git branches. Given a task, reply with a 1 to 3 word lowercase kebab-case branch name and nothing else. Use short words and skip filler such as "the", "fix-the" or "update".';
 const TITLE_SYSTEM_PROMPT =
-  "You title chat conversations. Given the user's first message, reply with a 3 to 6 word title in sentence case, without quotes or trailing punctuation, and nothing else.";
+  "You title chat conversations. Given the user's first message, reply with a 2 to 4 word title in sentence case, without quotes or trailing punctuation, and nothing else.";
 const SURROUNDING_QUOTES = /^["'`]+|["'`]+$/g;
 const NAMING_ARGS = [
   '-p',
@@ -205,7 +207,10 @@ export async function suggestName(
     withPrompt(NAMING_SYSTEM_PROMPT, extraPrompt),
     task,
   );
-  return truncateName(slugify(answer ?? '')) || null;
+  return (
+    truncateName(firstWords(slugify(answer ?? ''), SUGGESTED_NAME_WORDS)) ||
+    null
+  );
 }
 
 export async function suggestTitle(

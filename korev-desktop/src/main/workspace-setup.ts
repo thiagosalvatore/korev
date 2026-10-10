@@ -27,9 +27,13 @@ export function truncateName(name: string): string {
   return name.slice(0, NAME_MAX_CHARS).replace(/-+$/, '');
 }
 
+export function firstWords(slug: string, count: number): string {
+  return slug.split('-').slice(0, count).join('-');
+}
+
 export function nameFromTask(text: string | null): string {
   if (!text) return EMPTY_WORKSPACE_NAME;
-  const words = slugify(text).split('-').slice(0, TASK_NAME_WORDS).join('-');
+  const words = firstWords(slugify(text), TASK_NAME_WORDS);
   return truncateName(words) || EMPTY_WORKSPACE_NAME;
 }
 
