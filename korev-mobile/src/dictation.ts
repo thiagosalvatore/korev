@@ -28,6 +28,7 @@ export function useDictation(onText: (text: string) => void) {
   const recorder = useAudioRecorder(SPEECH_RECORDING);
   const recording = useAudioRecorderState(recorder, METERING_INTERVAL_MS);
   const [transcribing, setTranscribing] = useState(false);
+  const [locked, setLocked] = useState(false);
 
   async function start() {
     const permission = await requestRecordingPermissionsAsync();
@@ -45,6 +46,8 @@ export function useDictation(onText: (text: string) => void) {
   }
 
   async function stopRecording(): Promise<File | null> {
+    setLocked(false);
+    if (!recorder.isRecording) return null;
     await recorder.stop();
     await setAudioModeAsync({ allowsRecording: false });
     return recorder.uri ? new File(recorder.uri) : null;
@@ -72,9 +75,11 @@ export function useDictation(onText: (text: string) => void) {
 
   return {
     phase,
+    locked,
     metering: recording.metering,
     durationMillis: recording.durationMillis,
-    start: () => void attempt('Korev could not start recording', start),
+    start: () => attempt('Korev could not start recording', start),
+    lock: () => setLocked(recorder.isRecording),
     done: () => void done(),
     cancel: () => void cancel(),
   };
