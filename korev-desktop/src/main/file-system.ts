@@ -1,4 +1,5 @@
 import {
+  appendFile,
   mkdir,
   readFile,
   rename,
@@ -11,6 +12,7 @@ import { dirname } from 'node:path';
 export interface FileSystem {
   read(path: string): Promise<Buffer | null>;
   writeAtomic(path: string, contents: Buffer | string): Promise<void>;
+  append(path: string, contents: string): Promise<void>;
   remove(path: string): Promise<void>;
   link(target: string, path: string): Promise<void>;
   makeDir(path: string): Promise<void>;
@@ -42,6 +44,9 @@ export const nodeFileSystem: FileSystem = {
     const tempPath = `${path}${TEMP_SUFFIX}`;
     await writeFile(tempPath, contents, { mode: 0o600 });
     await rename(tempPath, path);
+  },
+  async append(path, contents) {
+    await appendFile(path, contents);
   },
   async remove(path) {
     await rm(path, { force: true });
@@ -84,6 +89,15 @@ export function createMemoryFileSystem(
     },
     async writeAtomic(path, contents) {
       files.set(path, Buffer.from(contents));
+    },
+    async append(path, contents) {
+      files.set(
+        path,
+        Buffer.concat([
+          files.get(path) ?? Buffer.alloc(0),
+          Buffer.from(contents),
+        ]),
+      );
     },
     async remove(path) {
       files.delete(path);

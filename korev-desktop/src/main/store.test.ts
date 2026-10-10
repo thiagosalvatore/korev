@@ -9,6 +9,7 @@ function fileSystemWith(state: unknown): FileSystem {
   return {
     read: async () => Buffer.from(JSON.stringify(state)),
     writeAtomic: async () => undefined,
+    append: async () => undefined,
     remove: async () => undefined,
     link: async () => undefined,
     makeDir: async () => undefined,
