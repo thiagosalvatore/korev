@@ -226,6 +226,8 @@ export const REMOTE_METHODS = [
   'deleteAskChat',
   'prepareDictation',
   'transcribe',
+  'moveRepo',
+  'moveFolder',
 ] as const satisfies readonly (keyof KorevApi)[];
 
 export type RemoteMethod = (typeof REMOTE_METHODS)[number];

@@ -19,7 +19,6 @@ import {
   type PromptKind,
   type PrStatus,
   type Repo,
-  type RepoFolder,
   type ReleaseInfo,
   type RepoScripts,
   type TerminalPreset,
@@ -31,6 +30,12 @@ import {
   type WorkspaceSource,
   type WorkspaceStatus,
 } from '../shared/model';
+import {
+  movedFolder,
+  movedRepo,
+  rootItems,
+  type MovedOrder,
+} from '../shared/workspaces';
 import { detectAgents, reconcileDefaultModels } from './agents';
 import type { Dictation } from './dictation';
 import type { RemoteAccess } from './remote-access';
@@ -75,12 +80,7 @@ import { rangeFileDiff, rangeFiles, searchFiles } from './git-review';
 import { findLocalUrl } from './workspace-setup';
 import { createSpotlight } from './spotlight';
 import { repoFavicon } from './repo-icon';
-import {
-  ATTACHMENTS_DIR,
-  attachmentsDir,
-  openStore,
-  type PersistedState,
-} from './store';
+import { ATTACHMENTS_DIR, attachmentsDir, openStore } from './store';
 import { createTerminals, type SpawnPty } from './terminals';
 import { isNewer, type Release } from './updates';
 import {
@@ -217,32 +217,6 @@ export interface Korev {
   showWhatsNew(): Promise<void>;
   emitState(): void;
   shutdown(): Promise<void>;
-}
-
-function moveBefore<T extends { id: string }>(
-  items: T[],
-  item: T,
-  beforeId: string | null,
-): T[] {
-  if (beforeId === item.id) return items;
-  const rest = items.filter((entry) => entry !== item);
-  const index = rest.findIndex((entry) => entry.id === beforeId);
-  rest.splice(index === -1 ? rest.length : index, 0, item);
-  return rest;
-}
-
-function rootItems({
-  repos,
-  folders,
-  rootOrder,
-}: PersistedState): (Repo | RepoFolder)[] {
-  const inFolder = (repo: Repo) =>
-    folders.some((folder) => folder.id === repo.folderId);
-  const unordered = [...repos.filter((repo) => !inFolder(repo)), ...folders];
-  const ordered = rootOrder.flatMap(
-    (id) => unordered.find((item) => item.id === id) ?? [],
-  );
-  return [...ordered, ...unordered.filter((item) => !ordered.includes(item))];
 }
 
 const IDLE: WorkspaceRuntime = {
@@ -799,12 +773,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     return found;
   }
 
-  function moveToRoot(item: Repo | RepoFolder, beforeId: string | null) {
-    store.state.rootOrder = moveBefore(
-      rootItems(store.state),
-      item,
-      beforeId,
-    ).map((entry) => entry.id);
+  function applyMove(moved: MovedOrder) {
+    store.state.repos = moved.repos;
+    store.state.rootOrder = moved.rootOrder;
+    saveAndEmit();
   }
 
   function saveAndEmit() {
@@ -968,20 +940,14 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       }
       saveAndEmit();
     },
-    async moveRepo(repoId, { folderId, beforeId }) {
-      const repo = ctx.repo(repoId);
-      if (folderId === null) {
-        repo.folderId = null;
-        moveToRoot(repo, beforeId);
-      } else {
-        repo.folderId = folder(folderId).id;
-        store.state.repos = moveBefore(store.state.repos, repo, beforeId);
-      }
-      saveAndEmit();
+    async moveRepo(repoId, destination) {
+      ctx.repo(repoId);
+      if (destination.folderId !== null) folder(destination.folderId);
+      applyMove(movedRepo(store.state, repoId, destination));
     },
     async moveFolder(folderId, beforeId) {
-      moveToRoot(folder(folderId), beforeId);
-      saveAndEmit();
+      folder(folderId);
+      applyMove(movedFolder(store.state, folderId, beforeId));
     },
     createWorkspaces: async (repoIds, task, source) =>
       createWorkspaces(ctx, repoIds, task, chats.send, null, source),

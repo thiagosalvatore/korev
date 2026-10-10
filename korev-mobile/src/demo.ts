@@ -13,6 +13,10 @@ import {
   type Workspace,
   type WorkspaceRuntime,
 } from '../../korev-desktop/src/shared/model';
+import {
+  movedFolder,
+  movedRepo,
+} from '../../korev-desktop/src/shared/workspaces';
 import { apiFor, createEventListeners } from './bridge';
 import type { Connection, ConnectionStatus } from './connection';
 import {
@@ -533,6 +537,12 @@ export function createDemoConnection(): Connection {
     async prepareDictation() {},
     async transcribe() {
       return DEMO_DICTATION;
+    },
+    async moveRepo(repoId, destination) {
+      setState({ ...state, ...movedRepo(state, repoId, destination) });
+    },
+    async moveFolder(folderId, beforeId) {
+      setState({ ...state, ...movedFolder(state, folderId, beforeId) });
     },
   };
 
