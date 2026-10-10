@@ -38,6 +38,7 @@ import {
   userSlug,
 } from './git';
 import { askWorktreePath } from './ask-worktrees';
+import { signingEnv, signingKey } from './commit-signing';
 import { DEFAULT_SHELL } from './login-path';
 import { loadRepoConfig, withPrompt } from './repo-config';
 import {
@@ -132,6 +133,11 @@ export function workspaceConfig(
   return loadRepoConfig(ctx.repo(workspace.repoId), workspace.path);
 }
 
+function agentSigningEnv(ctx: Context): NodeJS.ProcessEnv {
+  if (!ctx.store.state.settings.signAgentCommits) return {};
+  return signingEnv(signingKey(ctx.deps.userDataPath, ctx.deps.signer));
+}
+
 export async function scriptEnv(
   ctx: Context,
   repo: Repo,
@@ -142,6 +148,7 @@ export async function scriptEnv(
     ...ctx.deps.env,
     ...config.environment,
     ...workspaceEnv(repo, workspace),
+    ...agentSigningEnv(ctx),
   };
 }
 

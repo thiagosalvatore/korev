@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { signingEnv, signingKey } from './commit-signing';
 
 const run = promisify(execFile);
 const SIGNER_SOURCE = path.join(__dirname, '../../signer/main.swift');
@@ -72,5 +73,44 @@ describe('korev-sign', () => {
     const { blob } = await createKey('existing');
 
     await expect(run(signer, ['create', blob, '--software'])).rejects.toThrow();
+  });
+});
+
+describe('agent commits with the Korev key', () => {
+  it('signs a commit even when the user signs with another program', async () => {
+    const key = signingKey(dir, signer);
+    const { stdout: publicKey } = await run(signer, [
+      'create',
+      key.key,
+      '--software',
+    ]);
+    await writeFile(key.publicKey, publicKey);
+    const allowedSigners = path.join(dir, 'agent_allowed_signers');
+    await writeFile(allowedSigners, `${PRINCIPAL} ${publicKey}`);
+    const repo = path.join(dir, 'repo');
+    const env = { ...process.env, ...signingEnv(key) };
+    const git = (...args: string[]) => run('git', args, { cwd: repo, env });
+    await run('git', ['init', '-q', repo]);
+    await git('config', 'gpg.ssh.program', '/nonexistent/op-ssh-sign');
+
+    await git(
+      '-c',
+      `user.email=${PRINCIPAL}`,
+      '-c',
+      'user.name=Korev',
+      'commit',
+      '-q',
+      '--allow-empty',
+      '-m',
+      'signed by the agent',
+    );
+
+    const { stdout } = await git(
+      '-c',
+      `gpg.ssh.allowedSignersFile=${allowedSigners}`,
+      'log',
+      '--format=%G?',
+    );
+    expect(stdout.trim()).toBe('G');
   });
 });

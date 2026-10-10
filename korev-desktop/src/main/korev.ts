@@ -41,6 +41,7 @@ import type { Dictation } from './dictation';
 import type { RemoteAccess } from './remote-access';
 import { askScratchPath, askWorktreePath } from './ask-worktrees';
 import { createChats, lanesElsewhereNote, type TurnPrLinks } from './chats';
+import { enableCommitSigning, signingKey } from './commit-signing';
 import { readConductorRepos, readConductorSettings } from './conductor-import';
 import {
   errorMessage,
@@ -1294,6 +1295,16 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
     openExternal: (url) => deps.openExternal(url),
     updateSettings,
+    async enableCommitSigning() {
+      const enabled = await enableCommitSigning(
+        deps.run,
+        deps.env,
+        deps.fs,
+        signingKey(deps.userDataPath, deps.signer),
+      );
+      if (enabled.ok) await updateSettings({ signAgentCommits: true });
+      return enabled;
+    },
     remotePairing: () => deps.remote.pairing(),
     revokeRemoteDevices: () => deps.remote.revoke(),
     registerPushToken: (token) => deps.remote.registerPushToken(token),

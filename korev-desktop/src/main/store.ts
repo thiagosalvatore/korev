@@ -53,6 +53,7 @@ export function defaultSettings(home: string): Settings {
     notifications: true,
     notificationSound: true,
     keepAwake: true,
+    signAgentCommits: false,
     remoteAccess: false,
     remotePort: DEFAULT_REMOTE_PORT,
     phoneNotificationsUrl: '',

@@ -41,7 +41,7 @@ import { api } from './bridge';
 import { modelChoices } from '../shared/format';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { QrCode } from './QrCode';
-import { toast } from './ui/toast';
+import { reportFailure, toast } from './ui/toast';
 import { setUi, useUi } from './ui-store';
 
 interface Section {
@@ -139,6 +139,12 @@ function importSummary(imported: { repos: number; settings: number }) {
   return parts.length ? parts.join(', ') : 'Nothing to import';
 }
 
+async function setCommitSigning(signAgentCommits: boolean) {
+  if (!signAgentCommits) return update({ signAgentCommits });
+  if (reportFailure(await api.enableCommitSigning()))
+    toast('Agent commits are now signed with the Korev key', 'success');
+}
+
 async function importFromConductor() {
   toast(importSummary(await api.importFromConductor()), 'success');
 }
@@ -193,6 +199,17 @@ function General({ settings }: { settings: Settings }) {
         <Switch
           checked={settings.keepAwake}
           onChange={(keepAwake) => update({ keepAwake })}
+        />
+      </Row>
+      <Row
+        title="Sign agent commits with a Korev key"
+        description="Works while your Mac is locked. Korev keeps the key in your Mac's Secure Enclave, where it cannot be copied, and adds it to your GitHub account as a signing key. While your Mac is on, any app running as you can sign with it."
+      >
+        <Switch
+          checked={settings.signAgentCommits}
+          onChange={(signAgentCommits) =>
+            void setCommitSigning(signAgentCommits)
+          }
         />
       </Row>
       <Row

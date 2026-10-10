@@ -41,6 +41,13 @@ case "$message" in
       *'"allow"'*) touch approved.txt ;;
     esac
     ;;
+  *show-signing-key*)
+    echo "${KOREV_SIGNING_KEY:-none}" > .context/signing-key
+    ;;
+  *signing-fails*)
+    echo '{"type":"assistant","message":{"id":"s1","content":[{"type":"tool_use","id":"sign-1","name":"Bash","input":{"command":"git commit"}}]}}'
+    echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"sign-1","is_error":true,"content":"error: Couldn'"'"'t sign message: agent refused operation"}]}}'
+    ;;
   *hold-turn*)
     IFS= read -r _
     ;;

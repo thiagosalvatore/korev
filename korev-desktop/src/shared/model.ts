@@ -245,6 +245,7 @@ export interface Settings {
   notifications: boolean;
   notificationSound: boolean;
   keepAwake: boolean;
+  signAgentCommits: boolean;
   remoteAccess: boolean;
   remotePort: number;
   phoneNotificationsUrl: string;

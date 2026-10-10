@@ -62,6 +62,8 @@ const PUSH_TOKENS_FILE = 'push-tokens.json';
 const TAILNET_STATE_DIR = 'tailscale';
 const TAILNET_BINARY = 'korev-tailnet';
 const TAILNET_BIN_DIR = 'tailnet/bin';
+const SIGNER_BINARY = 'korev-sign';
+const SIGNER_BIN_DIR = 'signer/bin';
 const UNPACKED_ASAR_DIR = 'app.asar.unpacked';
 const TAILNET_HOSTNAME_PREFIX = 'korev-';
 const MODELS_DIR = 'models';
@@ -91,15 +93,15 @@ useSeparateDevData();
 let korevApp: Korev | null = null;
 let quitGate: QuitGate | null = null;
 
-function tailnetBinary(): string {
+function bundledBinary(binDir: string, binary: string): string {
   const appDir = app.isPackaged
     ? path.join(process.resourcesPath, UNPACKED_ASAR_DIR)
     : app.getAppPath();
   return path.join(
     appDir,
-    TAILNET_BIN_DIR,
+    binDir,
     `${process.platform}-${process.arch}`,
-    TAILNET_BINARY,
+    binary,
   );
 }
 
@@ -108,7 +110,7 @@ const remote = createRemoteAccess({
   pushTokensPath: path.join(app.getPath('userData'), PUSH_TOKENS_FILE),
   api: () => korevApp?.api ?? {},
   startTailnet: tailnetStarter({
-    binary: tailnetBinary(),
+    binary: bundledBinary(TAILNET_BIN_DIR, TAILNET_BINARY),
     stateDir: path.join(app.getPath('userData'), TAILNET_STATE_DIR),
     hostname: TAILNET_HOSTNAME_PREFIX + hostname().split('.')[0],
   }),
@@ -266,6 +268,7 @@ async function createKorevApp(): Promise<Korev> {
     shell: process.env.SHELL,
     home: homedir(),
     userDataPath: app.getPath('userData'),
+    signer: bundledBinary(SIGNER_BIN_DIR, SIGNER_BINARY),
     fs: nodeFileSystem,
     spawnPty,
     emit,

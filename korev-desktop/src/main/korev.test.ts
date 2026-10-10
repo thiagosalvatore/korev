@@ -14,6 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { runProcess, type CommandRunner } from './command-runner';
+import { SIGNING_NUDGE } from './commit-signing';
 import type { Notice } from './context';
 import { nodeFileSystem } from './file-system';
 import {
@@ -163,6 +164,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       shell: '/bin/sh',
       home,
       userDataPath: path.join(home, 'user-data'),
+      signer: path.join(home, 'korev-sign'),
       fs: nodeFileSystem,
       spawnPty: noPty,
       emit,
@@ -1042,6 +1044,33 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
         'utf8',
       ),
     ).toContain(`--add-dir ${path.join(home, 'user-data', 'attachments')}`);
+  });
+
+  it('gives agents the Korev signing key once commit signing is on', async () => {
+    await korev.api.updateSettings({ signAgentCommits: true });
+    const workspace = await createWorkspace();
+
+    await sendAndWait(workspace.sessions[0].id, 'show-signing-key');
+
+    expect(
+      await readFile(
+        path.join(workspace.path, '.context', 'signing-key'),
+        'utf8',
+      ),
+    ).toBe(`${path.join(home, 'user-data', 'signing-key')}\n`);
+  });
+
+  it('suggests the Korev signing key once when an agent cannot sign', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+
+    await sendAndWait(session.id, 'signing-fails');
+    await sendAndWait(session.id, 'signing-fails');
+
+    const nudges = (await korev.api.transcript(session.id)).filter(
+      (item) => item.kind === 'notice' && item.text === SIGNING_NUDGE,
+    );
+    expect(nudges).toHaveLength(1);
   });
 
   it('reads an image the agent saved as a data URL', async () => {
