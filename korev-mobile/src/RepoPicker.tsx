@@ -13,11 +13,13 @@ export function RepoPicker({
   repos,
   selected,
   multiple = false,
+  label = 'Repositories',
   onToggle,
 }: {
   repos: Repo[];
   selected: string[];
   multiple?: boolean;
+  label?: string;
   onToggle: (repoId: string) => void;
 }) {
   const theme = useTheme();
@@ -34,7 +36,7 @@ export function RepoPicker({
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Repositories"
+        accessibilityLabel={label}
         style={styles.button}
         onPress={() => setOpen(true)}
       >

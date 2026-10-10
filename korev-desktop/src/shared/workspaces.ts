@@ -1,7 +1,6 @@
 import type {
   AppState,
   AskChat,
-  LaneRepo,
   Repo,
   RepoFolder,
   Workspace,
@@ -206,7 +205,7 @@ export function worktreeProgress(
   };
 }
 
-export function laneRepos(state: AppState, workspace: Workspace): LaneRepo[] {
+export function laneRepos(state: AppState, workspace: Workspace): Repo[] {
   const members = state.workspaces.filter(
     (ws) =>
       ws.groupId !== null && ws.groupId === workspace.groupId && !ws.archivedAt,
@@ -218,6 +217,21 @@ export function laneRepos(state: AppState, workspace: Workspace): LaneRepo[] {
   if (repoIds.size < 2) return [];
   return [...repoIds].flatMap((repoId) => {
     const repo = state.repos.find((entry) => entry.id === repoId);
-    return repo ? [{ id: repo.id, name: repo.name }] : [];
+    return repo ? [repo] : [];
   });
+}
+
+export function sidebarEntries(
+  workspaces: Workspace[],
+  leads: Map<string, Workspace>,
+): Workspace[][] {
+  const entries: Workspace[][] = [];
+  for (const workspace of workspaces) {
+    const last = entries.at(-1);
+    const grouped = workspace.groupId !== null && leads.has(workspace.groupId);
+    if (grouped && last?.[0].groupId === workspace.groupId)
+      last.push(workspace);
+    else entries.push([workspace]);
+  }
+  return entries;
 }

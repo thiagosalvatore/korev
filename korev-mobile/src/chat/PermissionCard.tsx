@@ -11,6 +11,7 @@ import {
   answerQuestions,
   DISMISS_QUESTION,
   laneDrafts,
+  laneHere,
   lanesToSplit,
   planLanes,
   splitLabel,
@@ -20,8 +21,10 @@ import {
   type PermissionResponse,
   type PermissionStatus,
   type PlanLane,
+  type Repo,
 } from '../../../korev-desktop/src/shared/model';
 import { usePendingAction } from '../hooks';
+import { RepoPicker } from '../RepoPicker';
 import { MONO_FONT, useTheme, type Theme } from '../theme';
 import { Button, switchTrack } from '../ui';
 import { MarkdownView } from './MarkdownView';
@@ -30,6 +33,7 @@ type PermissionItem = Extract<ChatItem, { kind: 'permission' }>;
 
 interface PermissionCardProps {
   item: PermissionItem;
+  laneRepos?: Repo[];
   onRespond(response: PermissionResponse): Promise<boolean>;
   onHandoff?(): Promise<boolean>;
 }
@@ -95,10 +99,12 @@ function ToolApproval({ item, onRespond }: PermissionCardProps) {
 function LaneList({
   here,
   drafts,
+  repos,
   onChange,
 }: {
-  here: PlanLane;
+  here: PlanLane | undefined;
   drafts: LaneDraft[];
+  repos: Repo[];
   onChange(drafts: LaneDraft[]): void;
 }) {
   const styles = useStyles();
@@ -114,31 +120,47 @@ function LaneList({
       <Text style={styles.body}>
         Lanes: each ticked lane gets its own linked workspace
       </Text>
-      <View style={styles.lane}>
-        <Switch
-          value
-          disabled
-          accessibilityLabel={here.name}
-          trackColor={switchTrack(theme)}
-        />
-        <Text style={styles.optionLabel}>{here.name}</Text>
-        <Text style={styles.optionDescription}>This workspace</Text>
-      </View>
-      {drafts.map((draft, index) => (
-        <View key={index} style={styles.lane}>
+      {here ? (
+        <View style={styles.lane}>
           <Switch
-            value={draft.split}
-            accessibilityLabel={`Split off ${draft.name}`}
+            value
+            disabled
+            accessibilityLabel={here.name}
             trackColor={switchTrack(theme)}
-            onValueChange={(split) => update(index, { split })}
           />
-          <TextInput
-            style={[styles.input, styles.laneName]}
-            value={draft.name}
-            editable={draft.split}
-            accessibilityLabel="Lane name"
-            onChangeText={(name) => update(index, { name })}
-          />
+          <Text style={styles.optionLabel}>{here.name}</Text>
+          <Text style={styles.optionDescription}>
+            {repos.length
+              ? `This workspace · ${repos[0].name}`
+              : 'This workspace'}
+          </Text>
+        </View>
+      ) : null}
+      {drafts.map((draft, index) => (
+        <View key={index} style={styles.laneDraft}>
+          <View style={styles.lane}>
+            <Switch
+              value={draft.split}
+              accessibilityLabel={`Split off ${draft.name}`}
+              trackColor={switchTrack(theme)}
+              onValueChange={(split) => update(index, { split })}
+            />
+            <TextInput
+              style={[styles.input, styles.laneName]}
+              value={draft.name}
+              editable={draft.split}
+              accessibilityLabel="Lane name"
+              onChangeText={(name) => update(index, { name })}
+            />
+          </View>
+          {draft.repoId && draft.split ? (
+            <RepoPicker
+              repos={repos}
+              selected={[draft.repoId]}
+              label={`Repository for ${draft.name}`}
+              onToggle={(repoId) => update(index, { repoId })}
+            />
+          ) : null}
         </View>
       ))}
     </View>
@@ -148,6 +170,7 @@ function LaneList({
 export interface PlanReviewProps {
   plan: string;
   showPlan: boolean;
+  laneRepos?: Repo[];
   onApprove(lanes: PlanLane[]): Promise<boolean>;
   onKeepPlanning(feedback: string): Promise<boolean>;
   onHandoff?(): Promise<boolean>;
@@ -156,6 +179,7 @@ export interface PlanReviewProps {
 export function PlanReview({
   plan,
   showPlan,
+  laneRepos = [],
   onApprove,
   onKeepPlanning,
   onHandoff,
@@ -163,16 +187,22 @@ export function PlanReview({
   const styles = useStyles();
   const theme = useTheme();
   const [feedback, setFeedback] = useState('');
-  const [here, ...others] = planLanes(plan);
-  const [drafts, setDrafts] = useState(() => laneDrafts(others));
+  const lanes = planLanes(plan, laneRepos.length ? 1 : 2);
+  const { here, others } = laneHere(lanes, laneRepos);
+  const [drafts, setDrafts] = useState(() => laneDrafts(others, laneRepos));
   const split = lanesToSplit(drafts);
   const { pending, run } = usePendingAction({ holdOnSuccess: true });
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Plan ready for review</Text>
       {showPlan ? <MarkdownView value={plan} /> : null}
-      {here ? (
-        <LaneList here={here} drafts={drafts} onChange={setDrafts} />
+      {lanes.length ? (
+        <LaneList
+          here={here}
+          drafts={drafts}
+          repos={laneRepos}
+          onChange={setDrafts}
+        />
       ) : null}
       <TextInput
         style={styles.input}
@@ -192,7 +222,7 @@ export function PlanReview({
           />
         ) : null}
         <Button
-          label={here ? 'Approve here' : 'Approve plan'}
+          label={lanes.length ? 'Approve here' : 'Approve plan'}
           variant={split.length ? 'secondary' : 'primary'}
           pending={pending === 'approve'}
           disabled={pending !== null}
@@ -221,11 +251,17 @@ export function PlanReview({
   );
 }
 
-function PlanApproval({ item, onRespond, onHandoff }: PermissionCardProps) {
+function PlanApproval({
+  item,
+  laneRepos,
+  onRespond,
+  onHandoff,
+}: PermissionCardProps) {
   return (
     <PlanReview
       plan={item.plan ?? ''}
       showPlan
+      laneRepos={laneRepos}
       onHandoff={onHandoff}
       onApprove={(lanes) => onRespond({ allow: true, lanes })}
       onKeepPlanning={(message) => onRespond({ allow: false, message })}
@@ -334,13 +370,19 @@ function QuestionForm({ item, onRespond }: PermissionCardProps) {
 
 export function PermissionCard({
   item,
+  laneRepos,
   onRespond,
   onHandoff,
 }: PermissionCardProps) {
   if (item.status !== 'pending') return <Resolved item={item} />;
   if (item.plan !== null)
     return (
-      <PlanApproval item={item} onRespond={onRespond} onHandoff={onHandoff} />
+      <PlanApproval
+        item={item}
+        laneRepos={laneRepos}
+        onRespond={onRespond}
+        onHandoff={onHandoff}
+      />
     );
   if (item.questions) return <QuestionForm item={item} onRespond={onRespond} />;
   return <ToolApproval item={item} onRespond={onRespond} />;
@@ -362,6 +404,7 @@ function makeStyles(theme: Theme) {
     detail: { color: theme.fg2, fontFamily: MONO_FONT, fontSize: 12 },
     actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     lane: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    laneDraft: { gap: 6 },
     laneName: { flex: 1 },
     question: { gap: 6 },
     option: {

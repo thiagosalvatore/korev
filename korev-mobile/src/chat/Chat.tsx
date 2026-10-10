@@ -21,6 +21,7 @@ import {
   type ChatSession,
   type PermissionResponse,
   type PlanLane,
+  type Repo,
 } from '../../../korev-desktop/src/shared/model';
 import { attempt } from '../attempt';
 import { succeeded, warned } from '../haptics';
@@ -66,11 +67,15 @@ export function Chat({
   state,
   session,
   repoId,
+  laneRepos,
+  emptyHint,
   onHandoff,
 }: {
   state: AppState;
   session: ChatSession;
   repoId: string | null;
+  laneRepos?: Repo[];
+  emptyHint?: string;
   onHandoff?(sessionId: string): void;
 }) {
   const { api } = useConnection();
@@ -150,6 +155,7 @@ export function Chat({
                 sessionId={session.id}
                 repoUrl={repoUrl}
                 running={running}
+                laneRepos={laneRepos}
                 onRespond={respond}
                 onHandoff={handoff}
               />
@@ -165,6 +171,7 @@ export function Chat({
                   key={codexPlan.id}
                   plan={codexPlan.plan}
                   showPlan={false}
+                  laneRepos={laneRepos}
                   onApprove={approvePlan}
                   onKeepPlanning={keepPlanning}
                   onHandoff={handoff}
@@ -173,7 +180,7 @@ export function Chat({
             }
             ListEmptyComponent={
               <Text style={styles.emptyHint} numberOfLines={2}>
-                {emptyChatHint(state, session)}
+                {emptyHint ?? emptyChatHint(state, session)}
               </Text>
             }
             contentContainerStyle={

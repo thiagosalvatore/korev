@@ -8,6 +8,7 @@ import {
   GitPullRequest,
   GitPullRequestClosed,
   GitPullRequestDraft,
+  Link,
   MessageCircleQuestion,
   Plus,
   TriangleAlert,
@@ -29,6 +30,7 @@ import ReanimatedSwipeable, {
 import {
   prBadge,
   primaryPr,
+  type AppState,
   type PrBadge,
   type Repo,
   type RepoFolder,
@@ -38,7 +40,11 @@ import {
 } from '../../../../korev-desktop/src/shared/model';
 import {
   activeWorkspaces,
+  crossRepoLeads,
   repoSections,
+  sidebarEntries,
+  sidebarRepoId,
+  waitsForLane,
 } from '../../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../../attempt';
 import { succeeded } from '../../haptics';
@@ -143,13 +149,26 @@ function ArchiveAction({
   );
 }
 
+interface GroupMember {
+  repo: string;
+  waitsOn: string | null;
+}
+
+function memberDetail(workspace: Workspace, member: GroupMember): string {
+  return member.waitsOn
+    ? `Waits for the plan in ${member.waitsOn}`
+    : workspace.branch;
+}
+
 function WorkspaceRow({
   workspace,
   runtime,
+  member,
   styles,
 }: {
   workspace: Workspace;
   runtime: WorkspaceRuntime | undefined;
+  member?: GroupMember;
   styles: Styles;
 }) {
   const { api } = useConnection();
@@ -176,7 +195,11 @@ function WorkspaceRow({
       )}
     >
       <ListRow
-        accessibilityLabel={`Workspace ${workspace.name}`}
+        accessibilityLabel={
+          member
+            ? `Workspace ${workspace.name} in ${member.repo}`
+            : `Workspace ${workspace.name}`
+        }
         accessibilityActions={[{ name: ARCHIVE_ACTION, label: 'Archive' }]}
         onAccessibilityAction={({ nativeEvent }) => {
           if (nativeEvent.actionName === ARCHIVE_ACTION) void archive();
@@ -186,11 +209,11 @@ function WorkspaceRow({
             <StatusIcon workspace={workspace} runtime={runtime} />
           ) : null
         }
-        title={workspace.branch}
+        title={member ? member.repo : workspace.branch}
         highlighted={runtime?.unread || runtime?.status === 'waiting'}
         subtitle={
           <>
-            {workspace.name}
+            {member ? memberDetail(workspace, member) : workspace.name}
             {runtime?.message ? (
               <Text style={styles.error}> · {runtime.message}</Text>
             ) : null}
@@ -221,6 +244,50 @@ function WorkspaceRow({
   );
 }
 
+function LinkedGroup({
+  state,
+  lead,
+  members,
+  styles,
+}: {
+  state: AppState;
+  lead: Workspace;
+  members: Workspace[];
+  styles: Styles;
+}) {
+  const theme = useTheme();
+  const repoName = (workspace: Workspace) =>
+    state.repos.find((repo) => repo.id === workspace.repoId)?.name ?? '';
+  return (
+    <View accessibilityLabel={`Linked workspace ${lead.name}`}>
+      <View style={styles.linkedLabel}>
+        <Link size={ROW_ICON_SIZE - 4} color={theme.fg3} />
+        <Text
+          maxFontSizeMultiplier={CHROME_FONT_SCALE}
+          style={styles.linkedName}
+          numberOfLines={1}
+        >
+          {lead.name}
+        </Text>
+      </View>
+      <View style={styles.linkedMembers}>
+        {members.map((workspace) => (
+          <WorkspaceRow
+            key={workspace.id}
+            workspace={workspace}
+            runtime={state.runtime[workspace.id]}
+            member={{
+              repo: repoName(workspace),
+              waitsOn: waitsForLane(state, workspace) ? repoName(lead) : null,
+            }}
+            styles={styles}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function Chevron({ collapsed }: { collapsed: boolean }) {
   const theme = useTheme();
   const Icon = collapsed ? ChevronRight : ChevronDown;
@@ -228,17 +295,19 @@ function Chevron({ collapsed }: { collapsed: boolean }) {
 }
 
 function RepoGroup({
+  state,
   repo,
   workspaces,
-  runtime,
+  leads,
   collapsed,
   onToggle,
   onReorder,
   styles,
 }: {
+  state: AppState;
   repo: Repo;
   workspaces: Workspace[];
-  runtime: Record<string, WorkspaceRuntime>;
+  leads: Map<string, Workspace>;
   collapsed: boolean;
   onToggle: () => void;
   onReorder: () => void;
@@ -276,14 +345,25 @@ function RepoGroup({
       </View>
       {collapsed
         ? null
-        : workspaces.map((workspace) => (
-            <WorkspaceRow
-              key={workspace.id}
-              workspace={workspace}
-              runtime={runtime[workspace.id]}
-              styles={styles}
-            />
-          ))}
+        : sidebarEntries(workspaces, leads).map(([first, ...rest]) => {
+            const lead = first.groupId ? leads.get(first.groupId) : undefined;
+            return lead ? (
+              <LinkedGroup
+                key={first.id}
+                state={state}
+                lead={lead}
+                members={[first, ...rest]}
+                styles={styles}
+              />
+            ) : (
+              <WorkspaceRow
+                key={first.id}
+                workspace={first}
+                runtime={state.runtime[first.id]}
+                styles={styles}
+              />
+            );
+          })}
     </View>
   );
 }
@@ -342,13 +422,17 @@ export default function WorkspacesScreen() {
   if (!state) return <Loading style={styles.loading} />;
 
   const workspaces = activeWorkspaces(state);
+  const leads = crossRepoLeads(state);
   const sections = repoSections(state);
   const repoGroup = (repo: Repo) => (
     <RepoGroup
       key={repo.id}
+      state={state}
       repo={repo}
-      workspaces={workspaces.filter((ws) => ws.repoId === repo.id)}
-      runtime={state.runtime}
+      workspaces={workspaces.filter(
+        (ws) => sidebarRepoId(leads, ws) === repo.id,
+      )}
+      leads={leads}
       collapsed={collapsed.has(repo.id)}
       onToggle={() => toggle(repo.id)}
       onReorder={startReordering}
@@ -436,6 +520,15 @@ function makeStyles(theme: Theme) {
       fontWeight: '600',
     },
     error: { color: theme.dangerText },
+    linkedLabel: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingTop: 6,
+    },
+    linkedName: { flexShrink: 1, color: theme.fg3, fontSize: 12 },
+    linkedMembers: { paddingLeft: 12 },
     stats: { fontFamily: MONO_FONT, fontSize: 11 },
     additions: { color: theme.diffAdd },
     deletions: { color: theme.diffDel },

@@ -21,6 +21,7 @@ import {
 import type {
   ChatItem,
   PermissionResponse,
+  Repo,
   TodoStatus,
 } from '../../../korev-desktop/src/shared/model';
 import { MONO_FONT, useTheme, type Theme } from '../theme';
@@ -239,6 +240,7 @@ export function ChatItemView({
   sessionId,
   repoUrl,
   running,
+  laneRepos,
   onRespond,
   onHandoff,
 }: {
@@ -246,6 +248,7 @@ export function ChatItemView({
   sessionId: string;
   repoUrl: string | null;
   running: boolean;
+  laneRepos?: Repo[];
   onRespond(itemId: string, response: PermissionResponse): Promise<boolean>;
   onHandoff?(): Promise<boolean>;
 }) {
@@ -271,6 +274,7 @@ export function ChatItemView({
       return (
         <PermissionCard
           item={item}
+          laneRepos={laneRepos}
           onRespond={(response) => onRespond(item.id, response)}
           onHandoff={onHandoff}
         />

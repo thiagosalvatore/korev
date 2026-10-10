@@ -122,3 +122,8 @@ Notes** opens the same page.
   pickers, the composer, the PR bar) stop growing at 1.4× (`CHROME_FONT_SCALE`), so they never
   push the chat off the screen. Chat text and list rows scale fully.
 - **On amber.** Text on a `warning` fill, like the tab badge, uses `fgOnWarning`.
+- **Linked group.** The workspace list follows the desktop's Linked group: one entry under the
+  lead's repository, a link-icon label with the shared name, and indented rows that lead with
+  the repository name. The workspace title is "<repository> · <name>", and a waiting workspace's
+  empty chat says its agent starts when you approve the plan. The lanes card has a repository
+  picker per lane.
