@@ -5,8 +5,10 @@ import {
   fetchPrStatus,
   parsePrStatus,
   parsePrThreads,
+  reviewPrompt,
 } from './pull-requests';
 import type { CommandResult, CommandRunner } from './command-runner';
+import type { PrStatus } from '../shared/model';
 
 describe('PR status', () => {
   it('maps check runs and status contexts to check states', () => {
@@ -317,5 +319,49 @@ describe('PR links in agent output', () => {
       'https://github.com/acme/web/pull/42',
       'https://github.com/acme/api/pull/7',
     ]);
+  });
+});
+
+describe('review prompt', () => {
+  function pr(number: number, overrides: Partial<PrStatus>): PrStatus {
+    return {
+      number,
+      url: `https://github.com/acme/web/pull/${number}`,
+      title: `PR ${number}`,
+      state: 'OPEN',
+      isDraft: false,
+      mergeable: 'MERGEABLE',
+      reviewDecision: null,
+      mergedAt: null,
+      headRefName: `dev/${number}`,
+      baseRefName: 'main',
+      createdAt: '2026-01-01T00:00:00Z',
+      checks: [],
+      stack: null,
+      ...overrides,
+    };
+  }
+
+  it('names each open PR in a stack with its own base branch', () => {
+    const prompt = reviewPrompt([
+      pr(9, { headRefName: 'dev/api', baseRefName: 'dev/schema' }),
+      pr(8, { headRefName: 'dev/schema', baseRefName: 'main' }),
+      pr(5, { state: 'MERGED' }),
+    ]);
+
+    expect(prompt).toContain(
+      '#8 PR 8 (https://github.com/acme/web/pull/8): dev/schema into main',
+    );
+    expect(prompt).toContain(
+      '#9 PR 9 (https://github.com/acme/web/pull/9): dev/api into dev/schema',
+    );
+    expect(prompt.indexOf('#8')).toBeLessThan(prompt.indexOf('#9'));
+    expect(prompt).not.toContain('pull/5');
+  });
+
+  it('reviews the branch against its target when there is no open PR', () => {
+    expect(reviewPrompt([])).toContain(
+      'Review the changes on this branch compared to its target branch',
+    );
   });
 });

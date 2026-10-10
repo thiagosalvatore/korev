@@ -71,7 +71,7 @@ import {
   fixChecksPrompt,
   mergePr,
   resolveConflictsPrompt,
-  REVIEW_PROMPT,
+  reviewPrompt,
 } from './pull-requests';
 import { expandPort, loadRepoConfig, withPrompt } from './repo-config';
 import { listSkills } from './skills';
@@ -1048,7 +1048,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       const text = await actionPrompt(
         workspaceId,
         'code_review',
-        REVIEW_PROMPT,
+        reviewPrompt(ctx.runtime(workspaceId).prs),
       );
       workspace.sessions.push(session);
       const sent = await chats.send(session.id, {

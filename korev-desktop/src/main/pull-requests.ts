@@ -351,8 +351,26 @@ export function onPrBranch(prompt: string, pr: PrStatus, branch: string) {
   return `${prompt}\nThis is about pull request #${pr.number} (${pr.url}) on branch ${pr.headRefName}, not the current branch.`;
 }
 
-export const REVIEW_PROMPT =
-  'Review the changes on this branch compared to its target branch (committed and uncommitted). Look for bugs, missing tests and unclear code. List concrete findings with file and line, most severe first. Do not edit files.';
+const REVIEW_FINDINGS =
+  'Look for bugs, missing tests and unclear code. List concrete findings with file and line, most severe first. Do not edit files.';
+
+const BRANCH_REVIEW_PROMPT = `Review the changes on this branch compared to its target branch (committed and uncommitted). ${REVIEW_FINDINGS}`;
+
+export function reviewPrompt(prs: PrStatus[]): string {
+  const open = prs
+    .filter((pr) => pr.state === 'OPEN')
+    .sort((a, b) => a.number - b.number);
+  if (!open.length) return BRANCH_REVIEW_PROMPT;
+  return [
+    'Review the pull requests of this workspace:',
+    ...open.map(
+      (pr) =>
+        `- #${pr.number} ${pr.title} (${pr.url}): ${pr.headRefName} into ${pr.baseRefName}`,
+    ),
+    'Read each one with `gh pr view` and `gh pr diff`, and review it against its own base branch. Also review local changes that are not pushed yet.',
+    REVIEW_FINDINGS,
+  ].join('\n');
+}
 
 function nodes(connection: unknown): JsonRecord[] {
   const list = (connection as { nodes?: unknown } | undefined)?.nodes;
