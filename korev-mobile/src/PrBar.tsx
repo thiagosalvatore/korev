@@ -12,7 +12,9 @@ import type { KorevApi } from '../../korev-desktop/src/shared/api';
 import {
   MERGE_STEPS,
   nextPrStep,
+  PR_BADGE_LABELS,
   PR_STEPS,
+  prBadge,
   primaryPr,
   type CheckState,
   type PrStatus,
@@ -24,6 +26,7 @@ import { attempt } from './attempt';
 import { usePendingAction } from './hooks';
 import { succeeded } from './haptics';
 import { useConnection } from './korev';
+import { PickerButton, type PickerOption } from './PickerSheet';
 import { useTheme, type Theme } from './theme';
 import { Button, CHROME_FONT_SCALE, MIN_TOUCH_TARGET } from './ui';
 
@@ -113,6 +116,15 @@ function checkColor(theme: Theme, state: CheckState): string {
   return theme.fg4;
 }
 
+function prOptions(prs: PrStatus[], chosen: PrStatus): PickerOption[] {
+  return prs.map((entry) => ({
+    key: entry.url,
+    label: `#${entry.number} ${entry.title}`,
+    detail: PR_BADGE_LABELS[prBadge(entry)],
+    selected: entry.url === chosen.url,
+  }));
+}
+
 export function PrBar({
   workspace,
   runtime,
@@ -127,7 +139,9 @@ export function PrBar({
   const styles = makeStyles(theme);
   const [showChecks, setShowChecks] = useState(false);
   const { pending, run } = usePendingAction();
-  const pr = primaryPr(workspace, runtime);
+  const [chosenUrl, setChosenUrl] = useState<string | null>(null);
+  const prs = runtime?.prs ?? [];
+  const pr = primaryPr(workspace, runtime, chosenUrl);
   const step = nextPrStep(pr);
   const needsChat = PROMPT_STEPS.has(step);
 
@@ -160,6 +174,15 @@ export function PrBar({
             {pr?.checks.length ? ` · ${pr.checks.length} checks` : ''}
           </Text>
         </Pressable>
+        {pr && prs.length > 1 ? (
+          <PickerButton
+            label="Choose pull request"
+            value={`#${pr.number}`}
+            title="Pull requests"
+            options={prOptions(prs, pr)}
+            onSelect={setChosenUrl}
+          />
+        ) : null}
         <Button
           label={PR_STEPS[step].label}
           variant={PR_STEPS[step].tone}
