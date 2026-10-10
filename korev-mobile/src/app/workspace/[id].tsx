@@ -13,6 +13,12 @@ import {
   type AppState,
   type Workspace,
 } from '../../../../korev-desktop/src/shared/model';
+import {
+  crossRepoLead,
+  groupRepoName,
+  laneRepos,
+  waitsForLane,
+} from '../../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../../attempt';
 import { Chat } from '../../chat/Chat';
 import { useAppState, usePendingAction } from '../../hooks';
@@ -37,6 +43,19 @@ function defaultSession(state: AppState, workspace: Workspace) {
     workspace.sessions.find((entry) => waiting.has(entry.id)) ??
     workspace.sessions.at(-1)
   );
+}
+
+function workspaceTitle(state: AppState, workspace: Workspace): string {
+  const repo = groupRepoName(state, workspace);
+  return repo ? `${repo} · ${workspace.name}` : workspace.name;
+}
+
+function waitingHint(state: AppState, workspace: Workspace) {
+  const lead = waitsForLane(state, workspace)
+    ? crossRepoLead(state, workspace)
+    : null;
+  if (!lead) return undefined;
+  return `This workspace's agent starts when you approve the plan in ${groupRepoName(state, lead)}.`;
 }
 
 function SessionTabs({
@@ -139,7 +158,7 @@ export default function WorkspaceScreen() {
   if (runtime && !hasWorktree(runtime))
     return (
       <>
-        <Stack.Screen options={{ title: workspace.name }} />
+        <Stack.Screen options={{ title: workspaceTitle(state, workspace) }} />
         <WorktreePending workspace={workspace} runtime={runtime} />
       </>
     );
@@ -150,7 +169,7 @@ export default function WorkspaceScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: workspace.name }} />
+      <Stack.Screen options={{ title: workspaceTitle(state, workspace) }} />
       <PrBar workspace={workspace} runtime={runtime} sessionId={session?.id} />
       <SessionTabs
         state={state}
@@ -165,6 +184,8 @@ export default function WorkspaceScreen() {
           state={state}
           session={session}
           repoId={workspace.repoId}
+          laneRepos={laneRepos(state, workspace)}
+          emptyHint={waitingHint(state, workspace)}
           onHandoff={setSelectedId}
         />
       ) : (

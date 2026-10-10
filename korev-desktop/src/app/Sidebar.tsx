@@ -26,6 +26,7 @@ import {
   asksNewestFirst,
   crossRepoLeads,
   repoSections,
+  sidebarEntries,
   sidebarRepoId,
   waitsForLane,
 } from '../shared/workspaces';
@@ -485,21 +486,6 @@ function moveToFolderItems(
       onSelect: onNewFolder,
     },
   ];
-}
-
-function sidebarEntries(
-  workspaces: Workspace[],
-  leads: Map<string, Workspace>,
-): Workspace[][] {
-  const entries: Workspace[][] = [];
-  for (const workspace of workspaces) {
-    const last = entries.at(-1);
-    const grouped = workspace.groupId !== null && leads.has(workspace.groupId);
-    if (grouped && last?.[0].groupId === workspace.groupId)
-      last.push(workspace);
-    else entries.push([workspace]);
-  }
-  return entries;
 }
 
 function LinkedGroup({
