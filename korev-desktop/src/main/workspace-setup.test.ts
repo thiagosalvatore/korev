@@ -3,6 +3,7 @@ import {
   allocatePort,
   findLocalUrl,
   FIRST_PORT,
+  firstWords,
   PORTS_PER_WORKSPACE,
 } from './workspace-setup';
 
@@ -27,5 +28,12 @@ describe('run output', () => {
       'http://localhost:3000',
     );
     expect(findLocalUrl('compiled successfully')).toBeNull();
+  });
+});
+
+describe('names', () => {
+  it('keeps only the first words of a slug', () => {
+    expect(firstWords('add-stack-pr-picker-mobile', 3)).toBe('add-stack-pr');
+    expect(firstWords('add-note', 3)).toBe('add-note');
   });
 });
