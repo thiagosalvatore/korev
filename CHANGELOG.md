@@ -4,6 +4,18 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-10
+
+Agents can sign commits while your Mac is locked.
+
+### New
+
+- **Sign commits while your Mac is locked.** Turn on "Sign agent commits with a Korev key" in Settings. Korev makes a key in the Secure Enclave of your Mac and adds it to your GitHub account as a signing key. Agents then sign their commits with this key, also when your Mac is locked. Your own terminal keeps its signing setup. When an agent commit fails to sign and the setting is off, the chat shows a notice that points to the setting.
+
+### Fixed
+
+- Agents can sign commits with Secretive or another SSH agent that your shell profile sets. Before, signing failed when you opened Korev from the Dock.
+
 ## [0.10.0] - 2026-10-10
 
 A task in several repositories gets one plan, and each repository gets its own part of it.
