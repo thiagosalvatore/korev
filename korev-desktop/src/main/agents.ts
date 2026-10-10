@@ -23,6 +23,7 @@ const LISTED_MODEL_VISIBILITY = 'list';
 const CODEX_SIGNED_IN_PATTERN = /Logged in using (.+)/;
 const STDIN_PROMPT = '-';
 const READ_ONLY_DISALLOWED_TOOLS = ['Edit', 'Write', 'NotebookEdit'];
+const CODEX_READ_ONLY_PROFILE = 'korev-read-only';
 
 export interface TurnRequest {
   model: string;
@@ -92,15 +93,28 @@ function claudeArgs(request: TurnRequest): string[] {
   ];
 }
 
+function codexSandboxConfig(request: TurnRequest): string[] {
+  if (!request.planMode && !request.readOnly) {
+    return [
+      'sandbox_mode="workspace-write"',
+      'sandbox_workspace_write.network_access=true',
+    ];
+  }
+  const profile = `permissions.${CODEX_READ_ONLY_PROFILE}`;
+  return [
+    'sandbox_mode="read-only"',
+    `default_permissions="${CODEX_READ_ONLY_PROFILE}"`,
+    `${profile}.extends=":read-only"`,
+    `${profile}.network.enabled=true`,
+  ];
+}
+
 function codexArgs(request: TurnRequest): string[] {
   const model = request.model ? ['--model', request.model] : [];
   const options = [
     '--json',
     '--skip-git-repo-check',
-    '-c',
-    `sandbox_mode="${request.planMode || request.readOnly ? 'read-only' : 'workspace-write'}"`,
-    '-c',
-    'sandbox_workspace_write.network_access=true',
+    ...codexSandboxConfig(request).flatMap((setting) => ['-c', setting]),
     '-c',
     `model_reasoning_effort="${request.effort}"`,
     ...(request.fast ? ['-c', 'service_tier="fast"'] : []),

@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### Fixed
+
+- Codex can reach GitHub in Plan mode and Ask chats. Before, commands such as `gh pr view` failed with "error connecting to api.github.com".
+
 ## [0.10.0] - 2026-10-09
 
 Pull request numbers in agent replies open the pull request, and Codex can commit in a workspace.

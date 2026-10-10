@@ -63,6 +63,16 @@ describe('codex sandbox', () => {
       );
     },
   );
+
+  it.each([
+    { planMode: true, readOnly: false },
+    { planMode: false, readOnly: true },
+  ])('lets read-only chats reach the network (%o)', (mode) => {
+    const args = AGENTS.codex.args({ ...REQUEST, ...mode });
+
+    expect(args).toContain('sandbox_mode="read-only"');
+    expect(args).toContain('permissions.korev-read-only.network.enabled=true');
+  });
 });
 
 type Responses = Record<string, Partial<CommandResult>>;
