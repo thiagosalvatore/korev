@@ -10,6 +10,8 @@ const KEY_PATH_VARIABLE = 'KOREV_SIGNING_KEY';
 const SIGNING_SCOPE = 'admin:ssh_signing_key';
 const COMMAND_TIMEOUT_MS = 30_000;
 const SIGNING_FAILURE = /Couldn't sign message|failed to sign the data/;
+const ALLOWED_SIGNERS_SETTING = 'gpg.ssh.allowedSignersFile';
+const EMAIL_SETTING = 'user.email';
 
 export const SIGNING_SCOPE_FIX = `gh auth refresh -h github.com -s ${SIGNING_SCOPE}`;
 export const SIGNING_NUDGE =
@@ -101,6 +103,44 @@ async function addToGithub(
   };
 }
 
+async function gitConfig(
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+  args: string[],
+): Promise<string> {
+  const read = await run('git', ['config', '--get', ...args], {
+    env,
+    timeoutMs: COMMAND_TIMEOUT_MS,
+  });
+  return read.exitCode === 0 ? read.stdout.trim() : '';
+}
+
+function lineBreakBefore(text: string): string {
+  return text && !text.endsWith('\n') ? '\n' : '';
+}
+
+async function trustLocally(
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+  fs: FileSystem,
+  key: SigningKey,
+): Promise<void> {
+  const allowedSigners = await gitConfig(run, env, [
+    '--path',
+    ALLOWED_SIGNERS_SETTING,
+  ]);
+  const email = await gitConfig(run, env, [EMAIL_SETTING]);
+  if (!allowedSigners || !email) return;
+  const publicKey = String(await fs.read(key.publicKey)).trim();
+  const signers = String((await fs.read(allowedSigners)) ?? '');
+  const [, keyBlob] = publicKey.split(' ');
+  if (signers.includes(keyBlob)) return;
+  await fs.append(
+    allowedSigners,
+    `${lineBreakBefore(signers)}${email} ${publicKey}\n`,
+  );
+}
+
 export async function enableCommitSigning(
   run: CommandRunner,
   env: NodeJS.ProcessEnv,
@@ -109,5 +149,7 @@ export async function enableCommitSigning(
 ): Promise<Result> {
   const created = await createKey(run, env, fs, key);
   if (!created.ok) return created;
-  return addToGithub(run, env, key);
+  const added = await addToGithub(run, env, key);
+  if (added.ok) await trustLocally(run, env, fs, key);
+  return added;
 }
