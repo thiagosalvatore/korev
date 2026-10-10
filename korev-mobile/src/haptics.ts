@@ -1,4 +1,9 @@
-import { notificationAsync, NotificationFeedbackType } from 'expo-haptics';
+import {
+  impactAsync,
+  ImpactFeedbackStyle,
+  notificationAsync,
+  NotificationFeedbackType,
+} from 'expo-haptics';
 
 function feedbackWhenDone(type: NotificationFeedbackType) {
   return (done = true) => {
@@ -9,3 +14,7 @@ function feedbackWhenDone(type: NotificationFeedbackType) {
 
 export const succeeded = feedbackWhenDone(NotificationFeedbackType.Success);
 export const warned = feedbackWhenDone(NotificationFeedbackType.Warning);
+
+export function lifted() {
+  void impactAsync(ImpactFeedbackStyle.Medium);
+}

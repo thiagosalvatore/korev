@@ -45,9 +45,11 @@ import { succeeded } from '../../haptics';
 import { useAppState, useReconnect } from '../../hooks';
 import { useConnection } from '../../korev';
 import { ListRow, ROW_ICON_SIZE } from '../../ListRow';
+import { lifted } from '../../haptics';
 import { Loading } from '../../Offline';
 import { openNewWorkspace } from '../../navigation';
 import { RepoAvatar } from '../../RepoAvatar';
+import { ReorderList } from '../../ReorderList';
 import { MONO_FONT, useTheme, type Theme } from '../../theme';
 import { CHROME_FONT_SCALE, touchSlop } from '../../ui';
 
@@ -231,6 +233,7 @@ function RepoGroup({
   runtime,
   collapsed,
   onToggle,
+  onReorder,
   styles,
 }: {
   repo: Repo;
@@ -238,6 +241,7 @@ function RepoGroup({
   runtime: Record<string, WorkspaceRuntime>;
   collapsed: boolean;
   onToggle: () => void;
+  onReorder: () => void;
   styles: Styles;
 }) {
   const theme = useTheme();
@@ -249,6 +253,7 @@ function RepoGroup({
           accessibilityState={{ expanded: !collapsed }}
           style={styles.repoToggle}
           onPress={onToggle}
+          onLongPress={onReorder}
         >
           <RepoAvatar repo={repo} />
           <Text
@@ -287,12 +292,14 @@ function FolderGroup({
   folder,
   collapsed,
   onToggle,
+  onReorder,
   children,
   styles,
 }: {
   folder: RepoFolder;
   collapsed: boolean;
   onToggle: () => void;
+  onReorder: () => void;
   children: ReactNode;
   styles: Styles;
 }) {
@@ -303,6 +310,7 @@ function FolderGroup({
         accessibilityState={{ expanded: !collapsed }}
         style={styles.folderHeader}
         onPress={onToggle}
+        onLongPress={onReorder}
       >
         <Text
           maxFontSizeMultiplier={CHROME_FONT_SCALE}
@@ -324,6 +332,12 @@ export default function WorkspacesScreen() {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const toggle = (id: string) => setCollapsed(toggled(collapsed, id));
   const { refreshing, refresh } = useReconnect();
+  const [reordering, setReordering] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const startReordering = () => {
+    lifted();
+    setReordering(true);
+  };
 
   if (!state) return <Loading style={styles.loading} />;
 
@@ -337,6 +351,7 @@ export default function WorkspacesScreen() {
       runtime={state.runtime}
       collapsed={collapsed.has(repo.id)}
       onToggle={() => toggle(repo.id)}
+      onReorder={startReordering}
       styles={styles}
     />
   );
@@ -344,24 +359,34 @@ export default function WorkspacesScreen() {
   return (
     <ScrollView
       contentContainerStyle={styles.page}
+      scrollEnabled={!dragging}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={refresh} />
       }
     >
-      {sections.map(({ folder, repos }) =>
-        folder ? (
-          <FolderGroup
-            key={folder.id}
-            folder={folder}
-            collapsed={collapsed.has(folder.id)}
-            onToggle={() => toggle(folder.id)}
-            styles={styles}
-          >
-            {repos.map(repoGroup)}
-          </FolderGroup>
-        ) : (
-          repos.map(repoGroup)
-        ),
+      {reordering ? (
+        <ReorderList
+          state={state}
+          onDone={() => setReordering(false)}
+          onDraggingChange={setDragging}
+        />
+      ) : (
+        sections.map(({ folder, repos }) =>
+          folder ? (
+            <FolderGroup
+              key={folder.id}
+              folder={folder}
+              collapsed={collapsed.has(folder.id)}
+              onToggle={() => toggle(folder.id)}
+              onReorder={startReordering}
+              styles={styles}
+            >
+              {repos.map(repoGroup)}
+            </FolderGroup>
+          ) : (
+            repos.map(repoGroup)
+          ),
+        )
       )}
       {sections.length === 0 && (
         <Text style={styles.empty}>

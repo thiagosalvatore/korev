@@ -26,6 +26,82 @@ export function repoSections(state: AppState): RepoSection[] {
   });
 }
 
+export type SidebarOrder = Pick<AppState, 'repos' | 'folders' | 'rootOrder'>;
+
+export type MovedOrder = Pick<AppState, 'repos' | 'rootOrder'>;
+
+export interface RepoDestination {
+  folderId: string | null;
+  beforeId: string | null;
+}
+
+function moveBefore<T extends { id: string }>(
+  items: T[],
+  item: T,
+  beforeId: string | null,
+): T[] {
+  if (beforeId === item.id) return items;
+  const rest = items.filter((entry) => entry.id !== item.id);
+  const index = rest.findIndex((entry) => entry.id === beforeId);
+  rest.splice(index === -1 ? rest.length : index, 0, item);
+  return rest;
+}
+
+export function rootItems({
+  repos,
+  folders,
+  rootOrder,
+}: SidebarOrder): (Repo | RepoFolder)[] {
+  const inFolder = (repo: Repo) =>
+    folders.some((folder) => folder.id === repo.folderId);
+  const unordered = [...repos.filter((repo) => !inFolder(repo)), ...folders];
+  const ordered = rootOrder.flatMap(
+    (id) => unordered.find((item) => item.id === id) ?? [],
+  );
+  return [...ordered, ...unordered.filter((item) => !ordered.includes(item))];
+}
+
+function rootOrderWith(
+  order: SidebarOrder,
+  item: Repo | RepoFolder,
+  beforeId: string | null,
+): string[] {
+  return moveBefore(rootItems(order), item, beforeId).map((entry) => entry.id);
+}
+
+export function movedRepo(
+  order: SidebarOrder,
+  repoId: string,
+  { folderId, beforeId }: RepoDestination,
+): MovedOrder {
+  const repo = order.repos.find((entry) => entry.id === repoId);
+  if (!repo) return order;
+  const moved = { ...repo, folderId };
+  const repos = order.repos.map((entry) => (entry === repo ? moved : entry));
+  if (folderId !== null)
+    return {
+      repos: moveBefore(repos, moved, beforeId),
+      rootOrder: order.rootOrder,
+    };
+  return {
+    repos,
+    rootOrder: rootOrderWith({ ...order, repos }, moved, beforeId),
+  };
+}
+
+export function movedFolder(
+  order: SidebarOrder,
+  folderId: string,
+  beforeId: string | null,
+): MovedOrder {
+  const folder = order.folders.find((entry) => entry.id === folderId);
+  if (!folder) return order;
+  return {
+    repos: order.repos,
+    rootOrder: rootOrderWith(order, folder, beforeId),
+  };
+}
+
 export function asksNewestFirst(state: AppState): AskChat[] {
   return [...state.askChats].sort((a, b) =>
     b.lastMessageAt.localeCompare(a.lastMessageAt),
