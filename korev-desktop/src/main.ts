@@ -32,7 +32,7 @@ import { errorMessage, type Notice } from './main/context';
 import { nodeFileSystem } from './main/file-system';
 import { registerIpcHandlers } from './main/ipc';
 import { createKorev, type Korev } from './main/korev';
-import { childEnv, resolveLoginPath } from './main/login-path';
+import { childEnv, resolveLoginEnv } from './main/login-path';
 import {
   sendPhoneNotification,
   sendPushNotifications,
@@ -258,8 +258,8 @@ function watchForUpdates(korev: Korev) {
 }
 
 async function createKorevApp(): Promise<Korev> {
-  const loginPath = await resolveLoginPath(runProcess, process.env);
-  const env = childEnv(process.env, loginPath);
+  const login = await resolveLoginEnv(runProcess, process.env);
+  const env = childEnv(process.env, login);
   const korev = await createKorev({
     run: runProcess,
     env,
