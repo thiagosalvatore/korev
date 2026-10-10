@@ -1,5 +1,5 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -126,12 +126,16 @@ export default function WorkspaceScreen() {
   const state = useAppState();
   const styles = makeStyles(useTheme());
   const [selectedId, setSelectedId] = useState<string>();
+  const workspace = state?.workspaces.find((entry) => entry.id === id);
+  const runtime = workspace && state?.runtime[workspace.id];
+  const archiving = !!workspace?.archivedAt || runtime?.status === 'archiving';
+  useEffect(() => {
+    if (archiving) router.dismissTo('/');
+  }, [archiving]);
 
   if (!state) return <Loading style={styles.fill} />;
-  const workspace = state.workspaces.find((entry) => entry.id === id);
   if (!workspace)
     return <Text style={styles.empty}>This workspace no longer exists.</Text>;
-  const runtime = state.runtime[workspace.id];
   if (runtime && !hasWorktree(runtime))
     return (
       <>

@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
@@ -53,7 +52,7 @@ function confirm(
   );
 }
 
-async function confirmThenLeave(
+async function confirmThenRun(
   title: string,
   message: string | undefined,
   action: string,
@@ -61,9 +60,7 @@ async function confirmThenLeave(
   run: () => Promise<unknown>,
 ) {
   if (!(await confirm(title, message, action))) return;
-  const done = await attempt(failure, run);
-  succeeded(done);
-  if (done) router.back();
+  succeeded(await attempt(failure, run));
 }
 
 function runStep(
@@ -88,7 +85,7 @@ function runStep(
       api.resolveConflicts(workspace.id, sessionId, pr.number),
     );
   if (MERGE_STEPS.has(step))
-    return confirmThenLeave(
+    return confirmThenRun(
       `Merge #${pr.number}?`,
       `Squash merge "${pr.title}" into ${pr.baseRefName}.`,
       label,
@@ -96,7 +93,7 @@ function runStep(
       () => api.mergePr(workspace.id, pr.number),
     );
   if (step === 'archive')
-    return confirmThenLeave(
+    return confirmThenRun(
       `Archive ${workspace.name}?`,
       undefined,
       label,
