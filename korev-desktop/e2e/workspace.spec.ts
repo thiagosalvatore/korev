@@ -54,6 +54,14 @@ async function waitForAgentsToFinish(window: Page) {
   await expect.poll(() => runningAgents(window)).toBe(0);
 }
 
+async function pickRepositories(window: Page, names: string[]) {
+  const first = window.getByRole('checkbox', { name: names[0] });
+  if (!(await first.isVisible()))
+    await window.getByRole('button', { name: 'Repositories' }).click();
+  for (const name of names)
+    await window.getByRole('checkbox', { name }).check();
+}
+
 function launchApp(home: string) {
   return electron.launch({
     args: [
@@ -144,6 +152,9 @@ test('plans a task across two repositories once and hands each its lane', async 
   const { app, window } = await launch(home, web);
   try {
     await window.getByRole('button', { name: 'Open project' }).click();
+    await expect(
+      window.getByRole('heading', { name: 'New workspace' }),
+    ).toBeVisible();
     await app.evaluate(({ dialog }, repoPath) => {
       dialog.showOpenDialog = (async () => ({
         canceled: false,
@@ -157,9 +168,10 @@ test('plans a task across two repositories once and hands each its lane', async 
       ),
     );
     const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
-    await sidebar.getByRole('button', { name: /^New workspace/ }).click();
-    await window.getByRole('checkbox', { name: 'acme-web' }).click();
-    await window.getByRole('checkbox', { name: 'acme-api' }).click();
+    await expect(
+      sidebar.getByRole('region', { name: 'acme-api' }),
+    ).toBeVisible();
+    await pickRepositories(window, ['acme-web', 'acme-api']);
     await expect(
       window.getByRole('button', { name: 'Plan mode' }),
     ).toBeVisible();
