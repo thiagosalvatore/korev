@@ -2,7 +2,12 @@ import type { CommandRunner } from './command-runner';
 
 const PATH_START = '__KOREV_PATH_START__';
 const PATH_END = '__KOREV_PATH_END__';
-const PRINT_PATH = `printf ${PATH_START}; /usr/bin/printenv PATH; printf ${PATH_END}`;
+const SSH_AUTH_SOCK_START = '__KOREV_SSH_AUTH_SOCK_START__';
+const SSH_AUTH_SOCK_END = '__KOREV_SSH_AUTH_SOCK_END__';
+const PRINT_LOGIN_ENV = [
+  `printf ${PATH_START}; /usr/bin/printenv PATH; printf ${PATH_END}`,
+  `printf ${SSH_AUTH_SOCK_START}; /usr/bin/printenv SSH_AUTH_SOCK; printf ${SSH_AUTH_SOCK_END}`,
+].join('; ');
 const SHELL_TIMEOUT_MS = 5000;
 export const DEFAULT_SHELL = '/bin/zsh';
 const PATH_SEPARATOR = ':';
@@ -23,19 +28,24 @@ function between(text: string, start: string, end: string): string | null {
   return text.slice(from + start.length, to).trim();
 }
 
-async function shellPath(
+export interface LoginEnv {
+  path: string;
+  sshAuthSock?: string;
+}
+
+async function shellOutput(
   run: CommandRunner,
   env: NodeJS.ProcessEnv,
-): Promise<string | null> {
+): Promise<string> {
   try {
     const { stdout } = await run(
       env.SHELL || DEFAULT_SHELL,
-      ['-ilc', PRINT_PATH],
+      ['-ilc', PRINT_LOGIN_ENV],
       { env, timeoutMs: SHELL_TIMEOUT_MS },
     );
-    return between(stdout, PATH_START, PATH_END);
+    return stdout;
   } catch {
-    return null;
+    return '';
   }
 }
 
@@ -44,16 +54,23 @@ function installDirs(home: string | undefined): string[] {
   return [...homeDirs, ...SYSTEM_DIRS];
 }
 
-export async function resolveLoginPath(
+function mergedPath(shellPath: string | null, env: NodeJS.ProcessEnv): string {
+  const dirs = [shellPath, env.PATH, ...installDirs(env.HOME)].flatMap(
+    (value) => value?.split(PATH_SEPARATOR) ?? [],
+  );
+  return [...new Set(dirs.filter(Boolean))].join(PATH_SEPARATOR);
+}
+
+export async function resolveLoginEnv(
   run: CommandRunner,
   env: NodeJS.ProcessEnv,
-): Promise<string> {
-  const dirs = [
-    await shellPath(run, env),
-    env.PATH,
-    ...installDirs(env.HOME),
-  ].flatMap((value) => value?.split(PATH_SEPARATOR) ?? []);
-  return [...new Set(dirs.filter(Boolean))].join(PATH_SEPARATOR);
+): Promise<LoginEnv> {
+  const output = await shellOutput(run, env);
+  return {
+    path: mergedPath(between(output, PATH_START, PATH_END), env),
+    sshAuthSock:
+      between(output, SSH_AUTH_SOCK_START, SSH_AUTH_SOCK_END) || undefined,
+  };
 }
 
 export function isElectronVariable(name: string): boolean {
@@ -62,10 +79,13 @@ export function isElectronVariable(name: string): boolean {
 
 export function childEnv(
   env: NodeJS.ProcessEnv,
-  path: string,
+  login: LoginEnv,
 ): NodeJS.ProcessEnv {
   const inherited = Object.entries(env).filter(
     ([name]) => !isElectronVariable(name) && !GITHUB_TOKEN_VARIABLES.has(name),
   );
-  return { ...Object.fromEntries(inherited), PATH: path };
+  const sshAuthSock = login.sshAuthSock
+    ? { SSH_AUTH_SOCK: login.sshAuthSock }
+    : {};
+  return { ...Object.fromEntries(inherited), PATH: login.path, ...sshAuthSock };
 }
