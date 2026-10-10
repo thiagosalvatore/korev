@@ -36,6 +36,7 @@ import {
   type TurnRequest,
 } from './agents';
 import { askScratchPath, prepareAskWorktree } from './ask-worktrees';
+import { isSigningFailure, SIGNING_NUDGE } from './commit-signing';
 import { errorMessage, NotFoundError, type Context } from './context';
 import {
   branchExists,
@@ -250,6 +251,15 @@ export interface Chats {
   settled(): Promise<void>;
 }
 
+function isFailedSigning(item: ChatItem): boolean {
+  return (
+    item.kind === 'tool' &&
+    item.failed &&
+    item.output !== null &&
+    isSigningFailure(item.output)
+  );
+}
+
 export function createChats(
   ctx: Context,
   onWorkspaceTurnFinished: (workspaceId: string, links: TurnPrLinks) => void,
@@ -257,6 +267,7 @@ export function createChats(
   const transcripts = new Map<string, ChatItem[]>();
   const turns = new Map<string, ActiveTurn>();
   const running = new Set<Promise<void>>();
+  const nudgedAboutSigning = new Set<string>();
 
   function locate(sessionId: string): { owner: Owner; session: ChatSession } {
     for (const workspace of ctx.store.state.workspaces) {
@@ -505,6 +516,21 @@ export function createChats(
     alertUser(turn.owner, AGENT_NEEDS_INPUT_TITLE, name);
   }
 
+  function nudgeAboutSigning(
+    session: ChatSession,
+    items: ChatItem[],
+    turn: ActiveTurn,
+  ) {
+    if (ctx.store.state.settings.signAgentCommits) return;
+    if (nudgedAboutSigning.has(session.id)) return;
+    nudgedAboutSigning.add(session.id);
+    upsert(session.id, items, {
+      id: `${turn.id}:signing`,
+      kind: 'notice',
+      text: SIGNING_NUDGE,
+    });
+  }
+
   function handleLine(
     session: ChatSession,
     items: ChatItem[],
@@ -525,6 +551,7 @@ export function createChats(
     const updates = parser.feed(event);
     for (const item of updates)
       upsert(session.id, items, { ...item, id: `${turn.id}:${item.id}` });
+    if (updates.some(isFailedSigning)) nudgeAboutSigning(session, items, turn);
     const allConsumed =
       turn.acknowledged >= turn.written || turn.acknowledged === 0;
     if (event.type === 'result' && allConsumed && turn.backgroundTasks === 0)

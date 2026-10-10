@@ -23,6 +23,7 @@ export interface CoreDeps {
   shell: string | undefined;
   home: string;
   userDataPath: string;
+  signer: string;
   emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]): void;
   notify(notice: Notice): void;
   playSound(): void;

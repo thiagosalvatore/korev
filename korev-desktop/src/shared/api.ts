@@ -161,6 +161,7 @@ export interface KorevApi {
   openIn(workspaceId: string, editor: EditorId): Promise<Result>;
   openExternal(url: string): Promise<void>;
   updateSettings(patch: Partial<Settings>): Promise<void>;
+  enableCommitSigning(): Promise<Result>;
   remotePairing(): Promise<RemotePairing | null>;
   revokeRemoteDevices(): Promise<void>;
   registerPushToken(token: string): Promise<void>;
