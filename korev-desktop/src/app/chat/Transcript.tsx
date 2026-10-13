@@ -3,6 +3,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ComponentProps,
   type ReactNode,
 } from 'react';
 import {
@@ -24,7 +25,7 @@ import type {
 import { duration, fileName, imageType } from '../../shared/format';
 import { messageParts, type MessageParts } from '../../shared/message';
 import { ImagePreview, ImageThumbnail } from './ImagePreview';
-import { Markdown } from './Markdown';
+import { copyMarkdown, Markdown } from './Markdown';
 import { PermissionCard } from './PermissionCard';
 import { PlanChip } from './PlanChip';
 
@@ -342,6 +343,29 @@ function UserMessage({
   );
 }
 
+function AssistantMessage({
+  text,
+  ...markdownProps
+}: Omit<ComponentProps<typeof Markdown>, 'className'>) {
+  return (
+    <div className="group flex gap-1">
+      <Markdown
+        text={text}
+        className="min-w-0 flex-1 px-1.5"
+        {...markdownProps}
+      />
+      <div className="flex items-start pt-1 opacity-0 group-hover:opacity-100">
+        <IconButton
+          icon="copy"
+          label="Copy message"
+          size="sm"
+          onClick={() => void copyMarkdown(text)}
+        />
+      </div>
+    </div>
+  );
+}
+
 function TurnFiles({
   turn,
   onOpen,
@@ -557,10 +581,9 @@ export function Transcript({
               );
             case 'assistant':
               return (
-                <Markdown
+                <AssistantMessage
                   key={item.id}
                   text={item.text}
-                  className="px-1.5"
                   onOpenFile={onOpenFile}
                   onOpenImage={setPreviewImage}
                   repoUrl={repoUrl}

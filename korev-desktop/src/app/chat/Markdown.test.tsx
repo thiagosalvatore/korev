@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Markdown } from './Markdown';
+import { copyMarkdown, Markdown } from './Markdown';
 
 afterEach(cleanup);
 
@@ -69,5 +69,25 @@ describe('Markdown', () => {
     expect(screen.getByRole('link', { name: url }).getAttribute('href')).toBe(
       url,
     );
+  });
+
+  it('copies the markdown as plain text and the rendered html as rich text', async () => {
+    const write = vi.fn();
+    vi.stubGlobal('navigator', { clipboard: { write } });
+    vi.stubGlobal(
+      'ClipboardItem',
+      class {
+        constructor(readonly items: Record<string, Blob>) {}
+      },
+    );
+
+    await copyMarkdown('# Title\n\n- item');
+
+    const [[[{ items }]]] = write.mock.calls;
+    expect(await items['text/plain'].text()).toBe('# Title\n\n- item');
+    const html = await items['text/html'].text();
+    expect(html).toContain('<h1>Title</h1>');
+    expect(html).toContain('<li>item</li>');
+    vi.unstubAllGlobals();
   });
 });

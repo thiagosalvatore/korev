@@ -136,6 +136,15 @@ export function renderMarkdown(
   });
 }
 
+export function copyMarkdown(text: string): Promise<void> {
+  return navigator.clipboard.write([
+    new ClipboardItem({
+      'text/plain': new Blob([text], { type: 'text/plain' }),
+      'text/html': new Blob([renderMarkdown(text)], { type: 'text/html' }),
+    }),
+  ]);
+}
+
 function openLinks(
   event: MouseEvent<HTMLDivElement>,
   onOpenFile?: OpenFile,
