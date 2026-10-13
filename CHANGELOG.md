@@ -4,6 +4,19 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-13
+
+Copy an agent's answer from the chat with its formatting.
+
+### New
+
+- **Copy agent answers.** Hover an agent's answer in the chat and click Copy. Editors and terminals paste the markdown. Slack, Docs and Notes paste the headings, lists and code.
+
+### Fixed
+
+- `git log` shows commits that agents sign with the Korev key as verified. Before, git showed the key as unknown. If you turned on "Sign agent commits with a Korev key" before this version, turn it off and on again once.
+- When a plan starts with work that every lane needs, the agent does that work first. It splits the work into lanes in a second plan, so each lane gets the results. In a task in several repositories, the other workspaces wait until that second plan.
+
 ## [0.11.0] - 2026-10-10
 
 Agents can sign commits while your Mac is locked.
