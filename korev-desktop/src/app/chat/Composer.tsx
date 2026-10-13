@@ -30,6 +30,7 @@ import type { DiffComment } from '../ui-store';
 import { readAsBase64 } from './attachments';
 import { ComposerToolbar } from './ComposerToolbar';
 import { DictationButton, isDictationShortcut } from './DictationButton';
+import { highlightMarkdown } from './markdownHighlight';
 import { RecordingBar } from './RecordingBar';
 import { placeCaret, useVoiceInput } from './voiceInput';
 import { PlanChip } from './PlanChip';
@@ -144,6 +145,8 @@ export function Composer(props: ComposerProps) {
   const [suggestions, setSuggestions] = useState<Suggestions | null>(null);
   const [sending, setSending] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
+  const mirror = useRef<HTMLDivElement>(null);
+  const highlighted = useMemo(() => highlightMarkdown(text), [text]);
   const picker = useRef<HTMLInputElement>(null);
   const loader = useMemo(
     () => createSuggestionLoader({ workspaceId, repoId }),
@@ -448,28 +451,41 @@ export function Composer(props: ComposerProps) {
             onCancel={dictation.cancel}
           />
         ) : null}
-        <textarea
-          ref={input}
-          data-composer
-          aria-label="Message"
-          rows={2}
-          hidden={dictating}
-          value={text}
-          placeholder={
-            (pendingPlan ? PENDING_PLAN_PLACEHOLDER : props.placeholder) ??
-            'Ask to make changes, @mention files, #PRs, run /commands'
-          }
-          className="block max-h-80 min-h-14 w-full resize-none border-0 bg-transparent px-3.5 pt-3 pb-1 font-sans text-md text-fg-1 outline-none placeholder:text-fg-4 focus-visible:shadow-none"
-          onChange={(event) => {
-            update(event.target.value);
-            void loader
-              .suggest(event.target.value, event.target.selectionStart)
-              .then(setSuggestions);
-          }}
-          onKeyDown={onKeyDown}
-          onPaste={onPaste}
-          onBlur={() => setTimeout(() => setSuggestions(null), 100)}
-        />
+        <div className="relative">
+          <div
+            ref={mirror}
+            aria-hidden
+            hidden={dictating}
+            className="pointer-events-none absolute inset-0 overflow-hidden px-3.5 pt-3 pb-1 font-sans text-md break-words whitespace-pre-wrap text-fg-1 [scrollbar-gutter:stable]"
+            dangerouslySetInnerHTML={{ __html: highlighted }}
+          />
+          <textarea
+            ref={input}
+            data-composer
+            aria-label="Message"
+            rows={2}
+            hidden={dictating}
+            value={text}
+            placeholder={
+              (pendingPlan ? PENDING_PLAN_PLACEHOLDER : props.placeholder) ??
+              'Ask to make changes, @mention files, #PRs, run /commands'
+            }
+            className="relative block max-h-80 min-h-14 w-full resize-none border-0 bg-transparent px-3.5 pt-3 pb-1 font-sans text-md text-transparent caret-fg-1 outline-none [scrollbar-gutter:stable] placeholder:text-fg-4 focus-visible:shadow-none"
+            onChange={(event) => {
+              update(event.target.value);
+              void loader
+                .suggest(event.target.value, event.target.selectionStart)
+                .then(setSuggestions);
+            }}
+            onKeyDown={onKeyDown}
+            onPaste={onPaste}
+            onBlur={() => setTimeout(() => setSuggestions(null), 100)}
+            onScroll={(event) => {
+              if (mirror.current)
+                mirror.current.scrollTop = event.currentTarget.scrollTop;
+            }}
+          />
+        </div>
         <input
           ref={picker}
           type="file"
