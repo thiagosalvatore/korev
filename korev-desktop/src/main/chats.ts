@@ -138,7 +138,7 @@ export function systemPrompt(
     `The workspace has a .context directory (gitignored) where you can save files to collaborate with other agents.`,
     `Do not rename the current branch unless the user explicitly tells you to do so.`,
     `If the work needs more than one PR, create the extra branches in this worktree (for example as a stack). Do not create new git worktrees.`,
-    `If a plan has parts that can be built at the same time without each other's code, end the plan with a "## Lanes" section: one "### <short-name>" heading per part, followed by what it covers and its PRs. Keep dependent work in the same lane. Write two or more lanes, or no Lanes section. The user can then start each lane in its own linked workspace.`,
+    `If a plan has parts that can be built at the same time without each other's code, end the plan with a "## Lanes" section: one "### <short-name>" heading per part, followed by what it covers and its PRs. Keep dependent work in the same lane. Write two or more lanes, or no Lanes section. The user can then start each lane in its own linked workspace. If the lanes need results from work that must run first, such as queries or research, leave the Lanes section out: plan and do that work first. When it is done, ask the user to turn on plan mode for the lanes. Then write a plan with the Lanes section and put the results the lanes need in it, because each lane gets the whole plan.`,
     `If you start a dev server, use port $KOREV_PORT (ports $KOREV_PORT to $KOREV_PORT+9 are reserved for this workspace).`,
     ...linkedLines(linked),
   ].join('\n');

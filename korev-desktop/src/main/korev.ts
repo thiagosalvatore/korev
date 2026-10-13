@@ -16,6 +16,7 @@ import {
   type EditorId,
   latestPlan,
   type PlanLane,
+  planLanes,
   type PromptKind,
   type PrStatus,
   type Repo,
@@ -630,7 +631,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         plan,
         sendWithHistory(history),
       );
-    stopWaitingForLanes(ctx, origin);
+    if (planLanes(plan, 1).length) stopWaitingForLanes(ctx, origin);
   }
 
   async function approvePlan(

@@ -14,7 +14,7 @@ All of them use the same workspace name and branch name.
 
 ## One agent plans across the repositories
 
-When you create linked workspaces from the New workspace page, only the agent in the first repository starts. It starts in plan mode, reads every linked repository, and writes one plan. The plan ends with a **Lanes** section that has one lane per repository that needs changes. The other workspaces wait, and their agents start when you approve the plan. A workspace whose repository gets no lane stops waiting when you approve.
+When you create linked workspaces from the New workspace page, only the agent in the first repository starts. It starts in plan mode, reads every linked repository, and writes one plan. The plan ends with a **Lanes** section that has one lane per repository that needs changes. The other workspaces wait, and their agents start when you approve the plan. A workspace whose repository gets no lane stops waiting when you approve. If the approved plan has no **Lanes** section, the other workspaces keep waiting for the next plan.
 
 When you start workspaces from an Ask chat that already has a plan, every agent starts at once, with that plan.
 
@@ -28,6 +28,8 @@ A plan can have parts that can be built at the same time. The agent, Claude Code
 - An unticked lane stays in this workspace too.
 
 Press **Approve and split off N lanes**. Each new workspace gets the planning conversation and the plan, and its agent builds only its lane. The agent in this workspace is told which lanes are built elsewhere. **Approve here** builds every lane in this workspace.
+
+Sometimes the lanes need results from work that must run first, for example queries. The agent then plans only that work, without a **Lanes** section, and does it in this workspace. When it is done, turn on plan mode and ask for the lanes. The new plan has the results in it, and each lane gets the whole plan.
 
 <Screenshot
   name="plan-review"

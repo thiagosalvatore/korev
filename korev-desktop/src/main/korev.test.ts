@@ -1204,7 +1204,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   });
 
   it('stops a linked workspace waiting when the approved plan has no lane for it', async () => {
-    const { lead, member } = await createAcrossRepos('make-plan billing');
+    const { lead, member } = await createAcrossRepos('make-lanes billing');
     await waitUntilCreated(member.id);
     const permissionId = await waitForPermission(lead.sessions[0].id);
 
@@ -1216,6 +1216,18 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       async () => !(await workspaceState(member.id)).workspace.awaitsLane,
     );
     expect(await userMessages(member.sessions[0].id)).toEqual([]);
+  });
+
+  it('keeps linked workspaces waiting when the approved plan has no Lanes section', async () => {
+    const { lead, member } = await createAcrossRepos('make-plan billing');
+    await waitUntilCreated(member.id);
+    const permissionId = await waitForPermission(lead.sessions[0].id);
+
+    await korev.api.respondPermission(lead.sessions[0].id, permissionId, {
+      allow: true,
+    });
+
+    expect((await workspaceState(member.id)).workspace.awaitsLane).toBe(true);
   });
 
   it('starts a new workspace for a second lane in the same repository', async () => {

@@ -390,7 +390,7 @@ function ownPartNote(repo: Repo): string {
 }
 
 function leadNote(repo: Repo): string {
-  return `This task spans several repositories. Your system prompt lists their linked workspaces. Read all of them to explore and plan, and change files in this workspace only. End the plan with a "## Lanes" section that has one lane per repository that needs changes, each headed with the repository name. Leave out any repository that needs no changes. If ${repo.name} needs changes, put its lane first: this workspace builds only the ${repo.name} lane. The agent in each repository's linked workspace builds that repository's lane once the user approves the plan.`;
+  return `This task spans several repositories. Your system prompt lists their linked workspaces. Read all of them to explore and plan, and change files in this workspace only. End the plan with a "## Lanes" section that has one lane per repository that needs changes, each headed with the repository name. Leave out any repository that needs no changes. If ${repo.name} needs changes, put its lane first: this workspace builds only the ${repo.name} lane. The agent in each repository's linked workspace builds that repository's lane once the user approves the plan. If the lanes need results from work that must run first, such as queries or research, leave the Lanes section out and plan only that work. The linked workspaces keep waiting until the user approves a plan with lanes.`;
 }
 
 function leadsAlone(repos: Repo[], plan: string | null): boolean {
