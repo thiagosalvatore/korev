@@ -327,7 +327,7 @@ function UserMessage({
       </div>
       <div
         className={cn(
-          'flex max-w-[85%] flex-col gap-2 rounded-lg border border-border-1 bg-raised px-3.5 py-2.5 text-md whitespace-pre-wrap text-fg-1',
+          'flex max-w-[85%] flex-col gap-2 rounded-lg border border-border-1 bg-raised px-3.5 py-2.5 text-md text-fg-1',
           item.queued && 'border-dashed opacity-60',
         )}
       >
@@ -336,7 +336,7 @@ function UserMessage({
             Queued
           </span>
         ) : null}
-        {body ? <span>{body}</span> : null}
+        {body ? <Markdown text={body} breaks /> : null}
         <MessageAttachments plans={plans} files={files} sessionId={sessionId} />
       </div>
     </div>
@@ -348,13 +348,9 @@ function AssistantMessage({
   ...markdownProps
 }: Omit<ComponentProps<typeof Markdown>, 'className'>) {
   return (
-    <div className="group flex gap-1">
-      <Markdown
-        text={text}
-        className="min-w-0 flex-1 px-1.5"
-        {...markdownProps}
-      />
-      <div className="flex items-start pt-1 opacity-0 group-hover:opacity-100">
+    <div className="group flex flex-col gap-1">
+      <Markdown text={text} className="px-1.5" {...markdownProps} />
+      <div className="flex px-1 opacity-0 group-hover:opacity-100">
         <IconButton
           icon="copy"
           label="Copy message"

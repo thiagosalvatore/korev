@@ -16,6 +16,12 @@ describe('Markdown', () => {
     expect(onOpenFile).toHaveBeenCalledWith('src/foo.ts', 12);
   });
 
+  it('keeps single newlines as line breaks when breaks is on', () => {
+    const { container } = render(<Markdown text={'a\nb'} breaks />);
+
+    expect(container.querySelector('br')).not.toBeNull();
+  });
+
   it('opens a bare home path written in prose', () => {
     const onOpenFile = vi.fn();
     render(

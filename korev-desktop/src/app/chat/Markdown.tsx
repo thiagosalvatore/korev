@@ -130,9 +130,11 @@ export function renderMarkdown(
   text: string,
   linkFiles = false,
   repoUrl: string | null = null,
+  breaks = false,
 ): string {
   return (linkFiles ? linkingMarkdown(repoUrl) : markdown).parse(text, {
     async: false,
+    breaks,
   });
 }
 
@@ -172,17 +174,19 @@ export function Markdown({
   onOpenFile,
   onOpenImage,
   repoUrl = null,
+  breaks = false,
 }: {
   text: string;
   className?: string;
   onOpenFile?: OpenFile;
   onOpenImage?: OpenImage;
   repoUrl?: string | null;
+  breaks?: boolean;
 }) {
   const linkFiles = Boolean(onOpenFile || onOpenImage);
   const html = useMemo(
-    () => renderMarkdown(text, linkFiles, repoUrl),
-    [text, linkFiles, repoUrl],
+    () => renderMarkdown(text, linkFiles, repoUrl, breaks),
+    [text, linkFiles, repoUrl, breaks],
   );
   return (
     <div
