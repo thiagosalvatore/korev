@@ -291,6 +291,17 @@ async function createKorevApp(): Promise<Korev> {
       const problem = await shell.openPath(target);
       if (problem) console.warn(problem);
     },
+    showFileMenu: (file) =>
+      Menu.buildFromTemplate([
+        {
+          label: 'Reveal in Finder',
+          click: () => shell.showItemInFolder(file),
+        },
+        {
+          label: 'Open with Default App',
+          click: () => void shell.openPath(file),
+        },
+      ]).popup(),
     openExternal: async (url) => {
       if (isWebUrl(url)) await shell.openExternal(url);
     },

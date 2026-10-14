@@ -139,6 +139,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   let notify: Mock<(notice: Notice) => void>;
   let windowFocused: boolean;
   let keepAwake: Mock<(on: boolean) => void>;
+  let showFileMenu: Mock<(file: string) => void>;
   let applyRemote: Mock<(settings: RemoteSettings) => Promise<void>>;
   let emit: Mock<(event: string, payload: unknown) => void>;
   let fetchRelease: Mock<(which: string) => Promise<Release | null>>;
@@ -177,6 +178,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       newId: () => randomUUID(),
       chooseDirectory: async () => chosenDirectory,
       openPath: async () => undefined,
+      showFileMenu,
       openExternal: async () => undefined,
       applyTheme: () => undefined,
       remote: {
@@ -211,6 +213,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     notify = vi.fn();
     windowFocused = true;
     keepAwake = vi.fn();
+    showFileMenu = vi.fn();
     applyRemote = vi.fn(async () => undefined);
     emit = vi.fn();
     fetchRelease = vi.fn(async () => INSTALLED_RELEASE);
@@ -1086,6 +1089,51 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       `data:image/png;base64,${SCREENSHOT_BASE64}`,
     );
     expect(await korev.api.readImage(session.id, 'notes.txt')).toBeNull();
+  });
+
+  it('lists the artifacts agents saved in .context, without attachments', async () => {
+    const workspace = await createWorkspace();
+    const context = path.join(workspace.path, '.context');
+    await mkdir(path.join(context, 'plans'), { recursive: true });
+    await mkdir(path.join(context, 'attachments'), { recursive: true });
+    await writeFile(path.join(context, 'plans', 'login.md'), '# Login');
+    await writeFile(path.join(context, 'shot.png'), 'png');
+    await writeFile(path.join(context, 'attachments', 'upload.txt'), 'in');
+    await writeFile(path.join(context, '.DS_Store'), '');
+
+    expect(await korev.api.listArtifacts(workspace.id)).toEqual([
+      '.context/plans/login.md',
+      '.context/shot.png',
+    ]);
+  });
+
+  it('lists no artifacts when .context is missing', async () => {
+    const workspace = await createWorkspace();
+    await rm(path.join(workspace.path, '.context'), { recursive: true });
+
+    expect(await korev.api.listArtifacts(workspace.id)).toEqual([]);
+  });
+
+  it('shows the file menu for a workspace file at its full path', async () => {
+    const workspace = await createWorkspace();
+
+    await korev.api.showFileMenu(workspace.id, '.context/plans/login.md');
+
+    expect(showFileMenu).toHaveBeenCalledWith(
+      path.join(workspace.path, '.context', 'plans', 'login.md'),
+    );
+  });
+
+  it('reads an image from a workspace as a data URL', async () => {
+    const workspace = await createWorkspace();
+    await writeFile(
+      path.join(workspace.path, '.context', 'shot.png'),
+      Buffer.from(SCREENSHOT_BASE64, 'base64'),
+    );
+
+    expect(
+      await korev.api.readWorkspaceImage(workspace.id, '.context/shot.png'),
+    ).toBe(`data:image/png;base64,${SCREENSHOT_BASE64}`);
   });
 
   async function userMessages(sessionId: string) {

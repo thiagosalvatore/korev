@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type MouseEvent } from 'react';
 import {
   Button,
   cn,
@@ -14,6 +14,7 @@ import {
   type CheckState,
   type FileChange,
   type GitWorktree,
+  primaryPr,
   type PrStatus,
   type ReviewDecision,
   type Workspace,
@@ -29,13 +30,16 @@ import {
   resolveConflicts,
 } from './actions';
 import { api } from './bridge';
+import { draggable, FILE_DRAG_TYPE } from './dnd';
 import { fileName } from '../shared/format';
 import { usePolling } from './hooks';
 import { reportFailure } from './ui/toast';
 import { PrComments } from './comments/PrComments';
-import { setUi, useUi, type GitPanelTab } from './ui-store';
+import { GIT_PANEL_TABS, setUi, useUi, type GitPanelTab } from './ui-store';
 
 const CHANGES_REFRESH_MS = 4_000;
+const FILES_REFRESH_MS = 15_000;
+const ARTIFACTS_BASE = '.context/';
 
 const CHECK_ICONS: Record<CheckState, { icon: IconName; className: string }> = {
   success: { icon: 'circle-check', className: 'text-success-text' },
@@ -72,7 +76,7 @@ interface TreeNode {
   isFile: boolean;
 }
 
-function buildTree(files: string[]): TreeNode {
+function buildTree(files: string[], base: string): TreeNode {
   const root: TreeNode = {
     name: '',
     path: '',
@@ -81,9 +85,9 @@ function buildTree(files: string[]): TreeNode {
   };
   for (const file of files) {
     let node = root;
-    const parts = file.split('/');
+    const parts = file.slice(base.length).split('/');
     parts.forEach((part, index) => {
-      const path = parts.slice(0, index + 1).join('/');
+      const path = base + parts.slice(0, index + 1).join('/');
       let child = node.children.get(part);
       if (!child) {
         child = {
@@ -107,6 +111,17 @@ function sortedChildren(node: TreeNode): TreeNode[] {
   );
 }
 
+function fileRowActions(workspaceId: string, file: string) {
+  return {
+    ...draggable(FILE_DRAG_TYPE, file, 'copy'),
+    onClick: () => openFile(workspaceId, file),
+    onContextMenu: (event: MouseEvent) => {
+      event.preventDefault();
+      void api.showFileMenu(workspaceId, file);
+    },
+  };
+}
+
 function TreeItem({
   node,
   depth,
@@ -125,7 +140,7 @@ function TreeItem({
         className="flex h-6 w-full cursor-pointer items-center gap-1.5 truncate rounded-sm border-0 bg-transparent pr-2 text-left text-xs text-fg-2 hover:bg-hover hover:text-fg-1"
         style={indent}
         title={node.path}
-        onClick={() => openFile(workspace.id, node.path)}
+        {...fileRowActions(workspace.id, node.path)}
       >
         <Icon name="file" size={12} className="flex-none text-fg-4" />
         <span className="truncate">{node.name}</span>
@@ -162,21 +177,70 @@ function TreeItem({
   );
 }
 
-function AllFiles({ workspace }: { workspace: Workspace }) {
+function usePolledFiles(
+  list: (workspaceId: string) => Promise<string[]>,
+  workspaceId: string,
+  intervalMs: number,
+): string[] | null {
   const [files, setFiles] = useState<string[] | null>(null);
-  const [filter, setFilter] = useState('');
   usePolling(
     () =>
-      void api
-        .listFiles(workspace.id)
+      void list(workspaceId)
         .then(setFiles)
         .catch(() => setFiles([])),
-    15_000,
-    [workspace.id],
+    intervalMs,
+    [workspaceId],
   );
-  const tree = useMemo(() => buildTree(files ?? []), [files]);
+  return files;
+}
+
+function AllFiles({ workspace }: { workspace: Workspace }) {
+  const files = usePolledFiles(api.listFiles, workspace.id, FILES_REFRESH_MS);
+  return <FileTree workspace={workspace} files={files ?? []} base="" />;
+}
+
+function Artifacts({ workspace }: { workspace: Workspace }) {
+  const files = usePolledFiles(
+    api.listArtifacts,
+    workspace.id,
+    CHANGES_REFRESH_MS,
+  );
+  if (!files) return <Spinner />;
+  if (!files.length)
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-6 text-center text-fg-3">
+        <Icon name="files" size={20} />
+        <p className="m-0 text-sm">No artifacts yet</p>
+        <p className="m-0 text-xs text-fg-4">
+          Plans, notes and images that agents save in .context show up here.
+        </p>
+      </div>
+    );
+  return (
+    <FileTree
+      workspace={workspace}
+      files={files}
+      base={ARTIFACTS_BASE}
+      filterLabel="Filter artifacts"
+    />
+  );
+}
+
+function FileTree({
+  workspace,
+  files,
+  base,
+  filterLabel = 'Filter files',
+}: {
+  workspace: Workspace;
+  files: string[];
+  base: string;
+  filterLabel?: string;
+}) {
+  const [filter, setFilter] = useState('');
+  const tree = useMemo(() => buildTree(files, base), [files, base]);
   const matches = filter
-    ? (files ?? [])
+    ? files
         .filter((file) => file.toLowerCase().includes(filter.toLowerCase()))
         .slice(0, 200)
     : null;
@@ -184,9 +248,9 @@ function AllFiles({ workspace }: { workspace: Workspace }) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="p-2">
         <input
-          aria-label="Filter files"
+          aria-label={filterLabel}
           value={filter}
-          placeholder="Filter files"
+          placeholder={filterLabel}
           className="h-7 w-full rounded-sm border border-border-2 bg-inset px-2 text-xs text-fg-1 outline-none focus:border-accent-border"
           onChange={(event) => setFilter(event.target.value)}
         />
@@ -199,7 +263,7 @@ function AllFiles({ workspace }: { workspace: Workspace }) {
                 type="button"
                 title={file}
                 className="flex h-6 w-full cursor-pointer items-center gap-1.5 truncate rounded-sm border-0 bg-transparent px-2 text-left text-xs text-fg-2 hover:bg-hover"
-                onClick={() => openFile(workspace.id, file)}
+                {...fileRowActions(workspace.id, file)}
               >
                 <Icon name="file" size={12} className="flex-none text-fg-4" />
                 <span className="truncate">{fileName(file)}</span>
@@ -385,7 +449,7 @@ function PrCard({
   );
 }
 
-function Checks({
+function PullRequest({
   state,
   workspace,
 }: {
@@ -411,17 +475,29 @@ function Checks({
     );
   }
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-      {openFirst(prs).map((pr) => (
-        <PrSection
-          key={pr.url}
-          workspace={workspace}
-          pr={pr}
-          worktree={
-            strays.find((stray) => stray.branch === pr.headRefName) ?? null
-          }
-        />
-      ))}
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className="flex flex-col gap-3 p-3">
+        {openFirst(prs).map((pr) => (
+          <PrSection
+            key={pr.url}
+            workspace={workspace}
+            pr={pr}
+            worktree={
+              strays.find((stray) => stray.branch === pr.headRefName) ?? null
+            }
+          />
+        ))}
+      </div>
+      {prs.some((pr) => pr.state === 'OPEN') ? (
+        <div className="flex flex-none flex-col">
+          <div className="px-3 type-overline text-fg-4">Comments</div>
+          <PrComments
+            state={state}
+            workspace={workspace}
+            onOpenTab={() => openComments(workspace.id)}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -478,12 +554,16 @@ function PrSection({
   );
 }
 
-const TABS: { id: GitPanelTab; label: string }[] = [
-  { id: 'files', label: 'All files' },
-  { id: 'changes', label: 'Changes' },
-  { id: 'checks', label: 'Checks' },
-  { id: 'comments', label: 'Comments' },
-];
+const TAB_LABELS: Record<GitPanelTab, string> = {
+  files: 'Files',
+  changes: 'Changes',
+  pr: 'PR',
+  artifacts: 'Artifacts',
+};
+
+function prTabLabel(pr: PrStatus | null): string {
+  return pr ? `#${pr.number}` : TAB_LABELS.pr;
+}
 
 export function GitPanel({
   state,
@@ -493,6 +573,8 @@ export function GitPanel({
   workspace: Workspace;
 }) {
   const tab = useUi((ui) => ui.gitTab);
+  const prUrl = useUi((ui) => ui.workspaces[workspace.id]?.prUrl);
+  const pr = primaryPr(workspace, state.runtime[workspace.id], prUrl);
   const [changes, setChanges] = useState<FileChange[] | null>(null);
   usePolling(
     () => {
@@ -509,12 +591,11 @@ export function GitPanel({
     <section aria-label="Git" className="flex min-h-0 flex-1 flex-col">
       <Tabs
         className="flex-none px-1.5"
-        tabs={TABS.map((entry) => ({
-          ...entry,
+        tabs={GIT_PANEL_TABS.map((id) => ({
+          id,
+          label: id === 'pr' ? prTabLabel(pr) : TAB_LABELS[id],
           count:
-            entry.id === 'changes' && changes?.length
-              ? changes.length
-              : undefined,
+            id === 'changes' && changes?.length ? changes.length : undefined,
         }))}
         value={tab}
         onChange={(id) => setUi({ gitTab: id as GitPanelTab })}
@@ -526,14 +607,10 @@ export function GitPanel({
           <AllFiles workspace={workspace} />
         ) : tab === 'changes' ? (
           <Changes workspace={workspace} changes={changes} />
-        ) : tab === 'checks' ? (
-          <Checks state={state} workspace={workspace} />
+        ) : tab === 'pr' ? (
+          <PullRequest state={state} workspace={workspace} />
         ) : (
-          <PrComments
-            state={state}
-            workspace={workspace}
-            onOpenTab={() => openComments(workspace.id)}
-          />
+          <Artifacts workspace={workspace} />
         )}
       </div>
     </section>

@@ -26,7 +26,7 @@ Three columns:
   shows once, under the repository of its lead workspace (see Linked group).
 - **Centre**: the workspace header (workspace name, branch, target branch, Open in, PR number,
   the next git action), a tab strip (chats, Changes, open files) and the active tab.
-- **Right panel** (`--panel-w`): the git panel (All files / Changes / Checks) on top and
+- **Right panel** (`--panel-w`): the git panel (Files / Changes / PR / Artifacts) on top and
   the terminal panel (Setup / Run / Terminal) below.
 
 The **Grid** page (⌘G) replaces the centre and the right panel with 2 or 4 panes. Each pane

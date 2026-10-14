@@ -5,7 +5,7 @@ description: 'Read the diff, comment for the agent, and take a pull request from
 
 ## See what changed
 
-The right panel has three tabs: **All files**, **Changes** and **Checks**.
+The right panel has four tabs: **Files**, **Changes**, the pull request tab and **Artifacts**. The pull request tab shows the pull request's number, such as **#42**, or **PR** before there is one.
 
 **Changes** lists every file that differs from the workspace's target branch. From there:
 
@@ -48,7 +48,7 @@ Only the checks that the repository requires for merge count. If a check that is
 
 ## Checks
 
-The **Checks** tab shows the pull request:
+The pull request tab shows the pull request:
 
 - Its state, conflicts, failing and running checks, and review status.
 - The list of checks. Click one to open it on GitHub.
@@ -57,7 +57,7 @@ Korev refreshes the pull request every 30 seconds and after each agent turn.
 
 ## Comments
 
-The **Comments** tab shows the comments on the open pull request as threads. A thread on a line shows the code it is about and every reply. Comments on the pull request itself and review summaries show as **Conversation**.
+Under the checks, the pull request tab shows the comments on the open pull request as threads. A thread on a line shows the code it is about and every reply. Comments on the pull request itself and review summaries show as **Conversation**.
 
 - **Humans** and **Bots** split the threads by who started them. Bots are GitHub apps, such as CodeRabbit or Codecov.
 - A resolved thread starts closed. Click it to open it.

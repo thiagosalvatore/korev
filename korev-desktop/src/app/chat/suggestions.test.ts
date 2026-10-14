@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applySuggestion,
+  createSuggestionLoader,
   snippetSuggestions,
   type Suggestions,
 } from './suggestions';
@@ -35,5 +36,28 @@ describe('applySuggestion', () => {
       text: 'ok Run the tests.',
       caret: 17,
     });
+  });
+});
+
+describe('createSuggestionLoader', () => {
+  it('suggests the artifacts in .context alongside the tracked files', async () => {
+    const files: Record<string, string[]> = {
+      listFiles: ['src/login.ts'],
+      listArtifacts: ['.context/plans/login-page.md'],
+    };
+    window.korev = {
+      call: async (method: string) => files[method],
+      on: () => () => {},
+    } as unknown as Window['korev'];
+    const loader = createSuggestionLoader({ workspaceId: 'w1', repoId: null });
+
+    const suggested = await loader.suggest('@login', 6);
+
+    expect(suggested?.options.map((option) => option.insert)).toEqual(
+      expect.arrayContaining([
+        '@src/login.ts',
+        '@.context/plans/login-page.md',
+      ]),
+    );
   });
 });

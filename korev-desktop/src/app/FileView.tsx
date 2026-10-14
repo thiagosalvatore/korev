@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, cn, highlightCode, Icon, Spinner } from '../design-system';
+import { fileName, imageType } from '../shared/format';
 import type { Workspace } from '../shared/model';
 import { api } from './bridge';
 import { Markdown } from './chat/Markdown';
@@ -102,7 +103,60 @@ function Editor({
   );
 }
 
-export function FileView({
+function Unavailable() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 text-fg-3">
+      <Icon name="file-x" size={22} />
+      <p className="m-0 text-sm">This file can't be shown here.</p>
+    </div>
+  );
+}
+
+function FileHeader({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex h-9 flex-none items-center gap-2 border-b border-border-1 bg-surface px-3">
+      {children}
+    </div>
+  );
+}
+
+function ImageFile({ workspace, file }: FileViewProps) {
+  const [source, setSource] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    setSource(undefined);
+    void api.readWorkspaceImage(workspace.id, file).then(setSource);
+  }, [workspace.id, file]);
+
+  if (source === undefined) return <Spinner />;
+  if (source === null) return <Unavailable />;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <FileHeader>
+        <span className="min-w-0 flex-1 truncate font-mono text-xs text-fg-2">
+          {file}
+        </span>
+      </FileHeader>
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+        <img
+          src={source}
+          alt={fileName(file)}
+          className="max-h-full max-w-full"
+        />
+      </div>
+    </div>
+  );
+}
+
+export function FileView(props: FileViewProps) {
+  return imageType(props.file) ? (
+    <ImageFile {...props} />
+  ) : (
+    <TextFile {...props} />
+  );
+}
+
+function TextFile({
   workspace,
   file,
   line,
@@ -131,18 +185,11 @@ export function FileView({
   }
 
   if (contents === undefined) return <Spinner />;
-  if (contents === null) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 text-fg-3">
-        <Icon name="file-x" size={22} />
-        <p className="m-0 text-sm">This file can't be shown here.</p>
-      </div>
-    );
-  }
+  if (contents === null) return <Unavailable />;
   const dirty = draft !== contents;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-9 flex-none items-center gap-2 border-b border-border-1 bg-surface px-3">
+      <FileHeader>
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-fg-2">
           {file}
           {dirty ? <span className="ml-1 text-warning-text">●</span> : null}
@@ -179,7 +226,7 @@ export function FileView({
             Edit
           </Button>
         )}
-      </div>
+      </FileHeader>
       {editing ? (
         <Editor value={draft} onChange={setDraft} onSave={() => void save()} />
       ) : (

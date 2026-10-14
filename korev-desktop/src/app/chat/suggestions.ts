@@ -39,7 +39,12 @@ export function createSuggestionLoader(source: SuggestionSource) {
   async function load(trigger: SuggestionTrigger): Promise<SuggestionOption[]> {
     const { workspaceId, repoId } = source;
     if (trigger === '@' && workspaceId) {
-      return (await api.listFiles(workspaceId).catch(() => [])).map((file) => ({
+      const lists = await Promise.all(
+        [api.listFiles, api.listArtifacts].map((list) =>
+          list(workspaceId).catch(() => []),
+        ),
+      );
+      return lists.flat().map((file) => ({
         label: file,
         insert: `@${file}`,
       }));

@@ -110,6 +110,7 @@ const PR_CLOCK_SKEW_MS = 60_000;
 const FILE_MAX_BYTES = 1_000_000;
 const IMAGE_MAX_BYTES = 10_000_000;
 const CONTEXT_DIR = '.context';
+const HIDDEN_PREFIX = '.';
 const COMMAND_EXTENSION = '.md';
 const BUILTIN_COMMANDS = ['compact', 'review', 'init'];
 const IMPLEMENT_PLAN_TASK = 'Implement your part of the plan below.';
@@ -146,6 +147,29 @@ async function writeAttachment(
   const target = path.join(dir, safeName);
   await writeFile(target, Buffer.from(base64, 'base64'));
   return target;
+}
+
+async function imageDataUrl(file: string): Promise<string | null> {
+  const type = imageType(file);
+  if (!type) return null;
+  const contents = await readFile(file).catch(() => null);
+  if (!contents || contents.length > IMAGE_MAX_BYTES) return null;
+  return `data:${type};base64,${contents.toString('base64')}`;
+}
+
+async function listArtifacts(worktree: string): Promise<string[]> {
+  const contextDir = path.join(worktree, CONTEXT_DIR);
+  const attachments = path.join(contextDir, ATTACHMENTS_DIR);
+  const entries = await readdir(contextDir, {
+    recursive: true,
+    withFileTypes: true,
+  }).catch(() => []);
+  return entries
+    .filter((entry) => entry.isFile() && !entry.name.startsWith(HIDDEN_PREFIX))
+    .map((entry) => path.join(entry.parentPath, entry.name))
+    .filter((file) => !file.startsWith(attachments + path.sep))
+    .map((file) => path.relative(worktree, file))
+    .sort();
 }
 
 async function commandNames(dir: string): Promise<string[]> {
@@ -195,6 +219,7 @@ export interface KorevDeps extends CoreDeps {
   spawnPty: SpawnPty;
   chooseDirectory(): Promise<string | null>;
   openPath(target: string): Promise<void>;
+  showFileMenu(file: string): void;
   openExternal(url: string): Promise<void>;
   applyTheme(theme: Settings['theme']): void;
   remote: Pick<
@@ -1188,14 +1213,20 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       if (!contents || contents.length > FILE_MAX_BYTES) return null;
       return contents.toString('utf8');
     },
-    async readImage(sessionId, file) {
-      const type = imageType(file);
-      if (!type) return null;
-      const target = readablePath(sessionRoot(sessionId), deps.home, file);
-      const contents = await readFile(target).catch(() => null);
-      if (!contents || contents.length > IMAGE_MAX_BYTES) return null;
-      return `data:${type};base64,${contents.toString('base64')}`;
+    readImage: (sessionId, file) =>
+      imageDataUrl(readablePath(sessionRoot(sessionId), deps.home, file)),
+    async showFileMenu(workspaceId, file) {
+      deps.showFileMenu(
+        readablePath(workspacePath(workspaceId).path, deps.home, file),
+      );
     },
+    async listArtifacts(workspaceId) {
+      return listArtifacts(workspacePath(workspaceId).path);
+    },
+    readWorkspaceImage: (workspaceId, file) =>
+      imageDataUrl(
+        readablePath(workspacePath(workspaceId).path, deps.home, file),
+      ),
     prStatuses: (workspaceId) => refreshPrs(workspaceId),
     async mergePr(workspaceId, prNumber) {
       const workspace = workspacePath(workspaceId);

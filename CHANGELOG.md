@@ -7,6 +7,8 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 ### New
 
 - **Plans saved as files.** Korev saves each plan in the workspace's `.context/plans` folder, under a name taken from the plan's title.
+- **Artifacts.** The new Artifacts tab in the right panel lists the plans, notes and images that agents save in the workspace's `.context` folder. Click one to open it, or right-click it to reveal it in Finder or open it in its default app. Drag one into the message box, or type `@` and its name, to point the agent at it.
+- **One pull request tab.** The right panel's Checks and Comments tabs are now one tab, named after the pull request's number. It shows the checks first and the review comments under them.
 
 ## [0.12.0] - 2026-10-13
 

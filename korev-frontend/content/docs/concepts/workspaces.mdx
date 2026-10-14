@@ -40,6 +40,8 @@ Every workspace has a `.context/` folder. Korev adds it to the repository's `.gi
 - Attachments you add to a chat are saved in `.context/attachments/`.
 - The Create PR prompt tells the agent not to commit it.
 
+The **Artifacts** tab in the right panel lists the files in `.context/`, except attachments. Click a file to open it: markdown is rendered and images are shown. Right-click a file to reveal it in Finder or open it in its default app. To point the agent at a file, drag it into the message box or type `@` and its name.
+
 ## Ports
 
 Each active workspace gets ten ports. `KOREV_PORT` is the first one: 55000 for the first workspace, 55010 for the next, and so on. The agent is told to use `$KOREV_PORT` to `$KOREV_PORT+9` for dev servers. Use the same variable in your run scripts so two workspaces never fight for a port. See [Environment variables](../reference/environment-variables.mdx).

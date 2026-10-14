@@ -27,7 +27,7 @@ const LIST: Record<TabsVariant, string> = {
 };
 
 const TAB_BASE =
-  'relative inline-flex cursor-pointer items-center gap-[7px] border-0 bg-transparent px-2.5 font-sans text-sm leading-none font-medium text-fg-3 transition-colors duration-(--dur-fast) ease-out hover:text-fg-1 aria-selected:text-fg-1';
+  'relative inline-flex cursor-pointer items-center gap-[7px] whitespace-nowrap border-0 bg-transparent px-2.5 font-sans text-sm leading-none font-medium text-fg-3 transition-colors duration-(--dur-fast) ease-out hover:text-fg-1 aria-selected:text-fg-1';
 
 const TAB: Record<TabsVariant, string> = {
   underline:

@@ -2,15 +2,20 @@ import { useState, type DragEvent } from 'react';
 
 export const WORKSPACE_DRAG_TYPE = 'application/x-korev-workspace';
 export const ASK_DRAG_TYPE = 'application/x-korev-ask';
+export const FILE_DRAG_TYPE = 'application/x-korev-file';
 
 export type DropHandlers = Partial<Record<string, (draggedId: string) => void>>;
 
-export function draggable(type: string, id: string) {
+export function draggable(
+  type: string,
+  id: string,
+  effect: DataTransfer['effectAllowed'] = 'move',
+) {
   return {
     draggable: true,
     onDragStart: (event: DragEvent) => {
       event.dataTransfer.setData(type, id);
-      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.effectAllowed = effect;
     },
   };
 }
