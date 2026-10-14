@@ -75,8 +75,8 @@ PR, Fix errors and Resolve conflicts send a prompt to the active chat; Merge cal
   checkpoint taken before it, and puts the text back in the composer.
 - Agent text is markdown. Tool calls are one line each (icon, tool, target) and expand to
   show input and output. More than three in a row collapse into "N tool calls".
-- Hovering a markdown code block shows a copy button in its top-right corner. It turns into a
-  `success-text` check for 1.5 s after copying.
+- Hovering a markdown code block shows a copy button in its top-right corner, in its own column so
+  the code never runs under it. It turns into a `success-text` check for 1.5 s after copying.
 - The composer border turns dashed accent in plan mode (⇧Tab).
 - A plan's Lanes card lists each lane with a checkbox and its name. In a workspace linked across
   repositories, each lane also has a repository picker, preset to the repository its name matches.
