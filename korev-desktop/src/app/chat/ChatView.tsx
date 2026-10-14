@@ -21,6 +21,7 @@ import {
   groupRepoName,
   laneRepos,
   waitsForLane,
+  workspaceLabel,
 } from '../../shared/workspaces';
 import {
   EMPTY_WORKSPACE_UI,
@@ -100,7 +101,7 @@ function EmptyChat({
         className="text-fg-3"
       />
       <p className="m-0 text-lg font-semibold text-fg-1">
-        {AGENT_LABELS[session.agent]} in {workspace.name}
+        {AGENT_LABELS[session.agent]} in {workspaceLabel(workspace)}
       </p>
       <p className="m-0 text-sm text-fg-3">
         Working on <span className="font-mono">{workspace.branch}</span>.

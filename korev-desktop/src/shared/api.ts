@@ -79,6 +79,7 @@ export interface KorevApi {
   listIssues(repoId: string, query?: string): Promise<IssueSummary[]>;
   setBaseBranch(workspaceId: string, branch: string): Promise<void>;
   setKeepAfterMerge(workspaceId: string, keep: boolean): Promise<void>;
+  renameWorkspace(workspaceId: string, label: string): Promise<void>;
   workspaceConfig(workspaceId: string): Promise<RepoConfig>;
   repoConfig(repoId: string): Promise<RepoConfig>;
   listSkills(repoId: string): Promise<Skill[]>;

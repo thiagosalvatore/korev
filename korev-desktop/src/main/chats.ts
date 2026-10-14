@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { planFileName } from '../shared/message';
+import { workspaceLabel } from '../shared/workspaces';
 import {
   conversationText,
   finishedCodexPlan,
@@ -384,7 +385,9 @@ export function createChats(
     alertUser(
       { kind: 'workspace', workspace },
       failure ? AGENT_FAILED_TITLE : AGENT_FINISHED_TITLE,
-      failure ? `${workspace.name}: ${failure}` : workspace.name,
+      failure
+        ? `${workspaceLabel(workspace)}: ${failure}`
+        : workspaceLabel(workspace),
     );
   }
 
@@ -530,7 +533,9 @@ export function createChats(
     refreshStatus(turn.owner);
     ctx.emitState();
     const name =
-      turn.owner.kind === 'workspace' ? turn.owner.workspace.name : 'Ask';
+      turn.owner.kind === 'workspace'
+        ? workspaceLabel(turn.owner.workspace)
+        : 'Ask';
     alertUser(turn.owner, AGENT_NEEDS_INPUT_TITLE, name);
   }
 

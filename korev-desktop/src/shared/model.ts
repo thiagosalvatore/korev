@@ -199,6 +199,7 @@ export interface Workspace {
   repoId: string;
   groupId: string | null;
   name: string;
+  label: string | null;
   branch: string;
   baseBranch: string;
   path: string;

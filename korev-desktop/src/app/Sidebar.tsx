@@ -29,6 +29,7 @@ import {
   sidebarEntries,
   sidebarRepoId,
   waitsForLane,
+  workspaceLabel,
 } from '../shared/workspaces';
 import {
   archiveWorkspace,
@@ -223,126 +224,145 @@ function WorkspaceRow({
   const stats = runtime?.stats;
   const hasStats = stats && (stats.additions > 0 || stats.deletions > 0);
   const title = member ? member.repo : workspace.branch;
+  const label = workspaceLabel(workspace);
+  const [renaming, setRenaming] = useState(false);
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-current={selected ? 'page' : undefined}
-      aria-label={
-        member
-          ? `Workspace ${workspace.name} in ${member.repo}`
-          : `Workspace ${workspace.name}`
-      }
-      {...draggable(WORKSPACE_DRAG_TYPE, workspace.id)}
-      onClick={() => selectWorkspace(workspace.id)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') selectWorkspace(workspace.id);
-      }}
-      className={cn(
-        'group relative flex min-h-11 cursor-pointer items-center gap-2 rounded-md py-1.5 pr-1.5 pl-2 text-fg-2 hover:bg-hover',
-        selected && 'bg-active text-fg-1 hover:bg-active',
-      )}
-    >
-      <span className="flex w-4 justify-center self-start pt-0.5">
-        {runtime ? (
-          <StatusIcon workspace={workspace} runtime={runtime} />
-        ) : null}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span
-          className={cn(
-            'block truncate text-sm',
-            runtime?.unread || runtime?.status === 'waiting'
-              ? 'font-semibold text-fg-1'
-              : 'font-medium',
-          )}
-          title={title}
-        >
-          {title}
-        </span>
-        <span className="flex items-center gap-1.5 text-xs text-fg-3">
-          {member ? (
-            <span className="truncate">
-              {member.waitsOn
-                ? `Waits for the plan in ${member.waitsOn}`
-                : workspace.branch}
-            </span>
-          ) : (
-            <>
-              <LinkedIcon state={state} workspace={workspace} />
-              <span className="truncate">{workspace.name}</span>
-            </>
-          )}
-          {runtime?.message ? (
-            <span className="truncate text-danger-text">
-              · {runtime.message}
-            </span>
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-current={selected ? 'page' : undefined}
+        aria-label={
+          member ? `Workspace ${label} in ${member.repo}` : `Workspace ${label}`
+        }
+        {...draggable(WORKSPACE_DRAG_TYPE, workspace.id)}
+        onClick={() => selectWorkspace(workspace.id)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') selectWorkspace(workspace.id);
+        }}
+        className={cn(
+          'group relative flex min-h-11 cursor-pointer items-center gap-2 rounded-md py-1.5 pr-1.5 pl-2 text-fg-2 hover:bg-hover',
+          selected && 'bg-active text-fg-1 hover:bg-active',
+        )}
+      >
+        <span className="flex w-4 justify-center self-start pt-0.5">
+          {runtime ? (
+            <StatusIcon workspace={workspace} runtime={runtime} />
           ) : null}
         </span>
-      </span>
-      <span className="flex flex-none flex-col items-end gap-1 self-start pt-0.5">
-        {hasStats ? (
-          <span className="font-mono text-2xs">
-            <span className="text-diff-add-fg">+{stats.additions}</span>{' '}
-            <span className="text-diff-del-fg">−{stats.deletions}</span>
-          </span>
-        ) : index < 9 ? (
-          <span className="font-mono text-2xs text-fg-4 opacity-0 group-hover:opacity-100">
-            ⌘{index + 1}
-          </span>
-        ) : null}
-        {runtime?.unread ? (
+        <span className="min-w-0 flex-1">
           <span
-            aria-label="Unread"
-            className="size-1.5 rounded-full bg-accent"
-          />
-        ) : null}
-      </span>
-      <span className="absolute top-1 right-1 hidden group-hover:flex has-[[role=menu]]:flex">
-        <Menu
-          label={`${workspace.name} actions`}
-          align="right"
-          items={[
-            {
-              id: 'open',
-              label: 'Open in Finder',
-              icon: 'folder',
-              onSelect: () => void openIn(workspace, 'finder'),
-            },
-            {
-              id: 'keep-after-merge',
-              label: 'Keep after merge',
-              icon: 'pin',
-              checked: workspace.keepAfterMerge,
-              onSelect: () =>
-                void api.setKeepAfterMerge(
-                  workspace.id,
-                  !workspace.keepAfterMerge,
-                ),
-            },
-            {
-              id: 'archive',
-              label: 'Archive',
-              icon: 'archive',
-              hint: '⌘⇧A',
-              onSelect: () => void archiveWorkspace(state, workspace),
-            },
-          ]}
-          trigger={({ toggle }) => (
-            <IconButton
-              icon="ellipsis"
-              label="Workspace actions"
-              size="sm"
-              className="bg-raised"
-              onClick={(event) => {
-                event.stopPropagation();
-                toggle();
-              }}
+            className={cn(
+              'block truncate text-sm',
+              runtime?.unread || runtime?.status === 'waiting'
+                ? 'font-semibold text-fg-1'
+                : 'font-medium',
+            )}
+            title={title}
+          >
+            {title}
+          </span>
+          <span className="flex items-center gap-1.5 text-xs text-fg-3">
+            {member ? (
+              <span className="truncate">
+                {member.waitsOn
+                  ? `Waits for the plan in ${member.waitsOn}`
+                  : workspace.branch}
+              </span>
+            ) : (
+              <>
+                <LinkedIcon state={state} workspace={workspace} />
+                <span className="truncate" title={workspace.name}>
+                  {label}
+                </span>
+              </>
+            )}
+            {runtime?.message ? (
+              <span className="truncate text-danger-text">
+                · {runtime.message}
+              </span>
+            ) : null}
+          </span>
+        </span>
+        <span className="flex flex-none flex-col items-end gap-1 self-start pt-0.5">
+          {hasStats ? (
+            <span className="font-mono text-2xs">
+              <span className="text-diff-add-fg">+{stats.additions}</span>{' '}
+              <span className="text-diff-del-fg">−{stats.deletions}</span>
+            </span>
+          ) : index < 9 ? (
+            <span className="font-mono text-2xs text-fg-4 opacity-0 group-hover:opacity-100">
+              ⌘{index + 1}
+            </span>
+          ) : null}
+          {runtime?.unread ? (
+            <span
+              aria-label="Unread"
+              className="size-1.5 rounded-full bg-accent"
             />
-          )}
+          ) : null}
+        </span>
+        <span className="absolute top-1 right-1 hidden group-hover:flex has-[[role=menu]]:flex">
+          <Menu
+            label={`${label} actions`}
+            align="right"
+            items={[
+              {
+                id: 'rename',
+                label: 'Rename',
+                icon: 'pencil',
+                onSelect: () => setRenaming(true),
+              },
+              {
+                id: 'open',
+                label: 'Open in Finder',
+                icon: 'folder',
+                onSelect: () => void openIn(workspace, 'finder'),
+              },
+              {
+                id: 'keep-after-merge',
+                label: 'Keep after merge',
+                icon: 'pin',
+                checked: workspace.keepAfterMerge,
+                onSelect: () =>
+                  void api.setKeepAfterMerge(
+                    workspace.id,
+                    !workspace.keepAfterMerge,
+                  ),
+              },
+              {
+                id: 'archive',
+                label: 'Archive',
+                icon: 'archive',
+                hint: '⌘⇧A',
+                onSelect: () => void archiveWorkspace(state, workspace),
+              },
+            ]}
+            trigger={({ toggle }) => (
+              <IconButton
+                icon="ellipsis"
+                label="Workspace actions"
+                size="sm"
+                className="bg-raised"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggle();
+                }}
+              />
+            )}
+          />
+        </span>
+      </div>
+      {renaming ? (
+        <NameDialog
+          title="Rename workspace"
+          initialName={label}
+          submitLabel="Rename"
+          onSubmit={(name) => api.renameWorkspace(workspace.id, name)}
+          onClose={() => setRenaming(false)}
         />
-      </span>
-    </div>
+      ) : null}
+    </>
   );
 }
 
@@ -397,7 +417,7 @@ function useCollapsed(
   return [key === 'expandedRepos' ? !listed : listed, toggle] as const;
 }
 
-function FolderNameDialog({
+function NameDialog({
   title,
   initialName = '',
   submitLabel,
@@ -506,12 +526,12 @@ function LinkedGroup({
   return (
     <div
       role="group"
-      aria-label={`Linked workspace ${lead.name}`}
+      aria-label={`Linked workspace ${workspaceLabel(lead)}`}
       className="flex flex-col gap-0.5"
     >
       <div className="flex h-6 items-center gap-1.5 px-2 text-xs text-fg-3">
         <Icon name="link" size={11} />
-        <span className="truncate">{lead.name}</span>
+        <span className="truncate">{workspaceLabel(lead)}</span>
       </div>
       <div className="flex flex-col gap-0.5 pl-3">
         {members.map((workspace) => (
@@ -632,7 +652,7 @@ function RepoGroup({
         </span>
       </div>
       {naming ? (
-        <FolderNameDialog
+        <NameDialog
           title="New folder"
           submitLabel="Create"
           onSubmit={createFolderWithRepo}
@@ -748,7 +768,7 @@ function FolderSection({
         </span>
       </div>
       {renaming ? (
-        <FolderNameDialog
+        <NameDialog
           title="Rename folder"
           initialName={folder.name}
           submitLabel="Rename"
@@ -903,7 +923,7 @@ function History({ state }: { state: AppState }) {
                 className="min-w-0 flex-1 truncate"
                 title={workspace.branch}
               >
-                {workspace.name}
+                {workspaceLabel(workspace)}
                 <span className="ml-1.5 text-xs text-fg-4">
                   {timeAgo(workspace.archivedAt ?? workspace.createdAt)}
                 </span>
@@ -911,13 +931,13 @@ function History({ state }: { state: AppState }) {
               <span className="hidden gap-0.5 group-hover:flex">
                 <IconButton
                   icon="archive-restore"
-                  label={`Unarchive ${workspace.name}`}
+                  label={`Unarchive ${workspaceLabel(workspace)}`}
                   size="sm"
                   onClick={() => restoreWorkspace(workspace)}
                 />
                 <IconButton
                   icon="trash-2"
-                  label={`Delete ${workspace.name}`}
+                  label={`Delete ${workspaceLabel(workspace)}`}
                   size="sm"
                   onClick={() => api.deleteWorkspace(workspace.id)}
                 />

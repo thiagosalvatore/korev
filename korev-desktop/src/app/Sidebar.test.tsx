@@ -3,6 +3,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -104,6 +105,42 @@ describe('Sidebar repo groups', () => {
       />,
     );
     expect(repoHeader('idle-repo').getAttribute('aria-expanded')).toBe('true');
+  });
+});
+
+describe('Sidebar workspace name', () => {
+  const renamed = {
+    ...state,
+    workspaces: state.workspaces.map((ws) =>
+      ws.id === 'w1' ? { ...ws, label: 'Billing spike' } : ws,
+    ),
+  } as unknown as AppState;
+
+  it('shows the name the user gave under the branch', () => {
+    render(<Sidebar state={renamed} />);
+    const row = screen.getByRole('button', { name: 'Workspace Billing spike' });
+    expect(row.textContent).toContain('login-page');
+    expect(row.textContent).toContain('Billing spike');
+  });
+
+  it('renames a workspace from its menu', async () => {
+    render(<Sidebar state={state} />);
+    const row = screen.getByRole('button', { name: 'Workspace login-page' });
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Workspace actions' }),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    fireEvent.change(screen.getByLabelText('Name'), {
+      target: { value: 'Billing spike' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+
+    await waitFor(() =>
+      expect(window.korev.call).toHaveBeenCalledWith('renameWorkspace', [
+        'w1',
+        'Billing spike',
+      ]),
+    );
   });
 });
 

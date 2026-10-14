@@ -12,7 +12,7 @@ import type {
   Workspace,
   WorkspaceSource,
 } from '../shared/model';
-import { activeWorkspaces } from '../shared/workspaces';
+import { activeWorkspaces, workspaceLabel } from '../shared/workspaces';
 import { api } from './bridge';
 import {
   focusedGridPane,
@@ -236,7 +236,7 @@ export async function archiveWorkspace(state: AppState, workspace: Workspace) {
   );
   const result = await api.archiveWorkspace(workspace.id);
   if (!reportFailure(result)) return;
-  toast(`Archived ${workspace.name}`, 'neutral');
+  toast(`Archived ${workspaceLabel(workspace)}`, 'neutral');
   if (getUi().workspaceId !== workspace.id) return;
   const next =
     remaining.find((ws) => ws.repoId === workspace.repoId) ?? remaining[0];

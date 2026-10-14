@@ -35,6 +35,7 @@ import {
   movedFolder,
   movedRepo,
   rootItems,
+  workspaceLabel,
   type MovedOrder,
 } from '../shared/workspaces';
 import { detectAgents, reconcileDefaultModels } from './agents';
@@ -510,7 +511,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     const archived = await archive(workspaceId);
     if (!archived.ok) return;
     deps.emit('toast', {
-      title: `${mergedNumbers(prs)} merged. Archived ${workspace.name}`,
+      title: `${mergedNumbers(prs)} merged. Archived ${workspaceLabel(workspace)}`,
       tone: 'success',
     });
   }
@@ -1020,6 +1021,17 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
     async setKeepAfterMerge(workspaceId, keep) {
       ctx.workspace(workspaceId).keepAfterMerge = keep;
+      saveAndEmit();
+    },
+    async renameWorkspace(workspaceId, label) {
+      const workspace = ctx.workspace(workspaceId);
+      // Linked workspaces show under one name, so they share the label.
+      const renamed = workspace.groupId
+        ? store.state.workspaces.filter(
+            (ws) => ws.groupId === workspace.groupId,
+          )
+        : [workspace];
+      for (const ws of renamed) ws.label = label.trim() || null;
       saveAndEmit();
     },
     async workspaceConfig(workspaceId) {

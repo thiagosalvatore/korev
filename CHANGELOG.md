@@ -7,6 +7,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 ### New
 
 - **Plans saved as files.** Korev saves each plan in the workspace's `.context/plans` folder, under a name taken from the plan's title.
+- **Rename a workspace.** Choose **Rename** in the **…** menu of a workspace in the sidebar and type any name. The name shows under the branch in the sidebar, in the workspace header and in the phone app. The branch and the worktree folder stay the same.
 
 ## [0.12.0] - 2026-10-13
 

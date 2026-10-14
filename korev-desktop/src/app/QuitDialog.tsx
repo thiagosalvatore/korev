@@ -1,6 +1,7 @@
 import { Button, Dialog, Icon, Toast } from '../design-system';
 import type { QuitChoice } from '../shared/api';
 import type { AppState } from '../shared/model';
+import { workspaceLabel } from '../shared/workspaces';
 import { api } from './bridge';
 import { setUi, useUi } from './ui-store';
 
@@ -16,7 +17,7 @@ function runningAgents(state: AppState): RunningAgent[] {
   const inWorkspaces = state.workspaces.flatMap((workspace) =>
     workspace.sessions.map((session) => ({
       sessionId: session.id,
-      name: workspace.name,
+      name: workspaceLabel(workspace),
       detail: `${repoName(workspace.repoId)} · ${session.title}`,
     })),
   );

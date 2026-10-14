@@ -190,17 +190,21 @@ function groupStartTimes(workspaces: Workspace[]): Map<string, string> {
   return starts;
 }
 
+export function workspaceLabel(workspace: Workspace) {
+  return workspace.label ?? workspace.name;
+}
+
 export function worktreeProgress(
   workspace: Workspace,
   runtime: WorkspaceRuntime,
 ) {
   if (runtime.status === 'archiving')
     return {
-      title: `Archiving ${workspace.name}`,
+      title: `Archiving ${workspaceLabel(workspace)}`,
       detail: 'Stopping agents and removing the worktree.',
     };
   return {
-    title: `Creating ${workspace.name}`,
+    title: `Creating ${workspaceLabel(workspace)}`,
     detail: `Fetching origin/${workspace.baseBranch} and adding a worktree. You can keep working elsewhere.`,
   };
 }

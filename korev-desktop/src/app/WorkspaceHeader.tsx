@@ -20,7 +20,7 @@ import {
   resolveConflicts,
 } from './actions';
 import { api } from './bridge';
-import { groupRepoName } from '../shared/workspaces';
+import { groupRepoName, workspaceLabel } from '../shared/workspaces';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { prIcon } from './Sidebar';
 import { Menu } from './ui/Menu';
@@ -212,7 +212,7 @@ export function WorkspaceHeader({
           </>
         ) : null}
         <span className="text-sm font-semibold text-fg-1">
-          {workspace.name}
+          {workspaceLabel(workspace)}
         </span>
         <Icon name="chevron-right" size={13} className="text-fg-4" />
         <button

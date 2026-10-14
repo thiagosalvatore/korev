@@ -45,6 +45,7 @@ import {
   sidebarEntries,
   sidebarRepoId,
   waitsForLane,
+  workspaceLabel,
 } from '../../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../../attempt';
 import { succeeded } from '../../haptics';
@@ -197,8 +198,8 @@ function WorkspaceRow({
       <ListRow
         accessibilityLabel={
           member
-            ? `Workspace ${workspace.name} in ${member.repo}`
-            : `Workspace ${workspace.name}`
+            ? `Workspace ${workspaceLabel(workspace)} in ${member.repo}`
+            : `Workspace ${workspaceLabel(workspace)}`
         }
         accessibilityActions={[{ name: ARCHIVE_ACTION, label: 'Archive' }]}
         onAccessibilityAction={({ nativeEvent }) => {
@@ -213,7 +214,9 @@ function WorkspaceRow({
         highlighted={runtime?.unread || runtime?.status === 'waiting'}
         subtitle={
           <>
-            {member ? memberDetail(workspace, member) : workspace.name}
+            {member
+              ? memberDetail(workspace, member)
+              : workspaceLabel(workspace)}
             {runtime?.message ? (
               <Text style={styles.error}> · {runtime.message}</Text>
             ) : null}
@@ -259,7 +262,7 @@ function LinkedGroup({
   const repoName = (workspace: Workspace) =>
     state.repos.find((repo) => repo.id === workspace.repoId)?.name ?? '';
   return (
-    <View accessibilityLabel={`Linked workspace ${lead.name}`}>
+    <View accessibilityLabel={`Linked workspace ${workspaceLabel(lead)}`}>
       <View style={styles.linkedLabel}>
         <Link size={ROW_ICON_SIZE - 4} color={theme.fg3} />
         <Text
@@ -267,7 +270,7 @@ function LinkedGroup({
           style={styles.linkedName}
           numberOfLines={1}
         >
-          {lead.name}
+          {workspaceLabel(lead)}
         </Text>
       </View>
       <View style={styles.linkedMembers}>

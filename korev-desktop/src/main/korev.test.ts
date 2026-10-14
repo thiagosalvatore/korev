@@ -415,6 +415,28 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toBeNull();
   });
 
+  it('renames a workspace without moving its worktree', async () => {
+    const workspace = await createWorkspace();
+
+    await korev.api.renameWorkspace(workspace.id, '  Billing spike  ');
+
+    const renamed = (await workspaceState(workspace.id)).workspace;
+    expect(renamed.label).toBe('Billing spike');
+    expect([renamed.name, renamed.path]).toEqual([
+      workspace.name,
+      workspace.path,
+    ]);
+  });
+
+  it('goes back to the worktree name when the new name is blank', async () => {
+    const workspace = await createWorkspace();
+    await korev.api.renameWorkspace(workspace.id, 'Billing spike');
+
+    await korev.api.renameWorkspace(workspace.id, ' ');
+
+    expect((await workspaceState(workspace.id)).workspace.label).toBeNull();
+  });
+
   it('keeps a workspace set to keep after merge when its PR merges', async () => {
     await korev.api.updateSettings({ archiveOnMerge: true });
     const workspace = await createWorkspace();

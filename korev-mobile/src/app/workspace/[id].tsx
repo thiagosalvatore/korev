@@ -18,6 +18,7 @@ import {
   groupRepoName,
   laneRepos,
   waitsForLane,
+  workspaceLabel,
 } from '../../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../../attempt';
 import { Chat } from '../../chat/Chat';
@@ -47,7 +48,8 @@ function defaultSession(state: AppState, workspace: Workspace) {
 
 function workspaceTitle(state: AppState, workspace: Workspace): string {
   const repo = groupRepoName(state, workspace);
-  return repo ? `${repo} · ${workspace.name}` : workspace.name;
+  const label = workspaceLabel(workspace);
+  return repo ? `${repo} · ${label}` : label;
 }
 
 function waitingHint(state: AppState, workspace: Workspace) {

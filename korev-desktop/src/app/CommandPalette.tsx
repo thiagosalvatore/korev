@@ -16,6 +16,7 @@ import {
 import { fuzzyRank } from './fuzzy';
 import { api } from './bridge';
 import { fileName, timeAgo } from '../shared/format';
+import { workspaceLabel } from '../shared/workspaces';
 import { openProject } from './Sidebar';
 import { setUi, useUi } from './ui-store';
 
@@ -47,7 +48,7 @@ function paletteItems(
       (ws): PaletteItem => ({
         id: `ws:${ws.id}`,
         label: ws.branch,
-        detail: `${repoName(ws.repoId)} · ${ws.name}${ws.archivedAt ? ' · archived' : ''} · ${timeAgo(ws.createdAt)}`,
+        detail: `${repoName(ws.repoId)} · ${workspaceLabel(ws)}${ws.archivedAt ? ' · archived' : ''} · ${timeAgo(ws.createdAt)}`,
         icon: ws.archivedAt ? 'archive' : 'git-branch',
         section: 'Workspaces',
         run: () =>

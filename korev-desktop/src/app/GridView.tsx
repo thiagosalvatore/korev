@@ -12,6 +12,7 @@ import {
   activeWorkspaces,
   asksNewestFirst,
   groupRepoName,
+  workspaceLabel,
 } from '../shared/workspaces';
 import {
   chatPane,
@@ -245,10 +246,12 @@ function WorkspacePaneHeader({
         {workspace.branch}
       </span>
       <span className="min-w-0 flex-1 truncate text-xs text-fg-3">
-        {repoName ? `${repoName} · ${workspace.name}` : workspace.name}
+        {repoName
+          ? `${repoName} · ${workspaceLabel(workspace)}`
+          : workspaceLabel(workspace)}
       </span>
       <Menu
-        label={`${workspace.name} tabs`}
+        label={`${workspaceLabel(workspace)} tabs`}
         align="right"
         items={paneTabItems(
           state,
@@ -428,7 +431,7 @@ function EmptyPane({ state, index }: { state: AppState; index: number }) {
   const items = workspaces.map(
     (workspace): MenuItem => ({
       id: workspace.id,
-      label: workspace.name,
+      label: workspaceLabel(workspace),
       section: repoName(state, workspace),
       onSelect: () => fillPane(index, workspace, state.settings.defaultAgent),
     }),

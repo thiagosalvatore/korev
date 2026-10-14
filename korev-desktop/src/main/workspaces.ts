@@ -676,6 +676,7 @@ function addDraftWorkspace(
     archivedAt: null,
     restoredAt: null,
     archiveSnapshot: null,
+    label: null,
     keepAfterMerge: false,
     awaitsLane: false,
     sessions: [newChatSession(ctx, ctx.store.state.settings.defaultAgent)],

@@ -277,6 +277,64 @@ test('creates a workspace from an existing branch with the create-from picker', 
   }
 });
 
+test('renames a workspace and keeps the name after a restart', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  let { app, window } = await launch(home, repo);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window.getByRole('textbox', { name: 'Message' }).fill('Add a note');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+    await expect(window.getByText('I added agent-note.txt.')).toBeVisible();
+    await waitForAgentsToFinish(window);
+    const before = (await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'getState',
+        [],
+      ),
+    )) as AppState;
+
+    const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
+    await sidebar.getByText('dev-person/add-agent-note').hover();
+    await sidebar.getByRole('button', { name: 'Workspace actions' }).click();
+    await window.getByRole('menuitem', { name: 'Rename' }).click();
+    const dialog = window.getByRole('dialog', { name: 'Rename workspace' });
+    await dialog.getByLabel('Name').fill('Billing spike');
+    await dialog.getByRole('button', { name: 'Rename' }).click();
+
+    const row = sidebar.getByRole('button', {
+      name: 'Workspace Billing spike',
+    });
+    await expect(row).toContainText('dev-person/add-agent-note');
+    await expect(
+      window.getByRole('banner').getByText('Billing spike'),
+    ).toBeVisible();
+
+    await app.close();
+    ({ app, window } = await launch(home, repo));
+    await expect(
+      window
+        .getByRole('navigation', { name: 'Workspaces' })
+        .getByRole('button', { name: 'Workspace Billing spike' }),
+    ).toBeVisible();
+    const after = (await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'getState',
+        [],
+      ),
+    )) as AppState;
+    const [was, now] = [before.workspaces[0], after.workspaces[0]];
+    expect([now.name, now.branch, now.path]).toEqual([
+      was.name,
+      was.branch,
+      was.path,
+    ]);
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 test('asks before a tool call when approvals are on and continues after Allow', async () => {
   const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
   const repo = await createRepo(home);
