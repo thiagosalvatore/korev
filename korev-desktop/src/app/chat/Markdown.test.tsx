@@ -44,6 +44,17 @@ describe('Markdown', () => {
     expect(screen.queryByRole('link')).toBeNull();
   });
 
+  it('leaves a branch name in inline code alone', () => {
+    render(
+      <Markdown
+        text="PR A: `thiagosalvatore/delete-deleted-view-nodes` is open."
+        onOpenFile={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
   it('does not link paths when nothing can open them', () => {
     render(<Markdown text="See `src/foo.ts`." />);
 

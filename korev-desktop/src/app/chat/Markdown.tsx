@@ -31,6 +31,7 @@ const FILE_REF = new RegExp(
   String.raw`^((?:~|\.{1,2})?\/?(?:${PATH_SEGMENT}\/)*${PATH_SEGMENT})${LINE_SUFFIX}$`,
 );
 const SHORT_EXTENSION = /\.[a-z][a-z0-9]{0,4}$/;
+const EXPLICIT_PATH = /^(?:~|\.{1,2})?\//;
 const BARE_PATH = new RegExp(
   String.raw`(^|[\s(;])(~?(?:\/${PATH_SEGMENT})+\.[A-Za-z][A-Za-z0-9]*)${LINE_SUFFIX}`,
   'g',
@@ -40,7 +41,7 @@ function parseFileRef(text: string): FileRef | null {
   const match = FILE_REF.exec(text);
   if (!match) return null;
   const [, file, line] = match;
-  if (!file.includes('/') && !SHORT_EXTENSION.test(file)) return null;
+  if (!SHORT_EXTENSION.test(file) && !EXPLICIT_PATH.test(file)) return null;
   return { file, line: line ? Number(line) : null };
 }
 
