@@ -88,6 +88,24 @@ describe('Markdown', () => {
     );
   });
 
+  it('copies a code block from its copy button', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+    render(
+      <Markdown
+        text={'Run it:\n\n```sh\nnpm test -- <file>\n```'}
+        onOpenFile={vi.fn()}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: 'Copy code' });
+    fireEvent.click(button);
+
+    expect(writeText).toHaveBeenCalledWith('npm test -- <file>\n');
+    await vi.waitFor(() => expect(button.dataset.copied).toBe(''));
+    vi.unstubAllGlobals();
+  });
+
   it('copies the markdown as plain text and the rendered html as rich text', async () => {
     const write = vi.fn();
     vi.stubGlobal('navigator', { clipboard: { write } });
@@ -98,13 +116,17 @@ describe('Markdown', () => {
       },
     );
 
-    await copyMarkdown('# Title\n\n- item');
+    await copyMarkdown('# Title\n\n- item\n\n```\ncode\n```');
 
     const [[[{ items }]]] = write.mock.calls;
-    expect(await items['text/plain'].text()).toBe('# Title\n\n- item');
+    expect(await items['text/plain'].text()).toBe(
+      '# Title\n\n- item\n\n```\ncode\n```',
+    );
     const html = await items['text/html'].text();
     expect(html).toContain('<h1>Title</h1>');
     expect(html).toContain('<li>item</li>');
+    expect(html).toContain('<pre><code>code\n</code></pre>');
+    expect(html).not.toContain('Copy code');
     vi.unstubAllGlobals();
   });
 });

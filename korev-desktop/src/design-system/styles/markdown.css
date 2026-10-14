@@ -66,6 +66,52 @@
     background: none;
     padding: 0;
   }
+  .kv-md-code {
+    position: relative;
+  }
+  .kv-md-code pre {
+    padding-right: 40px;
+  }
+  .kv-md-copy {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border-2);
+    border-radius: 6px;
+    background: var(--bg-raised);
+    color: var(--fg-3);
+    cursor: pointer;
+    outline: none;
+    opacity: 0;
+    transition: opacity var(--dur-fast) ease-out;
+  }
+  .kv-md-code:hover .kv-md-copy,
+  .kv-md-copy:focus-visible,
+  .kv-md-copy[data-copied] {
+    opacity: 1;
+  }
+  .kv-md-copy:hover {
+    background: var(--bg-hover);
+    color: var(--fg-1);
+  }
+  .kv-md-copy:focus-visible {
+    box-shadow: var(--focus-ring);
+  }
+  .kv-md-copy[data-copied] {
+    color: var(--success-text);
+  }
+  .kv-md-copy .kv-md-copied-icon,
+  .kv-md-copy[data-copied] .kv-md-copy-icon {
+    display: none;
+  }
+  .kv-md-copy[data-copied] .kv-md-copied-icon {
+    display: block;
+  }
   .kv-md blockquote {
     border-left: 3px solid var(--border-2);
     padding-left: 12px;
