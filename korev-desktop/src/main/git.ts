@@ -138,6 +138,20 @@ export async function startPoint(git: Git, repo: string, base: string) {
   return (await hasRemoteBranch(git, repo, base)) ? `origin/${base}` : base;
 }
 
+export async function commitsBehind(
+  git: Git,
+  worktree: string,
+  base: string,
+): Promise<number> {
+  const from = await startPoint(git, worktree, base);
+  const count = await git.run(worktree, [
+    'rev-list',
+    '--count',
+    `HEAD..${from}`,
+  ]);
+  return Number(count.trim());
+}
+
 export async function gitDirs(git: Git, worktree: string): Promise<string[]> {
   const output = await git.run(worktree, [
     'rev-parse',

@@ -10,6 +10,26 @@ IFS= read -r message
 echo '{"type":"system","subtype":"init","session_id":"fake-session"}'
 echo '{"type":"user","message":{"role":"user","content":"ack"}}'
 case "$message" in
+  *'type=\"worker_done\"'*)
+    echo "$message" > .context/coordinator-woken
+    ;;
+  *'type=\"worker_idle\"'*)
+    echo "$message" > .context/coordinator-idle
+    ;;
+  *korev-worker-task*)
+    korev done --outcome succeeded --summary "notes written"
+    ;;
+  *orchestrate-*)
+    case "$message" in
+      *orchestrate-quiet*) spec="write notes and stop" ;;
+      *) spec="korev-worker-task: write notes" ;;
+    esac
+    korev run create --objective "Write notes"
+    korev task create --title notes --spec "$spec"
+    korev task create --title publish --spec "publish the notes" --deps t1
+    korev worker start --task t2 > .context/t2-start 2>&1
+    korev worker start --task t1 > .context/t1-start 2>&1
+    ;;
   *make-lanes*"lane of the plan below"*)
     echo "written by the fake agent" > agent-note.txt
     ;;

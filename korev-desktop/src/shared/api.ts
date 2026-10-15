@@ -85,6 +85,7 @@ export interface KorevApi {
   repoIcon(repoId: string): Promise<string | null>;
   repoGithubUrl(repoId: string): Promise<string | null>;
   startReview(workspaceId: string): Promise<Result<string>>;
+  resumeRun(runId: string): Promise<Result>;
   archiveWorkspace(workspaceId: string): Promise<Result>;
   restoreWorkspace(workspaceId: string): Promise<Result>;
   deleteWorkspace(workspaceId: string): Promise<void>;

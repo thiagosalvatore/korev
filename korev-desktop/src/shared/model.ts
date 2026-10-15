@@ -213,6 +213,59 @@ export interface Workspace {
   prs: TrackedPr[];
 }
 
+export type TaskStatus =
+  | 'pending'
+  | 'dispatched'
+  | 'completed'
+  | 'failed'
+  | 'interrupted';
+
+export type TaskState = TaskStatus | 'ready';
+
+export type TaskOutcome = 'succeeded' | 'failed';
+
+export interface TaskResult {
+  outcome: TaskOutcome;
+  summary: string;
+  files: string[];
+}
+
+export interface OrchestrationTask {
+  id: string;
+  title: string;
+  spec: string;
+  deps: string[];
+  repoId: string | null;
+  status: TaskStatus;
+  workspaceId: string | null;
+  sessionId: string | null;
+  result: TaskResult | null;
+}
+
+export interface OrchestrationRun {
+  id: string;
+  coordinatorSessionId: string;
+  coordinatorWorkspaceId: string;
+  objective: string;
+  depth: number;
+  parentRunId: string | null;
+  tasks: OrchestrationTask[];
+  wakes: number;
+  paused: boolean;
+  heldMessages: string[];
+  createdAt: string;
+}
+
+export function taskState(
+  run: OrchestrationRun,
+  task: OrchestrationTask,
+): TaskState {
+  if (task.status !== 'pending') return task.status;
+  const completed = (id: string) =>
+    run.tasks.some((other) => other.id === id && other.status === 'completed');
+  return task.deps.every(completed) ? 'ready' : 'pending';
+}
+
 export interface TrackedPr {
   url: string;
   sessionId: string | null;
@@ -498,6 +551,7 @@ export interface AppState {
   rootOrder: string[];
   workspaces: Workspace[];
   askChats: AskChat[];
+  runs: OrchestrationRun[];
   settings: Settings;
   runtime: Record<string, WorkspaceRuntime>;
   runningSessions: string[];

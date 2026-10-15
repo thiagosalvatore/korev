@@ -10,6 +10,7 @@ import {
   type AskChat,
   type ChatItem,
   type ChatSession,
+  type OrchestrationRun,
   type Repo,
   type RepoFolder,
   type Settings,
@@ -30,7 +31,18 @@ export interface PersistedState {
   rootOrder: string[];
   workspaces: Workspace[];
   askChats: AskChat[];
+  runs: OrchestrationRun[];
   settings: Settings;
+}
+
+function interruptedAfterRestart(run: OrchestrationRun): OrchestrationRun {
+  return {
+    ...run,
+    heldMessages: run.heldMessages ?? [],
+    tasks: run.tasks.map((task) =>
+      task.status === 'dispatched' ? { ...task, status: 'interrupted' } : task,
+    ),
+  };
 }
 
 export function defaultSettings(home: string): Settings {
@@ -145,6 +157,9 @@ function sanitize(raw: unknown, home: string): PersistedState {
         session: sessionWithoutLegacyCodexDefault(ask.session),
         lastMessageAt: ask.lastMessageAt ?? ask.createdAt,
       }),
+    ),
+    runs: (Array.isArray(value.runs) ? value.runs : []).map(
+      interruptedAfterRestart,
     ),
     settings,
   };

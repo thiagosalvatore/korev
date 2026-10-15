@@ -828,6 +828,30 @@ function withLaneRepo(
   return { ...lane, repoId: presetLaneRepo(lane.name, repos) };
 }
 
+export function addLinkedWorkspace(
+  ctx: Context,
+  origin: Workspace,
+  lane: PlanLane,
+  task: SendOptions,
+  plan: string | null,
+  send: SendTask,
+): Workspace {
+  origin.groupId ??= ctx.deps.newId();
+  const workspace = addLaneWorkspace(ctx, origin, lane, task);
+  ctx.background(
+    prepareNamedWorkspaces(
+      ctx,
+      [ctx.repo(workspace.repoId)],
+      [workspace],
+      Promise.resolve(workspace.name),
+      task,
+      plan,
+      send,
+    ),
+  );
+  return workspace;
+}
+
 export function createLaneWorkspaces(
   ctx: Context,
   origin: Workspace,
@@ -837,31 +861,14 @@ export function createLaneWorkspaces(
   send: SendTask,
 ) {
   const groupId = (origin.groupId ??= ctx.deps.newId());
-  const drafts: { workspace: Workspace; laneOptions: SendOptions }[] = [];
   for (const lane of lanes.map((entry) => withLaneRepo(ctx, origin, entry))) {
     const laneOptions = { ...options, text: laneTask(lane) };
     const member = lane.repoId && awaitingMember(ctx, groupId, lane.repoId);
     if (member) sendLane(ctx, member, laneOptions, plan, send);
-    else {
-      const workspace = addLaneWorkspace(ctx, origin, lane, laneOptions);
-      drafts.push({ workspace, laneOptions });
-    }
+    else addLinkedWorkspace(ctx, origin, lane, laneOptions, plan, send);
   }
   ctx.store.save();
   ctx.emitState();
-  for (const { workspace, laneOptions } of drafts) {
-    ctx.background(
-      prepareNamedWorkspaces(
-        ctx,
-        [ctx.repo(workspace.repoId)],
-        [workspace],
-        Promise.resolve(workspace.name),
-        laneOptions,
-        plan,
-        send,
-      ),
-    );
-  }
 }
 
 async function runArchiveScript(

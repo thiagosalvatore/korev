@@ -658,11 +658,62 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
     const contextDir = path.join(workspace.path, '.context');
     expect(await readFile(path.join(contextDir, 'korev-help'), 'utf8')).toMatch(
-      'korev help',
+      'korev worker start',
     );
     const agentUrl = await readFile(path.join(contextDir, 'agent-url'), 'utf8');
     const afterTurn = await fetch(agentUrl.trim(), { method: 'POST' });
     expect(afterTurn.status).toBe(401);
+  });
+
+  async function contextFileOnceWritten(workspace: Workspace, name: string) {
+    const file = path.join(workspace.path, '.context', name);
+    await waitFor(async () => existsSync(file));
+    await waitFor(
+      async () => (await korev.api.getState()).runningSessions.length === 0,
+    );
+    return readFile(file, 'utf8');
+  }
+
+  it('starts a worker for a ready task and wakes the coordinator with its report', async () => {
+    const coordinator = await createWorkspace(task('orchestrate-demo'));
+
+    const woken = await contextFileOnceWritten(
+      coordinator,
+      'coordinator-woken',
+    );
+
+    expect(woken).toContain('notes written');
+    expect(woken).toContain('Now ready: t2');
+    expect(
+      await readFile(
+        path.join(coordinator.path, '.context', 't2-start'),
+        'utf8',
+      ),
+    ).toContain('t2 waits for t1');
+    const state = await korev.api.getState();
+    const [run] = state.runs;
+    expect(run.tasks.map((entry) => entry.status)).toEqual([
+      'completed',
+      'pending',
+    ]);
+    const worker = state.workspaces.find(
+      (ws) => ws.id === run.tasks[0].workspaceId,
+    );
+    expect(worker?.groupId).toBe(
+      state.workspaces.find((ws) => ws.id === coordinator.id)?.groupId,
+    );
+    expect(worker?.groupId).not.toBeNull();
+  });
+
+  it('tells the coordinator when a worker ends its turn without reporting', async () => {
+    const coordinator = await createWorkspace(task('orchestrate-quiet'));
+
+    const idle = await contextFileOnceWritten(coordinator, 'coordinator-idle');
+
+    expect(idle).toContain('without running korev done');
+    expect(idle).toContain('I added agent-note.txt.');
+    const [run] = (await korev.api.getState()).runs;
+    expect(run.tasks[0].status).toBe('dispatched');
   });
 
   it('shows the user message before the checkpoint is taken', async () => {
