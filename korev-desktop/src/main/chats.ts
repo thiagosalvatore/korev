@@ -242,6 +242,13 @@ function turnResult(items: ChatItem[], turn: ActiveTurn): ResultItem | null {
   return result?.kind === 'result' ? result : null;
 }
 
+function scopedToTurn(item: ChatItem, turnId: string): ChatItem {
+  const scoped = { ...item, id: `${turnId}:${item.id}` };
+  if (scoped.kind === 'tool' && scoped.parentToolId)
+    scoped.parentToolId = `${turnId}:${scoped.parentToolId}`;
+  return scoped;
+}
+
 export interface Chats {
   transcript(sessionId: string): Promise<ChatItem[]>;
   isRunning(sessionId: string): boolean;
@@ -573,7 +580,7 @@ export function createChats(
     turn.backgroundTasks = backgroundTaskCount(event) ?? turn.backgroundTasks;
     const updates = parser.feed(event);
     for (const item of updates)
-      upsert(session.id, items, { ...item, id: `${turn.id}:${item.id}` });
+      upsert(session.id, items, scopedToTurn(item, turn.id));
     if (updates.some(isFailedSigning)) nudgeAboutSigning(session, items, turn);
     const allConsumed =
       turn.acknowledged >= turn.written || turn.acknowledged === 0;

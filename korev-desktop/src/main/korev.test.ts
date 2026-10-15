@@ -1098,6 +1098,21 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(nudges).toHaveLength(1);
   });
 
+  it('nests a sub-agent tool call under its Task in the transcript', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+
+    await sendAndWait(session.id, 'run-subagent');
+
+    const tools = (await korev.api.transcript(session.id)).filter(
+      (item) => item.kind === 'tool',
+    );
+    const task = tools.find((item) => item.name === 'Task');
+    const child = tools.find((item) => item.name === 'Bash');
+    expect(child).toMatchObject({ output: 'README.md' });
+    expect(child?.parentToolId).toBe(task?.id);
+  });
+
   it('reads an image the agent saved as a data URL', async () => {
     const workspace = await createWorkspace();
     const [session] = workspace.sessions;

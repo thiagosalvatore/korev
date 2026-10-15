@@ -595,6 +595,7 @@ export type ChatItem =
       detail: string;
       output: string | null;
       failed: boolean;
+      parentToolId?: string;
     }
   | { id: string; kind: 'todos'; todos: Todo[] }
   | {
@@ -641,6 +642,10 @@ export interface PermissionResponse {
 }
 
 export const PLAN_TOOL = 'ExitPlanMode';
+
+export function isSubagentTool(item: ChatItem): boolean {
+  return item.kind === 'tool' && Boolean(item.parentToolId);
+}
 
 export const PENDING_PLAN_PLACEHOLDER =
   'Add instructions, or send to implement the plan';

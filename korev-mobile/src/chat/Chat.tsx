@@ -16,6 +16,7 @@ import { modelLabel } from '../../../korev-desktop/src/shared/format';
 import {
   AGENT_LABELS,
   finishedCodexPlan,
+  isSubagentTool,
   type AppState,
   type ChatItem,
   type ChatSession,
@@ -147,7 +148,7 @@ export function Chat({
           <FlatList
             ref={list}
             inverted
-            data={[...shown].reverse()}
+            data={shown.filter((item) => !isSubagentTool(item)).reverse()}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <ChatItemView

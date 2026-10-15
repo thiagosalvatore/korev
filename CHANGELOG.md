@@ -9,6 +9,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 - **Folders in a repository.** Put workspaces of one repository in a folder from the workspace's menu, or drag a workspace onto a folder. Click a folder to collapse it. Lanes that you split off a plan go into a folder named after the workspace that made the plan.
 - **Rename a workspace.** Choose **Rename** in the **…** menu of a workspace in the sidebar and type any name. The name shows under the branch in the sidebar, in the workspace header and in the phone app. The branch and the worktree folder stay the same.
 - **Copy code blocks.** Hover a code block in a chat, plan or markdown file and click the copy button in its corner to copy the code.
+- **Sub-agent tool calls.** When Claude starts a sub-agent, the tool calls of the sub-agent show under its Task row in the chat. They are collapsed to a count, such as "12 tool calls". Click the count to see them. The phone app does not show them.
 
 ## [0.13.1] - 2026-10-15
 

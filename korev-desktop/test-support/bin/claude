@@ -48,6 +48,12 @@ case "$message" in
     echo '{"type":"assistant","message":{"id":"s1","content":[{"type":"tool_use","id":"sign-1","name":"Bash","input":{"command":"git commit"}}]}}'
     echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"sign-1","is_error":true,"content":"error: Couldn'"'"'t sign message: agent refused operation"}]}}'
     ;;
+  *run-subagent*)
+    echo '{"type":"assistant","message":{"id":"a1","content":[{"type":"tool_use","id":"task-1","name":"Task","input":{"description":"Explore the repo","prompt":"look around"}}]}}'
+    echo '{"type":"assistant","parent_tool_use_id":"task-1","message":{"id":"a2","content":[{"type":"tool_use","id":"sub-1","name":"Bash","input":{"command":"ls"}}]}}'
+    echo '{"type":"user","parent_tool_use_id":"task-1","message":{"content":[{"type":"tool_result","tool_use_id":"sub-1","content":"README.md"}]}}'
+    echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"task-1","content":"The repo has a README."}]}}'
+    ;;
   *hold-turn*)
     IFS= read -r _
     ;;
