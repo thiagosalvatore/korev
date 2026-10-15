@@ -4,6 +4,16 @@
     background: var(--bg-inset);
     color: var(--syn-plain);
     overflow: auto;
+    --shiki-foreground: var(--syn-plain);
+    --shiki-token-keyword: var(--syn-keyword);
+    --shiki-token-string: var(--syn-string);
+    --shiki-token-string-expression: var(--syn-string);
+    --shiki-token-constant: var(--syn-number);
+    --shiki-token-comment: var(--syn-comment);
+    --shiki-token-function: var(--syn-fn);
+    --shiki-token-link: var(--syn-fn);
+    --shiki-token-punctuation: var(--syn-punct);
+    --shiki-token-parameter: var(--syn-plain);
   }
   .kv-diff table {
     border-collapse: collapse;
