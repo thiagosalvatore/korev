@@ -72,7 +72,7 @@ function isAuthorized(request: IncomingMessage, token: string): boolean {
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
-async function readJson(request: IncomingMessage): Promise<unknown> {
+export async function readBody(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request as AsyncIterable<Buffer>) {
@@ -81,8 +81,13 @@ async function readJson(request: IncomingMessage): Promise<unknown> {
       throw new RequestError(HTTP_PAYLOAD_TOO_LARGE, 'Request too large');
     chunks.push(chunk);
   }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+async function readJson(request: IncomingMessage): Promise<unknown> {
+  const body = await readBody(request);
   try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    return JSON.parse(body);
   } catch {
     throw new RequestError(HTTP_BAD_REQUEST, 'Body is not JSON');
   }

@@ -36,6 +36,7 @@ const INSTALLED_RELEASE: Release = {
 };
 
 const FAKE_AGENT_BIN = path.resolve(__dirname, '../../test-support/bin');
+const KOREV_CLI_DIR = path.resolve(__dirname, '../../cli');
 const WAIT_TIMEOUT_MS = 10_000;
 const TEST_TIMEOUT_MS = 30_000;
 
@@ -166,6 +167,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       home,
       userDataPath: path.join(home, 'user-data'),
       signer: path.join(home, 'korev-sign'),
+      cliDir: KOREV_CLI_DIR,
       fs: nodeFileSystem,
       spawnPty: noPty,
       emit,
@@ -647,6 +649,20 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(reverted).toEqual({ ok: true, value: 'Add a note' });
     expect(existsSync(path.join(workspace.path, 'agent-note.txt'))).toBe(false);
     expect(await korev.api.transcript(session.id)).toEqual([]);
+  });
+
+  it('lets a workspace agent run korev only while its turn lasts', async () => {
+    const workspace = await createWorkspace();
+
+    await sendAndWait(workspace.sessions[0].id, 'ask-korev-for-help');
+
+    const contextDir = path.join(workspace.path, '.context');
+    expect(await readFile(path.join(contextDir, 'korev-help'), 'utf8')).toMatch(
+      'korev help',
+    );
+    const agentUrl = await readFile(path.join(contextDir, 'agent-url'), 'utf8');
+    const afterTurn = await fetch(agentUrl.trim(), { method: 'POST' });
+    expect(afterTurn.status).toBe(401);
   });
 
   it('shows the user message before the checkpoint is taken', async () => {

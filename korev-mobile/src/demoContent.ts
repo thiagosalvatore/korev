@@ -79,6 +79,7 @@ const SETTINGS: Settings = {
   deleteBranchOnArchive: false,
   archiveOnMerge: false,
   toolApprovals: false,
+  orchestration: true,
   loadout: [],
   snippets: [],
   editor: 'cursor',

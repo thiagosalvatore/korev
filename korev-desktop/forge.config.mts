@@ -31,6 +31,8 @@ const SIGNER_SOURCE = 'main.swift';
 const SWIFT_ARCH: Record<string, string> = { arm64: 'arm64', x64: 'x86_64' };
 const SWIFT_MIN_MACOS = 'macos12';
 const DARWIN = 'darwin';
+const CLI_DIR = 'cli';
+const CLI_SCRIPT = 'korev';
 
 interface NativePackage {
   dir: string;
@@ -57,6 +59,10 @@ const NATIVE_PACKAGES: NativePackage[] = [
   {
     dir: TAILNET_BIN_DIR,
     runtimeFiles: (platform, arch) => [`${platform}-${arch}`],
+  },
+  {
+    dir: CLI_DIR,
+    runtimeFiles: () => [CLI_SCRIPT],
   },
   {
     dir: SIGNER_BIN_DIR,

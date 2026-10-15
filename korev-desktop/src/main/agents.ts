@@ -24,6 +24,7 @@ const CODEX_SIGNED_IN_PATTERN = /Logged in using (.+)/;
 const STDIN_PROMPT = '-';
 const READ_ONLY_DISALLOWED_TOOLS = ['Edit', 'Write', 'NotebookEdit'];
 const CODEX_READ_ONLY_PROFILE = 'korev-read-only';
+const KOREV_CLI_TOOL = 'Bash(korev:*)';
 
 export interface TurnRequest {
   model: string;
@@ -32,6 +33,7 @@ export interface TurnRequest {
   effort: string;
   fast: boolean;
   toolApprovals: boolean;
+  korevCli: boolean;
   resumeId: string | null;
   fork: boolean;
   newSessionId: string;
@@ -89,6 +91,7 @@ function claudeArgs(request: TurnRequest): string[] {
     ...(request.readOnly
       ? ['--disallowedTools', ...READ_ONLY_DISALLOWED_TOOLS]
       : []),
+    ...(request.korevCli ? ['--allowedTools', KOREV_CLI_TOOL] : []),
     ...session,
   ];
 }

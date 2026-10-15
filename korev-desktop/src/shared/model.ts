@@ -239,6 +239,7 @@ export interface Settings {
   deleteBranchOnArchive: boolean;
   archiveOnMerge: boolean;
   toolApprovals: boolean;
+  orchestration: boolean;
   loadout: string[];
   snippets: Snippet[];
   editor: EditorId;

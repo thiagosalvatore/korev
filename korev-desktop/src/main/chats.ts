@@ -30,6 +30,7 @@ import {
   type TurnParser,
 } from './agent-events';
 import { spawnAgent, type AgentProcess } from './agent-process';
+import type { AgentGrant } from './agent-server';
 import {
   AGENTS,
   backgroundTaskCount,
@@ -83,6 +84,8 @@ const ASK_PLAN_MESSAGE =
   'This is a read-only Ask chat, so the plan cannot be carried out here. The user sees your plan in the chat and can start workspaces from it. Finish your reply.';
 const LANES_ELSEWHERE_NOTE =
   '## Lanes in other workspaces\nThese lanes are built at the same time in other linked workspaces. Do not build them here: ';
+const KOREV_CLI_LINE =
+  'You can coordinate other agents with the korev command (also at $KOREV_CLI): start workers in linked workspaces, message them and get their results back. Run `korev help` to see how.';
 const STATUSES_KEPT_BY_TURNS = new Set([
   'creating',
   'archiving',
@@ -140,6 +143,7 @@ export function systemPrompt(
   workspace: Workspace,
   linked: LinkedWorkspace[] = [],
   general?: string,
+  korevCli = false,
 ): string {
   const base = [
     `You are working inside Korev, a Mac app that lets the user run many coding agents in parallel.`,
@@ -151,6 +155,7 @@ export function systemPrompt(
     `If a plan has parts that can be built at the same time without each other's code, end the plan with a "## Lanes" section: one "### <short-name>" heading per part, followed by what it covers and its PRs. Keep dependent work in the same lane. Write two or more lanes, or no Lanes section. The user can then start each lane in its own linked workspace. If the lanes need results from work that must run first, such as queries or research, leave the Lanes section out: plan and do that work first. When it is done, ask the user to turn on plan mode for the lanes. Then write a plan with the Lanes section and put the results the lanes need in it, because each lane gets the whole plan.`,
     `If you start a dev server, use port $KOREV_PORT (ports $KOREV_PORT to $KOREV_PORT+9 are reserved for this workspace).`,
     ...linkedLines(linked),
+    ...(korevCli ? [KOREV_CLI_LINE] : []),
   ].join('\n');
   return withPrompt(base, general);
 }
@@ -197,6 +202,7 @@ interface TurnTarget {
   systemPrompt: string;
   readOnly: boolean;
   addDirs: string[];
+  korevCli: boolean;
 }
 
 type Owner =
@@ -433,6 +439,7 @@ export function createChats(
       systemPrompt: NO_REPO_ASK_PROMPT,
       readOnly: true,
       addDirs: [await readableAttachments()],
+      korevCli: false,
     };
   }
 
@@ -451,6 +458,7 @@ export function createChats(
       systemPrompt: askSystemPrompt(repos, checkouts),
       readOnly: true,
       addDirs: [...checkouts.slice(1), await readableAttachments()],
+      korevCli: false,
     };
   }
 
@@ -474,6 +482,7 @@ export function createChats(
     const linked = linkedWorkspaces(workspace);
     const config = await workspaceConfig(ctx, workspace);
     const linkedPaths = linked.map((entry) => entry.workspace.path);
+    const korevCli = ctx.store.state.settings.orchestration;
     const gitDirsPerCheckout = await Promise.all(
       [workspace.path, ...linkedPaths].map((dir) => gitDirs(ctx.git, dir)),
     );
@@ -485,8 +494,10 @@ export function createChats(
         workspace,
         linked,
         config.prompts.general,
+        korevCli,
       ),
       readOnly: false,
+      korevCli,
       addDirs: [
         ...linkedPaths,
         ...gitDirsPerCheckout.flat(),
@@ -589,6 +600,7 @@ export function createChats(
       : replayPrompt(items.slice(0, -1), options.text);
     let sinceSave = 0;
     let parser: TurnParser | null = null;
+    let grant: AgentGrant | null = null;
     const notice = (text: string) =>
       upsert(session.id, items, {
         id: `${turn.id}:notice`,
@@ -606,15 +618,19 @@ export function createChats(
         effort: options.effort,
         fast: options.fast,
         toolApprovals: ctx.store.state.settings.toolApprovals,
+        korevCli: target.korevCli,
         resumeId: session.agentSessionId,
         fork: session.forkOnNextTurn,
         newSessionId: ctx.deps.newId(),
         systemPrompt: target.systemPrompt,
         addDirs: target.addDirs,
       };
+      grant = target.korevCli
+        ? ctx.agentAccess.grant(session.id, target.env.PATH)
+        : null;
       const process = spawnAgent(agent.binary, agent.args(request), {
         cwd: target.cwd,
-        env: { ...target.env, KOREV_SESSION_ID: session.id },
+        env: { ...target.env, ...grant?.env, KOREV_SESSION_ID: session.id },
         onLine: (line) => {
           sinceSave += handleLine(
             session,
@@ -649,6 +665,7 @@ export function createChats(
     } catch (error) {
       notice(errorMessage(error));
     } finally {
+      grant?.revoke();
       const startedSession = parser?.sessionId() ?? null;
       if (startedSession) {
         session.agentSessionId = startedSession;

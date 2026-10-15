@@ -23,6 +23,7 @@ const REQUEST: TurnRequest = {
   effort: 'high',
   fast: false,
   toolApprovals: false,
+  korevCli: false,
   resumeId: 'chat-1',
   fork: true,
   newSessionId: 'chat-2',
@@ -39,6 +40,14 @@ describe('forking a chat', () => {
 
     expect(args).toContain(expected.join(' '));
     expect(args).toContain('chat-1');
+  });
+});
+
+describe('korev CLI', () => {
+  it('lets Claude run korev commands without asking', () => {
+    const args = AGENTS.claude.args({ ...REQUEST, korevCli: true }).join(' ');
+
+    expect(args).toContain('--allowedTools Bash(korev:*)');
   });
 });
 

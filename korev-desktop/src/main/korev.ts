@@ -37,6 +37,7 @@ import {
   rootItems,
   type MovedOrder,
 } from '../shared/workspaces';
+import { startAgentServer } from './agent-server';
 import { detectAgents, reconcileDefaultModels } from './agents';
 import type { Dictation } from './dictation';
 import type { RemoteAccess } from './remote-access';
@@ -80,6 +81,7 @@ import { listSkills } from './skills';
 import { listIssues, listPullRequests } from './sources';
 import { rangeFileDiff, rangeFiles, searchFiles } from './git-review';
 import { findLocalUrl } from './workspace-setup';
+import { createOrchestration } from './orchestration';
 import { createSpotlight } from './spotlight';
 import { repoFavicon } from './repo-icon';
 import { ATTACHMENTS_DIR, attachmentsDir, openStore } from './store';
@@ -316,11 +318,16 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   let whatsNew: ReleaseInfo | null = null;
   const editors = installedEditors(deps.home);
   const backgroundTasks = new Set<Promise<unknown>>();
+  const orchestration = createOrchestration();
+  const agentServer = await startAgentServer(deps.cliDir, (call) =>
+    orchestration.runCli(call),
+  );
 
   const ctx: Context = {
     deps,
     store,
     git,
+    agentAccess: agentServer,
     terminals: createTerminals({
       spawnPty: deps.spawnPty,
       shell: deps.shell,
@@ -1394,6 +1401,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       await chats.settled();
       await ctx.settled();
       ctx.terminals.closeAll();
+      await agentServer.close();
       await store.flush();
     },
   };

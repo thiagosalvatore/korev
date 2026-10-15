@@ -47,6 +47,7 @@ export function defaultSettings(home: string): Settings {
     deleteBranchOnArchive: false,
     archiveOnMerge: false,
     toolApprovals: false,
+    orchestration: true,
     loadout: [],
     snippets: [],
     editor: 'cursor',

@@ -1,0 +1,11 @@
+#!/bin/bash
+if [ -z "$KOREV_AGENT_URL" ]; then
+  echo "korev: only agents started by Korev can run this command." >&2
+  exit 1
+fi
+arguments=()
+for argument in "$@"; do
+  arguments+=(--data-urlencode "a=$argument")
+done
+exec curl --silent --show-error --fail-with-body --request POST \
+  "${arguments[@]}" "$KOREV_AGENT_URL"

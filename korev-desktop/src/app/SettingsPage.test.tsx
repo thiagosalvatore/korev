@@ -39,6 +39,7 @@ const STATE = {
     reviewModel: null,
     loadout: [],
     toolApprovals: false,
+    orchestration: true,
   },
 } as unknown as AppState;
 

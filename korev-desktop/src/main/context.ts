@@ -6,6 +6,7 @@ import type {
   WorkspaceRuntime,
   WorkspaceStatus,
 } from '../shared/model';
+import type { AgentAccess } from './agent-server';
 import type { CommandRunner } from './command-runner';
 import type { Git } from './git';
 import type { Store } from './store';
@@ -24,6 +25,7 @@ export interface CoreDeps {
   home: string;
   userDataPath: string;
   signer: string;
+  cliDir: string;
   emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]): void;
   notify(notice: Notice): void;
   playSound(): void;
@@ -39,6 +41,7 @@ export interface Context {
   store: Store;
   git: Git;
   terminals: Terminals;
+  agentAccess: AgentAccess;
   runningSessions: Set<string>;
   planLimits: PlanLimits;
   focusedWorkspaceIds: string[];

@@ -611,6 +611,15 @@ function Agents({ state }: { state: AppState }) {
           onChange={(toolApprovals) => update({ toolApprovals })}
         />
       </Row>
+      <Row
+        title="Let agents coordinate other agents"
+        description="Workspace agents get the korev command. With it they can start workers in linked workspaces, message them and get their results back. Run korev help in an agent turn to see every command."
+      >
+        <Switch
+          checked={state.settings.orchestration}
+          onChange={(orchestration) => update({ orchestration })}
+        />
+      </Row>
       <p className="mt-3 mb-0 text-xs text-fg-3">
         Without approvals, agents run with full permissions inside the workspace
         folder. A workspace is a git worktree, not a sandbox.

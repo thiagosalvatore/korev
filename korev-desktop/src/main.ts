@@ -64,6 +64,7 @@ const TAILNET_BINARY = 'korev-tailnet';
 const TAILNET_BIN_DIR = 'tailnet/bin';
 const SIGNER_BINARY = 'korev-sign';
 const SIGNER_BIN_DIR = 'signer/bin';
+const CLI_DIR = 'cli';
 const UNPACKED_ASAR_DIR = 'app.asar.unpacked';
 const TAILNET_HOSTNAME_PREFIX = 'korev-';
 const MODELS_DIR = 'models';
@@ -92,6 +93,12 @@ useSeparateDevData();
 
 let korevApp: Korev | null = null;
 let quitGate: QuitGate | null = null;
+
+function korevCliDir(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, UNPACKED_ASAR_DIR, CLI_DIR)
+    : path.resolve(__dirname, '..', '..', CLI_DIR);
+}
 
 function bundledBinary(binDir: string, binary: string): string {
   const appDir = app.isPackaged
@@ -269,6 +276,7 @@ async function createKorevApp(): Promise<Korev> {
     home: homedir(),
     userDataPath: app.getPath('userData'),
     signer: bundledBinary(SIGNER_BIN_DIR, SIGNER_BINARY),
+    cliDir: korevCliDir(),
     fs: nodeFileSystem,
     spawnPty,
     emit,
