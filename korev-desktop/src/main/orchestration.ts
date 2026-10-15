@@ -13,6 +13,7 @@ import {
   type TaskOutcome,
   type Workspace,
 } from '../shared/model';
+import { korevMessage } from '../shared/message';
 import type { CliCall, CliReply } from './agent-server';
 import { errorMessage, type Context } from './context';
 import { commitsBehind } from './git';
@@ -27,6 +28,10 @@ const OUTCOMES: TaskOutcome[] = ['succeeded', 'failed'];
 const SETTABLE_STATUSES = ['pending', 'completed', 'failed'] as const;
 const LIST_SEPARATOR = ',';
 const RUN_PAUSED_TITLE = 'Orchestration paused';
+const DECISION_NEEDED_TITLE = 'Decision needed';
+const QUESTION_ID_PREFIX = 'q';
+const GATE_ID_PREFIX = 'g';
+const USER = 'user';
 
 export const GUIDE = `korev: coordinate other agents from inside a Korev workspace.
 
@@ -55,18 +60,28 @@ Coordinator
   korev worker list [--json]
   korev worker stop --task t1       Stop the worker. The task can be restarted.
   korev worker release --task t1    Archive a finished worker's workspace.
+  korev reply --id q1 --body "<answer>"
+      Answer a worker's question. The answer starts the worker's next turn.
 
 Worker
   korev done --outcome succeeded|failed --summary "<what you did and what is left>"
              [--files a.ts,b.ts]
       Run exactly once, when the task is finished or you cannot finish it.
       Then end your turn.
+  korev ask --question "<question>" [--options a,b]
+      Ask the coordinator instead of asking the user. Then end your turn:
+      the answer arrives as your next message.
 
 Everyone
   korev send --to <target> --body "<text>" [--type status|escalation|handoff|merge_ready]
       Targets: @coordinator, @all (every worker in the run), @idle (workers
       that are not running), @claude, @codex, a task id (t1) or a linked
       workspace name.
+  korev gate create --task t1 --question "<decision>" --options a,b
+  korev gate list [--task t1]
+      A decision gate blocks its task until the user picks an option in
+      Korev. Agents cannot resolve gates. The choice goes to the task's
+      worker and to the coordinator.
 
 Rules
   - Korev tells the coordinator when a worker's turn ends without korev done.
@@ -91,6 +106,13 @@ export interface Orchestration {
   turnFinished(sessionId: string): Promise<void>;
   workspaceArchived(workspaceId: string): Promise<void>;
   resumeRun(runId: string): Promise<Result>;
+  resumeTask(runId: string, taskId: string): Promise<Result>;
+  answerQuestion(
+    runId: string,
+    questionId: string,
+    answer: string,
+  ): Promise<Result>;
+  resolveGate(runId: string, gateId: string, choice: string): Promise<Result>;
 }
 
 type Command = (call: CliCall, args: string[]) => Promise<CliReply>;
@@ -145,10 +167,6 @@ function flags<T extends Record<string, 'string' | 'boolean'>>(
   }
 }
 
-export function korevMessage(from: string, type: string, body: string) {
-  return `<korev-message from="${from}" type="${type}">\n${body}\n</korev-message>`;
-}
-
 function taskLine(run: OrchestrationRun, task: OrchestrationTask): string {
   const deps = task.deps.length ? ` (after ${task.deps.join(', ')})` : '';
   const result = task.result ? ` - ${task.result.summary}` : '';
@@ -157,6 +175,17 @@ function taskLine(run: OrchestrationRun, task: OrchestrationTask): string {
 
 function taskJson(run: OrchestrationRun, task: OrchestrationTask) {
   return { ...task, state: taskState(run, task) };
+}
+
+function decisionLines(run: OrchestrationRun, task: OrchestrationTask) {
+  const decided = run.gates.filter(
+    (gate) => gate.taskId === task.id && gate.resolution !== null,
+  );
+  if (!decided.length) return null;
+  return [
+    'The user already made these decisions for this task:',
+    ...decided.map((gate) => `- ${gate.question} ${gate.resolution}`),
+  ].join('\n');
 }
 
 export function workerPreamble(
@@ -168,10 +197,12 @@ export function workerPreamble(
     `Task ${task.id}: ${task.title}`,
     run.objective ? `Objective of the whole run: ${run.objective}` : null,
     task.spec,
+    decisionLines(run, task),
     [
       `Work only in this workspace and commit on its branch.`,
       `When you finish, or cannot finish, run exactly once: korev done --outcome succeeded|failed --summary "<what you did, what changed, what is left>" [--files a,b]. Then end your turn.`,
       `To tell the coordinator something earlier: korev send --to ${COORDINATOR} --type status|escalation --body "<text>".`,
+      `If you need an answer to continue, run korev ask --question "<question>" instead of asking the user, then end your turn.`,
       `Run korev help to see every command.`,
     ].join('\n'),
   ]
@@ -251,6 +282,8 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
       depth,
       parentRunId: parent?.id ?? null,
       tasks: [],
+      questions: [],
+      gates: [],
       wakes: 0,
       paused: false,
       heldMessages: [],
@@ -494,6 +527,10 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
       const state = taskState(run, task);
       if (state === 'pending')
         throw new CliError(`${task.id} waits for ${task.deps.join(', ')}.`);
+      if (state === 'blocked')
+        throw new CliError(
+          `${task.id} waits for the user to resolve a decision gate.`,
+        );
       if (state === 'dispatched' || state === 'completed')
         throw new CliError(`${task.id} is already ${state}.`);
       const coordinator = workspaceChat(call.sessionId);
@@ -611,6 +648,98 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
       return done('Reported to the coordinator. End your turn now.');
     },
 
+    ask: async (call, args) => {
+      const values = flags(args, { question: 'string', options: 'string' });
+      const found = activeTask(call.sessionId);
+      if (!found) throw new CliError('Only a running worker can ask.');
+      const { run, task } = found;
+      const question = {
+        id: `${QUESTION_ID_PREFIX}${run.questions.length + 1}`,
+        taskId: task.id,
+        askerSessionId: call.sessionId,
+        question: required(values.question, 'question'),
+        options: list(values.options),
+        answer: null,
+      };
+      run.questions.push(question);
+      const options = question.options.length
+        ? `\nOptions: ${question.options.join(', ')}`
+        : '';
+      await wake(
+        run,
+        korevMessage(
+          `worker of ${task.id}`,
+          'question',
+          `${question.id}: ${question.question}${options}\n\nAnswer with \`korev reply --id ${question.id} --body "..."\`.`,
+        ),
+      );
+      return done(
+        `Asked the coordinator (${question.id}). End your turn now. The answer arrives as your next message.`,
+      );
+    },
+
+    reply: async (call, args) => {
+      const values = flags(args, { id: 'string', body: 'string' });
+      const run = requireRun(call.sessionId);
+      const sent = await answer(
+        run,
+        required(values.id, 'id'),
+        required(values.body, 'body'),
+        'coordinator',
+      );
+      if (!sent.ok) throw new CliError(sent.message);
+      return done('Answered.');
+    },
+
+    'gate create': async (call, args) => {
+      const values = flags(args, {
+        task: 'string',
+        question: 'string',
+        options: 'string',
+      });
+      const run = gateRun(call.sessionId, required(values.task, 'task'));
+      const task = findTask(run, values.task);
+      const options = list(values.options);
+      if (options.length < 2)
+        throw new CliError('A gate needs at least two --options.');
+      const gate = {
+        id: `${GATE_ID_PREFIX}${run.gates.length + 1}`,
+        taskId: task.id,
+        question: required(values.question, 'question'),
+        options,
+        resolution: null,
+      };
+      run.gates.push(gate);
+      saveAndEmit();
+      ctx.deps.notify({
+        title: DECISION_NEEDED_TITLE,
+        body: gate.question,
+        workspaceId: run.coordinatorWorkspaceId,
+      });
+      return done(
+        `Created ${gate.id}. ${task.id} is blocked until the user picks an option in Korev. End your turn: the choice arrives as a message.`,
+      );
+    },
+
+    'gate list': async (call, args) => {
+      const values = flags(args, { task: 'string' });
+      const run =
+        coordinatedRun(call.sessionId) ?? workerTask(call.sessionId)?.run;
+      if (!run) throw new CliError('You are not part of any run.');
+      const gates = run.gates.filter(
+        (gate) => !values.task || gate.taskId === values.task,
+      );
+      if (!gates.length) return done('No gates.');
+      return done(
+        gates
+          .map(
+            (gate) =>
+              `${gate.id} (${gate.taskId}) ${gate.question} [${gate.options.join(' | ')}] -> ${gate.resolution ?? 'waiting for the user'}`,
+          )
+          .join('\n'),
+      );
+    },
+
     send: async (call, args) => {
       const values = flags(args, {
         to: 'string',
@@ -660,6 +789,51 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
         .filter(Boolean)
         .join('\n\n'),
     );
+  }
+
+  function gateRun(sessionId: string, taskId: string) {
+    const own = coordinatedRun(sessionId);
+    if (own?.tasks.some((task) => task.id === taskId)) return own;
+    const worker = activeTask(sessionId);
+    if (worker?.task.id === taskId) return worker.run;
+    throw new CliError(
+      `Only the coordinator or the worker of ${taskId} can gate it.`,
+    );
+  }
+
+  async function answer(
+    run: OrchestrationRun,
+    questionId: string,
+    body: string,
+    from: string,
+  ): Promise<Result> {
+    const question = run.questions.find((entry) => entry.id === questionId);
+    if (!question)
+      return { ok: false, message: `There is no question ${questionId}.` };
+    if (question.answer !== null)
+      return { ok: false, message: `${questionId} is already answered.` };
+    question.answer = body;
+    return deliver(
+      run,
+      question.askerSessionId,
+      korevMessage(
+        from,
+        'answer',
+        `Answer to ${question.id} (${question.question}):\n\n${body}`,
+      ),
+    );
+  }
+
+  function waitsForAnswer(run: OrchestrationRun, task: OrchestrationTask) {
+    return (
+      run.questions.some(
+        (question) => question.taskId === task.id && question.answer === null,
+      ) || taskState(run, task) === 'blocked'
+    );
+  }
+
+  function findRun(runId: string) {
+    return runs().find((entry) => entry.id === runId);
   }
 
   function recipients(sessionId: string, to: string) {
@@ -754,7 +928,7 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
     runCli,
     async turnFinished(sessionId) {
       const found = activeTask(sessionId);
-      if (!found) return;
+      if (!found || waitsForAnswer(found.run, found.task)) return;
       await reportUnfinished(
         found.run,
         found.task,
@@ -776,8 +950,51 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
         }
       }
     },
+    async answerQuestion(runId, questionId, text) {
+      const run = findRun(runId);
+      if (!run) return { ok: false, message: 'Run not found' };
+      return answer(run, questionId, text.trim(), USER);
+    },
+    async resolveGate(runId, gateId, choice) {
+      const run = findRun(runId);
+      const gate = run?.gates.find((entry) => entry.id === gateId);
+      if (!run || !gate) return { ok: false, message: 'Gate not found' };
+      if (gate.resolution !== null)
+        return { ok: false, message: 'This gate is already resolved' };
+      if (!gate.options.includes(choice))
+        return { ok: false, message: 'Pick one of the options' };
+      gate.resolution = choice;
+      const task = run.tasks.find((entry) => entry.id === gate.taskId);
+      const text = korevMessage(
+        USER,
+        'decision',
+        `${gate.id} for ${gate.taskId}: ${gate.question}\nThe user chose: ${choice}`,
+      );
+      const toWorker =
+        task?.status === 'dispatched' && task.sessionId
+          ? deliver(run, task.sessionId, text)
+          : null;
+      const results = await Promise.all([wake(run, text), toWorker]);
+      return results.find((result) => result && !result.ok) ?? ok();
+    },
+    async resumeTask(runId, taskId) {
+      const run = findRun(runId);
+      const task = run?.tasks.find((entry) => entry.id === taskId);
+      if (!run || task?.status !== 'interrupted' || !task.sessionId)
+        return { ok: false, message: 'This task is not interrupted' };
+      task.status = 'dispatched';
+      return deliver(
+        run,
+        task.sessionId,
+        korevMessage(
+          USER,
+          'resume',
+          `Korev stopped while you worked on ${task.id}. Continue the task, then run korev done.`,
+        ),
+      );
+    },
     async resumeRun(runId) {
-      const run = runs().find((entry) => entry.id === runId);
+      const run = findRun(runId);
       if (!run) return { ok: false, message: 'Run not found' };
       const held = run.heldMessages;
       Object.assign(run, { paused: false, wakes: 0, heldMessages: [] });

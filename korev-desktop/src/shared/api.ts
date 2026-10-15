@@ -86,6 +86,13 @@ export interface KorevApi {
   repoGithubUrl(repoId: string): Promise<string | null>;
   startReview(workspaceId: string): Promise<Result<string>>;
   resumeRun(runId: string): Promise<Result>;
+  resumeTask(runId: string, taskId: string): Promise<Result>;
+  answerQuestion(
+    runId: string,
+    questionId: string,
+    answer: string,
+  ): Promise<Result>;
+  resolveGate(runId: string, gateId: string, choice: string): Promise<Result>;
   archiveWorkspace(workspaceId: string): Promise<Result>;
   restoreWorkspace(workspaceId: string): Promise<Result>;
   deleteWorkspace(workspaceId: string): Promise<void>;
@@ -233,6 +240,10 @@ export const REMOTE_METHODS = [
   'transcribe',
   'moveRepo',
   'moveFolder',
+  'resumeRun',
+  'resumeTask',
+  'answerQuestion',
+  'resolveGate',
 ] as const satisfies readonly (keyof KorevApi)[];
 
 export type RemoteMethod = (typeof REMOTE_METHODS)[number];

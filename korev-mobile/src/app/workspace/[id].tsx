@@ -21,6 +21,7 @@ import {
 } from '../../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../../attempt';
 import { Chat } from '../../chat/Chat';
+import { RunDecisions } from '../../chat/RunDecisions';
 import { useAppState, usePendingAction } from '../../hooks';
 import { Loading } from '../../Offline';
 import { useConnection } from '../../korev';
@@ -166,11 +167,15 @@ export default function WorkspaceScreen() {
     workspace.sessions.find((entry) => entry.id === selectedId) ??
     defaultSession(state, workspace);
   if (session && session.id !== selectedId) setSelectedId(session.id);
+  const coordinatedRun = state.runs?.findLast((run) =>
+    workspace.sessions.some((entry) => entry.id === run.coordinatorSessionId),
+  );
 
   return (
     <>
       <Stack.Screen options={{ title: workspaceTitle(state, workspace) }} />
       <PrBar workspace={workspace} runtime={runtime} sessionId={session?.id} />
+      {coordinatedRun ? <RunDecisions run={coordinatedRun} /> : null}
       <SessionTabs
         state={state}
         workspace={workspace}

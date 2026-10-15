@@ -13,6 +13,13 @@ case "$message" in
   *'type=\"worker_done\"'*)
     echo "$message" > .context/coordinator-woken
     ;;
+  *'type=\"decision\"'*)
+    echo "$message" > .context/coordinator-decided
+    ;;
+  *gate-demo*)
+    korev task create --title db --spec "migrate the database"
+    korev gate create --task t1 --question "Drop the old table?" --options yes,no
+    ;;
   *'type=\"worker_idle\"'*)
     echo "$message" > .context/coordinator-idle
     ;;

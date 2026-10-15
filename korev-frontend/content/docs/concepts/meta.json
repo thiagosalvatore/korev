@@ -6,6 +6,7 @@
     "workspaces",
     "ask",
     "linked-workspaces",
+    "orchestration",
     "agents-and-modes",
     "permissions"
   ]

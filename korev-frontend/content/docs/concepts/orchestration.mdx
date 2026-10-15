@@ -1,0 +1,54 @@
+---
+title: Orchestration
+description: 'One agent splits a task, starts a worker agent for each part, and gets each worker’s report back.'
+---
+
+Ask an agent in a workspace to coordinate the work, for example "split this refactor into tasks and run them in parallel". That agent becomes the **coordinator**. It uses the `korev` command, which Korev puts on the PATH of every workspace agent.
+
+## What the coordinator does
+
+1. It creates a **run** for the whole job.
+2. It adds **tasks**. A task can wait for other tasks. It starts only when they are done.
+3. It starts a **worker** for each ready task. Each worker gets its own [linked workspace](./linked-workspaces.mdx), on its own branch, with Claude Code or Codex.
+4. It ends its turn. When a worker finishes, the worker's report arrives in the coordinator's chat and the coordinator continues.
+
+Workers can message the coordinator and ask it questions. Their messages show in the chat with the sender's name, for example "worker of t1".
+
+## What Korev does on its own
+
+- If a worker's turn ends without a report, Korev sends its last reply to the coordinator.
+- If a worker fails or you archive its workspace, its task fails and the coordinator hears about it.
+- If Korev quits while workers run, their tasks show as **Interrupted**. Press **Resume** on the Runs page to continue one.
+- After 100 messages, Korev pauses the run and notifies you, so two agents cannot keep waking each other up. Press **Resume run** to continue.
+
+## Runs page
+
+**Runs** in the sidebar, or **Orchestration runs** in the command palette (⌘K), lists every run. A run shows:
+
+- its tasks, with their state: Waiting, Ready, Working, Done, Failed, Interrupted or Needs a decision;
+- the workspace of each worker;
+- each worker's report.
+
+## Decisions and questions
+
+An agent can create a **decision gate** when a task needs your call, for example "Drop the old table? yes / no". The task waits until you pick an option. Agents cannot pick for you. The gate shows in the coordinator's chat, on the Runs page and in the phone app. Your choice goes to the coordinator and to the task's worker.
+
+A worker asks the coordinator, not you, when it needs an answer. You can answer instead on the Runs page or in the phone app.
+
+## Turn it off
+
+Turn off **Settings → Agents → Let agents coordinate other agents**. Agents then do not get the `korev` command.
+
+## Commands
+
+Agents learn the commands from `korev help`. The main ones:
+
+| Command | Who runs it | What it does |
+| --- | --- | --- |
+| `korev run create --objective "..."` | coordinator | Starts a run. |
+| `korev task create --title ... --spec ... [--deps t1]` | coordinator | Adds a task. |
+| `korev worker start --task t1 [--agent codex]` | coordinator | Starts a worker in a new linked workspace. |
+| `korev done --outcome succeeded --summary "..."` | worker | Reports the result. |
+| `korev ask --question "..."` | worker | Asks the coordinator. |
+| `korev send --to @coordinator --body "..."` | anyone | Sends a message. |
+| `korev gate create --task t1 --question "..." --options a,b` | anyone in the run | Asks you to decide. |

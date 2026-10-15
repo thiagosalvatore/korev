@@ -1126,6 +1126,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
     archiveWorkspace: (workspaceId) => archive(workspaceId),
     resumeRun: (runId) => orchestration.resumeRun(runId),
+    resumeTask: (runId, taskId) => orchestration.resumeTask(runId, taskId),
+    answerQuestion: (runId, questionId, answer) =>
+      orchestration.answerQuestion(runId, questionId, answer),
+    resolveGate: (runId, gateId, choice) =>
+      orchestration.resolveGate(runId, gateId, choice),
     async toggleSpotlight(workspaceId) {
       const workspace = workspacePath(workspaceId);
       const repo = ctx.repo(workspace.repoId);

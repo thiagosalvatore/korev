@@ -13,6 +13,7 @@ import { DRAG_REGION } from './layout';
 import { NewWorkspacePage } from './NewWorkspacePage';
 import { QuitDialog, QuitPending } from './QuitDialog';
 import { ReleaseNotesDialog } from './ReleaseNotesDialog';
+import { RunsPage } from './RunsPage';
 import { SettingsPage } from './SettingsPage';
 import { Sidebar } from './Sidebar';
 import { Toaster } from './ui/toast';
@@ -82,6 +83,7 @@ function Shell({ state }: { state: AppState }) {
         />
       ) : null}
       {page.kind === 'grid' ? <GridView state={state} /> : null}
+      {page.kind === 'runs' ? <RunsPage state={state} /> : null}
       {page.kind === 'workspace' && workspace ? (
         <WorkspaceView key={workspace.id} state={state} workspace={workspace} />
       ) : null}

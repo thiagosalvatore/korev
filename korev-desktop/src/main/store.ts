@@ -39,6 +39,8 @@ function interruptedAfterRestart(run: OrchestrationRun): OrchestrationRun {
   return {
     ...run,
     heldMessages: run.heldMessages ?? [],
+    questions: run.questions ?? [],
+    gates: run.gates ?? [],
     tasks: run.tasks.map((task) =>
       task.status === 'dispatched' ? { ...task, status: 'interrupted' } : task,
     ),

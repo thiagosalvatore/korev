@@ -29,6 +29,7 @@ import {
   type DiffComment,
 } from '../ui-store';
 import { Composer, saveDraft } from './Composer';
+import { RunDecisions } from '../RunsPage';
 import { PlanReview } from './PermissionCard';
 import { Transcript } from './Transcript';
 
@@ -163,6 +164,9 @@ export function ChatView({
     ? () => void handoffPlan(workspace, session.id)
     : undefined;
   const repos = workspace ? laneRepos(state, workspace) : [];
+  const coordinatedRun = state.runs.findLast(
+    (run) => run.coordinatorSessionId === session.id,
+  );
 
   async function revert(itemId: string) {
     const result = await api.revert(session.id, itemId);
@@ -212,19 +216,22 @@ export function ChatView({
           laneRepos={repos}
           repoUrl={repoUrl}
           footer={
-            codexPlan ? (
-              <PlanReview
-                key={codexPlan.id}
-                plan={codexPlan.plan}
-                showPlan={false}
-                laneRepos={repos}
-                onApprove={(lanes) =>
-                  void api.approvePlan(session.id, lanes).then(reportFailure)
-                }
-                onKeepPlanning={(feedback) => void send(feedback, true)}
-                onHandoff={handoff}
-              />
-            ) : null
+            <>
+              {codexPlan ? (
+                <PlanReview
+                  key={codexPlan.id}
+                  plan={codexPlan.plan}
+                  showPlan={false}
+                  laneRepos={repos}
+                  onApprove={(lanes) =>
+                    void api.approvePlan(session.id, lanes).then(reportFailure)
+                  }
+                  onKeepPlanning={(feedback) => void send(feedback, true)}
+                  onHandoff={handoff}
+                />
+              ) : null}
+              {coordinatedRun ? <RunDecisions run={coordinatedRun} /> : null}
+            </>
           }
         />
       ) : (

@@ -4,6 +4,14 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+Let one agent run a team of other agents.
+
+### New
+
+- **Orchestration.** Ask a workspace agent to coordinate a job. It splits the job into tasks, starts a worker agent in a linked workspace for each one, and gets each worker's report back in its chat. Workers can message and ask the coordinator. Turn it off in Settings → Agents.
+- **Runs page.** Runs in the sidebar lists each run's tasks, their state, their workers and their reports. Resume a task that stopped when Korev quit.
+- **Decisions.** An agent can ask you to choose between options before a task goes on. Pick in the chat, on the Runs page or in the phone app.
+
 ## [0.13.1] - 2026-10-15
 
 Files in the file viewer show the right colors for their language.

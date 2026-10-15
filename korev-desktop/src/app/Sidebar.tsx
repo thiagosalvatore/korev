@@ -35,6 +35,7 @@ import {
   deleteAsk,
   openAsk,
   openGrid,
+  openRuns,
   openIn,
   openNewWorkspace,
   openSettings,
@@ -1079,6 +1080,14 @@ export function Sidebar({ state }: { state: AppState }) {
           active={pageKind === 'grid'}
           onClick={openGrid}
         />
+        {state.runs.length ? (
+          <NavRow
+            icon="network"
+            label="Runs"
+            active={pageKind === 'runs'}
+            onClick={openRuns}
+          />
+        ) : null}
       </div>
       <AskChats state={state} />
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-1">

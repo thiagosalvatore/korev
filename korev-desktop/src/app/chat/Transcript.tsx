@@ -23,7 +23,11 @@ import type {
   TurnRange,
 } from '../../shared/model';
 import { duration, fileName, imageType } from '../../shared/format';
-import { messageParts, type MessageParts } from '../../shared/message';
+import {
+  messageParts,
+  type AgentMessage,
+  type MessageParts,
+} from '../../shared/message';
 import { ImagePreview, ImageThumbnail } from './ImagePreview';
 import { copyMarkdown, Markdown } from './Markdown';
 import { PermissionCard } from './PermissionCard';
@@ -295,6 +299,22 @@ function MessageAttachments({
   );
 }
 
+function AgentMessageCard({ message }: { message: AgentMessage }) {
+  return (
+    <section
+      aria-label={`Message from ${message.from}`}
+      className="flex flex-col gap-1.5"
+    >
+      <div className="flex items-center gap-1.5 text-xs text-fg-3">
+        <Icon name="bot" size={13} />
+        <span className="font-medium text-fg-2">{message.from}</span>
+        <span>{message.type.replaceAll('_', ' ')}</span>
+      </div>
+      <Markdown text={message.body} breaks />
+    </section>
+  );
+}
+
 function UserMessage({
   item,
   sessionId,
@@ -306,7 +326,7 @@ function UserMessage({
   canRevert: boolean;
   onRevert: () => void;
 }) {
-  const { body, plans, files } = messageParts(item.text);
+  const { body, plans, files, agentMessages } = messageParts(item.text);
   return (
     <div className="group flex justify-end gap-1">
       <div className="flex items-start gap-0.5 pt-1 opacity-0 group-hover:opacity-100">
@@ -336,6 +356,9 @@ function UserMessage({
             Queued
           </span>
         ) : null}
+        {agentMessages.map((message, index) => (
+          <AgentMessageCard key={index} message={message} />
+        ))}
         {body ? <Markdown text={body} breaks /> : null}
         <MessageAttachments plans={plans} files={files} sessionId={sessionId} />
       </div>

@@ -27,6 +27,7 @@ const state = {
   repos: [],
   askChats: [ask],
   agents: [],
+  runs: [],
   runningSessions: [],
   waitingSessions: [],
   runtime: {},

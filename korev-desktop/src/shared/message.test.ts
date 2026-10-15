@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { formatAttachments, messageParts, planBlock } from './message';
+import {
+  formatAttachments,
+  korevMessage,
+  messageParts,
+  planBlock,
+} from './message';
 
 describe('messageParts', () => {
   it('takes a handed-off plan out of the text', () => {
@@ -15,6 +20,7 @@ describe('messageParts', () => {
         },
       ],
       files: [],
+      agentMessages: [],
     });
   });
 
@@ -42,6 +48,7 @@ describe('messageParts', () => {
       body: 'Look at this',
       plans: [],
       files: ['.context/attachments/1-shot.png', '/tmp/b.txt'],
+      agentMessages: [],
     });
   });
 
@@ -50,6 +57,30 @@ describe('messageParts', () => {
       body: 'Fix the <plan> tag parser',
       plans: [],
       files: [],
+      agentMessages: [],
+    });
+  });
+
+  it('takes the messages other agents sent out of the text', () => {
+    const text = [
+      korevMessage(
+        'worker of t1',
+        'worker_done',
+        't1 succeeded.\n\nnotes written',
+      ),
+      korevMessage('worker of t2', 'question', 'q1: Which API?'),
+    ].join('\n\n');
+
+    expect(messageParts(text)).toMatchObject({
+      body: '',
+      agentMessages: [
+        {
+          from: 'worker of t1',
+          type: 'worker_done',
+          body: 't1 succeeded.\n\nnotes written',
+        },
+        { from: 'worker of t2', type: 'question', body: 'q1: Which API?' },
+      ],
     });
   });
 });

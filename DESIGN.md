@@ -20,7 +20,8 @@ How the Korev desktop app looks and behaves. The tokens live in
 
 Three columns:
 
-- **Left sidebar** (`--sidebar-w`): Search (⌘K), New workspace (⌘N), Ask, then the Ask
+- **Left sidebar** (`--sidebar-w`): Search (⌘K), New workspace (⌘N), Ask, Grid, Runs (only
+  once an agent has started an orchestration run), then the Ask
   chats, then one group per repository with its workspaces, then History (archived
   workspaces), then Add repository and Settings. A workspace linked across repositories
   shows once, under the repository of its lead workspace (see Linked group).
@@ -35,6 +36,13 @@ branch, the workspace name, the tab picker, **Open in full view** and **Remove f
 Ask pane header has the chat title and its repositories instead of the branch and the tab
 picker. The focused pane has an accent border, and the sidebar marks its workspace or Ask chat
 as the current row.
+
+The **Runs** page replaces the centre and the right panel with one card per orchestration run,
+newest first. A card has the objective, **Resume run** while the run is paused, the
+coordinator's workspace, the open decisions and questions, then one row per task: id, title,
+state badge, the tasks it waits for, its worker's workspace, and the worker's report under it.
+Decision cards use the permission card style (warning border). They also show at the end of the
+coordinator's chat.
 
 ## Workspace row
 

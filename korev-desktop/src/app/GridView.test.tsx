@@ -55,6 +55,7 @@ const state = {
   ],
   askChats: [ask],
   agents: [],
+  runs: [],
   runningSessions: [],
   waitingSessions: [],
   runtime: {},

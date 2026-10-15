@@ -68,6 +68,7 @@ function setup() {
   } as unknown as Context;
   const delivered: { sessionId: string; text: string }[] = [];
   const transcript: ChatItem[] = [];
+  const firstMessages: string[] = [];
   const orchestration = createOrchestration({
     ctx,
     send: async () => OK,
@@ -80,6 +81,7 @@ function setup() {
       const created = workspace(lane.name, origin.groupId);
       created.sessions[0].agent = task.agent;
       state.workspaces.push(created);
+      firstMessages.push(task.text);
       return created;
     },
     stopWorkspace: () => undefined,
@@ -117,7 +119,16 @@ function setup() {
     expect(started.ok).toBe(true);
     return `${title}-chat`;
   }
-  return { ctx, state, cli, orchestration, delivered, notify, startWorker };
+  return {
+    ctx,
+    state,
+    cli,
+    orchestration,
+    delivered,
+    notify,
+    startWorker,
+    firstMessages,
+  };
 }
 
 describe('orchestration', () => {
@@ -226,5 +237,78 @@ describe('orchestration', () => {
 
     expect(reply).toMatchObject({ ok: false });
     expect(reply.output).toContain('--colour');
+  });
+
+  it('passes a worker question to the coordinator and the reply back, without reporting the worker idle', async () => {
+    const { cli, orchestration, delivered, startWorker } = setup();
+    const worker = await startWorker('lead-chat', 'docs');
+
+    await cli(worker, 'ask', '--question', 'Which API?', '--options', 'v1,v2');
+    await orchestration.turnFinished(worker);
+    await cli('lead-chat', 'reply', '--id', 'q1', '--body', 'v2');
+
+    expect(delivered).toEqual([
+      expect.objectContaining({
+        sessionId: 'lead-chat',
+        text: expect.stringContaining('q1: Which API?'),
+      }),
+      expect.objectContaining({
+        sessionId: worker,
+        text: expect.stringContaining('v2'),
+      }),
+    ]);
+  });
+
+  it('blocks a task behind a gate until the user picks an option', async () => {
+    const { cli, orchestration, state, delivered, notify, firstMessages } =
+      setup();
+    await cli(
+      'lead-chat',
+      'task',
+      'create',
+      '--title',
+      'db',
+      '--spec',
+      'migrate',
+    );
+    await cli(
+      'lead-chat',
+      'gate',
+      'create',
+      '--task',
+      't1',
+      '--question',
+      'Drop the old table?',
+      '--options',
+      'yes,no',
+    );
+    const [run] = state.runs;
+
+    const blocked = await cli('lead-chat', 'worker', 'start', '--task', 't1');
+    const wrongChoice = await orchestration.resolveGate(run.id, 'g1', 'maybe');
+    const resolved = await orchestration.resolveGate(run.id, 'g1', 'no');
+    const started = await cli('lead-chat', 'worker', 'start', '--task', 't1');
+
+    expect(blocked.output).toContain('decision gate');
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Decision needed' }),
+    );
+    expect(wrongChoice.ok).toBe(false);
+    expect(resolved.ok).toBe(true);
+    expect(delivered[0].text).toContain('The user chose: no');
+    expect(started.ok).toBe(true);
+    expect(firstMessages[0]).toContain('Drop the old table? no');
+  });
+
+  it('resumes a task that was interrupted when Korev quit', async () => {
+    const { orchestration, state, delivered, startWorker } = setup();
+    const worker = await startWorker('lead-chat', 'docs');
+    const [run] = state.runs;
+    run.tasks[0].status = 'interrupted';
+
+    await orchestration.resumeTask(run.id, 't1');
+
+    expect(run.tasks[0].status).toBe('dispatched');
+    expect(delivered).toEqual([expect.objectContaining({ sessionId: worker })]);
   });
 });

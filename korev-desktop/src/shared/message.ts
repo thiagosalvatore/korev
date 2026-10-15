@@ -1,6 +1,8 @@
 const ATTACHMENTS_HEADER = 'Attached files (read them):';
 export const TAB_CONTEXT_HEADER = 'Context from other tabs:';
 const PLAN_PATTERN = /<plan(?: from="([^"]*)")?>\n([\s\S]*?)\n<\/plan>/g;
+const AGENT_MESSAGE_PATTERN =
+  /<korev-message from="([^"]*)" type="([^"]*)">\n([\s\S]*?)\n<\/korev-message>/g;
 const HEADING_PATTERN = /^#{1,6}\s+(.+)$/m;
 const LIST_ITEM_PREFIX = '- ';
 const DEFAULT_PLAN_NAME = 'plan';
@@ -13,10 +15,21 @@ export interface MessagePlan {
   markdown: string;
 }
 
+export interface AgentMessage {
+  from: string;
+  type: string;
+  body: string;
+}
+
 export interface MessageParts {
   body: string;
   plans: MessagePlan[];
   files: string[];
+  agentMessages: AgentMessage[];
+}
+
+export function korevMessage(from: string, type: string, body: string) {
+  return `<korev-message from="${from.replaceAll('"', "'")}" type="${type}">\n${body}\n</korev-message>`;
 }
 
 export function planBlock(plan: string, from?: string): string {
@@ -61,10 +74,16 @@ export function messageParts(text: string): MessageParts {
       markdown,
     }),
   );
-  const { rest, files } = splitAttachments(text.replace(PLAN_PATTERN, ''));
+  const agentMessages = Array.from(
+    text.matchAll(AGENT_MESSAGE_PATTERN),
+    ([, from, type, body]) => ({ from, type, body }),
+  );
+  const { rest, files } = splitAttachments(
+    text.replace(PLAN_PATTERN, '').replace(AGENT_MESSAGE_PATTERN, ''),
+  );
   const body = rest
     .replace(EMPTY_TAB_CONTEXT, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  return { body, plans, files };
+  return { body, plans, files, agentMessages };
 }

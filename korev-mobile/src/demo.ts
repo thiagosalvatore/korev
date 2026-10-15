@@ -38,6 +38,10 @@ import {
   PLAN_REPLY,
 } from './demoContent';
 
+const NO_RUNS: Result = {
+  ok: false,
+  message: 'The demo has no orchestration runs.',
+};
 const STREAM_STEP_MS = 80;
 const THINKING_MS = 1500;
 const OPENING_REPLY_DELAY_MS = 8000;
@@ -544,6 +548,10 @@ export function createDemoConnection(): Connection {
     async moveFolder(folderId, beforeId) {
       setState({ ...state, ...movedFolder(state, folderId, beforeId) });
     },
+    resumeRun: async () => NO_RUNS,
+    resumeTask: async () => NO_RUNS,
+    answerQuestion: async () => NO_RUNS,
+    resolveGate: async () => NO_RUNS,
   };
 
   const bridge = {

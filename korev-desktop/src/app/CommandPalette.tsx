@@ -9,6 +9,7 @@ import {
   openFile,
   openSearch,
   openNewWorkspace,
+  openRuns,
   openSettings,
   restoreWorkspace,
   selectWorkspace,
@@ -69,6 +70,13 @@ function paletteItems(
       icon: 'folder-plus',
       section: 'Actions',
       run: () => void openProject(),
+    },
+    {
+      id: 'runs',
+      label: 'Orchestration runs',
+      icon: 'network',
+      section: 'Actions',
+      run: openRuns,
     },
     ...(current
       ? [

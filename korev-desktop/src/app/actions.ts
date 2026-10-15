@@ -311,6 +311,10 @@ export function focusComposer() {
     ?.focus();
 }
 
+export function openRuns() {
+  setUi({ page: { kind: 'runs' } });
+}
+
 export function openGrid() {
   setUi({ page: { kind: 'grid' } });
 }
