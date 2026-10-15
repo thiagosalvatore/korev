@@ -5,6 +5,7 @@ import type {
   RepoFolder,
   Workspace,
   WorkspaceRuntime,
+  WorkspaceStatus,
 } from './model';
 
 export interface RepoSection {
@@ -277,4 +278,24 @@ export function sidebarEntries(
     else entries.push([workspace]);
   }
   return entries;
+}
+
+export type BoardColumn = 'needs-you' | 'working' | 'done' | 'idle';
+
+const BOARD_COLUMN_BY_STATUS: Record<
+  Exclude<WorkspaceStatus, 'idle'>,
+  BoardColumn
+> = {
+  waiting: 'needs-you',
+  error: 'needs-you',
+  failed: 'needs-you',
+  working: 'working',
+  'setting-up': 'working',
+  creating: 'working',
+  archiving: 'working',
+};
+
+export function boardColumn(runtime: WorkspaceRuntime): BoardColumn {
+  if (runtime.status !== 'idle') return BOARD_COLUMN_BY_STATUS[runtime.status];
+  return runtime.unread ? 'done' : 'idle';
 }

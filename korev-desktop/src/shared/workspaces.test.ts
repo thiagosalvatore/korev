@@ -4,9 +4,11 @@ import {
   type AppState,
   type Repo,
   type Workspace,
+  type WorkspaceRuntime,
 } from './model';
 import {
   activeWorkspaces,
+  boardColumn,
   crossRepoLead,
   folderRuns,
   laneRepos,
@@ -243,5 +245,27 @@ describe('a group across repositories', () => {
     expect(waitsForLane(group, { ...apiMember, awaitsLane: false })).toBe(
       false,
     );
+  });
+});
+
+describe('boardColumn', () => {
+  const runtime = (
+    status: WorkspaceRuntime['status'],
+    unread = false,
+  ): WorkspaceRuntime => ({ status, unread }) as WorkspaceRuntime;
+
+  it('puts each status in its column', () => {
+    expect(boardColumn(runtime('waiting'))).toBe('needs-you');
+    expect(boardColumn(runtime('error'))).toBe('needs-you');
+    expect(boardColumn(runtime('failed'))).toBe('needs-you');
+    expect(boardColumn(runtime('working'))).toBe('working');
+    expect(boardColumn(runtime('setting-up'))).toBe('working');
+    expect(boardColumn(runtime('creating'))).toBe('working');
+    expect(boardColumn(runtime('archiving'))).toBe('working');
+  });
+
+  it('splits idle workspaces by whether you have read the last turn', () => {
+    expect(boardColumn(runtime('idle', true))).toBe('done');
+    expect(boardColumn(runtime('idle', false))).toBe('idle');
   });
 });

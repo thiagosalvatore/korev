@@ -315,6 +315,15 @@ export function openGrid() {
   setUi({ page: { kind: 'grid' } });
 }
 
+export function openBoard() {
+  setUi({ page: { kind: 'board' } });
+}
+
+export function toggleBoard() {
+  if (getUi().page.kind !== 'board') return openBoard();
+  setUi({ page: { kind: 'workspace' } });
+}
+
 export function focusedPane(): GridPane | null {
   return focusedGridPane(getUi().grid);
 }

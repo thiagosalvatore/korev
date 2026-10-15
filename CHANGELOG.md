@@ -6,6 +6,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ### New
 
+- **Agent board.** Click **Board** in the sidebar or press ⌘⇧B to see every workspace from every repository in four columns: Needs you, Working, Done and Idle. Each card shows the branch, the pull request step and the last line the agent wrote. Click a card to open the workspace.
 - **Folders in a repository.** Put workspaces of one repository in a folder from the workspace's menu, or drag a workspace onto a folder. Click a folder to collapse it. Lanes that you split off a plan go into a folder named after the workspace that made the plan.
 - **Rename a workspace.** Choose **Rename** in the **…** menu of a workspace in the sidebar and type any name. The name shows under the branch in the sidebar, in the workspace header and in the phone app. The branch and the worktree folder stay the same.
 

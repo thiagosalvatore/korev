@@ -5,6 +5,7 @@ import {
   archiveWorkspace,
   createPr,
   newChat,
+  openBoard,
   openDiff,
   openFile,
   openSearch,
@@ -63,6 +64,14 @@ function paletteItems(
       hint: '⌘N',
       section: 'Actions',
       run: () => openNewWorkspace(null),
+    },
+    {
+      id: 'board',
+      label: 'Agent board',
+      icon: 'square-kanban',
+      hint: '⌘⇧B',
+      section: 'Actions',
+      run: openBoard,
     },
     {
       id: 'add-repo',

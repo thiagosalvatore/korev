@@ -25,6 +25,7 @@ import {
 import {
   activeWorkspaces,
   asksNewestFirst,
+  boardColumn,
   crossRepoLead,
   crossRepoLeads,
   folderRuns,
@@ -38,6 +39,7 @@ import {
   archiveWorkspace,
   deleteAsk,
   openAsk,
+  openBoard,
   openGrid,
   openIn,
   openNewWorkspace,
@@ -132,12 +134,8 @@ function StatusIcon({
   workspace: Workspace;
   runtime: WorkspaceRuntime;
 }) {
-  if (
-    runtime.status === 'working' ||
-    runtime.status === 'setting-up' ||
-    runtime.status === 'creating' ||
-    runtime.status === 'archiving'
-  ) {
+  const column = boardColumn(runtime);
+  if (column === 'working') {
     return (
       <Icon
         name="loader-circle"
@@ -157,7 +155,7 @@ function StatusIcon({
       </span>
     );
   }
-  if (runtime.status === 'error' || runtime.status === 'failed') {
+  if (column === 'needs-you') {
     return (
       <Icon name="triangle-alert" size={14} className="text-danger-text" />
     );
@@ -1241,6 +1239,13 @@ export function Sidebar({ state }: { state: AppState }) {
           hint="⌘G"
           active={pageKind === 'grid'}
           onClick={openGrid}
+        />
+        <NavRow
+          icon="square-kanban"
+          label="Board"
+          hint="⌘⇧B"
+          active={pageKind === 'board'}
+          onClick={openBoard}
         />
       </div>
       <AskChats state={state} />

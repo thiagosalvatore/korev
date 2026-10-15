@@ -4,6 +4,7 @@ import type { AppState } from '../shared/model';
 import { activeWorkspaces } from '../shared/workspaces';
 import { openNewWorkspace, selectWorkspace } from './actions';
 import { AskPage } from './AskPage';
+import { BoardView } from './BoardView';
 import { api } from './bridge';
 import { CommandPalette } from './CommandPalette';
 import { paneCount, paneWorkspaceId } from './grid';
@@ -82,6 +83,7 @@ function Shell({ state }: { state: AppState }) {
         />
       ) : null}
       {page.kind === 'grid' ? <GridView state={state} /> : null}
+      {page.kind === 'board' ? <BoardView state={state} /> : null}
       {page.kind === 'workspace' && workspace ? (
         <WorkspaceView key={workspace.id} state={state} workspace={workspace} />
       ) : null}

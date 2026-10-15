@@ -36,11 +36,11 @@ import {
   terminalTabs,
   type PaneContent,
 } from './grid';
-import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
+import { NO_DRAG } from './layout';
+import { PageHeader } from './PageHeader';
 import { Menu, type MenuItem } from './ui/Menu';
 import {
   getUi,
-  setUi,
   tabKey,
   useUi,
   type GridLayout,
@@ -531,7 +531,6 @@ function Pane({
 
 export function GridView({ state }: { state: AppState }) {
   const grid = useUi((ui) => ui.grid);
-  const sidebar = useUi((ui) => ui.sidebar);
   const { cols, rows } = GRID_LAYOUTS[grid.layout];
 
   useEffect(() => {
@@ -541,25 +540,9 @@ export function GridView({ state }: { state: AppState }) {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col bg-app">
-      <header
-        className={cn(
-          'flex h-11 flex-none items-center gap-2 border-b border-border-1 bg-app pr-2',
-          DRAG_REGION,
-          sidebar ? 'pl-3' : TRAFFIC_LIGHT_GUTTER,
-        )}
-      >
-        {sidebar ? null : (
-          <IconButton
-            icon="panel-left"
-            label="Show sidebar"
-            size="sm"
-            className={NO_DRAG}
-            onClick={() => setUi({ sidebar: true })}
-          />
-        )}
-        <span className="flex-1 text-sm font-semibold text-fg-1">Grid</span>
+      <PageHeader title="Grid">
         <LayoutPicker layout={grid.layout} />
-      </header>
+      </PageHeader>
       <div
         className="grid min-h-0 flex-1 gap-px bg-border-1"
         style={{

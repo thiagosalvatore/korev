@@ -870,6 +870,7 @@ export type AppCommand =
   | 'toggle-theme'
   | 'toggle-zen'
   | 'toggle-grid'
+  | 'toggle-board'
   | 'quick-open'
   | 'search-files'
   | 'confirm-quit'

@@ -5,6 +5,7 @@ import {
   type Page,
 } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -707,6 +708,58 @@ test('runs a terminal in a grid pane and keeps it in the full view', async () =>
     await expect(window.getByRole('main').locator('.xterm-rows')).toContainText(
       'korev-grid-terminal',
     );
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('moves a workspace from Working to Done on the board', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const { app, window } = await launch(home, repo);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window.getByRole('textbox', { name: 'Message' }).fill('hold-turn');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+    await expect.poll(() => runningAgents(window)).toBe(1);
+    const state = (await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'getState',
+        [],
+      ),
+    )) as AppState;
+    const [workspace] = state.workspaces;
+    await expect
+      .poll(() => existsSync(path.join(workspace.path, '.context/claude-args')))
+      .toBe(true);
+
+    const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
+    await sidebar.getByRole('button', { name: /^Board/ }).click();
+    const working = window.getByRole('region', { name: 'Working' });
+    const done = window.getByRole('region', { name: 'Done' });
+    await expect(
+      working.getByRole('button', { name: /^Workspace / }),
+    ).toHaveCount(1);
+    await snap(window, '12-board-working');
+
+    await window.evaluate(
+      (sessionId) =>
+        (globalThis as unknown as { korev: KorevBridge }).korev.call('send', [
+          sessionId,
+          { text: 'finish' },
+        ]),
+      workspace.sessions[0].id,
+    );
+    await expect(done.getByText('I added agent-note.txt.')).toBeVisible();
+    await waitForAgentsToFinish(window);
+    await expect(working.getByRole('button')).toHaveCount(0);
+    await snap(window, '13-board-done');
+
+    await done.getByRole('button', { name: /^Workspace / }).click();
+    await expect(
+      window.getByRole('main').getByText('I added agent-note.txt.'),
+    ).toBeVisible();
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });

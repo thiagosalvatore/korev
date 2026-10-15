@@ -1,0 +1,27 @@
+---
+title: Agent board
+description: 'See every workspace in four columns, sorted by what each agent is doing.'
+---
+
+The agent board shows all your workspaces on one page, from every repository. Each workspace is a card in one of four columns. Use it to see which agents need you and which ones have finished.
+
+## Open the board
+
+Click **Board** in the sidebar, or press ⌘⇧B. You can also choose **Agent board** in the command palette. Press ⌘⇧B again to go back to the workspace you had open.
+
+## The columns
+
+| Column    | The workspace is in this column when                                        |
+| --------- | --------------------------------------------------------------------------- |
+| Needs you | The agent waits for your answer, or the agent or the worktree setup failed. |
+| Working   | The agent is in a turn, or Korev creates, sets up or archives the worktree. |
+| Done      | The agent finished a turn and you have not opened the workspace since.      |
+| Idle      | The agent is not working and you have read its last turn.                   |
+
+The board uses the same rules as the icons in the sidebar, so a spinner in the sidebar means the card is in **Working**.
+
+## A card
+
+Each card shows the repository, the workspace name, the branch and the last line that the agent wrote in the chat. If the workspace has a pull request, the card also shows its next step, such as **Checks running** or **Merge**.
+
+Click a card to open its workspace. When you open a workspace from **Done**, it moves to **Idle**.
