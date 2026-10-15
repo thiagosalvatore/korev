@@ -34,6 +34,7 @@ import type {
   TerminalOutput,
   TerminalSize,
   Workspace,
+  WorkspaceFolder,
 } from './model';
 
 export interface KorevApi {
@@ -62,6 +63,10 @@ export interface KorevApi {
     target: { folderId: string | null; beforeId: string | null },
   ): Promise<void>;
   moveFolder(folderId: string, beforeId: string | null): Promise<void>;
+  createWorkspaceFolder(repoId: string, name: string): Promise<WorkspaceFolder>;
+  renameWorkspaceFolder(folderId: string, name: string): Promise<void>;
+  deleteWorkspaceFolder(folderId: string): Promise<void>;
+  moveWorkspace(workspaceId: string, folderId: string | null): Promise<void>;
   createWorkspaces(
     repoIds: string[],
     task: SendOptions | null,

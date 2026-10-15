@@ -22,6 +22,7 @@ const state = {
     { id: 'idle', name: 'idle-repo' },
   ],
   folders: [],
+  workspaceFolders: [],
   rootOrder: ['busy', 'idle'],
   workspaces: [
     {
@@ -192,6 +193,89 @@ describe('Sidebar group across repositories', () => {
       name: 'Workspace add-billing in idle-repo',
     });
     expect(waiting.textContent).toContain('Waits for the plan in busy-repo');
+  });
+});
+
+describe('Sidebar workspace folders', () => {
+  const lane = (id: string, createdAt: string) => ({
+    id,
+    repoId: 'busy',
+    groupId: null,
+    folderId: 'wave',
+    name: id,
+    branch: `dev/${id}`,
+    createdAt,
+    archivedAt: null,
+    awaitsLane: false,
+    sessions: [],
+    prs: [],
+  });
+  const foldered = {
+    ...state,
+    workspaceFolders: [{ id: 'wave', repoId: 'busy', name: 'Wave 1' }],
+    workspaces: [
+      ...state.workspaces,
+      lane('settings-api', '2026-01-02T00:00:00Z'),
+      lane('settings-ui', '2026-01-03T00:00:00Z'),
+    ],
+  } as unknown as AppState;
+  const folder = () => screen.getByRole('group', { name: 'Folder Wave 1' });
+  const rowsInFolder = () =>
+    within(folder())
+      .queryAllByRole('button', { name: /^Workspace settings/ })
+      .map((row) => row.getAttribute('aria-label'));
+
+  it('lists the workspaces of a folder under its name', () => {
+    render(<Sidebar state={foldered} />);
+
+    expect(rowsInFolder()).toEqual([
+      'Workspace settings-api',
+      'Workspace settings-ui',
+    ]);
+    expect(
+      within(folder()).queryByRole('button', { name: 'Workspace login-page' }),
+    ).toBeNull();
+  });
+
+  it('hides the workspaces of a collapsed folder', () => {
+    render(<Sidebar state={foldered} />);
+
+    fireEvent.click(within(folder()).getByRole('button', { expanded: true }));
+
+    expect(rowsInFolder()).toEqual([]);
+  });
+
+  it('moves a workspace into a folder from its menu', () => {
+    render(<Sidebar state={foldered} />);
+    const row = screen.getByRole('button', { name: 'Workspace login-page' });
+
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Workspace actions' }),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Wave 1' }));
+
+    expect(window.korev.call).toHaveBeenCalledWith('moveWorkspace', [
+      'w1',
+      'wave',
+    ]);
+  });
+
+  it('renames a folder', () => {
+    render(<Sidebar state={foldered} />);
+
+    fireEvent.click(
+      within(folder()).getByRole('button', { name: 'Wave 1 actions' }),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    fireEvent.change(screen.getByLabelText('Name'), {
+      target: { value: 'Wave 2' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+
+    expect(window.korev.call).toHaveBeenCalledWith('renameWorkspaceFolder', [
+      'wave',
+      'Wave 2',
+    ]);
   });
 });
 

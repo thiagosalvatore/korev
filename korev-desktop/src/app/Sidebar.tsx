@@ -19,12 +19,15 @@ import {
   type Repo,
   type RepoFolder,
   type Workspace,
+  type WorkspaceFolder,
   type WorkspaceRuntime,
 } from '../shared/model';
 import {
   activeWorkspaces,
   asksNewestFirst,
+  crossRepoLead,
   crossRepoLeads,
+  folderRuns,
   repoSections,
   sidebarEntries,
   sidebarRepoId,
@@ -226,6 +229,12 @@ function WorkspaceRow({
   const title = member ? member.repo : workspace.branch;
   const label = workspaceLabel(workspace);
   const [renaming, setRenaming] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const folderHolder = crossRepoLead(state, workspace) ?? workspace;
+  async function createFolderWithWorkspace(name: string) {
+    const folder = await api.createWorkspaceFolder(folderHolder.repoId, name);
+    await api.moveWorkspace(folderHolder.id, folder.id);
+  }
   return (
     <>
       <div
@@ -337,6 +346,14 @@ function WorkspaceRow({
                 hint: '⌘⇧A',
                 onSelect: () => void archiveWorkspace(state, workspace),
               },
+              ...moveToFolderItems(
+                state.workspaceFolders.filter(
+                  (folder) => folder.repoId === folderHolder.repoId,
+                ),
+                folderHolder.folderId ?? null,
+                (target) => void api.moveWorkspace(folderHolder.id, target),
+                () => setNaming(true),
+              ),
             ]}
             trigger={({ toggle }) => (
               <IconButton
@@ -360,6 +377,14 @@ function WorkspaceRow({
           submitLabel="Rename"
           onSubmit={(name) => api.renameWorkspace(workspace.id, name)}
           onClose={() => setRenaming(false)}
+        />
+      ) : null}
+      {naming ? (
+        <NameDialog
+          title="New folder"
+          submitLabel="Create"
+          onSubmit={createFolderWithWorkspace}
+          onClose={() => setNaming(false)}
         />
       ) : null}
     </>
@@ -474,19 +499,17 @@ function NameDialog({
 }
 
 function moveToFolderItems(
-  state: AppState,
-  repo: Repo,
-  folderId: string | null,
+  folders: { id: string; name: string }[],
+  current: string | null,
+  moveTo: (folderId: string | null) => void,
   onNewFolder: () => void,
 ): MenuItem[] {
-  const moveTo = (target: string | null) =>
-    void api.moveRepo(repo.id, { folderId: target, beforeId: null });
   return [
-    ...state.folders.map((folder) => ({
+    ...folders.map((folder) => ({
       id: folder.id,
       label: folder.name,
       icon: 'folder' as const,
-      checked: folder.id === folderId,
+      checked: folder.id === current,
       section: MOVE_TO_FOLDER,
       onSelect: () => moveTo(folder.id),
     })),
@@ -494,7 +517,7 @@ function moveToFolderItems(
       id: 'no-folder',
       label: 'No folder',
       icon: 'folder-minus',
-      checked: folderId === null,
+      checked: current === null,
       section: MOVE_TO_FOLDER,
       onSelect: () => moveTo(null),
     },
@@ -506,6 +529,101 @@ function moveToFolderItems(
       onSelect: onNewFolder,
     },
   ];
+}
+
+function WorkspaceFolderSection({
+  state,
+  folder,
+  children,
+}: {
+  state: AppState;
+  folder: WorkspaceFolder;
+  children: ReactNode;
+}) {
+  const [collapsed, toggle] = useCollapsed('collapsedFolders', folder.id);
+  const [renaming, setRenaming] = useState(false);
+  const drop = useDropTarget({
+    [WORKSPACE_DRAG_TYPE]: (draggedId) => {
+      const dragged = state.workspaces.find((ws) => ws.id === draggedId);
+      const holder = dragged && (crossRepoLead(state, dragged) ?? dragged);
+      if (holder?.repoId === folder.repoId)
+        void api.moveWorkspace(holder.id, folder.id);
+    },
+  });
+  return (
+    <div
+      role="group"
+      aria-label={`Folder ${folder.name}`}
+      className="flex flex-col gap-0.5"
+    >
+      <div
+        {...drop.props}
+        className={cn(
+          'group flex h-7 items-center gap-1 rounded-md px-2 hover:bg-hover',
+          drop.over && DROP_INDICATOR,
+        )}
+      >
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-xs text-fg-3"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+        >
+          <Icon name="folder" size={13} />
+          <span className="truncate">{folder.name}</span>
+          <Icon
+            name="chevron-down"
+            size={12}
+            className={cn(
+              'text-fg-4 transition-transform',
+              collapsed && '-rotate-90',
+            )}
+          />
+        </button>
+        <span className="hidden group-hover:flex has-[[role=menu]]:flex">
+          <Menu
+            label={`${folder.name} actions`}
+            align="right"
+            items={[
+              {
+                id: 'rename',
+                label: 'Rename',
+                icon: 'pencil',
+                onSelect: () => setRenaming(true),
+              },
+              {
+                id: 'delete',
+                label: 'Delete folder',
+                icon: 'trash-2',
+                danger: true,
+                onSelect: () => void api.deleteWorkspaceFolder(folder.id),
+              },
+            ]}
+            trigger={({ toggle: toggleMenu }) => (
+              <IconButton
+                icon="ellipsis"
+                label={`${folder.name} actions`}
+                size="sm"
+                onClick={toggleMenu}
+              />
+            )}
+          />
+        </span>
+      </div>
+      {renaming ? (
+        <NameDialog
+          title="Rename folder"
+          initialName={folder.name}
+          submitLabel="Rename"
+          onSubmit={(name) => api.renameWorkspaceFolder(folder.id, name)}
+          onClose={() => setRenaming(false)}
+        />
+      ) : null}
+      {collapsed ? null : (
+        <div className="flex flex-col gap-0.5 pl-3">{children}</div>
+      )}
+    </div>
+  );
 }
 
 function LinkedGroup({
@@ -586,6 +704,28 @@ function RepoGroup({
     const folder = await api.createFolder(name);
     await api.moveRepo(repo.id, { folderId: folder.id, beforeId: null });
   }
+  const entriesOf = (members: Workspace[]) =>
+    sidebarEntries(members, leads).map(([first, ...rest]) => {
+      const lead = first.groupId ? leads.get(first.groupId) : undefined;
+      return lead ? (
+        <LinkedGroup
+          key={first.id}
+          state={state}
+          lead={lead}
+          members={[first, ...rest]}
+          selectedId={selectedId}
+          indexOf={indexOf}
+        />
+      ) : (
+        <WorkspaceRow
+          key={first.id}
+          state={state}
+          workspace={first}
+          selected={first.id === selectedId}
+          index={indexOf(first)}
+        />
+      );
+    });
   return (
     <section aria-label={repo.name} className="mb-2">
       <div
@@ -637,8 +777,15 @@ function RepoGroup({
           <Menu
             label={`${repo.name} actions`}
             align="right"
-            items={moveToFolderItems(state, repo, folderId, () =>
-              setNaming(true),
+            items={moveToFolderItems(
+              state.folders,
+              folderId,
+              (target) =>
+                void api.moveRepo(repo.id, {
+                  folderId: target,
+                  beforeId: null,
+                }),
+              () => setNaming(true),
             )}
             trigger={({ toggle: toggleMenu }) => (
               <IconButton
@@ -661,25 +808,21 @@ function RepoGroup({
       ) : null}
       {collapsed ? null : (
         <div className="mt-0.5 flex flex-col gap-0.5">
-          {sidebarEntries(workspaces, leads).map(([first, ...rest]) => {
-            const lead = first.groupId ? leads.get(first.groupId) : undefined;
-            return lead ? (
-              <LinkedGroup
-                key={first.id}
+          {folderRuns(workspaces, leads).map((run) => {
+            const folder = state.workspaceFolders.find(
+              (entry) => entry.id === run.folderId,
+            );
+            const entries = entriesOf(run.workspaces);
+            return folder ? (
+              <WorkspaceFolderSection
+                key={folder.id}
                 state={state}
-                lead={lead}
-                members={[first, ...rest]}
-                selectedId={selectedId}
-                indexOf={indexOf}
-              />
+                folder={folder}
+              >
+                {entries}
+              </WorkspaceFolderSection>
             ) : (
-              <WorkspaceRow
-                key={first.id}
-                state={state}
-                workspace={first}
-                selected={first.id === selectedId}
-                index={indexOf(first)}
-              />
+              <Fragment key={run.workspaces[0].id}>{entries}</Fragment>
             );
           })}
           {workspaces.length === 0 ? (

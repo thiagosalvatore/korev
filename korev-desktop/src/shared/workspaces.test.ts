@@ -8,6 +8,7 @@ import {
 import {
   activeWorkspaces,
   crossRepoLead,
+  folderRuns,
   laneRepos,
   repoSections,
   waitsForLane,
@@ -104,6 +105,38 @@ describe('activeWorkspaces', () => {
       'other',
     ]);
   });
+
+  it('keeps the workspaces of one folder together, where its first one was made', () => {
+    const inWave = (ws: Workspace) => ({ ...ws, folderId: 'wave' });
+    const foldered = {
+      ...state,
+      workspaces: [
+        workspace('first', 'scratch', '2026-01-01'),
+        inWave(workspace('wave-2', 'scratch', '2026-01-04')),
+        workspace('between', 'scratch', '2026-01-03'),
+        inWave(workspace('wave-1', 'scratch', '2026-01-02')),
+      ],
+    } as AppState;
+
+    const sorted = activeWorkspaces(foldered);
+
+    expect(sorted.map((ws) => ws.id)).toEqual([
+      'first',
+      'wave-1',
+      'wave-2',
+      'between',
+    ]);
+    expect(
+      folderRuns(sorted, new Map()).map((run) => [
+        run.folderId,
+        run.workspaces.map((ws) => ws.id),
+      ]),
+    ).toEqual([
+      [null, ['first']],
+      ['wave', ['wave-1', 'wave-2']],
+      [null, ['between']],
+    ]);
+  });
 });
 
 describe('laneRepos', () => {
@@ -180,6 +213,26 @@ describe('a group across repositories', () => {
       'api-1',
       'api-member',
       'scratch-member',
+    ]);
+  });
+
+  it('puts all its members in the folder of the lead', () => {
+    const foldered = {
+      ...group,
+      workspaces: group.workspaces.map((ws) =>
+        ws === lead ? { ...ws, folderId: 'wave' } : ws,
+      ),
+    } as AppState;
+    const leads = new Map([['billing', foldered.workspaces[0]]]);
+
+    expect(
+      folderRuns(activeWorkspaces(foldered), leads).map((run) => [
+        run.folderId,
+        run.workspaces.map((ws) => ws.id),
+      ]),
+    ).toEqual([
+      [null, ['api-1']],
+      ['wave', ['web-lead', 'api-member', 'scratch-member']],
     ]);
   });
 

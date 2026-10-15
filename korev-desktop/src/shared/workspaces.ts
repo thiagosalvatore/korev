@@ -115,16 +115,24 @@ export function activeWorkspaces(state: AppState): Workspace[] {
       .map((repo, index) => [repo.id, index]),
   );
   const active = state.workspaces.filter((ws) => !ws.archivedAt);
-  const groupStart = groupStartTimes(active);
   const leads = crossRepoLeads(state);
-  const startOf = (ws: Workspace) =>
+  const folderOf = (ws: Workspace) => sidebarFolderId(leads, ws);
+  const groupStart = startTimes(active, (ws) => ws.groupId);
+  const folderStart = startTimes(active, folderOf);
+  const groupStartOf = (ws: Workspace) =>
     (ws.groupId && groupStart.get(ws.groupId)) || ws.createdAt;
+  const startOf = (ws: Workspace) => {
+    const folderId = folderOf(ws);
+    return (folderId && folderStart.get(folderId)) || groupStartOf(ws);
+  };
   const orderOf = (ws: Workspace) =>
     repoOrder.get(sidebarRepoId(leads, ws)) ?? 0;
   return active.sort(
     (a, b) =>
       orderOf(a) - orderOf(b) ||
       startOf(a).localeCompare(startOf(b)) ||
+      (folderOf(a) ?? '').localeCompare(folderOf(b) ?? '') ||
+      groupStartOf(a).localeCompare(groupStartOf(b)) ||
       (a.groupId ?? a.id).localeCompare(b.groupId ?? b.id) ||
       a.createdAt.localeCompare(b.createdAt),
   );
@@ -159,6 +167,33 @@ export function sidebarRepoId(
   return lead?.repoId ?? workspace.repoId;
 }
 
+export function sidebarFolderId(
+  leads: Map<string, Workspace>,
+  workspace: Workspace,
+): string | null {
+  const lead = workspace.groupId ? leads.get(workspace.groupId) : undefined;
+  return (lead ?? workspace).folderId ?? null;
+}
+
+export interface FolderRun {
+  folderId: string | null;
+  workspaces: Workspace[];
+}
+
+export function folderRuns(
+  workspaces: Workspace[],
+  leads: Map<string, Workspace>,
+): FolderRun[] {
+  const runs: FolderRun[] = [];
+  for (const workspace of workspaces) {
+    const folderId = sidebarFolderId(leads, workspace);
+    const last = runs.at(-1);
+    if (last?.folderId === folderId) last.workspaces.push(workspace);
+    else runs.push({ folderId, workspaces: [workspace] });
+  }
+  return runs;
+}
+
 export function crossRepoLead(
   state: AppState,
   workspace: Workspace,
@@ -180,12 +215,16 @@ export function waitsForLane(state: AppState, workspace: Workspace): boolean {
   return workspace.awaitsLane && lead !== null && lead.id !== workspace.id;
 }
 
-function groupStartTimes(workspaces: Workspace[]): Map<string, string> {
+function startTimes(
+  workspaces: Workspace[],
+  keyOf: (workspace: Workspace) => string | null,
+): Map<string, string> {
   const starts = new Map<string, string>();
   for (const ws of workspaces) {
-    if (!ws.groupId) continue;
-    const start = starts.get(ws.groupId);
-    if (!start || ws.createdAt < start) starts.set(ws.groupId, ws.createdAt);
+    const key = keyOf(ws);
+    if (!key) continue;
+    const start = starts.get(key);
+    if (!start || ws.createdAt < start) starts.set(key, ws.createdAt);
   }
   return starts;
 }

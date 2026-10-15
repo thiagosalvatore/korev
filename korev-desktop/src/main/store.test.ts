@@ -43,6 +43,16 @@ describe('openStore', () => {
     expect(store.state.workspaces[0].awaitsLane).toBe(false);
   });
 
+  it('has no workspace folders in a state saved before they existed', async () => {
+    const store = await openStore(
+      fileSystemWith({ workspaces: [{ sessions: [] }] }),
+      '/user-data',
+      '/home',
+    );
+    expect(store.state.workspaceFolders).toEqual([]);
+    expect(store.state.workspaces[0].folderId).toBeNull();
+  });
+
   it('has not seen any version yet on a fresh install', async () => {
     const store = await openStore(fileSystemWith({}), '/user-data', '/home');
     expect(store.state.settings.lastSeenVersion).toBeNull();
