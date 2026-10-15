@@ -528,13 +528,16 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   }
 
   let checkingPrs = false;
+  let shuttingDown = false;
 
   async function refreshAllPrs() {
     if (checkingPrs) return;
     checkingPrs = true;
     try {
-      for (const workspace of activeWorkspaces(ctx))
+      for (const workspace of activeWorkspaces(ctx)) {
+        if (shuttingDown) return;
         await refreshPrs(workspace.id).catch(() => null);
+      }
     } finally {
       checkingPrs = false;
     }
@@ -1472,8 +1475,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   void refreshAgents();
   for (const workspace of activeWorkspaces(ctx))
     ctx.background(refreshStats(ctx, workspace));
-  void refreshAllPrs();
-  const prWatch = setInterval(() => void refreshAllPrs(), PR_POLL_MS);
+  ctx.background(refreshAllPrs());
+  const prWatch = setInterval(
+    () => ctx.background(refreshAllPrs()),
+    PR_POLL_MS,
+  );
 
   return {
     api,
@@ -1483,6 +1489,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     showWhatsNew,
     emitState: () => ctx.emitState(),
     async shutdown() {
+      shuttingDown = true;
       clearInterval(prWatch);
       await spotlight.disableAll();
       await ctx.settled();

@@ -73,6 +73,8 @@ let prsByUrl: Record<string, Record<string, unknown>> = {};
 let stacksByUrl: Record<string, Record<string, unknown>> = {};
 let ghMerges: string[][] = [];
 let gitAddGate: Promise<void> | null = null;
+let prViewGate: Promise<void> | null = null;
+let prViewsWaiting = 0;
 
 const BRANCH_PR_URL = 'https://github.com/acme/web/pull/7';
 const NO_PR = { exitCode: 1, stdout: '', stderr: 'no pull requests found' };
@@ -102,8 +104,13 @@ function isGhMerge(args: readonly string[]) {
 const runWithFakeSqlite: CommandRunner = async (file, args, options) => {
   if (file === 'sqlite3')
     return { exitCode: 0, stdout: JSON.stringify(conductorRepos), stderr: '' };
-  if (file === 'gh' && args[0] === 'pr' && args[1] === 'view')
+  if (file === 'gh' && args[0] === 'pr' && args[1] === 'view') {
+    if (prViewGate) {
+      prViewsWaiting++;
+      await prViewGate;
+    }
     return fakePrView(args[2]);
+  }
   if (file === 'gh' && args[0] === 'api' && args[1] === 'graphql')
     return fakePrStack(args);
   if (file === 'gh' && isGhMerge(args)) {
@@ -232,6 +239,8 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     stacksByUrl = {};
     ghMerges = [];
     gitAddGate = null;
+    prViewGate = null;
+    prViewsWaiting = 0;
     await korev.shutdown();
     vi.useRealTimers();
     await rm(home, { recursive: true, force: true });
@@ -396,6 +405,27 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       async () =>
         (await workspaceState(workspace.id)).runtime.prs[0]?.number === 7,
     );
+  });
+
+  it('waits for a running PR check before it shuts down', async () => {
+    await korev.shutdown();
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    korev = await openKorev();
+    await createWorkspace();
+    let releasePrView!: () => void;
+    prViewGate = new Promise((resolve) => (releasePrView = resolve));
+
+    vi.advanceTimersByTime(PR_POLL_MS);
+    await waitFor(async () => prViewsWaiting > 0);
+    const shutdown = korev.shutdown().then(() => 'shut down');
+    const stillWaiting = new Promise((resolve) =>
+      setTimeout(() => resolve('waiting'), 100),
+    );
+
+    expect(await Promise.race([shutdown, stillWaiting])).toBe('waiting');
+    releasePrView();
+    await shutdown;
+    korev = await openKorev();
   });
 
   it('keeps a restored workspace whose PR merged before the restore', async () => {
