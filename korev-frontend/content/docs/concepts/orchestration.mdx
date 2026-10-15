@@ -43,12 +43,12 @@ Turn off **Settings → Agents → Let agents coordinate other agents**. Agents 
 
 Agents learn the commands from `korev help`. The main ones:
 
-| Command | Who runs it | What it does |
-| --- | --- | --- |
-| `korev run create --objective "..."` | coordinator | Starts a run. |
-| `korev task create --title ... --spec ... [--deps t1]` | coordinator | Adds a task. |
-| `korev worker start --task t1 [--agent codex]` | coordinator | Starts a worker in a new linked workspace. |
-| `korev done --outcome succeeded --summary "..."` | worker | Reports the result. |
-| `korev ask --question "..."` | worker | Asks the coordinator. |
-| `korev send --to @coordinator --body "..."` | anyone | Sends a message. |
-| `korev gate create --task t1 --question "..." --options a,b` | anyone in the run | Asks you to decide. |
+| Command                                                      | Who runs it       | What it does                               |
+| ------------------------------------------------------------ | ----------------- | ------------------------------------------ |
+| `korev run create --objective "..."`                         | coordinator       | Starts a run.                              |
+| `korev task create --title ... --spec ... [--deps t1]`       | coordinator       | Adds a task.                               |
+| `korev worker start --task t1 [--agent codex]`               | coordinator       | Starts a worker in a new linked workspace. |
+| `korev done --outcome succeeded --summary "..."`             | worker            | Reports the result.                        |
+| `korev ask --question "..."`                                 | worker            | Asks the coordinator.                      |
+| `korev send --to @coordinator --body "..."`                  | anyone            | Sends a message.                           |
+| `korev gate create --task t1 --question "..." --options a,b` | anyone in the run | Asks you to decide.                        |
