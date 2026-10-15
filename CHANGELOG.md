@@ -4,6 +4,16 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-10-15
+
+Files in the file viewer show the right colors for their language.
+
+### Fixed
+
+- The file viewer highlights code in every common language, such as SQL, Rust and YAML. Before, it used TypeScript colors for most files, and comments and strings over several lines lost their color.
+- Cmd+A in the file viewer selects only the file. Before, it selected the whole window.
+- Branch names in inline code, such as `origin/main`, are no longer links. Before, a click tried to open a file with that name.
+
 ## [0.13.0] - 2026-10-14
 
 See the files that agents save in a new Artifacts tab, and see markdown as you type it.
