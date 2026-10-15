@@ -14,7 +14,9 @@ export type DiffLayout = 'unified' | 'split';
 
 export type PaletteMode = false | 'all' | 'files';
 
-export type GitPanelTab = 'files' | 'changes' | 'checks' | 'comments';
+export const GIT_PANEL_TABS = ['files', 'changes', 'pr', 'artifacts'] as const;
+
+export type GitPanelTab = (typeof GIT_PANEL_TABS)[number];
 
 export type QuitPrompt = 'closed' | 'asking' | 'waiting';
 
@@ -127,6 +129,10 @@ export const EMPTY_WORKSPACE_UI: WorkspaceUi = {
   comments: [],
 };
 
+function knownGitTab(tab: string | undefined): GitPanelTab {
+  return GIT_PANEL_TABS.find((known) => known === tab) ?? INITIAL.gitTab;
+}
+
 function load(): UiState {
   try {
     const saved = JSON.parse(
@@ -135,6 +141,7 @@ function load(): UiState {
     return {
       ...INITIAL,
       ...saved,
+      gitTab: knownGitTab(saved?.gitTab),
       palette: false,
       updateOpen: false,
       quit: 'closed',

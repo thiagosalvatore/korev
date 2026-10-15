@@ -6,8 +6,29 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ### New
 
-- **Plans saved as files.** Korev saves each plan in the workspace's `.context/plans` folder, under a name taken from the plan's title.
 - **Rename a workspace.** Choose **Rename** in the **…** menu of a workspace in the sidebar and type any name. The name shows under the branch in the sidebar, in the workspace header and in the phone app. The branch and the worktree folder stay the same.
+
+## [0.13.1] - 2026-10-15
+
+Files in the file viewer show the right colors for their language.
+
+### Fixed
+
+- The file viewer highlights code in every common language, such as SQL, Rust and YAML. Before, it used TypeScript colors for most files, and comments and strings over several lines lost their color.
+- Cmd+A in the file viewer selects only the file. Before, it selected the whole window.
+- Branch names in inline code, such as `origin/main`, are no longer links. Before, a click tried to open a file with that name.
+
+## [0.13.0] - 2026-10-14
+
+See the files that agents save in a new Artifacts tab, and see markdown as you type it.
+
+### New
+
+- **Plans saved as files.** Korev saves each plan in the workspace's `.context/plans` folder, under a name taken from the plan's title.
+- **Artifacts.** The new Artifacts tab in the right panel lists the plans, notes and images that agents save in the workspace's `.context` folder. Click one to open it, or right-click it to reveal it in Finder or open it in its default app. Drag one into the message box, or type `@` and its name, to point the agent at it.
+- **One pull request tab.** The right panel's Checks and Comments tabs are now one tab, named after the pull request's number. It shows the checks first and the review comments under them.
+- **Markdown in your messages.** Your own messages in the chat show their formatting, like the agent's answers do. The Copy button on an agent's answer is now under its text.
+- **Markdown in the message box.** The message box shows bold, code, headings and links in color as you type. The markdown stays visible and you can edit it.
 
 ## [0.12.0] - 2026-10-13
 

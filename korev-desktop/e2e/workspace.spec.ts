@@ -16,6 +16,8 @@ import type { AppState } from '../src/shared/model';
 const APP_ENTRY = '.vite/build/main.cjs';
 const FAKE_AGENT_BIN = path.resolve('test-support/bin');
 const SCREENSHOT_DIR = process.env.KOREV_SCREENSHOT_DIR;
+const ONE_PIXEL_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
 test.setTimeout(120_000);
 
@@ -457,6 +459,83 @@ test('opens a file the agent mentions from outside the workspace', async () => {
     await expect(window.getByRole('button', { name: 'Edit' })).toHaveCount(0);
     await snap(window, '09-mentioned-file');
     await waitForAgentsToFinish(window);
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('browses the artifacts in .context and drags one into the message', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const { app, window } = await launch(home, repo);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window.getByRole('textbox', { name: 'Message' }).fill('Add a note');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+    await expect(window.getByText('I added agent-note.txt.')).toBeVisible();
+    await waitForAgentsToFinish(window);
+
+    const state = (await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'getState',
+        [],
+      ),
+    )) as AppState;
+    const plans = path.join(state.workspaces[0].path, '.context', 'plans');
+    await mkdir(plans, { recursive: true });
+    await writeFile(
+      path.join(plans, 'login-page.md'),
+      '# Login page\n\nAdd it.\n',
+    );
+
+    const panel = window.getByRole('complementary', {
+      name: 'Workspace panel',
+    });
+    await panel.getByRole('tab', { name: 'Artifacts' }).click();
+    await panel.getByRole('button', { name: 'plans' }).click();
+    const artifact = panel.getByRole('button', { name: 'login-page.md' });
+    const message = window.getByRole('textbox', { name: 'Message' });
+    await artifact.hover();
+    await window.mouse.down();
+    await message.hover();
+    await message.hover({ position: { x: 20, y: 20 } });
+    await window.mouse.up();
+    await expect(message).toHaveValue('@.context/plans/login-page.md');
+    await snap(window, '10-artifacts');
+
+    await artifact.click();
+    await expect(
+      window.getByRole('main').getByRole('heading', { name: 'Login page' }),
+    ).toBeVisible();
+
+    await app.evaluate(({ Menu, shell }) => {
+      const revealed: string[] = [];
+      Object.assign(globalThis, { revealed });
+      shell.showItemInFolder = (file) => void revealed.push(file);
+      Menu.prototype.popup = function clickFirstItem(this: Electron.Menu) {
+        this.items[0].click();
+      };
+    });
+    await artifact.click({ button: 'right' });
+    await expect
+      .poll(() =>
+        app.evaluate(
+          () => (globalThis as unknown as { revealed: string[] }).revealed,
+        ),
+      )
+      .toEqual([path.join(plans, 'login-page.md')]);
+
+    await writeFile(
+      path.join(plans, '..', 'shot.png'),
+      Buffer.from(ONE_PIXEL_PNG_BASE64, 'base64'),
+    );
+    await panel.getByRole('button', { name: 'shot.png' }).click();
+    await expect(
+      window.getByRole('main').getByRole('img', { name: 'shot.png' }),
+    ).toBeVisible();
+    await expect(panel.getByRole('tab', { name: /Changes\s*1/ })).toBeVisible();
+    await snap(window, '11-image-artifact');
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });

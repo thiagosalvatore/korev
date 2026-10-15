@@ -1,12 +1,26 @@
-import { useEffect, useRef, useState } from 'react';
-import { Button, cn, highlightCode, Icon, Spinner } from '../design-system';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
+import type { ThemedToken } from 'shiki/core';
+import { Button, cn, Icon, Spinner } from '../design-system';
+import { fileName, imageType } from '../shared/format';
 import type { Workspace } from '../shared/model';
 import { api } from './bridge';
 import { Markdown } from './chat/Markdown';
-import { languageOf } from './diff/language';
+import { highlightFile } from './highlightFile';
 import { reportFailure, toast } from './ui/toast';
 
 const MARKDOWN_FILE = /\.(md|markdown)$/i;
+const SAVE_KEY = 's';
+const SELECT_ALL_KEY = 'a';
+
+function isShortcut(event: KeyboardEvent, key: string): boolean {
+  return (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === key;
+}
 
 function isOutsideWorkspace(file: string): boolean {
   return file.startsWith('~') || file.startsWith('/');
@@ -22,11 +36,22 @@ function SourceLines({
   line: number | null;
 }) {
   const highlighted = useRef<HTMLTableRowElement>(null);
-  const lang = languageOf(file);
+  const [tokens, setTokens] = useState<ThemedToken[][] | null>(null);
 
   useEffect(() => {
     highlighted.current?.scrollIntoView({ block: 'center' });
   }, [contents, line]);
+
+  useEffect(() => {
+    let current = true;
+    setTokens(null);
+    void highlightFile(contents, file).then((result) => {
+      if (current) setTokens(result);
+    });
+    return () => {
+      current = false;
+    };
+  }, [contents, file]);
 
   return (
     <div className="kv-diff">
@@ -44,7 +69,11 @@ function SourceLines({
             >
               <td className="kv-diff__num">{index + 1}</td>
               <td className="kv-diff__code pl-3">
-                {highlightCode(text, lang)}
+                {tokens?.[index]?.map((token, position) => (
+                  <span key={position} style={{ color: token.color }}>
+                    {token.content}
+                  </span>
+                )) ?? text}
               </td>
             </tr>
           ))}
@@ -79,10 +108,7 @@ function Editor({
       className="min-h-0 flex-1 resize-none border-0 bg-inset p-3 font-mono text-code text-fg-1 outline-none focus-visible:shadow-none"
       onChange={(event) => onChange(event.target.value)}
       onKeyDown={(event) => {
-        if (
-          (event.metaKey || event.ctrlKey) &&
-          event.key.toLowerCase() === 's'
-        ) {
+        if (isShortcut(event, SAVE_KEY)) {
           event.preventDefault();
           onSave();
         }
@@ -102,7 +128,91 @@ function Editor({
   );
 }
 
-export function FileView({
+function ReadOnlyContents({
+  file,
+  children,
+}: {
+  file: string;
+  children: ReactNode;
+}) {
+  const contents = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    contents.current?.focus({ preventScroll: true });
+  }, []);
+
+  return (
+    <div
+      ref={contents}
+      role="region"
+      aria-label={file}
+      tabIndex={0}
+      className="min-h-0 flex-1 overflow-auto outline-none"
+      onKeyDown={(event) => {
+        if (!isShortcut(event, SELECT_ALL_KEY)) return;
+        event.preventDefault();
+        window.getSelection()?.selectAllChildren(event.currentTarget);
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Unavailable() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 text-fg-3">
+      <Icon name="file-x" size={22} />
+      <p className="m-0 text-sm">This file can't be shown here.</p>
+    </div>
+  );
+}
+
+function FileHeader({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex h-9 flex-none items-center gap-2 border-b border-border-1 bg-surface px-3">
+      {children}
+    </div>
+  );
+}
+
+function ImageFile({ workspace, file }: FileViewProps) {
+  const [source, setSource] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    setSource(undefined);
+    void api.readWorkspaceImage(workspace.id, file).then(setSource);
+  }, [workspace.id, file]);
+
+  if (source === undefined) return <Spinner />;
+  if (source === null) return <Unavailable />;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <FileHeader>
+        <span className="min-w-0 flex-1 truncate font-mono text-xs text-fg-2">
+          {file}
+        </span>
+      </FileHeader>
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+        <img
+          src={source}
+          alt={fileName(file)}
+          className="max-h-full max-w-full"
+        />
+      </div>
+    </div>
+  );
+}
+
+export function FileView(props: FileViewProps) {
+  return imageType(props.file) ? (
+    <ImageFile {...props} />
+  ) : (
+    <TextFile {...props} />
+  );
+}
+
+function TextFile({
   workspace,
   file,
   line,
@@ -131,18 +241,11 @@ export function FileView({
   }
 
   if (contents === undefined) return <Spinner />;
-  if (contents === null) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 text-fg-3">
-        <Icon name="file-x" size={22} />
-        <p className="m-0 text-sm">This file can't be shown here.</p>
-      </div>
-    );
-  }
+  if (contents === null) return <Unavailable />;
   const dirty = draft !== contents;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-9 flex-none items-center gap-2 border-b border-border-1 bg-surface px-3">
+      <FileHeader>
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-fg-2">
           {file}
           {dirty ? <span className="ml-1 text-warning-text">●</span> : null}
@@ -179,17 +282,17 @@ export function FileView({
             Edit
           </Button>
         )}
-      </div>
+      </FileHeader>
       {editing ? (
         <Editor value={draft} onChange={setDraft} onSave={() => void save()} />
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto">
+        <ReadOnlyContents file={file}>
           {MARKDOWN_FILE.test(file) ? (
             <Markdown text={contents} className="p-4" />
           ) : (
             <SourceLines contents={contents} file={file} line={line} />
           )}
-        </div>
+        </ReadOnlyContents>
       )}
     </div>
   );

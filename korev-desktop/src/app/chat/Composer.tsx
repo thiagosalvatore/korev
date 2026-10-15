@@ -24,6 +24,8 @@ import {
   TAB_CONTEXT_HEADER,
 } from '../../shared/message';
 import { api } from '../bridge';
+import { FILE_DRAG_TYPE } from '../dnd';
+import { insertDictation } from '../../shared/dictation';
 import { fileName } from '../../shared/format';
 import { reportFailure } from '../ui/toast';
 import type { DiffComment } from '../ui-store';
@@ -311,7 +313,24 @@ export function Composer(props: ComposerProps) {
     void addFiles(event.clipboardData.files);
   }
 
+  function mentionFile(file: string) {
+    const current = input.current?.value ?? text;
+    const inserted = insertDictation(
+      current,
+      input.current?.selectionStart ?? current.length,
+      `@${file}`,
+    );
+    update(inserted.text);
+    placeCaret(input, inserted.caret);
+  }
+
   function onDrop(event: DragEvent<HTMLDivElement>) {
+    const draggedFile = event.dataTransfer.getData(FILE_DRAG_TYPE);
+    if (draggedFile) {
+      event.preventDefault();
+      mentionFile(draggedFile);
+      return;
+    }
     if (!event.dataTransfer.files.length) return;
     event.preventDefault();
     void addFiles(event.dataTransfer.files);

@@ -157,6 +157,9 @@ export interface KorevApi {
   listFiles(workspaceId: string): Promise<string[]>;
   readFile(workspaceId: string, path: string): Promise<string | null>;
   readImage(sessionId: string, path: string): Promise<string | null>;
+  listArtifacts(workspaceId: string): Promise<string[]>;
+  showFileMenu(workspaceId: string, path: string): Promise<void>;
+  readWorkspaceImage(workspaceId: string, path: string): Promise<string | null>;
   prStatuses(workspaceId: string): Promise<PrStatus[]>;
   mergePr(workspaceId: string, prNumber: number): Promise<Result>;
   openIn(workspaceId: string, editor: EditorId): Promise<Result>;
