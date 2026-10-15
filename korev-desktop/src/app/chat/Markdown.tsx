@@ -1,4 +1,4 @@
-import { Marked, type Token } from 'marked';
+import { Marked, Renderer, type Token, type Tokens } from 'marked';
 import { useMemo, type MouseEvent } from 'react';
 import { cn } from '../../design-system';
 import { imageType } from '../../shared/format';
@@ -66,7 +66,22 @@ const markdownOptions = {
   },
 };
 
-const markdown = new Marked(markdownOptions);
+const ICON_ATTRIBUTES =
+  'width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+const COPY_CODE_BUTTON = `<button type="button" class="kv-md-copy" title="Copy code" aria-label="Copy code"><svg class="kv-md-copy-icon" ${ICON_ATTRIBUTES}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="kv-md-copied-icon" ${ICON_ATTRIBUTES}><path d="M20 6 9 17l-5-5"/></svg></button>`;
+const COPIED_MS = 1500;
+
+const plainRenderer = new Renderer();
+const copyableCode = {
+  renderer: {
+    code: (token: Tokens.Code) =>
+      `<div class="kv-md-code">${plainRenderer.code(token)}${COPY_CODE_BUTTON}</div>`,
+  },
+};
+
+// The clipboard copy renders without the code block buttons.
+const plainMarkdown = new Marked(markdownOptions);
+const markdown = new Marked(markdownOptions, copyableCode);
 
 function linkPrRefs(escapedText: string, repoUrl: string | null): string {
   return splitPrRefs(escapedText, repoUrl)
@@ -89,7 +104,7 @@ function markInnerTokens(token: Token) {
 }
 
 function createLinkingMarkdown(repoUrl: string | null): Marked {
-  return new Marked(markdownOptions, {
+  return new Marked(markdownOptions, copyableCode, {
     walkTokens(token) {
       if (token.type === 'link') markInnerTokens(token);
     },
@@ -143,16 +158,34 @@ export function copyMarkdown(text: string): Promise<void> {
   return navigator.clipboard.write([
     new ClipboardItem({
       'text/plain': new Blob([text], { type: 'text/plain' }),
-      'text/html': new Blob([renderMarkdown(text)], { type: 'text/html' }),
+      'text/html': new Blob([plainMarkdown.parse(text, { async: false })], {
+        type: 'text/html',
+      }),
     }),
   ]);
 }
 
-function openLinks(
+function copyCode(button: HTMLElement) {
+  const code = button.closest('.kv-md-code')?.querySelector('code');
+  if (!code) return;
+  void navigator.clipboard.writeText(code.textContent ?? '').then(() => {
+    button.dataset.copied = '';
+    setTimeout(() => delete button.dataset.copied, COPIED_MS);
+  });
+}
+
+function handleClick(
   event: MouseEvent<HTMLDivElement>,
   onOpenFile?: OpenFile,
   onOpenImage?: OpenImage,
 ) {
+  const copyButton = (event.target as HTMLElement).closest<HTMLElement>(
+    '.kv-md-copy',
+  );
+  if (copyButton) {
+    copyCode(copyButton);
+    return;
+  }
   const anchor = (event.target as HTMLElement).closest('a');
   if (!anchor) return;
   event.preventDefault();
@@ -192,7 +225,7 @@ export function Markdown({
   return (
     <div
       className={cn('kv-md', className)}
-      onClick={(event) => openLinks(event, onOpenFile, onOpenImage)}
+      onClick={(event) => handleClick(event, onOpenFile, onOpenImage)}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

@@ -135,6 +135,7 @@ export function demoWorkspace(
     archivedAt: null,
     restoredAt: null,
     archiveSnapshot: null,
+    label: null,
     keepAfterMerge: false,
     awaitsLane: false,
     sessions: [session],
@@ -377,6 +378,7 @@ export function demoWorld(now: number): DemoWorld {
   const state: AppState = {
     repos: [WEB, API],
     folders: [],
+    workspaceFolders: [],
     rootOrder: [WEB.id, API.id],
     workspaces: [
       login,

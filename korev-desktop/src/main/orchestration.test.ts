@@ -21,6 +21,7 @@ function workspace(name: string, groupId: string | null): Workspace {
     repoId: 'repo',
     groupId,
     name,
+    label: null,
     branch: name,
     baseBranch: 'main',
     path: `/work/${name}`,

@@ -24,6 +24,7 @@ import {
   openNewWorkspace,
   openSettings,
   selectWorkspace,
+  toggleBoard,
   toggleGrid,
   toggleRunScript,
 } from './actions';
@@ -102,6 +103,8 @@ export function runCommand(state: AppState, command: AppCommand) {
     }
     case 'toggle-grid':
       return toggleGrid();
+    case 'toggle-board':
+      return toggleBoard();
     case 'toggle-theme':
       return void api.updateSettings({
         theme: THEME_CYCLE[state.settings.theme],

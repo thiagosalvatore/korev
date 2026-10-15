@@ -35,6 +35,7 @@ import {
   movedFolder,
   movedRepo,
   rootItems,
+  workspaceLabel,
   type MovedOrder,
 } from '../shared/workspaces';
 import { startAgentServer } from './agent-server';
@@ -425,12 +426,14 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   }
 
   function snapshot(): AppState {
-    const { repos, folders, workspaces, askChats, settings } = store.state;
+    const { repos, folders, workspaces, workspaceFolders, askChats, settings } =
+      store.state;
     return {
       repos,
       folders,
       rootOrder: rootItems(store.state).map((item) => item.id),
       workspaces,
+      workspaceFolders,
       askChats,
       runs: store.state.runs,
       settings,
@@ -550,7 +553,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     const archived = await archive(workspaceId);
     if (!archived.ok) return;
     deps.emit('toast', {
-      title: `${mergedNumbers(prs)} merged. Archived ${workspace.name}`,
+      title: `${mergedNumbers(prs)} merged. Archived ${workspaceLabel(workspace)}`,
       tone: 'success',
     });
   }
@@ -836,6 +839,14 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     return found;
   }
 
+  function workspaceFolder(folderId: string) {
+    const found = store.state.workspaceFolders.find(
+      (entry) => entry.id === folderId,
+    );
+    if (!found) throw new NotFoundError('Workspace folder', folderId);
+    return found;
+  }
+
   function applyMove(moved: MovedOrder) {
     store.state.repos = moved.repos;
     store.state.rootOrder = moved.rootOrder;
@@ -965,6 +976,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       }
       await removeRepoFromAskChats(ctx.repo(repoId));
       state.repos = state.repos.filter((repo) => repo.id !== repoId);
+      state.workspaceFolders = state.workspaceFolders.filter(
+        (folder) => folder.repoId !== repoId,
+      );
       store.save();
       ctx.emitState();
     },
@@ -1011,6 +1025,39 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     async moveFolder(folderId, beforeId) {
       folder(folderId);
       applyMove(movedFolder(store.state, folderId, beforeId));
+    },
+    async createWorkspaceFolder(repoId, name) {
+      ctx.repo(repoId);
+      const created = { id: deps.newId(), repoId, name: name.trim() };
+      store.state.workspaceFolders.push(created);
+      saveAndEmit();
+      return created;
+    },
+    async renameWorkspaceFolder(folderId, name) {
+      workspaceFolder(folderId).name = name.trim();
+      saveAndEmit();
+    },
+    async deleteWorkspaceFolder(folderId) {
+      const { state } = store;
+      state.workspaceFolders = state.workspaceFolders.filter(
+        (entry) => entry.id !== folderId,
+      );
+      for (const workspace of state.workspaces) {
+        if (workspace.folderId === folderId) workspace.folderId = null;
+      }
+      saveAndEmit();
+    },
+    async moveWorkspace(workspaceId, folderId) {
+      const workspace = ctx.workspace(workspaceId);
+      if (
+        folderId !== null &&
+        workspaceFolder(folderId).repoId !== workspace.repoId
+      )
+        throw new Error(
+          'A workspace can only go in a folder of its repository',
+        );
+      workspace.folderId = folderId;
+      saveAndEmit();
     },
     createWorkspaces: async (repoIds, task, source) =>
       createWorkspaces(ctx, repoIds, task, chats.send, null, source),
@@ -1077,6 +1124,17 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
     async setKeepAfterMerge(workspaceId, keep) {
       ctx.workspace(workspaceId).keepAfterMerge = keep;
+      saveAndEmit();
+    },
+    async renameWorkspace(workspaceId, label) {
+      const workspace = ctx.workspace(workspaceId);
+      // Linked workspaces show under one name, so they share the label.
+      const renamed = workspace.groupId
+        ? store.state.workspaces.filter(
+            (ws) => ws.groupId === workspace.groupId,
+          )
+        : [workspace];
+      for (const ws of renamed) ws.label = label.trim() || null;
       saveAndEmit();
     },
     async workspaceConfig(workspaceId) {

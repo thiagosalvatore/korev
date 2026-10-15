@@ -18,6 +18,7 @@ import {
 } from '../shared/model';
 import { errorMessage, terminalRef, type Context } from './context';
 import { planBlock } from '../shared/message';
+import { workspaceLabel } from '../shared/workspaces';
 import {
   addBranchWorktree,
   addDetachedWorktree,
@@ -676,8 +677,10 @@ function addDraftWorkspace(
     archivedAt: null,
     restoredAt: null,
     archiveSnapshot: null,
+    label: null,
     keepAfterMerge: false,
     awaitsLane: false,
+    folderId: null,
     sessions: [newChatSession(ctx, ctx.store.state.settings.defaultAgent)],
     prs: [],
   };
@@ -778,10 +781,28 @@ function addLaneWorkspace(
     nameFromTask(lane.name),
     workspaceNames(ctx, repo.id),
   );
-  return addDraftWorkspace(ctx, repo, name, origin.groupId, laneOptions, {
-    kind: 'new',
-    baseBranch,
-  });
+  const workspace = addDraftWorkspace(
+    ctx,
+    repo,
+    name,
+    origin.groupId,
+    laneOptions,
+    { kind: 'new', baseBranch },
+  );
+  if (repo.id === origin.repoId) workspace.folderId = laneFolderId(ctx, origin);
+  return workspace;
+}
+
+function laneFolderId(ctx: Context, origin: Workspace): string {
+  if (origin.folderId) return origin.folderId;
+  const folder = {
+    id: ctx.deps.newId(),
+    repoId: origin.repoId,
+    name: workspaceLabel(origin),
+  };
+  ctx.store.state.workspaceFolders.push(folder);
+  origin.folderId = folder.id;
+  return folder.id;
 }
 
 function leadsGroup(ctx: Context, workspace: Workspace): boolean {

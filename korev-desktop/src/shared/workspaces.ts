@@ -5,6 +5,7 @@ import type {
   RepoFolder,
   Workspace,
   WorkspaceRuntime,
+  WorkspaceStatus,
 } from './model';
 
 export interface RepoSection {
@@ -115,16 +116,24 @@ export function activeWorkspaces(state: AppState): Workspace[] {
       .map((repo, index) => [repo.id, index]),
   );
   const active = state.workspaces.filter((ws) => !ws.archivedAt);
-  const groupStart = groupStartTimes(active);
   const leads = crossRepoLeads(state);
-  const startOf = (ws: Workspace) =>
+  const folderOf = (ws: Workspace) => sidebarFolderId(leads, ws);
+  const groupStart = startTimes(active, (ws) => ws.groupId);
+  const folderStart = startTimes(active, folderOf);
+  const groupStartOf = (ws: Workspace) =>
     (ws.groupId && groupStart.get(ws.groupId)) || ws.createdAt;
+  const startOf = (ws: Workspace) => {
+    const folderId = folderOf(ws);
+    return (folderId && folderStart.get(folderId)) || groupStartOf(ws);
+  };
   const orderOf = (ws: Workspace) =>
     repoOrder.get(sidebarRepoId(leads, ws)) ?? 0;
   return active.sort(
     (a, b) =>
       orderOf(a) - orderOf(b) ||
       startOf(a).localeCompare(startOf(b)) ||
+      (folderOf(a) ?? '').localeCompare(folderOf(b) ?? '') ||
+      groupStartOf(a).localeCompare(groupStartOf(b)) ||
       (a.groupId ?? a.id).localeCompare(b.groupId ?? b.id) ||
       a.createdAt.localeCompare(b.createdAt),
   );
@@ -159,6 +168,33 @@ export function sidebarRepoId(
   return lead?.repoId ?? workspace.repoId;
 }
 
+export function sidebarFolderId(
+  leads: Map<string, Workspace>,
+  workspace: Workspace,
+): string | null {
+  const lead = workspace.groupId ? leads.get(workspace.groupId) : undefined;
+  return (lead ?? workspace).folderId ?? null;
+}
+
+export interface FolderRun {
+  folderId: string | null;
+  workspaces: Workspace[];
+}
+
+export function folderRuns(
+  workspaces: Workspace[],
+  leads: Map<string, Workspace>,
+): FolderRun[] {
+  const runs: FolderRun[] = [];
+  for (const workspace of workspaces) {
+    const folderId = sidebarFolderId(leads, workspace);
+    const last = runs.at(-1);
+    if (last?.folderId === folderId) last.workspaces.push(workspace);
+    else runs.push({ folderId, workspaces: [workspace] });
+  }
+  return runs;
+}
+
 export function crossRepoLead(
   state: AppState,
   workspace: Workspace,
@@ -180,14 +216,22 @@ export function waitsForLane(state: AppState, workspace: Workspace): boolean {
   return workspace.awaitsLane && lead !== null && lead.id !== workspace.id;
 }
 
-function groupStartTimes(workspaces: Workspace[]): Map<string, string> {
+function startTimes(
+  workspaces: Workspace[],
+  keyOf: (workspace: Workspace) => string | null,
+): Map<string, string> {
   const starts = new Map<string, string>();
   for (const ws of workspaces) {
-    if (!ws.groupId) continue;
-    const start = starts.get(ws.groupId);
-    if (!start || ws.createdAt < start) starts.set(ws.groupId, ws.createdAt);
+    const key = keyOf(ws);
+    if (!key) continue;
+    const start = starts.get(key);
+    if (!start || ws.createdAt < start) starts.set(key, ws.createdAt);
   }
   return starts;
+}
+
+export function workspaceLabel(workspace: Workspace) {
+  return workspace.label ?? workspace.name;
 }
 
 export function worktreeProgress(
@@ -196,11 +240,11 @@ export function worktreeProgress(
 ) {
   if (runtime.status === 'archiving')
     return {
-      title: `Archiving ${workspace.name}`,
+      title: `Archiving ${workspaceLabel(workspace)}`,
       detail: 'Stopping agents and removing the worktree.',
     };
   return {
-    title: `Creating ${workspace.name}`,
+    title: `Creating ${workspaceLabel(workspace)}`,
     detail: `Fetching origin/${workspace.baseBranch} and adding a worktree. You can keep working elsewhere.`,
   };
 }
@@ -234,4 +278,24 @@ export function sidebarEntries(
     else entries.push([workspace]);
   }
   return entries;
+}
+
+export type BoardColumn = 'needs-you' | 'working' | 'done' | 'idle';
+
+const BOARD_COLUMN_BY_STATUS: Record<
+  Exclude<WorkspaceStatus, 'idle'>,
+  BoardColumn
+> = {
+  waiting: 'needs-you',
+  error: 'needs-you',
+  failed: 'needs-you',
+  working: 'working',
+  'setting-up': 'working',
+  creating: 'working',
+  archiving: 'working',
+};
+
+export function boardColumn(runtime: WorkspaceRuntime): BoardColumn {
+  if (runtime.status !== 'idle') return BOARD_COLUMN_BY_STATUS[runtime.status];
+  return runtime.unread ? 'done' : 'idle';
 }

@@ -19,21 +19,27 @@ import {
   type Repo,
   type RepoFolder,
   type Workspace,
+  type WorkspaceFolder,
   type WorkspaceRuntime,
 } from '../shared/model';
 import {
   activeWorkspaces,
   asksNewestFirst,
+  boardColumn,
+  crossRepoLead,
   crossRepoLeads,
+  folderRuns,
   repoSections,
   sidebarEntries,
   sidebarRepoId,
   waitsForLane,
+  workspaceLabel,
 } from '../shared/workspaces';
 import {
   archiveWorkspace,
   deleteAsk,
   openAsk,
+  openBoard,
   openGrid,
   openRuns,
   openIn,
@@ -129,12 +135,8 @@ function StatusIcon({
   workspace: Workspace;
   runtime: WorkspaceRuntime;
 }) {
-  if (
-    runtime.status === 'working' ||
-    runtime.status === 'setting-up' ||
-    runtime.status === 'creating' ||
-    runtime.status === 'archiving'
-  ) {
+  const column = boardColumn(runtime);
+  if (column === 'working') {
     return (
       <Icon
         name="loader-circle"
@@ -154,7 +156,7 @@ function StatusIcon({
       </span>
     );
   }
-  if (runtime.status === 'error' || runtime.status === 'failed') {
+  if (column === 'needs-you') {
     return (
       <Icon name="triangle-alert" size={14} className="text-danger-text" />
     );
@@ -224,126 +226,167 @@ function WorkspaceRow({
   const stats = runtime?.stats;
   const hasStats = stats && (stats.additions > 0 || stats.deletions > 0);
   const title = member ? member.repo : workspace.branch;
+  const label = workspaceLabel(workspace);
+  const [renaming, setRenaming] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const folderHolder = crossRepoLead(state, workspace) ?? workspace;
+  async function createFolderWithWorkspace(name: string) {
+    const folder = await api.createWorkspaceFolder(folderHolder.repoId, name);
+    await api.moveWorkspace(folderHolder.id, folder.id);
+  }
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-current={selected ? 'page' : undefined}
-      aria-label={
-        member
-          ? `Workspace ${workspace.name} in ${member.repo}`
-          : `Workspace ${workspace.name}`
-      }
-      {...draggable(WORKSPACE_DRAG_TYPE, workspace.id)}
-      onClick={() => selectWorkspace(workspace.id)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') selectWorkspace(workspace.id);
-      }}
-      className={cn(
-        'group relative flex min-h-11 cursor-pointer items-center gap-2 rounded-md py-1.5 pr-1.5 pl-2 text-fg-2 hover:bg-hover',
-        selected && 'bg-active text-fg-1 hover:bg-active',
-      )}
-    >
-      <span className="flex w-4 justify-center self-start pt-0.5">
-        {runtime ? (
-          <StatusIcon workspace={workspace} runtime={runtime} />
-        ) : null}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span
-          className={cn(
-            'block truncate text-sm',
-            runtime?.unread || runtime?.status === 'waiting'
-              ? 'font-semibold text-fg-1'
-              : 'font-medium',
-          )}
-          title={title}
-        >
-          {title}
-        </span>
-        <span className="flex items-center gap-1.5 text-xs text-fg-3">
-          {member ? (
-            <span className="truncate">
-              {member.waitsOn
-                ? `Waits for the plan in ${member.waitsOn}`
-                : workspace.branch}
-            </span>
-          ) : (
-            <>
-              <LinkedIcon state={state} workspace={workspace} />
-              <span className="truncate">{workspace.name}</span>
-            </>
-          )}
-          {runtime?.message ? (
-            <span className="truncate text-danger-text">
-              · {runtime.message}
-            </span>
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-current={selected ? 'page' : undefined}
+        aria-label={
+          member ? `Workspace ${label} in ${member.repo}` : `Workspace ${label}`
+        }
+        {...draggable(WORKSPACE_DRAG_TYPE, workspace.id)}
+        onClick={() => selectWorkspace(workspace.id)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') selectWorkspace(workspace.id);
+        }}
+        className={cn(
+          'group relative flex min-h-11 cursor-pointer items-center gap-2 rounded-md py-1.5 pr-1.5 pl-2 text-fg-2 hover:bg-hover',
+          selected && 'bg-active text-fg-1 hover:bg-active',
+        )}
+      >
+        <span className="flex w-4 justify-center self-start pt-0.5">
+          {runtime ? (
+            <StatusIcon workspace={workspace} runtime={runtime} />
           ) : null}
         </span>
-      </span>
-      <span className="flex flex-none flex-col items-end gap-1 self-start pt-0.5">
-        {hasStats ? (
-          <span className="font-mono text-2xs">
-            <span className="text-diff-add-fg">+{stats.additions}</span>{' '}
-            <span className="text-diff-del-fg">−{stats.deletions}</span>
-          </span>
-        ) : index < 9 ? (
-          <span className="font-mono text-2xs text-fg-4 opacity-0 group-hover:opacity-100">
-            ⌘{index + 1}
-          </span>
-        ) : null}
-        {runtime?.unread ? (
+        <span className="min-w-0 flex-1">
           <span
-            aria-label="Unread"
-            className="size-1.5 rounded-full bg-accent"
-          />
-        ) : null}
-      </span>
-      <span className="absolute top-1 right-1 hidden group-hover:flex has-[[role=menu]]:flex">
-        <Menu
-          label={`${workspace.name} actions`}
-          align="right"
-          items={[
-            {
-              id: 'open',
-              label: 'Open in Finder',
-              icon: 'folder',
-              onSelect: () => void openIn(workspace, 'finder'),
-            },
-            {
-              id: 'keep-after-merge',
-              label: 'Keep after merge',
-              icon: 'pin',
-              checked: workspace.keepAfterMerge,
-              onSelect: () =>
-                void api.setKeepAfterMerge(
-                  workspace.id,
-                  !workspace.keepAfterMerge,
-                ),
-            },
-            {
-              id: 'archive',
-              label: 'Archive',
-              icon: 'archive',
-              hint: '⌘⇧A',
-              onSelect: () => void archiveWorkspace(state, workspace),
-            },
-          ]}
-          trigger={({ toggle }) => (
-            <IconButton
-              icon="ellipsis"
-              label="Workspace actions"
-              size="sm"
-              className="bg-raised"
-              onClick={(event) => {
-                event.stopPropagation();
-                toggle();
-              }}
+            className={cn(
+              'block truncate text-sm',
+              runtime?.unread || runtime?.status === 'waiting'
+                ? 'font-semibold text-fg-1'
+                : 'font-medium',
+            )}
+            title={title}
+          >
+            {title}
+          </span>
+          <span className="flex items-center gap-1.5 text-xs text-fg-3">
+            {member ? (
+              <span className="truncate">
+                {member.waitsOn
+                  ? `Waits for the plan in ${member.waitsOn}`
+                  : workspace.branch}
+              </span>
+            ) : (
+              <>
+                <LinkedIcon state={state} workspace={workspace} />
+                <span className="truncate" title={workspace.name}>
+                  {label}
+                </span>
+              </>
+            )}
+            {runtime?.message ? (
+              <span className="truncate text-danger-text">
+                · {runtime.message}
+              </span>
+            ) : null}
+          </span>
+        </span>
+        <span className="flex flex-none flex-col items-end gap-1 self-start pt-0.5">
+          {hasStats ? (
+            <span className="font-mono text-2xs">
+              <span className="text-diff-add-fg">+{stats.additions}</span>{' '}
+              <span className="text-diff-del-fg">−{stats.deletions}</span>
+            </span>
+          ) : index < 9 ? (
+            <span className="font-mono text-2xs text-fg-4 opacity-0 group-hover:opacity-100">
+              ⌘{index + 1}
+            </span>
+          ) : null}
+          {runtime?.unread ? (
+            <span
+              aria-label="Unread"
+              className="size-1.5 rounded-full bg-accent"
             />
-          )}
+          ) : null}
+        </span>
+        <span className="absolute top-1 right-1 hidden group-hover:flex has-[[role=menu]]:flex">
+          <Menu
+            label={`${label} actions`}
+            align="right"
+            items={[
+              {
+                id: 'rename',
+                label: 'Rename',
+                icon: 'pencil',
+                onSelect: () => setRenaming(true),
+              },
+              {
+                id: 'open',
+                label: 'Open in Finder',
+                icon: 'folder',
+                onSelect: () => void openIn(workspace, 'finder'),
+              },
+              {
+                id: 'keep-after-merge',
+                label: 'Keep after merge',
+                icon: 'pin',
+                checked: workspace.keepAfterMerge,
+                onSelect: () =>
+                  void api.setKeepAfterMerge(
+                    workspace.id,
+                    !workspace.keepAfterMerge,
+                  ),
+              },
+              {
+                id: 'archive',
+                label: 'Archive',
+                icon: 'archive',
+                hint: '⌘⇧A',
+                onSelect: () => void archiveWorkspace(state, workspace),
+              },
+              ...moveToFolderItems(
+                state.workspaceFolders.filter(
+                  (folder) => folder.repoId === folderHolder.repoId,
+                ),
+                folderHolder.folderId ?? null,
+                (target) => void api.moveWorkspace(folderHolder.id, target),
+                () => setNaming(true),
+              ),
+            ]}
+            trigger={({ toggle }) => (
+              <IconButton
+                icon="ellipsis"
+                label="Workspace actions"
+                size="sm"
+                className="bg-raised"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggle();
+                }}
+              />
+            )}
+          />
+        </span>
+      </div>
+      {renaming ? (
+        <NameDialog
+          title="Rename workspace"
+          initialName={label}
+          submitLabel="Rename"
+          onSubmit={(name) => api.renameWorkspace(workspace.id, name)}
+          onClose={() => setRenaming(false)}
         />
-      </span>
-    </div>
+      ) : null}
+      {naming ? (
+        <NameDialog
+          title="New folder"
+          submitLabel="Create"
+          onSubmit={createFolderWithWorkspace}
+          onClose={() => setNaming(false)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -398,7 +441,7 @@ function useCollapsed(
   return [key === 'expandedRepos' ? !listed : listed, toggle] as const;
 }
 
-function FolderNameDialog({
+function NameDialog({
   title,
   initialName = '',
   submitLabel,
@@ -455,19 +498,17 @@ function FolderNameDialog({
 }
 
 function moveToFolderItems(
-  state: AppState,
-  repo: Repo,
-  folderId: string | null,
+  folders: { id: string; name: string }[],
+  current: string | null,
+  moveTo: (folderId: string | null) => void,
   onNewFolder: () => void,
 ): MenuItem[] {
-  const moveTo = (target: string | null) =>
-    void api.moveRepo(repo.id, { folderId: target, beforeId: null });
   return [
-    ...state.folders.map((folder) => ({
+    ...folders.map((folder) => ({
       id: folder.id,
       label: folder.name,
       icon: 'folder' as const,
-      checked: folder.id === folderId,
+      checked: folder.id === current,
       section: MOVE_TO_FOLDER,
       onSelect: () => moveTo(folder.id),
     })),
@@ -475,7 +516,7 @@ function moveToFolderItems(
       id: 'no-folder',
       label: 'No folder',
       icon: 'folder-minus',
-      checked: folderId === null,
+      checked: current === null,
       section: MOVE_TO_FOLDER,
       onSelect: () => moveTo(null),
     },
@@ -487,6 +528,101 @@ function moveToFolderItems(
       onSelect: onNewFolder,
     },
   ];
+}
+
+function WorkspaceFolderSection({
+  state,
+  folder,
+  children,
+}: {
+  state: AppState;
+  folder: WorkspaceFolder;
+  children: ReactNode;
+}) {
+  const [collapsed, toggle] = useCollapsed('collapsedFolders', folder.id);
+  const [renaming, setRenaming] = useState(false);
+  const drop = useDropTarget({
+    [WORKSPACE_DRAG_TYPE]: (draggedId) => {
+      const dragged = state.workspaces.find((ws) => ws.id === draggedId);
+      const holder = dragged && (crossRepoLead(state, dragged) ?? dragged);
+      if (holder?.repoId === folder.repoId)
+        void api.moveWorkspace(holder.id, folder.id);
+    },
+  });
+  return (
+    <div
+      role="group"
+      aria-label={`Folder ${folder.name}`}
+      className="flex flex-col gap-0.5"
+    >
+      <div
+        {...drop.props}
+        className={cn(
+          'group flex h-7 items-center gap-1 rounded-md px-2 hover:bg-hover',
+          drop.over && DROP_INDICATOR,
+        )}
+      >
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-xs text-fg-3"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+        >
+          <Icon name="folder" size={13} />
+          <span className="truncate">{folder.name}</span>
+          <Icon
+            name="chevron-down"
+            size={12}
+            className={cn(
+              'text-fg-4 transition-transform',
+              collapsed && '-rotate-90',
+            )}
+          />
+        </button>
+        <span className="hidden group-hover:flex has-[[role=menu]]:flex">
+          <Menu
+            label={`${folder.name} actions`}
+            align="right"
+            items={[
+              {
+                id: 'rename',
+                label: 'Rename',
+                icon: 'pencil',
+                onSelect: () => setRenaming(true),
+              },
+              {
+                id: 'delete',
+                label: 'Delete folder',
+                icon: 'trash-2',
+                danger: true,
+                onSelect: () => void api.deleteWorkspaceFolder(folder.id),
+              },
+            ]}
+            trigger={({ toggle: toggleMenu }) => (
+              <IconButton
+                icon="ellipsis"
+                label={`${folder.name} actions`}
+                size="sm"
+                onClick={toggleMenu}
+              />
+            )}
+          />
+        </span>
+      </div>
+      {renaming ? (
+        <NameDialog
+          title="Rename folder"
+          initialName={folder.name}
+          submitLabel="Rename"
+          onSubmit={(name) => api.renameWorkspaceFolder(folder.id, name)}
+          onClose={() => setRenaming(false)}
+        />
+      ) : null}
+      {collapsed ? null : (
+        <div className="flex flex-col gap-0.5 pl-3">{children}</div>
+      )}
+    </div>
+  );
 }
 
 function LinkedGroup({
@@ -507,12 +643,12 @@ function LinkedGroup({
   return (
     <div
       role="group"
-      aria-label={`Linked workspace ${lead.name}`}
+      aria-label={`Linked workspace ${workspaceLabel(lead)}`}
       className="flex flex-col gap-0.5"
     >
       <div className="flex h-6 items-center gap-1.5 px-2 text-xs text-fg-3">
         <Icon name="link" size={11} />
-        <span className="truncate">{lead.name}</span>
+        <span className="truncate">{workspaceLabel(lead)}</span>
       </div>
       <div className="flex flex-col gap-0.5 pl-3">
         {members.map((workspace) => (
@@ -567,6 +703,28 @@ function RepoGroup({
     const folder = await api.createFolder(name);
     await api.moveRepo(repo.id, { folderId: folder.id, beforeId: null });
   }
+  const entriesOf = (members: Workspace[]) =>
+    sidebarEntries(members, leads).map(([first, ...rest]) => {
+      const lead = first.groupId ? leads.get(first.groupId) : undefined;
+      return lead ? (
+        <LinkedGroup
+          key={first.id}
+          state={state}
+          lead={lead}
+          members={[first, ...rest]}
+          selectedId={selectedId}
+          indexOf={indexOf}
+        />
+      ) : (
+        <WorkspaceRow
+          key={first.id}
+          state={state}
+          workspace={first}
+          selected={first.id === selectedId}
+          index={indexOf(first)}
+        />
+      );
+    });
   return (
     <section aria-label={repo.name} className="mb-2">
       <div
@@ -618,8 +776,15 @@ function RepoGroup({
           <Menu
             label={`${repo.name} actions`}
             align="right"
-            items={moveToFolderItems(state, repo, folderId, () =>
-              setNaming(true),
+            items={moveToFolderItems(
+              state.folders,
+              folderId,
+              (target) =>
+                void api.moveRepo(repo.id, {
+                  folderId: target,
+                  beforeId: null,
+                }),
+              () => setNaming(true),
             )}
             trigger={({ toggle: toggleMenu }) => (
               <IconButton
@@ -633,7 +798,7 @@ function RepoGroup({
         </span>
       </div>
       {naming ? (
-        <FolderNameDialog
+        <NameDialog
           title="New folder"
           submitLabel="Create"
           onSubmit={createFolderWithRepo}
@@ -642,25 +807,21 @@ function RepoGroup({
       ) : null}
       {collapsed ? null : (
         <div className="mt-0.5 flex flex-col gap-0.5">
-          {sidebarEntries(workspaces, leads).map(([first, ...rest]) => {
-            const lead = first.groupId ? leads.get(first.groupId) : undefined;
-            return lead ? (
-              <LinkedGroup
-                key={first.id}
+          {folderRuns(workspaces, leads).map((run) => {
+            const folder = state.workspaceFolders.find(
+              (entry) => entry.id === run.folderId,
+            );
+            const entries = entriesOf(run.workspaces);
+            return folder ? (
+              <WorkspaceFolderSection
+                key={folder.id}
                 state={state}
-                lead={lead}
-                members={[first, ...rest]}
-                selectedId={selectedId}
-                indexOf={indexOf}
-              />
+                folder={folder}
+              >
+                {entries}
+              </WorkspaceFolderSection>
             ) : (
-              <WorkspaceRow
-                key={first.id}
-                state={state}
-                workspace={first}
-                selected={first.id === selectedId}
-                index={indexOf(first)}
-              />
+              <Fragment key={run.workspaces[0].id}>{entries}</Fragment>
             );
           })}
           {workspaces.length === 0 ? (
@@ -749,7 +910,7 @@ function FolderSection({
         </span>
       </div>
       {renaming ? (
-        <FolderNameDialog
+        <NameDialog
           title="Rename folder"
           initialName={folder.name}
           submitLabel="Rename"
@@ -904,7 +1065,7 @@ function History({ state }: { state: AppState }) {
                 className="min-w-0 flex-1 truncate"
                 title={workspace.branch}
               >
-                {workspace.name}
+                {workspaceLabel(workspace)}
                 <span className="ml-1.5 text-xs text-fg-4">
                   {timeAgo(workspace.archivedAt ?? workspace.createdAt)}
                 </span>
@@ -912,13 +1073,13 @@ function History({ state }: { state: AppState }) {
               <span className="hidden gap-0.5 group-hover:flex">
                 <IconButton
                   icon="archive-restore"
-                  label={`Unarchive ${workspace.name}`}
+                  label={`Unarchive ${workspaceLabel(workspace)}`}
                   size="sm"
                   onClick={() => restoreWorkspace(workspace)}
                 />
                 <IconButton
                   icon="trash-2"
-                  label={`Delete ${workspace.name}`}
+                  label={`Delete ${workspaceLabel(workspace)}`}
                   size="sm"
                   onClick={() => api.deleteWorkspace(workspace.id)}
                 />
@@ -1088,6 +1249,13 @@ export function Sidebar({ state }: { state: AppState }) {
             onClick={openRuns}
           />
         ) : null}
+        <NavRow
+          icon="square-kanban"
+          label="Board"
+          hint="⌘⇧B"
+          active={pageKind === 'board'}
+          onClick={openBoard}
+        />
       </div>
       <AskChats state={state} />
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-1">

@@ -26,7 +26,8 @@ export type Page =
   | { kind: 'ask'; askChatId: string | null; repoIds: string[] }
   | { kind: 'settings'; section: string }
   | { kind: 'grid' }
-  | { kind: 'runs' };
+  | { kind: 'runs' }
+  | { kind: 'board' };
 
 export type GridLayout = '2x1' | '1x2' | '2x2';
 

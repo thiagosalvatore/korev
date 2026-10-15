@@ -14,6 +14,7 @@ import {
   type Workspace,
 } from '../shared/model';
 import { korevMessage } from '../shared/message';
+import { workspaceLabel } from '../shared/workspaces';
 import type { CliCall, CliReply } from './agent-server';
 import { errorMessage, type Context } from './context';
 import { commitsBehind } from './git';
@@ -319,7 +320,7 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
     const coordinator = ctx.workspace(run.coordinatorWorkspaceId);
     ctx.deps.notify({
       title: RUN_PAUSED_TITLE,
-      body: `${coordinator.name} reached ${MAX_WAKES_PER_RUN} messages. Resume the run to keep going.`,
+      body: `${workspaceLabel(coordinator)} reached ${MAX_WAKES_PER_RUN} messages. Resume the run to keep going.`,
       workspaceId: coordinator.id,
     });
   }

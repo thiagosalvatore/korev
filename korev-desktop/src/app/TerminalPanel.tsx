@@ -13,6 +13,7 @@ import {
   startRunScript,
   toggleRunScript,
 } from './actions';
+import { workspaceLabel } from '../shared/workspaces';
 import { Menu } from './ui/Menu';
 import { api } from './bridge';
 import { reportFailure, toast } from './ui/toast';
@@ -159,7 +160,7 @@ function SpotlightButton({
           toast(
             active
               ? `Spotlight off, ${repo.name} restored`
-              : `Spotlight on for ${workspace.name}`,
+              : `Spotlight on for ${workspaceLabel(workspace)}`,
           );
       }}
     >

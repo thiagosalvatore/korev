@@ -152,6 +152,12 @@ export interface RepoFolder {
   name: string;
 }
 
+export interface WorkspaceFolder {
+  id: string;
+  repoId: string;
+  name: string;
+}
+
 export type WorkspaceSource =
   | { kind: 'new'; baseBranch: string | null }
   | { kind: 'branch'; branch: string }
@@ -199,6 +205,7 @@ export interface Workspace {
   repoId: string;
   groupId: string | null;
   name: string;
+  label: string | null;
   branch: string;
   baseBranch: string;
   path: string;
@@ -209,6 +216,7 @@ export interface Workspace {
   archiveSnapshot: Checkpoint | null;
   keepAfterMerge: boolean;
   awaitsLane: boolean;
+  folderId?: string | null;
   sessions: ChatSession[];
   prs: TrackedPr[];
 }
@@ -581,6 +589,7 @@ export interface AppState {
   folders: RepoFolder[];
   rootOrder: string[];
   workspaces: Workspace[];
+  workspaceFolders: WorkspaceFolder[];
   askChats: AskChat[];
   runs: OrchestrationRun[];
   settings: Settings;
@@ -672,6 +681,7 @@ export type ChatItem =
       detail: string;
       output: string | null;
       failed: boolean;
+      parentToolId?: string;
     }
   | { id: string; kind: 'todos'; todos: Todo[] }
   | {
@@ -718,6 +728,10 @@ export interface PermissionResponse {
 }
 
 export const PLAN_TOOL = 'ExitPlanMode';
+
+export function isSubagentTool(item: ChatItem): boolean {
+  return item.kind === 'tool' && Boolean(item.parentToolId);
+}
 
 export const PENDING_PLAN_PLACEHOLDER =
   'Add instructions, or send to implement the plan';
@@ -947,6 +961,7 @@ export type AppCommand =
   | 'toggle-theme'
   | 'toggle-zen'
   | 'toggle-grid'
+  | 'toggle-board'
   | 'quick-open'
   | 'search-files'
   | 'confirm-quit'

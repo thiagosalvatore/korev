@@ -21,6 +21,7 @@ import {
   type Workspace,
   type WorkspaceRuntime,
 } from '../../korev-desktop/src/shared/model';
+import { workspaceLabel } from '../../korev-desktop/src/shared/workspaces';
 import { attempt } from './attempt';
 import { usePendingAction } from './hooks';
 import { succeeded } from './haptics';
@@ -97,7 +98,7 @@ function runStep(
     );
   if (step === 'archive')
     return confirmThenRun(
-      `Archive ${workspace.name}?`,
+      `Archive ${workspaceLabel(workspace)}?`,
       undefined,
       label,
       failure,

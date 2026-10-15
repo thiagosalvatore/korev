@@ -12,6 +12,18 @@ Let one agent run a team of other agents.
 - **Runs page.** Runs in the sidebar lists each run's tasks, their state, their workers and their reports. Resume a task that stopped when Korev quit.
 - **Decisions.** An agent can ask you to choose between options before a task goes on. Pick in the chat, on the Runs page or in the phone app.
 
+## [0.14.0] - 2026-10-15
+
+Put workspaces in folders, give them names, and copy code blocks with one click.
+
+### New
+
+- **Agent board.** Click **Board** in the sidebar or press ⌘⇧B to see every workspace from every repository in four columns: Needs you, Working, Done and Idle. Each card shows the branch, the pull request step and the last line the agent wrote. Click a card to open the workspace.
+- **Folders in a repository.** Put workspaces of one repository in a folder from the workspace's menu, or drag a workspace onto a folder. Click a folder to collapse it. Lanes that you split off a plan go into a folder named after the workspace that made the plan.
+- **Rename a workspace.** Choose **Rename** in the **…** menu of a workspace in the sidebar and type any name. The name shows under the branch in the sidebar, in the workspace header and in the phone app. The branch and the worktree folder stay the same.
+- **Copy code blocks.** Hover a code block in a chat, plan or markdown file and click the copy button in its corner to copy the code.
+- **Sub-agent tool calls.** When Claude starts a sub-agent, the tool calls of the sub-agent show under its Task row in the chat. They are collapsed to a count, such as "12 tool calls". Click the count to see them. The phone app does not show them.
+
 ## [0.13.1] - 2026-10-15
 
 Files in the file viewer show the right colors for their language.

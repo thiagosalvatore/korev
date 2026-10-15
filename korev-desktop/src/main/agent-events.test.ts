@@ -121,26 +121,108 @@ describe('Claude stream parser', () => {
     ]);
   });
 
-  it('ignores events from subagents', () => {
+  it('tags sub-agent tool calls with their Task and keeps the main stream intact', () => {
     const parser = createClaudeParser(CWD);
+    const subagent = { parent_tool_use_id: 'task-1' };
     const items = feedAll(parser, [
       {
+        type: 'stream_event',
+        event: {
+          type: 'message_start',
+          message: { id: 'msg-1', usage: { input_tokens: 500 } },
+        },
+      },
+      {
         type: 'assistant',
-        parent_tool_use_id: 'task-1',
         message: {
-          id: 'msg-9',
+          id: 'msg-1',
           content: [
+            {
+              type: 'tool_use',
+              id: 'task-1',
+              name: 'Task',
+              input: { description: 'Explore', prompt: 'look around' },
+            },
+          ],
+        },
+      },
+      {
+        ...subagent,
+        type: 'stream_event',
+        event: {
+          type: 'message_start',
+          message: { id: 'msg-sub', usage: { input_tokens: 90_000 } },
+        },
+      },
+      {
+        ...subagent,
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text: 'sub-agent text' },
+        },
+      },
+      {
+        ...subagent,
+        type: 'assistant',
+        message: {
+          id: 'msg-sub',
+          content: [
+            { type: 'text', text: 'sub-agent text' },
             {
               type: 'tool_use',
               id: 'tool-9',
               name: 'Bash',
               input: { command: 'ls' },
             },
+            {
+              type: 'tool_use',
+              id: 'todo-9',
+              name: 'TodoWrite',
+              input: { todos: [] },
+            },
           ],
         },
       },
+      {
+        ...subagent,
+        type: 'user',
+        message: {
+          content: [
+            { type: 'tool_result', tool_use_id: 'tool-9', content: 'a.ts' },
+          ],
+        },
+      },
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text: 'Done.' },
+        },
+      },
+      {
+        type: 'result',
+        subtype: 'success',
+        modelUsage: { 'claude-opus-5-5': { contextWindow: 1_000_000 } },
+      },
     ]);
-    expect(items).toEqual([]);
+
+    expect(items).toMatchObject([
+      { id: 'task-1', kind: 'tool', name: 'Task' },
+      {
+        id: 'tool-9',
+        kind: 'tool',
+        name: 'Bash',
+        output: 'a.ts',
+        parentToolId: 'task-1',
+      },
+      { id: 'msg-1:0', kind: 'assistant', text: 'Done.' },
+      { kind: 'result', ok: true },
+    ]);
+    expect(items[0]).not.toHaveProperty('parentToolId');
+    expect(parser.usage()?.context?.usedTokens).toBe(500);
   });
 
   it('reports a failed turn with its message', () => {

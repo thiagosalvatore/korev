@@ -17,6 +17,7 @@ import {
   type RunQuestion,
   type TaskState,
 } from '../shared/model';
+import { workspaceLabel } from '../shared/workspaces';
 import { selectWorkspace } from './actions';
 import { api } from './bridge';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
@@ -180,7 +181,7 @@ function TaskRow({
             disabled={Boolean(worker.archivedAt)}
             onClick={() => selectWorkspace(worker.id)}
           >
-            {worker.name}
+            {workspaceLabel(worker)}
           </Button>
         ) : null}
       </div>
@@ -226,7 +227,7 @@ function RunCard({ state, run }: { state: AppState; run: OrchestrationRun }) {
             icon="bot"
             onClick={() => selectWorkspace(coordinator.id)}
           >
-            {coordinator.name}
+            {workspaceLabel(coordinator)}
           </Button>
         )}
       </div>

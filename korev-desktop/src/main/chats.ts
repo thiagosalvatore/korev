@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { planFileName } from '../shared/message';
+import { workspaceLabel } from '../shared/workspaces';
 import {
   conversationText,
   finishedCodexPlan,
@@ -247,6 +248,13 @@ function turnResult(items: ChatItem[], turn: ActiveTurn): ResultItem | null {
   return result?.kind === 'result' ? result : null;
 }
 
+function scopedToTurn(item: ChatItem, turnId: string): ChatItem {
+  const scoped = { ...item, id: `${turnId}:${item.id}` };
+  if (scoped.kind === 'tool' && scoped.parentToolId)
+    scoped.parentToolId = `${turnId}:${scoped.parentToolId}`;
+  return scoped;
+}
+
 export interface Chats {
   transcript(sessionId: string): Promise<ChatItem[]>;
   isRunning(sessionId: string): boolean;
@@ -390,7 +398,9 @@ export function createChats(
     alertUser(
       { kind: 'workspace', workspace },
       failure ? AGENT_FAILED_TITLE : AGENT_FINISHED_TITLE,
-      failure ? `${workspace.name}: ${failure}` : workspace.name,
+      failure
+        ? `${workspaceLabel(workspace)}: ${failure}`
+        : workspaceLabel(workspace),
     );
   }
 
@@ -541,7 +551,9 @@ export function createChats(
     refreshStatus(turn.owner);
     ctx.emitState();
     const name =
-      turn.owner.kind === 'workspace' ? turn.owner.workspace.name : 'Ask';
+      turn.owner.kind === 'workspace'
+        ? workspaceLabel(turn.owner.workspace)
+        : 'Ask';
     alertUser(turn.owner, AGENT_NEEDS_INPUT_TITLE, name);
   }
 
@@ -579,7 +591,7 @@ export function createChats(
     turn.backgroundTasks = backgroundTaskCount(event) ?? turn.backgroundTasks;
     const updates = parser.feed(event);
     for (const item of updates)
-      upsert(session.id, items, { ...item, id: `${turn.id}:${item.id}` });
+      upsert(session.id, items, scopedToTurn(item, turn.id));
     if (updates.some(isFailedSigning)) nudgeAboutSigning(session, items, turn);
     const allConsumed =
       turn.acknowledged >= turn.written || turn.acknowledged === 0;

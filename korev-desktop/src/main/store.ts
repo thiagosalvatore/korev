@@ -13,6 +13,7 @@ import {
   type OrchestrationRun,
   type Repo,
   type RepoFolder,
+  type WorkspaceFolder,
   type Settings,
   type Workspace,
 } from '../shared/model';
@@ -30,6 +31,7 @@ export interface PersistedState {
   folders: RepoFolder[];
   rootOrder: string[];
   workspaces: Workspace[];
+  workspaceFolders: WorkspaceFolder[];
   askChats: AskChat[];
   runs: OrchestrationRun[];
   settings: Settings;
@@ -140,9 +142,11 @@ function sanitize(raw: unknown, home: string): PersistedState {
         ...workspace,
         archiveSnapshot: workspace.archiveSnapshot ?? null,
         restoredAt: workspace.restoredAt ?? null,
+        label: workspace.label ?? null,
         keepAfterMerge: workspace.keepAfterMerge ?? false,
         awaitsLane: workspace.awaitsLane ?? false,
         groupId: workspace.groupId ?? null,
+        folderId: workspace.folderId ?? null,
         prs: workspace.prs ?? [],
         sessions: workspace.sessions.map((session) => ({
           ...sessionWithoutLegacyCodexDefault(session),
@@ -153,6 +157,9 @@ function sanitize(raw: unknown, home: string): PersistedState {
         })),
       }),
     ),
+    workspaceFolders: Array.isArray(value.workspaceFolders)
+      ? value.workspaceFolders
+      : [],
     askChats: (Array.isArray(value.askChats) ? value.askChats : []).map(
       (ask) => ({
         ...ask,

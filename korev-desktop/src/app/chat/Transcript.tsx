@@ -14,13 +14,14 @@ import {
   IconButton,
   type IconName,
 } from '../../design-system';
-import type {
-  ChatItem,
-  LaneRepo,
-  PermissionResponse,
-  Todo,
-  TurnChanges,
-  TurnRange,
+import {
+  isSubagentTool,
+  type ChatItem,
+  type LaneRepo,
+  type PermissionResponse,
+  type Todo,
+  type TurnChanges,
+  type TurnRange,
 } from '../../shared/model';
 import { duration, fileName, imageType } from '../../shared/format';
 import {
@@ -54,14 +55,58 @@ const TOOL_GROUP_THRESHOLD = 3;
 
 const READ_TOOL = 'Read';
 
+type SubagentTools = Map<string, ToolItem[]>;
+
+function SubagentToolList({
+  items,
+  running,
+  sessionId,
+}: {
+  items: ToolItem[];
+  running: boolean;
+  sessionId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="ml-6 flex flex-col border-l border-border-1 pl-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        className="flex cursor-pointer items-center gap-2 self-start rounded-sm border-0 bg-transparent px-1.5 py-1 text-left text-xs text-fg-3 hover:bg-hover hover:text-fg-1"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <Icon name="layers" size={12} />
+        {items.length} tool call{items.length === 1 ? '' : 's'}
+        <Icon
+          name="chevron-right"
+          size={12}
+          className={cn('transition-transform', open && 'rotate-90')}
+        />
+      </button>
+      {open
+        ? items.map((child) => (
+            <ToolRow
+              key={child.id}
+              item={child}
+              running={running}
+              sessionId={sessionId}
+            />
+          ))
+        : null}
+    </div>
+  );
+}
+
 function ToolRow({
   item,
   running,
   sessionId,
+  subagentTools = [],
 }: {
   item: ToolItem;
   running: boolean;
   sessionId: string;
+  subagentTools?: ToolItem[];
 }) {
   const [open, setOpen] = useState(false);
   const pending = item.output === null && running;
@@ -123,16 +168,25 @@ function ToolRow({
           ) : null}
         </div>
       ) : null}
+      {subagentTools.length ? (
+        <SubagentToolList
+          items={subagentTools}
+          running={running}
+          sessionId={sessionId}
+        />
+      ) : null}
     </div>
   );
 }
 
 function ToolGroup({
   items,
+  subagentTools,
   running,
   sessionId,
 }: {
   items: ToolItem[];
+  subagentTools: SubagentTools;
   running: boolean;
   sessionId: string;
 }) {
@@ -156,6 +210,7 @@ function ToolGroup({
             item={item}
             running={running}
             sessionId={sessionId}
+            subagentTools={subagentTools.get(item.id)}
           />
         ))}
       </div>
@@ -173,7 +228,12 @@ function ToolGroup({
         <Icon name="chevron-right" size={12} />
       </button>
       {last ? (
-        <ToolRow item={last} running={running} sessionId={sessionId} />
+        <ToolRow
+          item={last}
+          running={running}
+          sessionId={sessionId}
+          subagentTools={subagentTools.get(last.id)}
+        />
       ) : null}
     </div>
   );
@@ -475,9 +535,18 @@ type Block =
   | { kind: 'item'; item: ChatItem }
   | { kind: 'tools'; items: ToolItem[] };
 
+function subagentToolsByParent(items: ChatItem[]): SubagentTools {
+  const tools = items.filter((item) => item.kind === 'tool');
+  return Map.groupBy(
+    tools.filter(isSubagentTool),
+    (tool) => tool.parentToolId ?? '',
+  );
+}
+
 function toBlocks(items: ChatItem[]): Block[] {
   const blocks: Block[] = [];
   for (const item of items) {
+    if (isSubagentTool(item)) continue;
     const last = blocks.at(-1);
     if (item.kind === 'tool' && last?.kind === 'tools') last.items.push(item);
     else if (item.kind === 'tool')
@@ -550,6 +619,7 @@ export function Transcript({
     lastUser?.kind === 'user' ? Date.parse(lastUser.at) : Date.now();
   const lastUserText = lastUser?.kind === 'user' ? lastUser.text : null;
   const lastResult = items.findLast((item) => item.kind === 'result');
+  const subagentTools = subagentToolsByParent(items);
 
   useLayoutEffect(() => {
     const element = scroller.current;
@@ -581,6 +651,7 @@ export function Transcript({
               <ToolGroup
                 key={block.items[0].id}
                 items={block.items}
+                subagentTools={subagentTools}
                 running={running}
                 sessionId={sessionId}
               />

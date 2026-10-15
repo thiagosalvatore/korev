@@ -420,6 +420,28 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toBeNull();
   });
 
+  it('renames a workspace without moving its worktree', async () => {
+    const workspace = await createWorkspace();
+
+    await korev.api.renameWorkspace(workspace.id, '  Billing spike  ');
+
+    const renamed = (await workspaceState(workspace.id)).workspace;
+    expect(renamed.label).toBe('Billing spike');
+    expect([renamed.name, renamed.path]).toEqual([
+      workspace.name,
+      workspace.path,
+    ]);
+  });
+
+  it('goes back to the worktree name when the new name is blank', async () => {
+    const workspace = await createWorkspace();
+    await korev.api.renameWorkspace(workspace.id, 'Billing spike');
+
+    await korev.api.renameWorkspace(workspace.id, ' ');
+
+    expect((await workspaceState(workspace.id)).workspace.label).toBeNull();
+  });
+
   it('keeps a workspace set to keep after merge when its PR merges', async () => {
     await korev.api.updateSettings({ archiveOnMerge: true });
     const workspace = await createWorkspace();
@@ -1143,6 +1165,21 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(nudges).toHaveLength(1);
   });
 
+  it('nests a sub-agent tool call under its Task in the transcript', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+
+    await sendAndWait(session.id, 'run-subagent');
+
+    const tools = (await korev.api.transcript(session.id)).filter(
+      (item) => item.kind === 'tool',
+    );
+    const task = tools.find((item) => item.name === 'Task');
+    const child = tools.find((item) => item.name === 'Bash');
+    expect(child).toMatchObject({ output: 'README.md' });
+    expect(child?.parentToolId).toBe(task?.id);
+  });
+
   it('reads an image the agent saved as a data URL', async () => {
     const workspace = await createWorkspace();
     const [session] = workspace.sessions;
@@ -1801,6 +1838,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       return Boolean(pending);
     });
 
+    await korev.api.renameWorkspace(origin.id, 'Settings page');
     await korev.api.respondPermission(session.id, permissionId, {
       allow: true,
       lanes: [
@@ -1820,6 +1858,11 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     const groupId = workspaces.find((ws) => ws.id === origin.id)!.groupId;
     expect(groupId).not.toBeNull();
     expect([api.groupId, ui.groupId]).toEqual([groupId, groupId]);
+    const folderId = workspaces.find((ws) => ws.id === origin.id)!.folderId;
+    expect((await korev.api.getState()).workspaceFolders).toEqual([
+      { id: folderId, repoId: origin.repoId, name: 'Settings page' },
+    ]);
+    expect([api.folderId, ui.folderId]).toEqual([folderId, folderId]);
     expect([api.branch, ui.branch]).toEqual(['dev/settings-api', 'dev/ui']);
     expect([api.repoId, api.baseBranch]).toEqual([origin.repoId, 'main']);
     const apiPrompt = (await userMessages(api.sessions[0].id)).at(-1);
@@ -2167,6 +2210,39 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       'web',
       'acme',
     ]);
+  });
+
+  it('moves a workspace into a folder of its repository and out when the folder goes', async () => {
+    const workspace = await createWorkspace();
+    const folder = await korev.api.createWorkspaceFolder(
+      workspace.repoId,
+      ' Wave 1 ',
+    );
+
+    await korev.api.moveWorkspace(workspace.id, folder.id);
+    await korev.api.renameWorkspaceFolder(folder.id, 'Wave 2');
+
+    let state = await korev.api.getState();
+    expect(state.workspaceFolders).toEqual([
+      { id: folder.id, repoId: workspace.repoId, name: 'Wave 2' },
+    ]);
+    expect(state.workspaces[0].folderId).toBe(folder.id);
+
+    await korev.api.deleteWorkspaceFolder(folder.id);
+
+    state = await korev.api.getState();
+    expect(state.workspaceFolders).toEqual([]);
+    expect(state.workspaces[0].folderId).toBeNull();
+  });
+
+  it('keeps a workspace out of a folder of another repository', async () => {
+    const workspace = await createWorkspace();
+    const [, api] = await addRepos('api');
+    const folder = await korev.api.createWorkspaceFolder(api.id, 'API');
+
+    await expect(
+      korev.api.moveWorkspace(workspace.id, folder.id),
+    ).rejects.toThrow('A workspace can only go in a folder of its repository');
   });
 
   it('keeps folders and repository order after a restart', async () => {

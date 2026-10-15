@@ -282,6 +282,18 @@ export function createClaudeParser(cwd: string): TurnParser {
     });
   }
 
+  function onSubagentEvent(event: JsonRecord, parentToolId: string) {
+    const updates =
+      event.type === 'assistant'
+        ? onAssistant(event)
+        : event.type === 'user'
+          ? onToolResults(event)
+          : [];
+    return updates.flatMap((item): ChatItem[] =>
+      item.kind === 'tool' ? [{ ...item, parentToolId }] : [],
+    );
+  }
+
   function onResult(event: JsonRecord): ChatItem[] {
     const ok = event.subtype === 'success' && event.is_error !== true;
     windowTokens = largestContextWindow(event.modelUsage) || windowTokens;
@@ -306,7 +318,8 @@ export function createClaudeParser(cwd: string): TurnParser {
     usage,
     feed(event) {
       if (typeof event.session_id === 'string') session = event.session_id;
-      if (event.parent_tool_use_id) return [];
+      const parentToolId = str(event.parent_tool_use_id);
+      if (parentToolId) return onSubagentEvent(event, parentToolId);
       switch (event.type) {
         case 'stream_event':
           return onStreamEvent(record(event.event));
