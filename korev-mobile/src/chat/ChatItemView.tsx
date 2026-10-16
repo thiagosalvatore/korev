@@ -1,5 +1,6 @@
+import { setStringAsync } from 'expo-clipboard';
 import { FileText, Paperclip } from 'lucide-react-native';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -8,6 +9,7 @@ import {
   View,
   type StyleProp,
   type TextStyle,
+  type ViewStyle,
 } from 'react-native';
 import {
   duration,
@@ -24,6 +26,7 @@ import type {
   Repo,
   TodoStatus,
 } from '../../../korev-desktop/src/shared/model';
+import { succeeded } from '../haptics';
 import { MONO_FONT, useTheme, type Theme } from '../theme';
 import { ImagePreview, ImageThumbnail } from './ImagePreview';
 import { MarkdownView } from './MarkdownView';
@@ -93,6 +96,30 @@ function MessageAttachments({
   );
 }
 
+function CopyOnLongPress({
+  text,
+  style,
+  children,
+}: {
+  text: string;
+  style?: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
+  return (
+    <Pressable
+      style={style}
+      accessibilityHint="Long press to copy"
+      onLongPress={
+        text
+          ? () => void setStringAsync(text).then(() => succeeded())
+          : undefined
+      }
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 export function UserMessage({
   item,
   sessionId,
@@ -103,15 +130,11 @@ export function UserMessage({
   const styles = useStyles();
   const { body, plans, files } = messageParts(item.text);
   return (
-    <View style={styles.userBubble}>
-      {body ? (
-        <Text selectable style={styles.text}>
-          {body}
-        </Text>
-      ) : null}
+    <CopyOnLongPress text={body} style={styles.userBubble}>
+      {body ? <Text style={styles.text}>{body}</Text> : null}
       <MessageAttachments plans={plans} files={files} sessionId={sessionId} />
       {item.queued ? <Text style={styles.dim}>Queued</Text> : null}
-    </View>
+    </CopyOnLongPress>
   );
 }
 
@@ -191,11 +214,13 @@ function AssistantMessage({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   return (
     <>
-      <MarkdownView
-        value={item.text}
-        onOpenImage={setPreviewImage}
-        repoUrl={repoUrl}
-      />
+      <CopyOnLongPress text={item.text}>
+        <MarkdownView
+          value={item.text}
+          onOpenImage={setPreviewImage}
+          repoUrl={repoUrl}
+        />
+      </CopyOnLongPress>
       <ImagePreview
         sessionId={sessionId}
         path={previewImage}
