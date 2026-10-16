@@ -20,7 +20,7 @@ class ChatRenderer extends Renderer {
     repoUrl: string | null,
     linkColor: string,
   ) {
-    super();
+    super({ selectable: false });
     this.openImage = openImage;
     this.repoUrl = repoUrl;
     this.linkColor = linkColor;
