@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type StyleProp,
   type TextStyle,
@@ -26,12 +27,15 @@ import type {
   Repo,
   TodoStatus,
 } from '../../../korev-desktop/src/shared/model';
+import { attempt } from '../attempt';
+import { chooseOption } from '../chooseOption';
 import { succeeded } from '../haptics';
 import { MONO_FONT, useTheme, type Theme } from '../theme';
 import { ImagePreview, ImageThumbnail } from './ImagePreview';
 import { MarkdownView } from './MarkdownView';
 import { PermissionCard } from './PermissionCard';
 import { PlanChip } from './PlanChip';
+import { ReaderSheet } from './ReaderSheet';
 
 type ItemOf<K extends ChatItem['kind']> = Extract<ChatItem, { kind: K }>;
 
@@ -96,7 +100,22 @@ function MessageAttachments({
   );
 }
 
-function CopyOnLongPress({
+type MessageAction = 'copy' | 'select';
+
+const MESSAGE_ACTIONS: MessageAction[] = ['copy', 'select'];
+
+const MESSAGE_ACTION_LABELS: Record<MessageAction, string> = {
+  copy: 'Copy message',
+  select: 'Select text',
+};
+
+function copyMessage(text: string) {
+  return attempt('Korev could not copy the message', () =>
+    setStringAsync(text),
+  ).then(succeeded);
+}
+
+function MessageActions({
   text,
   style,
   children,
@@ -105,18 +124,42 @@ function CopyOnLongPress({
   style?: StyleProp<ViewStyle>;
   children: ReactNode;
 }) {
+  const styles = useStyles();
+  const [selecting, setSelecting] = useState(false);
+
+  const showActions = async () => {
+    const action = await chooseOption(
+      'Message',
+      MESSAGE_ACTIONS,
+      MESSAGE_ACTION_LABELS,
+    );
+    if (action === 'copy') await copyMessage(text);
+    if (action === 'select') setSelecting(true);
+  };
+
   return (
-    <Pressable
-      style={style}
-      accessibilityHint="Long press to copy"
-      onLongPress={
-        text
-          ? () => void setStringAsync(text).then(() => succeeded())
-          : undefined
-      }
-    >
-      {children}
-    </Pressable>
+    <>
+      <Pressable
+        style={style}
+        accessibilityHint="Long press to copy or select the text"
+        onLongPress={text ? () => void showActions() : undefined}
+      >
+        {children}
+      </Pressable>
+      <ReaderSheet
+        title={MESSAGE_ACTION_LABELS.select}
+        visible={selecting}
+        onClose={() => setSelecting(false)}
+      >
+        <TextInput
+          value={text}
+          editable={false}
+          multiline
+          scrollEnabled={false}
+          style={styles.text}
+        />
+      </ReaderSheet>
+    </>
   );
 }
 
@@ -130,11 +173,11 @@ export function UserMessage({
   const styles = useStyles();
   const { body, plans, files } = messageParts(item.text);
   return (
-    <CopyOnLongPress text={body} style={styles.userBubble}>
+    <MessageActions text={body} style={styles.userBubble}>
       {body ? <Text style={styles.text}>{body}</Text> : null}
       <MessageAttachments plans={plans} files={files} sessionId={sessionId} />
       {item.queued ? <Text style={styles.dim}>Queued</Text> : null}
-    </CopyOnLongPress>
+    </MessageActions>
   );
 }
 
@@ -214,13 +257,14 @@ function AssistantMessage({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   return (
     <>
-      <CopyOnLongPress text={item.text}>
+      <MessageActions text={item.text}>
         <MarkdownView
           value={item.text}
           onOpenImage={setPreviewImage}
           repoUrl={repoUrl}
+          selectable={false}
         />
-      </CopyOnLongPress>
+      </MessageActions>
       <ImagePreview
         sessionId={sessionId}
         path={previewImage}

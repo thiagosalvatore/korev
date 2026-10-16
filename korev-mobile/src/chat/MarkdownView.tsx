@@ -19,8 +19,9 @@ class ChatRenderer extends Renderer {
     openImage: OpenImage | undefined,
     repoUrl: string | null,
     linkColor: string,
+    selectable: boolean,
   ) {
-    super({ selectable: false });
+    super({ selectable });
     this.openImage = openImage;
     this.repoUrl = repoUrl;
     this.linkColor = linkColor;
@@ -86,15 +87,17 @@ export function MarkdownView({
   value,
   onOpenImage,
   repoUrl = null,
+  selectable = true,
 }: {
   value: string;
   onOpenImage?: OpenImage;
   repoUrl?: string | null;
+  selectable?: boolean;
 }) {
   const theme = useTheme();
   const renderer = useMemo(
-    () => new ChatRenderer(onOpenImage, repoUrl, theme.accentText),
-    [onOpenImage, repoUrl, theme.accentText],
+    () => new ChatRenderer(onOpenImage, repoUrl, theme.accentText, selectable),
+    [onOpenImage, repoUrl, theme.accentText, selectable],
   );
   const elements = useMarkdown(value, {
     colorScheme: useColorScheme(),

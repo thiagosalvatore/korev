@@ -1,7 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { ActionSheetIOS, Alert, Platform } from 'react-native';
 import { fileName } from '../../../korev-desktop/src/shared/format';
+import { chooseOption } from '../chooseOption';
 
 export interface PickedFile {
   name: string;
@@ -15,33 +15,7 @@ const SOURCE_LABELS: Record<Source, string> = {
   photos: 'Photo library',
   files: 'Files',
 };
-const CANCEL = 'Cancel';
 const PHOTO_QUALITY = 0.7;
-
-function chooseSource(): Promise<Source | null> {
-  const labels = SOURCES.map((source) => SOURCE_LABELS[source]);
-  return new Promise((resolve) => {
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: [...labels, CANCEL], cancelButtonIndex: labels.length },
-        (index) => resolve(SOURCES[index] ?? null),
-      );
-      return;
-    }
-    Alert.alert(
-      'Attach',
-      undefined,
-      [
-        ...SOURCES.map((source) => ({
-          text: SOURCE_LABELS[source],
-          onPress: () => resolve(source),
-        })),
-        { text: CANCEL, style: 'cancel', onPress: () => resolve(null) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(null) },
-    );
-  });
-}
 
 async function pickPhotos(): Promise<PickedFile[]> {
   const result = await ImagePicker.launchImageLibraryAsync({
@@ -65,7 +39,7 @@ async function pickFiles(): Promise<PickedFile[]> {
 }
 
 export async function pickAttachments(): Promise<PickedFile[]> {
-  const source = await chooseSource();
+  const source = await chooseOption('Attach', SOURCES, SOURCE_LABELS);
   if (source === 'photos') return pickPhotos();
   if (source === 'files') return pickFiles();
   return [];
