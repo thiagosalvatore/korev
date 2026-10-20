@@ -182,6 +182,14 @@ export function explainerBlock(reply: string): string | null {
   return [...reply.matchAll(FENCE_PATTERN)].at(-1)?.[1] ?? null;
 }
 
+export function withoutExplainerBlocks(reply: string): string {
+  return reply.replace(FENCE_PATTERN, '').trim();
+}
+
+export function hasExplainerBlock(reply: string): boolean {
+  return explainerBlock(reply) !== null;
+}
+
 export function parseExplainer(reply: string): Result<ExplainerContent> {
   const block = explainerBlock(reply);
   if (block === null)

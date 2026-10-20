@@ -27,21 +27,10 @@ import {
   type DiffLayout,
 } from '../ui-store';
 import { CommentForm } from './CommentForm';
+import { ROW_CLASS, UnifiedRows } from './DiffRows';
 import { languageOf } from './language';
 
 const MAX_ROWS_PER_FILE = 3_000;
-const ROW_CLASS: Record<DiffRow['type'], string> = {
-  add: 'kv-diff__row--add',
-  del: 'kv-diff__row--del',
-  ctx: '',
-  hunk: 'kv-diff__row--hunk',
-};
-const SIGNS: Record<DiffRow['type'], string> = {
-  add: '+',
-  del: '−',
-  ctx: ' ',
-  hunk: '',
-};
 const NUMBER_BUTTON =
   'w-full cursor-pointer border-0 bg-transparent p-0 text-right font-mono text-inherit hover:text-accent-text';
 
@@ -259,41 +248,12 @@ export function FileDiff({
 
   function unifiedBody(rows: DiffRow[]) {
     return (
-      <table>
-        <colgroup>
-          <col className="w-11" />
-          <col className="w-11" />
-          <col className="w-4.5" />
-          <col />
-        </colgroup>
-        <tbody>
-          {rows.flatMap((row, index) => [
-            <tr key={index} className={ROW_CLASS[row.type]}>
-              {row.type === 'hunk' ? (
-                <>
-                  <td className="kv-diff__num" />
-                  <td className="kv-diff__num" />
-                  <td colSpan={2} className="pl-2">
-                    {row.code}
-                  </td>
-                </>
-              ) : (
-                <>
-                  <td className="kv-diff__num">{row.oldLine ?? ''}</td>
-                  <td className="kv-diff__num">
-                    <LineNumber line={row.newLine} onComment={setDraftLine} />
-                  </td>
-                  <td className="kv-diff__sign">{SIGNS[row.type]}</td>
-                  <td className="kv-diff__code">
-                    {highlightCode(row.code, lang)}
-                  </td>
-                </>
-              )}
-            </tr>,
-            ...notesFor(row, 4, String(index)),
-          ])}
-        </tbody>
-      </table>
+      <UnifiedRows
+        rows={rows}
+        lang={lang}
+        newLine={(line) => <LineNumber line={line} onComment={setDraftLine} />}
+        notes={notesFor}
+      />
     );
   }
 

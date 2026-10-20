@@ -23,6 +23,10 @@ import {
   type TurnChanges,
   type TurnRange,
 } from '../../shared/model';
+import {
+  hasExplainerBlock,
+  withoutExplainerBlocks,
+} from '../../shared/explainer';
 import { duration, fileName, imageType } from '../../shared/format';
 import {
   messageParts,
@@ -426,13 +430,37 @@ function UserMessage({
   );
 }
 
+function ExplainerChip({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-border-2 bg-surface px-3 py-2 text-sm text-fg-1 hover:bg-hover"
+      onClick={onOpen}
+    >
+      <Icon name="book-open-text" size={14} className="text-accent-text" />
+      Explanation ready
+      <span className="text-accent-text">Open</span>
+    </button>
+  );
+}
+
 function AssistantMessage({
   text,
+  onOpenExplainer,
   ...markdownProps
-}: Omit<ComponentProps<typeof Markdown>, 'className'>) {
+}: Omit<ComponentProps<typeof Markdown>, 'className'> & {
+  onOpenExplainer?: () => void;
+}) {
+  const explains = Boolean(onOpenExplainer) && hasExplainerBlock(text);
+  const shown = explains ? withoutExplainerBlocks(text) : text;
   return (
     <div className="group flex flex-col gap-1">
-      <Markdown text={text} className="px-1.5" {...markdownProps} />
+      {shown ? (
+        <Markdown text={shown} className="px-1.5" {...markdownProps} />
+      ) : null}
+      {explains && onOpenExplainer ? (
+        <ExplainerChip onOpen={onOpenExplainer} />
+      ) : null}
       <div className="flex px-1 opacity-0 group-hover:opacity-100">
         <IconButton
           icon="copy"
@@ -590,6 +618,7 @@ export interface TranscriptProps {
   onRetry: (text: string) => void;
   onOpenTurnFile: (file: string, range: TurnRange) => void;
   onOpenFile?: (file: string, line: number | null) => void;
+  onOpenExplainer?: () => void;
   repoUrl?: string | null;
 }
 
@@ -608,6 +637,7 @@ export function Transcript({
   onRetry,
   onOpenTurnFile,
   onOpenFile,
+  onOpenExplainer,
   repoUrl,
 }: TranscriptProps) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -676,6 +706,7 @@ export function Transcript({
                   text={item.text}
                   onOpenFile={onOpenFile}
                   onOpenImage={setPreviewImage}
+                  onOpenExplainer={onOpenExplainer}
                   repoUrl={repoUrl}
                 />
               );

@@ -4,6 +4,8 @@ import type { AppState } from '../shared/model';
 import {
   archiveWorkspace,
   createPr,
+  explainWorkspace,
+  openExplainPicker,
   newChat,
   openBoard,
   openDiff,
@@ -82,6 +84,13 @@ function paletteItems(
       run: () => void openProject(),
     },
     {
+      id: 'explain-pr',
+      label: 'Explain a pull request…',
+      icon: 'book-open-text',
+      section: 'Actions',
+      run: openExplainPicker,
+    },
+    {
       id: 'runs',
       label: 'Orchestration runs',
       icon: 'network',
@@ -105,6 +114,13 @@ function paletteItems(
             hint: '⌘⇧D',
             section: 'Actions',
             run: () => openDiff(current.id),
+          } as PaletteItem,
+          {
+            id: 'explain',
+            label: 'Explain these changes',
+            icon: 'book-open-text',
+            section: 'Actions',
+            run: () => void explainWorkspace(current),
           } as PaletteItem,
           {
             id: 'pr',

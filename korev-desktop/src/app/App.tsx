@@ -7,6 +7,7 @@ import { AskPage } from './AskPage';
 import { BoardView } from './BoardView';
 import { api } from './bridge';
 import { CommandPalette } from './CommandPalette';
+import { ExplainPrDialog } from './explainer/ExplainPrDialog';
 import { paneCount, paneWorkspaceId } from './grid';
 import { GridView } from './GridView';
 import { useAppState, useMediaQuery } from './hooks';
@@ -90,6 +91,7 @@ function Shell({ state }: { state: AppState }) {
         <WorkspaceView key={workspace.id} state={state} workspace={workspace} />
       ) : null}
       <CommandPalette state={state} />
+      <ExplainPrDialog state={state} />
     </div>
   );
 }

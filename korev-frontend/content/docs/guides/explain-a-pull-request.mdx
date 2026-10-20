@@ -1,0 +1,41 @@
+---
+title: Explain a pull request
+description: 'Get a plain-words walkthrough of a change before you review it, for your own branch or a teammate's pull request.'
+---
+
+An explanation tells you what a change does and why, in plain words, for someone who has never seen the code. Read it before you review a pull request, or before you ask a teammate to review yours.
+
+## Explain a teammate's pull request
+
+1. Choose **Explain a pull request…** in the command palette (⌘K), or **Explain a pull request** on the Ask page.
+2. Pick the repository if you have more than one.
+3. Pick a pull request. **Waiting for your review** lists the pull requests that ask for your review. **Opened by you** lists yours. Type to search, or paste a link to a pull request.
+
+Korev runs `gh pr view` and `gh pr diff`, then opens a read-only [Ask](../concepts/ask.mdx) chat named after the pull request. Nothing is checked out and the agent cannot change any files. Pick the same pull request again and Korev opens the same chat, as long as no new commits were pushed.
+
+## Explain your own changes
+
+Press **Explain** in the **Changes** tab, or on the pull request card in the pull request tab. You can also choose **Explain these changes** in the command palette. Korev compares the branch with its target branch, including files that are not committed yet, and opens a new chat in the workspace.
+
+## Read the explanation
+
+The chat opens on **Explanation**. It has:
+
+- **In one sentence**: what the change does for the people who use the product, with a short summary under it.
+- **Before** and **After**: how things behave without and with the change.
+- **How it works**: the parts of the change and how they connect. Click a box to read about it.
+- **Walkthrough**: the change in steps, in the order that makes it easy to follow. Each step shows the lines it talks about. Press **Got it, next step** or use ← and → to move. **Ask about this step** puts the step's name in the message box.
+- **Look closely**: what a reviewer should check by hand, from high to low. Click a file name to go to its step.
+- **Questions for the author**: hover a question to copy it.
+- **Other files**: files you can skim, with the reason. **Not explained** lists changed files the explanation does not mention, so read those in the diff.
+- **Words used here**: the technical words the explanation uses. In the text, these words have a dotted underline. Hover one to see its meaning.
+
+Switch to **Chat** to see the agent's work or to ask a question. A reply that holds a new explanation, for example after "explain it more simply", replaces the one you see.
+
+## When the change moves on
+
+When new commits arrive, or the branch changes, a banner says the change moved on. Press **Update** and the agent explains the new diff in the same chat.
+
+If the agent's answer cannot be read, Korev asks it once to fix it. If that fails too, the explanation shows the reason and **Try again**.
+
+The explanation uses the [review model](../concepts/agents-and-modes.mdx#review-model).

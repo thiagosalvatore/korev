@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Explain a pull request.** Press **Explain** in the Changes tab, or choose **Explain a pull request…** in the command palette or on the Ask page, to get a walkthrough of a change in plain words. It has a one-sentence summary, before and after, the steps in the order that makes sense with the real code under each one, what to look at closely, questions for the author and the words it uses. A teammate's pull request opens in a read-only Ask chat, so nothing is checked out. Korev lists every changed file the explanation leaves out, and offers **Update** when the change moves on. Switch to **Chat** to ask the agent about it.
+
 ## [0.15.0] - 2026-10-15
 
 Let one agent run a team of other agents, and see every workspace on one board.

@@ -278,6 +278,27 @@ export async function openPrAsWorkspace(workspace: Workspace, pr: PrStatus) {
   if (reportFailure(opened)) selectWorkspace(opened.value.id);
 }
 
+export async function explainWorkspace(workspace: Workspace) {
+  const started = await api.startExplainer({
+    kind: 'workspace',
+    workspaceId: workspace.id,
+  });
+  if (!reportFailure(started)) return;
+  if (getUi().page.kind !== 'workspace') selectWorkspace(workspace.id);
+  activateTab(workspace.id, `chat:${started.value.sessionId}`);
+}
+
+export function openExplainPicker() {
+  setUi({ explainPicker: true });
+}
+
+export async function explainPullRequest(repoId: string, number: number) {
+  const started = await api.startExplainer({ kind: 'pr', repoId, number });
+  if (!reportFailure(started)) return;
+  setUi({ explainPicker: false });
+  openAsk(started.value.askChatId);
+}
+
 export async function mergePr(workspace: Workspace, pr: PrStatus) {
   const result = await api.mergePr(workspace.id, pr.number);
   if (reportFailure(result)) toast('Pull request merged', 'success');

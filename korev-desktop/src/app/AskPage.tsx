@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { Button, cn, Icon, IconButton } from '../design-system';
 import type { AppState, AskChat } from '../shared/model';
-import { deleteAsk, openAsk, startAsk, startFromAsk } from './actions';
+import {
+  deleteAsk,
+  openAsk,
+  openExplainPicker,
+  startAsk,
+  startFromAsk,
+} from './actions';
 import { ChatView } from './chat/ChatView';
 import { Composer } from './chat/Composer';
 import { askRepoNames, loadoutChoices, modelChoices } from '../shared/format';
@@ -106,6 +112,27 @@ function NewAsk({
             autoFocus
             onStarted={(ask) => openAsk(ask.id)}
           />
+          <button
+            type="button"
+            className="flex cursor-pointer items-center gap-3 rounded-md border border-border-1 bg-transparent px-4 py-3 text-left hover:bg-hover"
+            onClick={openExplainPicker}
+          >
+            <Icon
+              name="book-open-text"
+              size={16}
+              className="text-accent-text"
+            />
+            <span className="flex flex-1 flex-col gap-0.5">
+              <span className="text-sm font-medium text-fg-1">
+                Explain a pull request
+              </span>
+              <span className="text-xs text-fg-3">
+                Get a plain-words walkthrough of a teammate's pull request
+                before you review it.
+              </span>
+            </span>
+            <Icon name="chevron-right" size={14} className="text-fg-4" />
+          </button>
         </div>
       </div>
     </div>

@@ -21,6 +21,8 @@ import {
 } from '../shared/model';
 import {
   createPr,
+  explainPullRequest,
+  explainWorkspace,
   fixErrors,
   openPrAsWorkspace,
   activateTab,
@@ -315,6 +317,15 @@ function Changes({
         <Button
           size="sm"
           variant="ghost"
+          icon="book-open-text"
+          disabled={!changes.length}
+          onClick={() => explainWorkspace(workspace)}
+        >
+          Explain
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
           icon="git-compare"
           disabled={!changes.length}
           onClick={() => openDiff(workspace.id)}
@@ -433,6 +444,18 @@ function PrCard({
               Fix errors
             </Button>
           ) : null}
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="book-open-text"
+            onClick={() =>
+              pr.headRefName === workspace.branch
+                ? explainWorkspace(workspace)
+                : explainPullRequest(workspace.repoId, pr.number)
+            }
+          >
+            Explain
+          </Button>
           {pr.headRefName !== workspace.branch ? (
             <Button
               size="sm"

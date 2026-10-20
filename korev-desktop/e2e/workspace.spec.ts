@@ -6,7 +6,7 @@ import {
 } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -65,7 +65,7 @@ async function pickRepositories(window: Page, names: string[]) {
     await window.getByRole('checkbox', { name }).check();
 }
 
-function launchApp(home: string) {
+function launchApp(home: string, env: NodeJS.ProcessEnv = {}) {
   return electron.launch({
     args: [
       APP_ENTRY,
@@ -77,12 +77,13 @@ function launchApp(home: string) {
       HOME: home,
       SHELL: '/bin/sh',
       PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}`,
+      ...env,
     },
   });
 }
 
-async function launch(home: string, repo: string) {
-  const app = await launchApp(home);
+async function launch(home: string, repo: string, env: NodeJS.ProcessEnv = {}) {
+  const app = await launchApp(home, env);
   await app.evaluate(({ dialog }, repoPath) => {
     dialog.showOpenDialog = (async () => ({
       canceled: false,
@@ -831,6 +832,108 @@ test('moves a workspace from Working to Done on the board', async () => {
     await expect(
       window.getByRole('main').getByText('I added agent-note.txt.'),
     ).toBeVisible();
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('explains the changes of a workspace step by step', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const { app, window } = await launch(home, repo);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window.getByRole('textbox', { name: 'Message' }).fill('Add a note');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+    await expect(window.getByText('I added agent-note.txt.')).toBeVisible();
+    await waitForAgentsToFinish(window);
+
+    const panel = window.getByRole('complementary', {
+      name: 'Workspace panel',
+    });
+    await panel.getByRole('button', { name: 'Explain', exact: true }).click();
+    const main = window.getByRole('main');
+    await expect(
+      main.getByText('The README now says how to install the app.'),
+    ).toBeVisible();
+    await expect(
+      main.getByRole('article', { name: 'Step 1: Add the install steps' }),
+    ).toBeVisible();
+    await expect(main.getByText('Not explained')).toBeVisible();
+    await snap(window, '14-explainer');
+    await main
+      .getByRole('region', { name: 'Look closely' })
+      .scrollIntoViewIfNeeded();
+    await snap(window, '14b-explainer-walkthrough');
+
+    await main.getByRole('button', { name: 'Got it, next step' }).click();
+    await expect(main.getByText('1 of 2 understood')).toBeVisible();
+    await main.getByRole('button', { name: 'Ask about this step' }).click();
+    await expect(window.getByRole('textbox', { name: 'Message' })).toHaveValue(
+      'About step 2, "Mention the CLI": ',
+    );
+
+    await main.getByRole('tab', { name: 'Chat' }).click();
+    await main.getByRole('button', { name: /Explanation ready/ }).click();
+    await expect(
+      main.getByRole('article', { name: 'Step 2: Mention the CLI' }),
+    ).toBeVisible();
+    await waitForAgentsToFinish(window);
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+const FAKE_GH = `#!/bin/sh
+case "$1 $2" in
+  "pr list")
+    case "$*" in
+      *review-requested*) echo '[{"number":42,"title":"Add install steps","headRefName":"octo/install","baseRefName":"main","author":{"login":"octo"},"isDraft":false}]' ;;
+      *) echo '[]' ;;
+    esac ;;
+  "pr view") echo '{"number":42,"url":"https://github.com/acme/web/pull/42","title":"Add install steps","author":{"login":"octo"},"headRefOid":"abc123","body":"Adds the steps."}' ;;
+  "pr diff") printf 'diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1,2 @@\n # acme\n+Install it.\n' ;;
+  *) exit 1 ;;
+esac
+`;
+
+test("explains a teammate's pull request in a read-only Ask chat", async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const fakeBin = path.join(home, 'fake-gh');
+  await mkdir(fakeBin);
+  await writeFile(path.join(fakeBin, 'gh'), FAKE_GH);
+  await chmod(path.join(fakeBin, 'gh'), 0o755);
+  await writeFile(path.join(home, '.shrc'), `export PATH=${fakeBin}:$PATH\n`);
+  const { app, window } = await launch(home, repo, {
+    ENV: path.join(home, '.shrc'),
+  });
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
+    await sidebar.getByRole('button', { name: 'Ask', exact: true }).click();
+    await window
+      .getByRole('button', { name: /^Explain a pull request/ })
+      .click();
+    const picker = window.getByRole('dialog', {
+      name: 'Explain a pull request',
+    });
+    await expect(
+      picker.getByRole('group', { name: 'Waiting for your review' }),
+    ).toBeVisible();
+    await snap(window, '15-explain-picker');
+    await picker.getByRole('option', { name: /#42 Add install steps/ }).click();
+
+    await expect(
+      window.getByText('The README now says how to install the app.'),
+    ).toBeVisible();
+    await expect(
+      sidebar.getByRole('button', { name: 'Ask #42 Add install steps' }),
+    ).toBeVisible();
+    await snap(window, '16-explainer-pr');
+    await waitForAgentsToFinish(window);
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });

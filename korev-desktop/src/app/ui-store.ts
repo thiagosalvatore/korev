@@ -78,6 +78,14 @@ export function tabKey(tab: MainTab): string {
   return tab.range ? `diff:${tab.range.to}` : 'diff';
 }
 
+export type ExplainerMode = 'explainer' | 'chat';
+
+export interface ExplainerUi {
+  mode: ExplainerMode;
+  step: number;
+  understood: number[];
+}
+
 export interface UiState {
   page: Page;
   workspaceId: string | null;
@@ -91,6 +99,8 @@ export interface UiState {
   historyOpen: boolean;
   askOpen: boolean;
   workspaces: Record<string, WorkspaceUi>;
+  explainers: Record<string, ExplainerUi>;
+  explainPicker: boolean;
   grid: GridUi;
   palette: PaletteMode;
   diffLayout: DiffLayout;
@@ -113,6 +123,8 @@ const INITIAL: UiState = {
   historyOpen: false,
   askOpen: true,
   workspaces: {},
+  explainers: {},
+  explainPicker: false,
   grid: {
     layout: '2x2',
     panes: Array<GridPane | null>(GRID_PANES).fill(null),
@@ -131,6 +143,12 @@ export const EMPTY_WORKSPACE_UI: WorkspaceUi = {
   comments: [],
 };
 
+export const EMPTY_EXPLAINER_UI: ExplainerUi = {
+  mode: 'explainer',
+  step: 0,
+  understood: [],
+};
+
 function knownGitTab(tab: string | undefined): GitPanelTab {
   return GIT_PANEL_TABS.find((known) => known === tab) ?? INITIAL.gitTab;
 }
@@ -145,6 +163,7 @@ function load(): UiState {
       ...saved,
       gitTab: knownGitTab(saved?.gitTab),
       palette: false,
+      explainPicker: false,
       updateOpen: false,
       quit: 'closed',
     };
@@ -179,6 +198,21 @@ export function updateWorkspaceUi(
       workspaces: {
         ...current.workspaces,
         [workspaceId]: { ...existing, ...update(existing) },
+      },
+    };
+  });
+}
+
+export function updateExplainerUi(
+  sessionId: string,
+  update: (current: ExplainerUi) => Partial<ExplainerUi>,
+) {
+  setUi((current) => {
+    const existing = current.explainers[sessionId] ?? EMPTY_EXPLAINER_UI;
+    return {
+      explainers: {
+        ...current.explainers,
+        [sessionId]: { ...existing, ...update(existing) },
       },
     };
   });

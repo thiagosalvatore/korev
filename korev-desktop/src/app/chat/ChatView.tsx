@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Button, Icon, Spinner } from '../../design-system';
+import { Button, Icon, Spinner, Tabs } from '../../design-system';
 import {
   AGENT_LABELS,
   finishedCodexPlan,
@@ -11,7 +11,13 @@ import {
   type ModelChoice,
   type Workspace,
 } from '../../shared/model';
-import { handoffPlan, openDiff, openFile, selectWorkspace } from '../actions';
+import {
+  focusComposer,
+  handoffPlan,
+  openDiff,
+  openFile,
+  selectWorkspace,
+} from '../actions';
 import { api } from '../bridge';
 import { loadoutChoices, modelChoices } from '../../shared/format';
 import { useRepoGithubUrl, useTranscript } from '../hooks';
@@ -24,11 +30,15 @@ import {
   workspaceLabel,
 } from '../../shared/workspaces';
 import {
+  EMPTY_EXPLAINER_UI,
   EMPTY_WORKSPACE_UI,
+  updateExplainerUi,
   updateWorkspaceUi,
   useUi,
   type DiffComment,
+  type ExplainerMode,
 } from '../ui-store';
+import { ExplainerView } from '../explainer/ExplainerView';
 import { Composer, saveDraft } from './Composer';
 import { RunDecisions } from '../RunsPage';
 import { PlanReview } from './PermissionCard';
@@ -50,6 +60,11 @@ export interface ChatViewProps {
 }
 
 const NO_COMMENTS: DiffComment[] = [];
+const EXPLAINER_TABS = [
+  { id: 'explainer', label: 'Explanation', icon: 'book-open-text' as const },
+  { id: 'chat', label: 'Chat', icon: 'message-square' as const },
+];
+const EXPLAINER_PLACEHOLDER = 'Ask a question about this change';
 const SWITCH_REPLAYS_CHAT =
   'Switching agents mid-chat replays the conversation, so the next reply is slower and uses more tokens';
 
@@ -133,6 +148,26 @@ export function ChatView({
   const archived = Boolean(workspace?.archivedAt);
   const chatRepoId = workspace?.repoId ?? repoId ?? null;
   const repoUrl = useRepoGithubUrl(chatRepoId);
+  const explainerMode = useUi(
+    (ui) => (ui.explainers[session.id] ?? EMPTY_EXPLAINER_UI).mode,
+  );
+  const explaining =
+    Boolean(session.explainer) && explainerMode === 'explainer';
+
+  function setExplainerMode(mode: ExplainerMode) {
+    updateExplainerUi(session.id, () => ({ mode }));
+  }
+
+  function prefillComposer(text: string) {
+    saveDraft(session.id, text);
+    setDraftVersion((version) => version + 1);
+    requestAnimationFrame(() => {
+      focusComposer();
+      const input = document.activeElement;
+      if (input instanceof HTMLTextAreaElement)
+        input.setSelectionRange(input.value.length, input.value.length);
+    });
+  }
 
   function changeModel(choice: ModelChoice) {
     if (choice.agent === session.agent)
@@ -146,6 +181,7 @@ export function ChatView({
   }
 
   function send(text: string, planMode = session.planMode) {
+    if (session.explainer) setExplainerMode('chat');
     return api
       .send(session.id, {
         text,
@@ -178,7 +214,28 @@ export function ChatView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {items ? (
+      {session.explainer ? (
+        <div className="flex flex-none justify-center pt-3">
+          <Tabs
+            variant="pill"
+            tabs={EXPLAINER_TABS}
+            value={explainerMode}
+            onChange={(mode) => setExplainerMode(mode as ExplainerMode)}
+          />
+        </div>
+      ) : null}
+      {session.explainer && explaining ? (
+        <ExplainerView
+          sessionId={session.id}
+          explainerRef={session.explainer}
+          items={items}
+          onAsk={prefillComposer}
+          onShowChat={() => setExplainerMode('chat')}
+          onOpenInDiff={
+            workspace ? (file) => openDiff(workspace.id, file) : null
+          }
+        />
+      ) : items ? (
         <Transcript
           sessionId={session.id}
           items={items}
@@ -214,6 +271,9 @@ export function ChatView({
           }
           onRetry={(text) => void send(text)}
           onHandoff={handoff}
+          onOpenExplainer={
+            session.explainer ? () => setExplainerMode('explainer') : undefined
+          }
           laneRepos={repos}
           repoUrl={repoUrl}
           footer={
@@ -271,8 +331,8 @@ export function ChatView({
             onDiscardPendingPlan={() =>
               void api.updateSession(session.id, { pendingPlan: null })
             }
-            placeholder={placeholder}
-            autoFocus={autoFocus}
+            placeholder={explaining ? EXPLAINER_PLACEHOLDER : placeholder}
+            autoFocus={autoFocus && !explaining}
             usage={{
               context: latestContext(items),
               limits: state.planLimits[session.agent] ?? [],

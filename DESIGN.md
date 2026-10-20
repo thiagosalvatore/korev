@@ -93,6 +93,28 @@ PR, Fix errors and Resolve conflicts send a prompt to the active chat; Merge cal
   Clicking it opens a popover with the token counts and the agent's plan limits (5-hour
   and weekly).
 
+## Explainer
+
+An explainer is a chat session whose agent writes a plain-words walkthrough of a change. Korev
+shows it in the chat area, so it works in a workspace tab, an Ask chat and a Grid pane.
+
+- **Explanation | Chat.** A pill switch on top of the session. It opens on Explanation. Sending a
+  message switches to Chat. In Chat, the agent's JSON block shows as an "Explanation ready ·
+  Open" chip.
+- **Sections**, top to bottom: header (number, author, file count, `+N −M`, **Open on GitHub**),
+  "In one sentence" card, Before and After cards (After uses `accent-subtle`), How it works
+  (numbered boxes joined by arrows; click one for its detail), Walkthrough, Look closely, Questions
+  for the author, Other files, Words used here.
+- **Walkthrough.** The steps on the left with a progress bar of the steps marked understood. The
+  step on the right has its text, a "Why" box on `accent-subtle`, and the diff rows the step cites,
+  drawn with the same rows as the Changes diff. ←/→ move between steps.
+- **Risk colours.** Look closely uses the `risk-*` tokens: high, medium, low.
+- **Glossary terms** have a dotted underline and a tooltip with the meaning.
+- **Not explained.** Changed files that no step and no routine entry names show in a `warning`
+  box, so the explanation can never hide a file.
+- **Banners** above the explanation: neutral while it updates, `danger` when an update failed,
+  `warning` with **Update** when the change moved on.
+
 ## Release notes
 
 "What's new" (after an update) and "Korev X is available" share one 560 px dialog. The title is
