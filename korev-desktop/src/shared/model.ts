@@ -329,7 +329,8 @@ export interface Settings {
   workspacesRoot: string;
   defaultEffort: Record<AgentKind, string>;
   defaultPlanMode: boolean;
-  reviewModel: ReviewModel | null;
+  reviewModel: ModelSetting | null;
+  explainModel: ModelSetting | null;
   autoRenameBranches: boolean;
   deleteBranchOnArchive: boolean;
   archiveOnMerge: boolean;
@@ -350,7 +351,7 @@ export interface Settings {
   lastSeenVersion: string | null;
 }
 
-export interface ReviewModel {
+export interface ModelSetting {
   agent: AgentKind;
   model: string;
   effort: string;

@@ -100,7 +100,7 @@ import {
   strayWorktrees,
   deleteWorkspace,
   newChatSession,
-  reviewChatSession,
+  chatSessionOn,
   onScriptExit,
   refreshStats,
   restoreWorkspace,
@@ -1204,7 +1204,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     repoGithubUrl: (repoId) => originGithubUrl(git, ctx.repo(repoId).path),
     async startReview(workspaceId) {
       const workspace = workspacePath(workspaceId);
-      const session = reviewChatSession(ctx);
+      const session = chatSessionOn(ctx, store.state.settings.reviewModel);
       const text = await actionPrompt(
         workspaceId,
         'code_review',

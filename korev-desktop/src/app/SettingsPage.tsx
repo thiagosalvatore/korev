@@ -252,7 +252,18 @@ function Models({ state }: { state: AppState }) {
           onChange={(agent) => update({ defaultAgent: agent as AgentKind })}
         />
       </Row>
-      <ReviewModel state={state} />
+      <TaskModel
+        state={state}
+        setting="reviewModel"
+        title="Review model"
+        description="Runs the Review button. Same as chats uses the default agent and its model."
+      />
+      <TaskModel
+        state={state}
+        setting="explainModel"
+        title="Explain model"
+        description="Writes explanations of pull requests and changes. Same as chats uses the default agent and its model."
+      />
       <Loadout state={state} />
       <Row
         title="Start chats in plan mode"
@@ -269,15 +280,28 @@ function Models({ state }: { state: AppState }) {
 
 const SAME_AS_CHATS = '';
 
-function ReviewModel({ state }: { state: AppState }) {
-  const { reviewModel, defaultAgent, defaultEffort } = state.settings;
-  const choices = modelChoices(state, reviewModel?.agent ?? defaultAgent);
+type ModelSettingKey = 'reviewModel' | 'explainModel';
+
+function TaskModel({
+  state,
+  setting,
+  title,
+  description,
+}: {
+  state: AppState;
+  setting: ModelSettingKey;
+  title: string;
+  description: string;
+}) {
+  const { defaultAgent, defaultEffort } = state.settings;
+  const current = state.settings[setting];
+  const choices = modelChoices(state, current?.agent ?? defaultAgent);
   const choose = (key: string) => {
     const choice = choices.find(
       (entry) => loadoutKey(entry.agent, entry.id) === key,
     );
     update({
-      reviewModel: choice
+      [setting]: choice
         ? {
             agent: choice.agent,
             model: choice.id,
@@ -287,13 +311,10 @@ function ReviewModel({ state }: { state: AppState }) {
     });
   };
   return (
-    <Row
-      title="Review model"
-      description="Runs the Review button. Same as chats uses the default agent and its model."
-    >
+    <Row title={title} description={description}>
       <div className="flex gap-2">
         <Select
-          ariaLabel="Review model"
+          ariaLabel={title}
           className="w-56"
           options={[
             { value: SAME_AS_CHATS, label: 'Same as chats' },
@@ -303,21 +324,17 @@ function ReviewModel({ state }: { state: AppState }) {
             })),
           ]}
           value={
-            reviewModel
-              ? loadoutKey(reviewModel.agent, reviewModel.model)
-              : SAME_AS_CHATS
+            current ? loadoutKey(current.agent, current.model) : SAME_AS_CHATS
           }
           onChange={choose}
         />
-        {reviewModel ? (
+        {current ? (
           <Select
-            ariaLabel="Review effort"
+            ariaLabel={`${title} effort`}
             className="w-28"
-            options={[...EFFORT_LEVELS[reviewModel.agent]]}
-            value={reviewModel.effort}
-            onChange={(effort) =>
-              update({ reviewModel: { ...reviewModel, effort } })
-            }
+            options={[...EFFORT_LEVELS[current.agent]]}
+            value={current.effort}
+            onChange={(effort) => update({ [setting]: { ...current, effort } })}
           />
         ) : null}
       </div>

@@ -5,6 +5,7 @@ import {
   presetLaneRepo,
   type AgentKind,
   type ChatSession,
+  type ModelSetting,
   type GitWorktree,
   type LaneRepo,
   type PlanLane,
@@ -105,11 +106,14 @@ export function newChatSession(ctx: Context, agent: AgentKind): ChatSession {
   };
 }
 
-export function reviewChatSession(ctx: Context): ChatSession {
-  const { reviewModel, defaultAgent } = ctx.store.state.settings;
+export function chatSessionOn(
+  ctx: Context,
+  setting: ModelSetting | null,
+): ChatSession {
+  const { defaultAgent } = ctx.store.state.settings;
   return {
-    ...newChatSession(ctx, reviewModel?.agent ?? defaultAgent),
-    ...reviewModel,
+    ...newChatSession(ctx, setting?.agent ?? defaultAgent),
+    ...setting,
   };
 }
 

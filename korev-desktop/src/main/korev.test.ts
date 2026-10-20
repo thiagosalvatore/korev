@@ -905,6 +905,36 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toMatchObject({ model: 'claude-haiku-4-5', effort: 'low' });
   });
 
+  it('starts explanations on the explain model, not the review model', async () => {
+    await korev.api.updateSettings({
+      reviewModel: {
+        agent: 'claude',
+        model: 'claude-haiku-4-5',
+        effort: 'low',
+      },
+      explainModel: {
+        agent: 'claude',
+        model: 'claude-sonnet-5-5',
+        effort: 'medium',
+      },
+    });
+    const workspace = await createWorkspace();
+    await writeFile(path.join(workspace.path, 'NOTES.md'), 'draft\n');
+
+    const started = await korev.api.startExplainer({
+      kind: 'workspace',
+      workspaceId: workspace.id,
+    });
+
+    if (!started.ok) throw new Error(started.message);
+    const state = await korev.api.getState();
+    expect(
+      state.workspaces[0].sessions.find(
+        (entry) => entry.id === started.value.sessionId,
+      ),
+    ).toMatchObject({ model: 'claude-sonnet-5-5', effort: 'medium' });
+  });
+
   it('renames the placeholder branch after the first message', async () => {
     await korev.api.updateSettings({ autoRenameBranches: true });
     const workspace = await createWorkspace();

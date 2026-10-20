@@ -18,7 +18,7 @@ import type {
 import type { TurnOutcome } from './chats';
 import { errorMessage, type Context } from './context';
 import { branchPatch } from './git';
-import { reviewChatSession } from './workspaces';
+import { chatSessionOn } from './workspaces';
 
 const GH_TIMEOUT_MS = 60_000;
 const DESCRIPTION_MAX_CHARS = 4_000;
@@ -432,7 +432,7 @@ export function createExplainers(
         value: { sessionId: reused.session.id, askChatId: reused.askChatId },
       };
     const session: ChatSession = {
-      ...reviewChatSession(ctx),
+      ...chatSessionOn(ctx, ctx.store.state.settings.explainModel),
       title: sessionTitle(target, found),
       explainer: refFor(target, found),
     };

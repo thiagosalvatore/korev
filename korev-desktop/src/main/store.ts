@@ -66,6 +66,7 @@ export function defaultSettings(home: string): Settings {
     defaultEffort: DEFAULT_EFFORT,
     defaultPlanMode: false,
     reviewModel: null,
+    explainModel: null,
     autoRenameBranches: true,
     deleteBranchOnArchive: false,
     archiveOnMerge: false,

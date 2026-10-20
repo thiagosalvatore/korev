@@ -37,6 +37,7 @@ const STATE = {
     defaultModels: { claude: CLAUDE_MODELS[0].id, codex: '' },
     defaultEffort: { claude: 'high', codex: 'medium' },
     reviewModel: null,
+    explainModel: null,
     loadout: [],
     toolApprovals: false,
     orchestration: true,
@@ -50,6 +51,24 @@ describe('Agents settings', () => {
     expect(screen.getByText('Connected')).toBeTruthy();
     expect(screen.getByText('ada@example.com')).toBeTruthy();
     expect(screen.getByLabelText('Claude Code model')).toBeTruthy();
+  });
+
+  it('keeps the explain model apart from the review model', () => {
+    render(<SettingsPage state={STATE} section="models" />);
+
+    fireEvent.change(screen.getByLabelText('Explain model'), {
+      target: { value: 'claude:claude-sonnet-5-5' },
+    });
+
+    expect(window.korev.call).toHaveBeenCalledWith('updateSettings', [
+      {
+        explainModel: {
+          agent: 'claude',
+          model: 'claude-sonnet-5-5',
+          effort: 'high',
+        },
+      },
+    ]);
   });
 
   it('offers no model choices for an agent that is not installed', () => {
