@@ -13,6 +13,16 @@ An explanation tells you what a change does and why, in plain words, for someone
 
 Korev runs `gh pr view` and `gh pr diff`, then opens a read-only [Ask](../concepts/ask.mdx) chat named after the pull request. Nothing is checked out and the agent cannot change any files. Pick the same pull request again and Korev opens the same chat, as long as no new commits were pushed.
 
+## Explain a stack
+
+When the pull request you pick builds on other open pull requests, Korev explains it together with every pull request below it, down to the default branch. Korev finds them by following each pull request's base branch, so this works for GitHub stacks and for branches you stacked by hand.
+
+- Under the title, **Stack of N** lists the pull requests from the bottom up.
+- **The stack** says what each pull request adds. Click its step count to go to its first step.
+- Each walkthrough step shows the pull request its code comes from.
+
+Pick a pull request in the middle of a stack to explain only it and the pull requests below it.
+
 ## Explain your own changes
 
 Press **Explain** in the **Changes** tab, or on the pull request card in the pull request tab. You can also choose **Explain these changes** in the command palette. Korev compares the branch with its target branch, including files that are not committed yet, and opens a new chat in the workspace.

@@ -2,11 +2,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { DiffRow } from '../../shared/diff';
 import {
   changedFiles,
+  findFilePatch,
   hunksForChange,
   uncoveredFiles,
   type ExplainerContent,
   type ExplainerRef,
-  type FilePatch,
 } from '../../shared/explainer';
 import { richSegments, type GlossaryEntry } from '../../shared/glossary';
 
@@ -157,8 +157,10 @@ export function ExplainerDocument({
   patch: string;
 }) {
   const { glossary } = content;
-  const files = new Map<string, FilePatch>(
-    changedFiles(patch).map((file) => [file.path, file]),
+  const files = changedFiles(patch);
+  const fileCount = new Set(files.map((file) => file.path)).size;
+  const summaries = new Map(
+    (content.layers ?? []).map((layer) => [layer.pr, layer.summary]),
   );
   const missing = uncoveredFiles(content, patch);
   const number =
@@ -171,7 +173,7 @@ export function ExplainerDocument({
         <span className="meta">
           {number}
           {explainerRef.author ? `@${explainerRef.author} · ` : ''}
-          {files.size} {files.size === 1 ? 'file' : 'files'}
+          {fileCount} {fileCount === 1 ? 'file' : 'files'}
           {explainerRef.url ? (
             <>
               {' · '}
@@ -200,6 +202,28 @@ export function ExplainerDocument({
           <Text text={content.after} glossary={glossary} />
         </div>
       </div>
+      {explainerRef.stack ? (
+        <Section title="The stack">
+          <ol className="flow">
+            {explainerRef.stack.map((layer, index) => (
+              <li key={layer.number}>
+                <span className="number">{index + 1}</span>
+                <div>
+                  <strong>
+                    <a href={layer.url}>#{layer.number}</a> {layer.title}
+                  </strong>
+                  <div className="muted">
+                    <Text
+                      text={summaries.get(layer.number) ?? ''}
+                      glossary={glossary}
+                    />
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </Section>
+      ) : null}
       {content.flow.length ? (
         <Section title="How it works">
           <ol className="flow">
@@ -223,6 +247,7 @@ export function ExplainerDocument({
             <summary>
               <span className="number">{index + 1}</span>
               <h3>{step.title}</h3>
+              {step.pr ? <span className="meta">#{step.pr}</span> : null}
             </summary>
             <div className="step">
               <div>
@@ -235,7 +260,7 @@ export function ExplainerDocument({
                 </div>
               ) : null}
               {step.changes.map((change, part) => {
-                const file = files.get(change.file);
+                const file = findFilePatch(files, change.file, step.pr);
                 const rows = file ? hunksForChange(file, change) : [];
                 return (
                   <div key={part} className="code">

@@ -12,11 +12,18 @@ export type ExplainerTarget =
 
 export type ExplainerStatus = 'writing' | 'ready' | 'failed';
 
+export interface StackLayer {
+  number: number;
+  title: string;
+  url: string;
+}
+
 export interface ExplainerRef {
   target: ExplainerTarget;
   title: string;
   url: string | null;
   author: string | null;
+  stack?: StackLayer[];
   revision: string;
   status: ExplainerStatus;
   error?: string;
@@ -33,6 +40,12 @@ export interface TourStep {
   explanation: string;
   why: string;
   changes: CodeChange[];
+  pr?: number;
+}
+
+export interface LayerSummary {
+  pr: number;
+  summary: string;
 }
 
 export interface Risk {
@@ -53,6 +66,7 @@ export interface ExplainerContent {
   questions: string[];
   routine: { file: string; reason: string }[];
   glossary: { term: string; meaning: string }[];
+  layers?: LayerSummary[];
 }
 
 export interface Explainer {
@@ -70,6 +84,13 @@ export interface ExplainerOpened {
 export interface FilePatch {
   path: string;
   deleted: boolean;
+  patch: string;
+  pr: number | null;
+}
+
+export interface LayerPatch {
+  number: number;
+  title: string;
   patch: string;
 }
 
@@ -123,14 +144,31 @@ function codeChange(value: unknown, at: string): CodeChange {
   return change;
 }
 
+function optionalNumber(value: unknown, at: string): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (Number.isInteger(value)) return value as number;
+  throw new ShapeError(`${at} must be a pull request number`);
+}
+
 function tourStep(value: unknown, at: string): TourStep {
   const entry = record(value, at);
-  return {
+  const step: TourStep = {
     title: text(entry.title, `${at}.title`),
     explanation: text(entry.explanation, `${at}.explanation`),
     why: text(entry.why, `${at}.why`),
     changes: list(entry.changes, `${at}.changes`, codeChange),
   };
+  const pr = optionalNumber(entry.pr, `${at}.pr`);
+  if (pr !== undefined) step.pr = pr;
+  return step;
+}
+
+function layerSummary(value: unknown, at: string): LayerSummary {
+  const entry = record(value, at);
+  const pr = optionalNumber(entry.pr, `${at}.pr`);
+  if (pr === undefined)
+    throw new ShapeError(`${at}.pr must be a pull request number`);
+  return { pr, summary: text(entry.summary, `${at}.summary`) };
 }
 
 function risk(value: unknown, at: string): Risk {
@@ -159,7 +197,7 @@ function content(value: unknown): ExplainerContent {
   const root = record(value, 'explanation');
   const tour = list(root.tour, 'tour', tourStep);
   if (!tour.length) throw new ShapeError('tour must have at least one step');
-  return {
+  const parsed: ExplainerContent = {
     headline: text(root.headline, 'headline'),
     summary: text(root.summary, 'summary'),
     before: text(root.before, 'before'),
@@ -171,6 +209,9 @@ function content(value: unknown): ExplainerContent {
     routine: list(root.routine, 'routine', pair('file', 'reason')),
     glossary: list(root.glossary, 'glossary', pair('term', 'meaning')),
   };
+  if (root.layers !== undefined && root.layers !== null)
+    parsed.layers = list(root.layers, 'layers', layerSummary);
+  return parsed;
 }
 
 const FENCE_PATTERN = new RegExp(
@@ -209,18 +250,45 @@ const FILE_HEADER = /^diff --git a\/(.+) b\/(.+)$/;
 const NEW_PATH = /^\+\+\+ b\/(.+)$/m;
 const DELETED_FILE = /^deleted file mode/m;
 
-function filePatch(patch: string): FilePatch {
+const LAYER_HEADER = /^### Pull request #(\d+)/;
+
+function filePatch(patch: string, pr: number | null): FilePatch {
   const header = FILE_HEADER.exec(patch.split('\n', 1)[0]);
   const deleted = DELETED_FILE.test(patch);
   const path = NEW_PATH.exec(patch)?.[1] ?? header?.[2] ?? '';
-  return { path, deleted, patch };
+  return { path, deleted, patch, pr };
+}
+
+export function stackPatch(layers: LayerPatch[]): string {
+  return layers
+    .map(
+      (layer) =>
+        `### Pull request #${layer.number}: ${layer.title}\n${layer.patch}`,
+    )
+    .join('\n');
 }
 
 export function changedFiles(patch: string): FilePatch[] {
-  return patch
-    .split(/^(?=diff --git )/m)
-    .filter((part) => part.startsWith('diff --git '))
-    .map(filePatch);
+  let pr: number | null = null;
+  const files: FilePatch[] = [];
+  for (const part of patch.split(/^(?=diff --git |### Pull request #)/m)) {
+    const layer = LAYER_HEADER.exec(part);
+    if (layer) pr = Number(layer[1]);
+    else if (part.startsWith('diff --git ')) files.push(filePatch(part, pr));
+  }
+  return files;
+}
+
+export function findFilePatch(
+  files: FilePatch[],
+  path: string,
+  pr?: number,
+): FilePatch | undefined {
+  const inFile = (file: FilePatch) => file.path === path;
+  return (
+    files.findLast((file) => inFile(file) && file.pr === pr) ??
+    files.findLast(inFile)
+  );
 }
 
 export function explainedFiles(content: ExplainerContent): Set<string> {
@@ -237,9 +305,8 @@ export function uncoveredFiles(
   patch: string,
 ): string[] {
   const explained = explainedFiles(content);
-  return changedFiles(patch)
-    .map((file) => file.path)
-    .filter((path) => !explained.has(path));
+  const changed = new Set(changedFiles(patch).map((file) => file.path));
+  return [...changed].filter((path) => !explained.has(path));
 }
 
 function hunks(rows: DiffRow[]): DiffRow[][] {

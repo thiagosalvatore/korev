@@ -23,6 +23,7 @@ const LISTED_MODEL_VISIBILITY = 'list';
 const CODEX_SIGNED_IN_PATTERN = /Logged in using (.+)/;
 const STDIN_PROMPT = '-';
 const READ_ONLY_DISALLOWED_TOOLS = ['Edit', 'Write', 'NotebookEdit'];
+const SHELL_TOOL = 'Bash';
 const CODEX_READ_ONLY_PROFILE = 'korev-read-only';
 const KOREV_CLI_TOOL = 'Bash(korev:*)';
 
@@ -30,6 +31,7 @@ export interface TurnRequest {
   model: string;
   planMode: boolean;
   readOnly: boolean;
+  noShell: boolean;
   effort: string;
   fast: boolean;
   toolApprovals: boolean;
@@ -56,6 +58,14 @@ function claudePermissionMode(request: TurnRequest): string {
   return request.readOnly || request.toolApprovals
     ? 'default'
     : 'bypassPermissions';
+}
+
+function disallowedTools(request: TurnRequest): string[] {
+  const tools = [
+    ...(request.readOnly ? READ_ONLY_DISALLOWED_TOOLS : []),
+    ...(request.noShell ? [SHELL_TOOL] : []),
+  ];
+  return tools.length ? ['--disallowedTools', ...tools] : [];
 }
 
 function claudeArgs(request: TurnRequest): string[] {
@@ -88,9 +98,7 @@ function claudeArgs(request: TurnRequest): string[] {
     '--append-system-prompt',
     request.systemPrompt,
     ...request.addDirs.flatMap((dir) => ['--add-dir', dir]),
-    ...(request.readOnly
-      ? ['--disallowedTools', ...READ_ONLY_DISALLOWED_TOOLS]
-      : []),
+    ...disallowedTools(request),
     ...(request.korevCli ? ['--allowedTools', KOREV_CLI_TOOL] : []),
     ...session,
   ];

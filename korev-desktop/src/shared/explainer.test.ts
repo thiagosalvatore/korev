@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   changedFiles,
+  findFilePatch,
+  stackPatch,
   hunksForChange,
   parseExplainer,
   parsePrUrl,
@@ -151,5 +153,55 @@ describe('parsePrUrl', () => {
 
   it('ignores other URLs', () => {
     expect(parsePrUrl('https://github.com/acme/web/issues/42')).toBeNull();
+  });
+});
+
+const STACK = stackPatch([
+  {
+    number: 1,
+    title: 'Add the rate',
+    patch: PATCH.split('diff --git a/src/legacy.ts')[0],
+  },
+  {
+    number: 2,
+    title: 'Use the rate',
+    patch: `diff --git a/src/tax.ts b/src/tax.ts
+--- a/src/tax.ts
++++ b/src/tax.ts
+@@ -2,1 +2,1 @@
+-export const tax = (price: number) => price * rate;
++export const tax = (price: number) => Math.round(price * rate);
+`,
+  },
+]);
+
+describe('stacks', () => {
+  it('keeps the pull request each file section comes from', () => {
+    expect(changedFiles(STACK).map((file) => [file.path, file.pr])).toEqual([
+      ['src/tax.ts', 1],
+      ['src/tax.ts', 2],
+    ]);
+  });
+
+  it('finds a file in the pull request a step names, else the top one', () => {
+    const files = changedFiles(STACK);
+    expect(findFilePatch(files, 'src/tax.ts', 1)?.patch).toContain(
+      '+export const tax',
+    );
+    expect(findFilePatch(files, 'src/tax.ts')?.patch).toContain('Math.round');
+  });
+
+  it('reads the pull request of each step and what each layer adds', () => {
+    const parsed = parseExplainer(
+      reply({
+        ...CONTENT,
+        tour: [{ ...CONTENT.tour[0], pr: 2 }],
+        layers: [{ pr: 2, summary: 'Rounds the tax.' }],
+      }),
+    );
+    expect(parsed.ok && parsed.value.tour[0].pr).toBe(2);
+    expect(parsed.ok && parsed.value.layers).toEqual([
+      { pr: 2, summary: 'Rounds the tax.' },
+    ]);
   });
 });

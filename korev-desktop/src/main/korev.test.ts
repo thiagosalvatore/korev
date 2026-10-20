@@ -76,6 +76,8 @@ let gitAddGate: Promise<void> | null = null;
 let prViewGate: Promise<void> | null = null;
 let prViewsWaiting = 0;
 let prDiff = '';
+let prsByNumber: Record<string, Record<string, unknown>> = {};
+let diffsByNumber: Record<string, string> = {};
 
 const README_PATCH = `diff --git a/README.md b/README.md
 --- a/README.md
@@ -89,7 +91,9 @@ const BRANCH_PR_URL = 'https://github.com/acme/web/pull/7';
 const NO_PR = { exitCode: 1, stdout: '', stderr: 'no pull requests found' };
 
 function fakePrView(ref: string) {
-  const pr = ref.startsWith('https://') ? prsByUrl[ref] : openPr;
+  const pr = ref.startsWith('https://')
+    ? prsByUrl[ref]
+    : (prsByNumber[ref] ?? openPr);
   return pr ? { exitCode: 0, stdout: JSON.stringify(pr), stderr: '' } : NO_PR;
 }
 
@@ -121,7 +125,18 @@ const runWithFakeSqlite: CommandRunner = async (file, args, options) => {
     return fakePrView(args[2]);
   }
   if (file === 'gh' && args[0] === 'pr' && args[1] === 'diff')
-    return { exitCode: 0, stdout: prDiff, stderr: '' };
+    return {
+      exitCode: 0,
+      stdout: diffsByNumber[args[2]] ?? prDiff,
+      stderr: '',
+    };
+  if (file === 'gh' && args[0] === 'pr' && args.includes('--head')) {
+    const head = args[args.indexOf('--head') + 1];
+    const found = Object.values(prsByNumber).filter(
+      (pr) => pr.headRefName === head,
+    );
+    return { exitCode: 0, stdout: JSON.stringify(found), stderr: '' };
+  }
   if (file === 'gh' && args[0] === 'api' && args[1] === 'graphql')
     return fakePrStack(args);
   if (file === 'gh' && isGhMerge(args)) {
@@ -253,6 +268,8 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     prViewGate = null;
     prViewsWaiting = 0;
     prDiff = '';
+    prsByNumber = {};
+    diffsByNumber = {};
     await korev.shutdown();
     vi.useRealTimers();
     await rm(home, { recursive: true, force: true });
@@ -1182,6 +1199,52 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(ask?.session.title).toBe('#42 Add install steps');
     expect(ready.ref).toMatchObject({ author: 'octo', revision: 'abc123' });
     expect(again).toEqual(started);
+  });
+
+  it('explains a pull request together with the open ones it builds on', async () => {
+    const repo = await addRepo();
+    prsByNumber = {
+      '41': {
+        number: 41,
+        url: 'https://github.com/acme/web/pull/41',
+        title: 'Add the install section',
+        headRefName: 'octo/install',
+        baseRefName: 'main',
+        headRefOid: 'aaa',
+      },
+      '42': {
+        number: 42,
+        url: 'https://github.com/acme/web/pull/42',
+        title: 'Mention the CLI',
+        headRefName: 'octo/install-cli',
+        baseRefName: 'octo/install',
+        headRefOid: 'bbb',
+      },
+    };
+    diffsByNumber = {
+      '41': README_PATCH,
+      '42': README_PATCH.replace('+Install it.', '+Put the CLI on your PATH.'),
+    };
+
+    const started = await korev.api.startExplainer({
+      kind: 'pr',
+      repoId: repo.id,
+      number: 42,
+    });
+    if (!started.ok) throw new Error(started.message);
+    const ready = await waitForExplainer(started.value.sessionId, 'ready');
+    const [prompt] = (
+      await korev.api.transcript(started.value.sessionId)
+    ).filter((item) => item.kind === 'user');
+
+    expect(ready.ref.stack?.map((layer) => layer.number)).toEqual([41, 42]);
+    expect(ready.ref.revision).toBe('aaa bbb');
+    expect(ready.patch).toMatch(
+      /### Pull request #41[\s\S]*### Pull request #42/,
+    );
+    expect(prompt.kind === 'user' && prompt.text).toContain(
+      'top of a stack of 2 pull requests',
+    );
   });
 
   it('asks once for a corrected block, then marks the explanation failed', async () => {

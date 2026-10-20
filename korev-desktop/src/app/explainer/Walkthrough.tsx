@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, cn, Icon } from '../../design-system';
 import {
+  findFilePatch,
   hunksForChange,
   type CodeChange,
   type FilePatch,
@@ -139,7 +140,14 @@ function StepList({
               >
                 {done ? <Icon name="check" size={11} /> : index + 1}
               </span>
-              <span className="leading-snug">{step.title}</span>
+              <span className="flex flex-col leading-snug">
+                {step.title}
+                {step.pr ? (
+                  <span className="font-mono text-2xs text-fg-4">
+                    #{step.pr}
+                  </span>
+                ) : null}
+              </span>
             </button>
           </li>
         );
@@ -178,7 +186,7 @@ export function Walkthrough({
   onOpenInDiff,
 }: {
   tour: TourStep[];
-  files: Map<string, FilePatch>;
+  files: FilePatch[];
   glossary: GlossaryEntry[];
   active: number;
   understood: number[];
@@ -194,7 +202,7 @@ export function Walkthrough({
     onSelect(Math.min(Math.max(active + delta, 0), tour.length - 1)),
   );
   return (
-    <div className="grid grid-cols-[minmax(160px,220px)_1fr] gap-5">
+    <div className="grid grid-cols-[minmax(160px,220px)_minmax(0,1fr)] gap-5">
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5 px-2">
           <span className="text-xs text-fg-3">
@@ -220,6 +228,7 @@ export function Walkthrough({
       >
         <span className="type-overline text-fg-3">
           Step {active + 1} of {tour.length}
+          {step.pr ? ` · #${step.pr}` : ''}
         </span>
         <h3 className="m-0 type-h2 text-fg-1">{step.title}</h3>
         <div className="flex flex-col gap-2 text-md leading-relaxed text-fg-1">
@@ -242,7 +251,7 @@ export function Walkthrough({
           <CodeExcerpt
             key={`${active}:${index}`}
             change={change}
-            file={files.get(change.file)}
+            file={findFilePatch(files, change.file, step.pr)}
             onOpenInDiff={onOpenInDiff}
           />
         ))}

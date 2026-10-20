@@ -20,6 +20,7 @@ const REQUEST: TurnRequest = {
   model: 'model',
   planMode: false,
   readOnly: false,
+  noShell: false,
   effort: 'high',
   fast: false,
   toolApprovals: false,
@@ -72,6 +73,18 @@ describe('codex sandbox', () => {
       );
     },
   );
+
+  it('keeps a chat without a shell out of Bash, and read-only out of edits', () => {
+    const args = AGENTS.claude.args({
+      ...REQUEST,
+      readOnly: true,
+      noShell: true,
+    });
+
+    expect(args.join(' ')).toContain(
+      '--disallowedTools Edit Write NotebookEdit Bash',
+    );
+  });
 
   it.each([
     { planMode: true, readOnly: false },

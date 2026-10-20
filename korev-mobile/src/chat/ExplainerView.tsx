@@ -13,6 +13,7 @@ import {
 import type { DiffRow } from '../../../korev-desktop/src/shared/diff';
 import {
   changedFiles,
+  findFilePatch,
   hunksForChange,
   uncoveredFiles,
   type CodeChange,
@@ -174,7 +175,7 @@ function Step({
 }: {
   index: number;
   content: ExplainerContent;
-  files: Map<string, FilePatch>;
+  files: FilePatch[];
   open: boolean;
   onToggle: () => void;
   styles: Styles;
@@ -198,7 +199,10 @@ function Step({
             {index + 1}
           </Text>
         </View>
-        <Text style={styles.stepTitle}>{step.title}</Text>
+        <Text style={styles.stepTitle}>
+          {step.title}
+          {step.pr ? <Text style={styles.mono}>{`  #${step.pr}`}</Text> : null}
+        </Text>
         <Chevron size={CHEVRON_SIZE} color={theme.fg3} />
       </Pressable>
       {open ? (
@@ -224,7 +228,7 @@ function Step({
             <CodeExcerpt
               key={part}
               change={change}
-              file={files.get(change.file)}
+              file={findFilePatch(files, change.file, step.pr)}
               styles={styles}
             />
           ))}
@@ -300,9 +304,9 @@ function Explanation({
   const theme = useTheme();
   const [openStep, setOpenStep] = useState<number | null>(0);
   const files = useMemo(() => changedFiles(explainer.patch), [explainer.patch]);
-  const byPath = useMemo(
-    () => new Map(files.map((file) => [file.path, file])),
-    [files],
+  const fileCount = new Set(files.map((file) => file.path)).size;
+  const summaries = new Map(
+    (content.layers ?? []).map((layer) => [layer.pr, layer.summary]),
   );
   const missing = useMemo(
     () => uncoveredFiles(content, explainer.patch),
@@ -318,7 +322,7 @@ function Explanation({
         <Text style={styles.meta}>
           {number}
           {ref.author ? `@${ref.author} · ` : ''}
-          {files.length} {files.length === 1 ? 'file' : 'files'}
+          {fileCount} {fileCount === 1 ? 'file' : 'files'}
         </Text>
         <Text accessibilityRole="header" style={styles.title}>
           {ref.title}
@@ -366,6 +370,34 @@ function Explanation({
           styles={styles}
         />
       </View>
+      {ref.stack ? (
+        <View style={styles.section}>
+          <Heading title="The stack" styles={styles} />
+          {ref.stack.map((layer, index) => (
+            <View key={layer.number} style={styles.flowRow}>
+              <View style={styles.number}>
+                <Text
+                  maxFontSizeMultiplier={CHROME_FONT_SCALE}
+                  style={styles.numberText}
+                >
+                  {index + 1}
+                </Text>
+              </View>
+              <View style={styles.flowText}>
+                <Text style={styles.strong}>
+                  #{layer.number} {layer.title}
+                </Text>
+                <RichText
+                  text={summaries.get(layer.number) ?? ''}
+                  glossary={glossary}
+                  style={styles.muted}
+                  styles={styles}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
       {content.flow.length ? (
         <View style={styles.section}>
           <Heading title="How it works" styles={styles} />
@@ -399,7 +431,7 @@ function Explanation({
             key={index}
             index={index}
             content={content}
-            files={byPath}
+            files={files}
             open={openStep === index}
             onToggle={() => setOpenStep(openStep === index ? null : index)}
             styles={styles}

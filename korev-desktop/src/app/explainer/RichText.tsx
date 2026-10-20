@@ -16,7 +16,7 @@ function GlossaryTerm({ text, meaning }: { text: string; meaning: string }) {
       {text}
       <span
         role="tooltip"
-        className="pointer-events-none invisible absolute bottom-full left-0 z-30 mb-1.5 w-64 rounded-md border border-border-2 bg-raised p-2.5 text-xs leading-snug font-normal text-fg-2 opacity-0 shadow-pop transition-opacity duration-(--dur-fast) group-hover:visible group-hover:opacity-100 group-focus:visible group-focus:opacity-100"
+        className="pointer-events-none absolute bottom-full left-0 z-30 mb-1.5 hidden w-64 rounded-md border border-border-2 bg-raised p-2.5 text-xs leading-snug font-normal text-fg-2 shadow-pop group-hover:block group-focus:block"
       >
         <span className="mb-0.5 block font-semibold text-fg-1">{text}</span>
         {meaning}

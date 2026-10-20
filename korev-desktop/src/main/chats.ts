@@ -650,6 +650,7 @@ export function createChats(
         model: options.model,
         planMode: options.planMode && !target.readOnly,
         readOnly: target.readOnly,
+        noShell: Boolean(session.explainer),
         effort: options.effort,
         fast: options.fast,
         toolApprovals: ctx.store.state.settings.toolApprovals,

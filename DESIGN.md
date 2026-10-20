@@ -110,6 +110,9 @@ shows it in the chat area, so it works in a workspace tab, an Ask chat and a Gri
   step on the right has its text, a "Why" box on `accent-subtle`, and the diff rows the step cites,
   drawn with the same rows as the Changes diff. ←/→ move between steps.
 - **Risk colours.** Look closely uses the `risk-*` tokens: high, medium, low.
+- **Stacks.** Under the title, "Stack of N" lists the pull requests from the bottom up. **The stack**
+  section comes after Before and After: one card per pull request with its number, title, what it adds
+  and a button to its first step. Each walkthrough step shows its pull request number under its title.
 - **Glossary terms** have a dotted underline and a tooltip with the meaning.
 - **Not explained.** Changed files that no step and no routine entry names show in a `warning`
   box, so the explanation can never hide a file.

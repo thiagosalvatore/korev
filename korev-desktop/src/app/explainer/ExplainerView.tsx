@@ -16,7 +16,9 @@ import {
   type ExplainerContent,
   type ExplainerRef,
   type FilePatch,
+  type LayerSummary,
   type RiskLevel,
+  type StackLayer,
   type TourStep,
 } from '../../shared/explainer';
 import type { ChatItem } from '../../shared/model';
@@ -198,6 +200,7 @@ function Header({
   const { ref } = explainer;
   const totals = useMemo(() => patchTotals(files), [files]);
   const number = ref.target.kind === 'pr' ? ref.target.number : null;
+  const fileCount = new Set(files.map((file) => file.path)).size;
   return (
     <header className="flex flex-col gap-2">
       <div className="flex items-center gap-2 text-xs text-fg-3">
@@ -208,7 +211,7 @@ function Header({
         {number === null ? <span>This branch</span> : <span>#{number}</span>}
         {ref.author ? <span>· @{ref.author}</span> : null}
         <span>
-          · {files.length} {files.length === 1 ? 'file' : 'files'}
+          · {fileCount} {fileCount === 1 ? 'file' : 'files'}
         </span>
         <DiffStat
           additions={totals.additions}
@@ -236,7 +239,98 @@ function Header({
         </Button>
       </div>
       <h1 className="m-0 type-h2 text-fg-1">{ref.title}</h1>
+      {ref.stack ? <StackPath stack={ref.stack} /> : null}
     </header>
+  );
+}
+
+function StackPath({ stack }: { stack: StackLayer[] }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs text-fg-3">
+      <Icon name="layers" size={13} />
+      <span>Stack of {stack.length}:</span>
+      {stack.map((layer, index) => (
+        <span key={layer.number} className="flex items-center gap-1.5">
+          {index ? (
+            <Icon name="arrow-right" size={11} className="text-fg-4" />
+          ) : null}
+          <button
+            type="button"
+            title={layer.title}
+            className="cursor-pointer border-0 bg-transparent p-0 font-mono text-xs text-accent-text hover:underline"
+            onClick={() => void api.openExternal(layer.url)}
+          >
+            #{layer.number}
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function StackLayers({
+  stack,
+  layers,
+  tour,
+  glossary,
+  onOpenStep,
+}: {
+  stack: StackLayer[];
+  layers: LayerSummary[];
+  tour: TourStep[];
+  glossary: GlossaryEntry[];
+  onOpenStep: (index: number) => void;
+}) {
+  const summaries = new Map(layers.map((layer) => [layer.pr, layer.summary]));
+  return (
+    <Section icon="layers" title="The stack">
+      <p className="m-0 text-sm text-fg-3">
+        From the bottom of the stack up. Each pull request builds on the one
+        before it.
+      </p>
+      <ol className="m-0 flex list-none flex-col gap-2 p-0">
+        {stack.map((layer, position) => {
+          const steps = tour.flatMap((step, index) =>
+            step.pr === layer.number ? [index] : [],
+          );
+          const summary = summaries.get(layer.number);
+          return (
+            <li
+              key={layer.number}
+              aria-label={`#${layer.number} ${layer.title}`}
+              className="flex gap-3 rounded-md border border-border-1 bg-surface px-4 py-3"
+            >
+              <span className="mt-0.5 flex size-[22px] flex-none items-center justify-center rounded-full bg-inset text-2xs font-semibold text-fg-2">
+                {position + 1}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="text-sm font-semibold text-fg-1">
+                  <span className="font-mono text-accent-text">
+                    #{layer.number}
+                  </span>{' '}
+                  {layer.title}
+                </span>
+                {summary ? (
+                  <div className="flex flex-col gap-1 text-sm leading-relaxed text-fg-2">
+                    <RichText text={summary} glossary={glossary} />
+                  </div>
+                ) : null}
+              </div>
+              {steps.length ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconRight="arrow-down"
+                  onClick={() => onOpenStep(steps[0])}
+                >
+                  {steps.length} {steps.length === 1 ? 'step' : 'steps'}
+                </Button>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+    </Section>
   );
 }
 
@@ -490,10 +584,6 @@ function Explanation({
     useUi((state) => state.explainers[sessionId]) ?? EMPTY_EXPLAINER_UI;
   const walkthrough = useRef<HTMLDivElement>(null);
   const files = useMemo(() => changedFiles(explainer.patch), [explainer.patch]);
-  const byPath = useMemo(
-    () => new Map(files.map((file) => [file.path, file])),
-    [files],
-  );
   const step = Math.min(ui.step, content.tour.length - 1);
 
   function setActive(index: number) {
@@ -509,8 +599,7 @@ function Explanation({
     if (index < content.tour.length - 1) setActive(index + 1);
   }
 
-  function openRisk(file: string) {
-    const index = stepOfFile(content.tour, file);
+  function openStep(index: number) {
     if (index >= 0) setActive(index);
     walkthrough.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -519,12 +608,21 @@ function Explanation({
     <div className="flex flex-col gap-8">
       <Header explainer={explainer} content={content} files={files} />
       <Overview content={content} glossary={content.glossary} />
+      {explainer.ref.stack ? (
+        <StackLayers
+          stack={explainer.ref.stack}
+          layers={content.layers ?? []}
+          tour={content.tour}
+          glossary={content.glossary}
+          onOpenStep={openStep}
+        />
+      ) : null}
       <Flow flow={content.flow} glossary={content.glossary} />
       <div ref={walkthrough} className="scroll-mt-4">
         <Section icon="footprints" title="Walkthrough">
           <Walkthrough
             tour={content.tour}
-            files={byPath}
+            files={files}
             glossary={content.glossary}
             active={step}
             understood={ui.understood.filter(
@@ -542,7 +640,7 @@ function Explanation({
       <Risks
         risks={content.risks}
         glossary={content.glossary}
-        onOpen={openRisk}
+        onOpen={(file) => openStep(stepOfFile(content.tour, file))}
       />
       <Questions questions={content.questions} />
       <Files content={content} patch={explainer.patch} />
