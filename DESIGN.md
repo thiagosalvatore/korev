@@ -101,7 +101,8 @@ shows it in the chat area, so it works in a workspace tab, an Ask chat and a Gri
 - **Explanation | Chat.** A pill switch on top of the session. It opens on Explanation. Sending a
   message switches to Chat. In Chat, the agent's JSON block shows as an "Explanation ready ·
   Open" chip.
-- **Sections**, top to bottom: header (number, author, file count, `+N −M`, **Open on GitHub**),
+- **Sections**, top to bottom: header (number, author, file count, `+N −M`, **Open on GitHub**,
+  **Export HTML**),
   "In one sentence" card, Before and After cards (After uses `accent-subtle`), How it works
   (numbered boxes joined by arrows; click one for its detail), Walkthrough, Look closely, Questions
   for the author, Other files, Words used here.
@@ -112,6 +113,9 @@ shows it in the chat area, so it works in a workspace tab, an Ask chat and a Gri
 - **Glossary terms** have a dotted underline and a tooltip with the meaning.
 - **Not explained.** Changed files that no step and no routine entry names show in a `warning`
   box, so the explanation can never hide a file.
+- **Export HTML** writes one file with its own styles copied from the token values, light and dark
+  through `prefers-color-scheme`. It has no scripts: steps are `<details>`, glossary terms are
+  `<abbr>`.
 - **Banners** above the explanation: neutral while it updates, `danger` when an update failed,
   `warning` with **Update** when the change moved on.
 

@@ -23,6 +23,7 @@ import type { ChatItem } from '../../shared/model';
 import { api } from '../bridge';
 import { reportFailure, toast } from '../ui/toast';
 import { EMPTY_EXPLAINER_UI, updateExplainerUi, useUi } from '../ui-store';
+import { downloadExplainer } from './exportHtml';
 import { RichText } from './RichText';
 import type { GlossaryEntry } from './glossary';
 import { Walkthrough } from './Walkthrough';
@@ -187,9 +188,11 @@ function StatusBanner({
 
 function Header({
   explainer,
+  content,
   files,
 }: {
   explainer: Explainer;
+  content: ExplainerContent;
   files: FilePatch[];
 }) {
   const { ref } = explainer;
@@ -223,6 +226,14 @@ function Header({
             Open on GitHub
           </Button>
         ) : null}
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="download"
+          onClick={() => downloadExplainer(ref, content, explainer.patch)}
+        >
+          Export HTML
+        </Button>
       </div>
       <h1 className="m-0 type-h2 text-fg-1">{ref.title}</h1>
     </header>
@@ -506,7 +517,7 @@ function Explanation({
 
   return (
     <div className="flex flex-col gap-8">
-      <Header explainer={explainer} files={files} />
+      <Header explainer={explainer} content={content} files={files} />
       <Overview content={content} glossary={content.glossary} />
       <Flow flow={content.flow} glossary={content.glossary} />
       <div ref={walkthrough} className="scroll-mt-4">

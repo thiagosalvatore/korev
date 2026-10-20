@@ -6,7 +6,14 @@ import {
 } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -933,6 +940,18 @@ test("explains a teammate's pull request in a read-only Ask chat", async () => {
       sidebar.getByRole('button', { name: 'Ask #42 Add install steps' }),
     ).toBeVisible();
     await snap(window, '16-explainer-pr');
+
+    const exported = path.join(home, 'explanation.html');
+    await app.evaluate(({ session }, savePath) => {
+      session.defaultSession.once('will-download', (_event, item) =>
+        item.setSavePath(savePath),
+      );
+    }, exported);
+    await window.getByRole('button', { name: 'Export HTML' }).click();
+    await expect.poll(() => existsSync(exported)).toBe(true);
+    await expect
+      .poll(async () => readFile(exported, 'utf8'))
+      .toContain('The README now says how to install the app.');
     await waitForAgentsToFinish(window);
   } finally {
     await app.close();
