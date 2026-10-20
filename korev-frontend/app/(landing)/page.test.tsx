@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import Home from './page';
 
 beforeAll(() => {
@@ -20,6 +20,8 @@ beforeAll(() => {
   vi.stubGlobal('matchMedia', () => ({ matches: false }));
 });
 
+afterEach(cleanup);
+
 describe('landing page', () => {
   it('renders the hero and switches the demo scene from the strip', () => {
     render(<Home />);
@@ -34,5 +36,14 @@ describe('landing page', () => {
     fireEvent.click(screen.getByRole('button', { name: /Review the diff/ }));
 
     expect(document.querySelector('.km-difftool')).not.toBeNull();
+  });
+
+  it('shows the explainer among the features', () => {
+    render(<Home />);
+    expect(
+      screen.getByRole('heading', {
+        name: 'Understand a pull request before you review it.',
+      }),
+    ).toBeTruthy();
   });
 });

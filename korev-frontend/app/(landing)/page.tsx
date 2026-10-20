@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import {
+  BookOpenText,
   FileDiff,
   GitBranch,
   GitPullRequestArrow,
@@ -11,6 +12,7 @@ import { Also } from '@/components/landing/Also';
 import { Download, Footer, Nav } from '@/components/landing/Chrome';
 import {
   Branch,
+  Explain,
   Linked,
   MainCommit,
   Review,
@@ -118,6 +120,20 @@ function FeatureGraph() {
         card={<Review />}
       />
       <MainCommit sha="e7d2b18" message="Merge #481 Fix flaky checkout test" />
+      <BranchSection
+        name="Explain"
+        icon={BookOpenText}
+        shortcut="Explain · a pull request or a stack"
+        title="Understand a pull request before you review it."
+        body="Korev explains any pull request in plain words, yours or a teammate’s. Each step shows the real lines it talks about."
+        points={[
+          'A stack of pull requests reads as one change, layer by layer',
+          'Lists every changed file the explanation leaves out',
+          'Export it as one HTML file, or read it on your phone',
+        ]}
+        card={<Explain />}
+      />
+      <MainCommit sha="3f9a6d0" message="Merge #480 Webhook retries" />
       <BranchSection
         name="Ship"
         icon={GitPullRequestArrow}

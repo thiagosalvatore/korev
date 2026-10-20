@@ -3,7 +3,11 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Archive,
+  BookOpenText,
+  Check,
   ChevronRight,
+  Eye,
+  Layers,
   FileCode2,
   FolderTree,
   GitBranchPlus,
@@ -227,6 +231,72 @@ export function Ship() {
             {k < MILESTONES.length - 1 && <ChevronRight size={12} />}
           </Fragment>
         ))}
+      </div>
+    </div>
+  );
+}
+
+interface ExplainStep {
+  title: string;
+  lines: [start: number, end: number];
+  newStart: number;
+}
+
+const EXPLAIN_STEPS: ExplainStep[] = [
+  { title: 'Read what the limiter already knows', lines: [2, 5], newStart: 19 },
+  {
+    title: 'Send the limits back on every response',
+    lines: [5, 8],
+    newStart: 20,
+  },
+  { title: 'Say why a request was refused', lines: [8, 11], newStart: 23 },
+];
+
+export function Explain() {
+  const current = useTick(2600, EXPLAIN_STEPS.length);
+  const [start, end] = EXPLAIN_STEPS[current].lines;
+  const newStart = EXPLAIN_STEPS[current].newStart;
+  return (
+    <div className="b-card">
+      <div className="hd">
+        <BookOpenText size={13} />
+        #482 Rate limit headers
+        <span className="r b-stack">
+          <Layers size={12} />
+          Stack of 2 · #481 → #482
+        </span>
+      </div>
+      <div className="b-explain">
+        <span className="ov">In one sentence</span>
+        <p className="hl">
+          API clients now see how many requests they have left, and why a
+          request was refused.
+        </p>
+        <ol className="b-tour">
+          {EXPLAIN_STEPS.map((step, index) => (
+            <li
+              key={step.title}
+              className={
+                index === current ? 'on' : index < current ? 'done' : undefined
+              }
+            >
+              <span className="n">
+                {index < current ? <Check size={11} /> : index + 1}
+              </span>
+              {step.title}
+            </li>
+          ))}
+        </ol>
+        <DiffHunk
+          oldStart={newStart}
+          newStart={newStart}
+          lines={RATE_LIMIT_DIFF.slice(start, end)}
+        />
+        <div className="b-risk">
+          <Eye size={13} />
+          <b>Medium</b>
+          Every caller can now read the limit, anonymous ones too.
+        </div>
       </div>
     </div>
   );

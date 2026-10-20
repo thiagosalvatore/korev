@@ -28,6 +28,7 @@ Each task gets a git worktree with its own chats, terminal, diff and pull reques
 
 - **Workspaces.** A workspace is a git worktree on its own branch, so agents in two workspaces never edit the same files. Korev copies your `.env` files, runs your setup script and gives each workspace ten ports, starting at `$KOREV_PORT`.
 - **Review.** The Changes tab lists every file that differs from the target branch. Comment on lines, then send all the comments to the agent as one message, or open a review chat with its own model.
+- **Explain.** Get a plain-words walkthrough of any pull request before you review it, yours or a teammate's, or a whole stack. Each step shows the real lines it talks about, and Korev lists every changed file the explanation leaves out.
 - **Ship.** The header always shows the next git step: **Create PR** → **Fix errors** → **Merge** → **Archive**. Failing checks and GitHub review comments go to the agent with their links.
 - **Ask and linked workspaces.** Ask reads the default branch and cannot edit files. When the plan is ready, start one linked workspace per repository with the whole conversation.
 - **The agents you already have.** Korev runs the `claude` and `codex` CLIs with their own sign-in, MCP servers and skills, and uses `gh` for pull requests and checks.
@@ -38,7 +39,7 @@ Each task gets a git worktree with its own chats, terminal, diff and pull reques
 1. **Add a repository.** Open a folder on your Mac or clone one from a URL.
 2. **Start a workspace.** Press ⌘N and describe the task. Korev creates a worktree on a new branch, copies your local `.env` files, runs your setup script and sends the task to the agent.
 3. **Watch and steer.** The agent works in the chat. Send another message at any time to steer it.
-4. **Review.** Read the diff, leave line comments for the agent, or start a review chat.
+4. **Review.** Let Korev explain the changes in plain words, read the diff, leave line comments for the agent, or start a review chat.
 5. **Ship.** The header button walks you through creating the pull request, fixing errors, merging and archiving.
 
 ## Install

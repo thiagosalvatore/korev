@@ -483,6 +483,94 @@
 .b-steps span.s.done {
   color: var(--fg-2);
 }
+.b-stack {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 11.5px var(--font-mono);
+  color: var(--accent-text);
+}
+.b-explain {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px 18px;
+}
+.b-explain .ov {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.b-explain .hl {
+  margin: -6px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--fg-1);
+}
+.b-tour {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--fg-3);
+}
+.b-tour li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  transition: all var(--dur-base);
+}
+.b-tour li.on {
+  background: var(--bg-active);
+  color: var(--fg-1);
+}
+.b-tour li.done {
+  color: var(--fg-2);
+}
+.b-tour .n {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  background: var(--bg-inset);
+}
+.b-tour li.on .n {
+  background: var(--accent);
+  color: var(--fg-on-accent);
+}
+.b-tour li.done .n {
+  background: var(--success-subtle);
+  color: var(--success-text);
+}
+.b-risk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-left: 3px solid var(--warning);
+  border-radius: 6px;
+  background: var(--warning-subtle);
+  font-size: 12.5px;
+  color: var(--fg-2);
+}
+.b-risk b {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  color: var(--warning-text);
+}
 .b-link {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 88px minmax(0, 1fr);
