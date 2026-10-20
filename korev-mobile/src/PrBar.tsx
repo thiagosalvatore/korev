@@ -123,14 +123,21 @@ function prOptions(prs: PrStatus[], chosen: PrStatus): PickerOption[] {
   }));
 }
 
+function hasChanges(runtime: WorkspaceRuntime | undefined): boolean {
+  const stats = runtime?.stats;
+  return Boolean(runtime?.prs.length || stats?.additions || stats?.deletions);
+}
+
 export function PrBar({
   workspace,
   runtime,
   sessionId,
+  onExplained,
 }: {
   workspace: Workspace;
   runtime: WorkspaceRuntime | undefined;
   sessionId: string | undefined;
+  onExplained: (sessionId: string) => void;
 }) {
   const { api } = useConnection();
   const theme = useTheme();
@@ -142,6 +149,16 @@ export function PrBar({
   const pr = primaryPr(workspace, runtime, chosenUrl);
   const step = nextPrStep(pr);
   const needsChat = PROMPT_STEPS.has(step);
+
+  const explain = () =>
+    attempt('Korev could not explain the changes', async () => {
+      const started = await api.startExplainer({
+        kind: 'workspace',
+        workspaceId: workspace.id,
+      });
+      if (started.ok) onExplained(started.value.sessionId);
+      return started;
+    });
 
   return (
     <View style={styles.panel}>
@@ -181,11 +198,20 @@ export function PrBar({
             onSelect={setChosenUrl}
           />
         ) : null}
+        {hasChanges(runtime) ? (
+          <Button
+            label="Explain"
+            variant="secondary"
+            pending={pending === 'explain'}
+            disabled={pending !== null}
+            onPress={() => void run('explain', explain)}
+          />
+        ) : null}
         <Button
           label={PR_STEPS[step].label}
           variant={PR_STEPS[step].tone}
-          pending={pending !== null}
-          disabled={needsChat && !sessionId}
+          pending={pending === step}
+          disabled={(needsChat && !sessionId) || pending !== null}
           onPress={() =>
             void run(step, () =>
               runStep(api, step, workspace, pr, sessionId ?? ''),

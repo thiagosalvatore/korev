@@ -8,7 +8,7 @@ import {
   type ExplainerRef,
   type FilePatch,
 } from '../../shared/explainer';
-import { richSegments, type GlossaryEntry } from './glossary';
+import { richSegments, type GlossaryEntry } from '../../shared/glossary';
 
 const STYLES = `
 :root {

@@ -25,7 +25,7 @@ import { reportFailure, toast } from '../ui/toast';
 import { EMPTY_EXPLAINER_UI, updateExplainerUi, useUi } from '../ui-store';
 import { downloadExplainer } from './exportHtml';
 import { RichText } from './RichText';
-import type { GlossaryEntry } from './glossary';
+import type { GlossaryEntry } from '../../shared/glossary';
 import { Walkthrough } from './Walkthrough';
 
 const RISK_STYLES: Record<RiskLevel, { label: string; className: string }> = {

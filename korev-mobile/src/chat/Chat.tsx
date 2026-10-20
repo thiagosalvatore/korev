@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
+  Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -30,14 +31,63 @@ import { useRepoGithubUrl, useTranscript } from '../hooks';
 import { Loading } from '../Offline';
 import { useConnection } from '../korev';
 import { useTheme, type Theme } from '../theme';
-import { ICON_BUTTON_ICON_SIZE, ICON_BUTTON_SIZE, IconButton } from '../ui';
+import {
+  CHROME_FONT_SCALE,
+  ICON_BUTTON_ICON_SIZE,
+  ICON_BUTTON_SIZE,
+  IconButton,
+  touchSlop,
+} from '../ui';
 import { ChatItemView } from './ChatItemView';
 import { Composer } from './Composer';
+import { ExplainerView } from './ExplainerView';
 import { pendingSend, withPendingMessage, type PendingSend } from './pending';
 import { PlanReview } from './PermissionCard';
 import { WorkingIndicator } from './WorkingIndicator';
 
 const FADE_MS = 150;
+const MODE_HEIGHT = 30;
+
+type ChatMode = 'explainer' | 'chat';
+
+const MODES: { id: ChatMode; label: string }[] = [
+  { id: 'explainer', label: 'Explanation' },
+  { id: 'chat', label: 'Chat' },
+];
+
+function ModeSwitch({
+  mode,
+  onChange,
+}: {
+  mode: ChatMode;
+  onChange: (mode: ChatMode) => void;
+}) {
+  const styles = makeStyles(useTheme());
+  return (
+    <View accessibilityRole="tablist" style={styles.modes}>
+      {MODES.map((entry) => (
+        <Pressable
+          key={entry.id}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: entry.id === mode }}
+          hitSlop={touchSlop(MODE_HEIGHT)}
+          style={[styles.mode, entry.id === mode && styles.modeSelected]}
+          onPress={() => onChange(entry.id)}
+        >
+          <Text
+            maxFontSizeMultiplier={CHROME_FONT_SCALE}
+            style={[
+              styles.modeText,
+              entry.id === mode && styles.modeTextSelected,
+            ]}
+          >
+            {entry.label}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
 
 function emptyChatHint(state: AppState, session: ChatSession): string {
   const agent = AGENT_LABELS[session.agent];
@@ -88,15 +138,19 @@ export function Chat({
   const { height: windowHeight } = useWindowDimensions();
   const [scrolledBack, setScrolledBack] = useState(false);
   const [pending, setPending] = useState<PendingSend | null>(null);
+  const [mode, setMode] = useState<ChatMode>('explainer');
+  const explaining = Boolean(session.explainer) && mode === 'explainer';
   const running = state.runningSessions.includes(session.id);
   const shown = items && withPendingMessage(items, pending);
   const working = running || shown !== items;
   const lastUser = shown?.findLast((item) => item.kind === 'user');
 
-  const startSending = (text: string) =>
+  const startSending = (text: string) => {
+    setMode('chat');
     setPending(
       text && items ? pendingSend(items, text, new Date().toISOString()) : null,
     );
+  };
 
   const respond = (itemId: string, response: PermissionResponse) =>
     attempt('Korev could not send your answer', () =>
@@ -143,7 +197,14 @@ export function Chat({
       behavior="padding"
       keyboardVerticalOffset={headerHeight}
     >
-      {shown ? (
+      {session.explainer ? <ModeSwitch mode={mode} onChange={setMode} /> : null}
+      {explaining ? (
+        <ExplainerView
+          session={session}
+          items={items}
+          onShowChat={() => setMode('chat')}
+        />
+      ) : shown ? (
         <View style={styles.fill}>
           <FlatList
             ref={list}
@@ -159,6 +220,9 @@ export function Chat({
                 laneRepos={laneRepos}
                 onRespond={respond}
                 onHandoff={handoff}
+                onOpenExplainer={
+                  session.explainer ? () => setMode('explainer') : undefined
+                }
               />
             )}
             ListHeaderComponent={
@@ -210,6 +274,26 @@ export function Chat({
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
     fill: { flex: 1 },
+    modes: {
+      flexDirection: 'row',
+      alignSelf: 'center',
+      gap: 2,
+      marginTop: 8,
+      padding: 2,
+      borderRadius: 8,
+      backgroundColor: theme.bgSurface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border1,
+    },
+    mode: {
+      minHeight: MODE_HEIGHT,
+      justifyContent: 'center',
+      paddingHorizontal: 14,
+      borderRadius: 6,
+    },
+    modeSelected: { backgroundColor: theme.bgActive },
+    modeText: { color: theme.fg3, fontSize: 13, fontWeight: '500' },
+    modeTextSelected: { color: theme.fg1 },
     transcript: { padding: 12, gap: 12 },
     emptyTranscript: { flexGrow: 1, justifyContent: 'center', padding: 24 },
     emptyHint: {

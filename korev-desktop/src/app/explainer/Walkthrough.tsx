@@ -9,7 +9,7 @@ import {
 import { UnifiedRows } from '../diff/DiffRows';
 import { languageOf } from '../diff/language';
 import { RichText } from './RichText';
-import type { GlossaryEntry } from './glossary';
+import type { GlossaryEntry } from '../../shared/glossary';
 
 const COLLAPSED_ROW_LIMIT = 120;
 const TYPING_TARGETS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);

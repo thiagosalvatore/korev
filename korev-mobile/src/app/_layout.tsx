@@ -39,6 +39,10 @@ function Screens() {
             name="ask/new"
             options={{ title: 'Ask a question', presentation: 'modal' }}
           />
+          <Stack.Screen
+            name="ask/explain"
+            options={{ title: 'Explain a pull request', presentation: 'modal' }}
+          />
           <Stack.Screen name="ask/[id]" options={{ title: '' }} />
         </Stack.Protected>
         <Stack.Protected guard={connection === null}>

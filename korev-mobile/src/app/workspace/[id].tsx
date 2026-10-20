@@ -176,7 +176,12 @@ export default function WorkspaceScreen() {
   return (
     <>
       <Stack.Screen options={{ title: workspaceTitle(state, workspace) }} />
-      <PrBar workspace={workspace} runtime={runtime} sessionId={session?.id} />
+      <PrBar
+        workspace={workspace}
+        runtime={runtime}
+        sessionId={session?.id}
+        onExplained={setSelectedId}
+      />
       {coordinatedRun ? <RunDecisions run={coordinatedRun} /> : null}
       <SessionTabs
         state={state}

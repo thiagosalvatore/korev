@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import type { ReactNode } from 'react';
 import {
+  BookOpenText,
   FolderGit2,
   MessageCircleQuestion,
   Plus,
@@ -10,7 +11,11 @@ import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { RemotePairing } from '../../../../korev-desktop/src/shared/model';
 import { useAppState } from '../../hooks';
 import { useKorev } from '../../korev';
-import { openNewAsk, openNewWorkspace } from '../../navigation';
+import {
+  openExplainPullRequest,
+  openNewAsk,
+  openNewWorkspace,
+} from '../../navigation';
 import { confirmUnpair } from '../../Offline';
 import { useOpenTappedWorkspace } from '../../push';
 import { useTheme, type Theme } from '../../theme';
@@ -174,13 +179,22 @@ export default function TabsLayout() {
         options={{
           title: 'Ask',
           headerRight: () => (
-            <HeaderButton
-              label="Ask a question"
-              onPress={openNewAsk}
-              styles={styles}
-            >
-              <Plus size={HEADER_ICON_SIZE} color={theme.fg2} />
-            </HeaderButton>
+            <View style={styles.headerButtons}>
+              <HeaderButton
+                label="Explain a pull request"
+                onPress={openExplainPullRequest}
+                styles={styles}
+              >
+                <BookOpenText size={HEADER_ICON_SIZE} color={theme.fg2} />
+              </HeaderButton>
+              <HeaderButton
+                label="Ask a question"
+                onPress={openNewAsk}
+                styles={styles}
+              >
+                <Plus size={HEADER_ICON_SIZE} color={theme.fg2} />
+              </HeaderButton>
+            </View>
           ),
           tabBarIcon: ({ color, size }) => (
             <MessageCircleQuestion size={size} color={color} />
@@ -210,6 +224,7 @@ function makeStyles(theme: Theme) {
       textTransform: 'uppercase',
     },
     headerButton: { paddingHorizontal: 16 },
+    headerButtons: { flexDirection: 'row' },
     centerSlot: { flex: 1, alignItems: 'center' },
     centerButton: {
       width: CENTER_BUTTON_SIZE,

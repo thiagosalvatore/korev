@@ -18,6 +18,10 @@ import {
   imageType,
 } from '../../../korev-desktop/src/shared/format';
 import {
+  hasExplainerBlock,
+  withoutExplainerBlocks,
+} from '../../../korev-desktop/src/shared/explainer';
+import {
   messageParts,
   type MessageParts,
 } from '../../../korev-desktop/src/shared/message';
@@ -31,6 +35,7 @@ import { attempt } from '../attempt';
 import { chooseOption } from '../chooseOption';
 import { succeeded } from '../haptics';
 import { MONO_FONT, useTheme, type Theme } from '../theme';
+import { MIN_TOUCH_TARGET } from '../ui';
 import { ImagePreview, ImageThumbnail } from './ImagePreview';
 import { MarkdownView } from './MarkdownView';
 import { PermissionCard } from './PermissionCard';
@@ -245,26 +250,53 @@ function ToolLine({
   );
 }
 
+function ExplainerChip({ onPress }: { onPress: () => void }) {
+  const styles = useStyles();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Explanation ready. Open it."
+      style={styles.explainerChip}
+      onPress={onPress}
+    >
+      <Text style={styles.explainerChipText}>Explanation ready</Text>
+      <Text style={styles.explainerChipAction}>Open</Text>
+    </Pressable>
+  );
+}
+
 function AssistantMessage({
   item,
   sessionId,
   repoUrl,
+  onOpenExplainer,
 }: {
   item: ItemOf<'assistant'>;
   sessionId: string;
   repoUrl: string | null;
+  onOpenExplainer?: () => void;
 }) {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const explains = Boolean(onOpenExplainer) && hasExplainerBlock(item.text);
+  const text = explains ? withoutExplainerBlocks(item.text) : item.text;
+  const styles = useStyles();
   return (
     <>
-      <MessageActions text={item.text}>
-        <MarkdownView
-          value={item.text}
-          onOpenImage={setPreviewImage}
-          repoUrl={repoUrl}
-          selectable={false}
-        />
-      </MessageActions>
+      <View style={styles.assistant}>
+        {text ? (
+          <MessageActions text={text}>
+            <MarkdownView
+              value={text}
+              onOpenImage={setPreviewImage}
+              repoUrl={repoUrl}
+              selectable={false}
+            />
+          </MessageActions>
+        ) : null}
+        {explains && onOpenExplainer ? (
+          <ExplainerChip onPress={onOpenExplainer} />
+        ) : null}
+      </View>
       <ImagePreview
         sessionId={sessionId}
         path={previewImage}
@@ -312,6 +344,7 @@ export function ChatItemView({
   laneRepos,
   onRespond,
   onHandoff,
+  onOpenExplainer,
 }: {
   item: ChatItem;
   sessionId: string;
@@ -320,6 +353,7 @@ export function ChatItemView({
   laneRepos?: Repo[];
   onRespond(itemId: string, response: PermissionResponse): Promise<boolean>;
   onHandoff?(): Promise<boolean>;
+  onOpenExplainer?(): void;
 }) {
   const styles = useStyles();
   switch (item.kind) {
@@ -327,7 +361,12 @@ export function ChatItemView({
       return <UserMessage item={item} sessionId={sessionId} />;
     case 'assistant':
       return (
-        <AssistantMessage item={item} sessionId={sessionId} repoUrl={repoUrl} />
+        <AssistantMessage
+          item={item}
+          sessionId={sessionId}
+          repoUrl={repoUrl}
+          onOpenExplainer={onOpenExplainer}
+        />
       );
     case 'thinking':
       return <Expandable header="Thinking…" body={item.text} />;
@@ -353,6 +392,21 @@ export function ChatItemView({
 
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
+    assistant: { gap: 8 },
+    explainerChip: {
+      flexDirection: 'row',
+      alignSelf: 'flex-start',
+      alignItems: 'center',
+      gap: 8,
+      minHeight: MIN_TOUCH_TARGET,
+      paddingHorizontal: 14,
+      borderRadius: 8,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border2,
+      backgroundColor: theme.bgSurface,
+    },
+    explainerChipText: { color: theme.fg1, fontSize: 14 },
+    explainerChipAction: { color: theme.accentText, fontSize: 14 },
     text: { color: theme.fg1, fontSize: 15, lineHeight: 22 },
     dim: { color: theme.fg3, fontSize: 13, lineHeight: 19 },
     failed: { color: theme.dangerText, fontSize: 13, lineHeight: 19 },

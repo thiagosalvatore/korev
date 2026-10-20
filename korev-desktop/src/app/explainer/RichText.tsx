@@ -1,5 +1,9 @@
 import { cn } from '../../design-system';
-import { richSegments, type GlossaryEntry, type RichSegment } from './glossary';
+import {
+  richSegments,
+  type GlossaryEntry,
+  type RichSegment,
+} from '../../shared/glossary';
 
 const PARAGRAPH_BREAK = /\n{2,}/;
 
