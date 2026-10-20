@@ -1,3 +1,5 @@
+import type { ExplainerRef } from './explainer';
+
 export type AgentKind = 'claude' | 'codex';
 
 export const AGENT_KINDS: readonly AgentKind[] = ['claude', 'codex'];
@@ -193,6 +195,7 @@ export interface ChatSession {
   forkOnNextTurn: boolean;
   createdAt: string;
   pendingPlan?: PendingPlan;
+  explainer?: ExplainerRef;
 }
 
 export interface PendingPlan {

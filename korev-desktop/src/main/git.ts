@@ -409,6 +409,24 @@ export async function fileDiff(
   return git.stdout(worktree, ['diff', '--no-index', '/dev/null', file]);
 }
 
+export async function branchPatch(
+  git: Git,
+  worktree: string,
+  base: string,
+): Promise<string> {
+  const from = await mergeBase(git, worktree, base);
+  const [tracked, untracked] = await Promise.all([
+    git.run(worktree, ['diff', '-M', from]),
+    untrackedFiles(git, worktree),
+  ]);
+  const added = await Promise.all(
+    untracked.map((file) =>
+      git.stdout(worktree, ['diff', '--no-index', '/dev/null', file]),
+    ),
+  );
+  return [tracked, ...added].join('');
+}
+
 export async function listFiles(git: Git, worktree: string): Promise<string[]> {
   const output = await git.run(worktree, [
     'ls-files',

@@ -36,6 +36,7 @@ import type {
   Workspace,
   WorkspaceFolder,
 } from './model';
+import type { Explainer, ExplainerOpened, ExplainerTarget } from './explainer';
 
 export interface KorevApi {
   getState(): Promise<AppState>;
@@ -91,6 +92,9 @@ export interface KorevApi {
   repoIcon(repoId: string): Promise<string | null>;
   repoGithubUrl(repoId: string): Promise<string | null>;
   startReview(workspaceId: string): Promise<Result<string>>;
+  startExplainer(target: ExplainerTarget): Promise<Result<ExplainerOpened>>;
+  explainer(sessionId: string): Promise<Explainer | null>;
+  updateExplainer(sessionId: string): Promise<Result>;
   resumeRun(runId: string): Promise<Result>;
   resumeTask(runId: string, taskId: string): Promise<Result>;
   answerQuestion(
@@ -239,6 +243,9 @@ export const REMOTE_METHODS = [
   'repoIcon',
   'repoGithubUrl',
   'createAskChat',
+  'startExplainer',
+  'explainer',
+  'updateExplainer',
   'registerPushToken',
   'unregisterPushToken',
   'deleteAskChat',

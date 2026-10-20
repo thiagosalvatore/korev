@@ -75,6 +75,15 @@ let ghMerges: string[][] = [];
 let gitAddGate: Promise<void> | null = null;
 let prViewGate: Promise<void> | null = null;
 let prViewsWaiting = 0;
+let prDiff = '';
+
+const README_PATCH = `diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1 +1,2 @@
+ # acme
++Install it.
+`;
 
 const BRANCH_PR_URL = 'https://github.com/acme/web/pull/7';
 const NO_PR = { exitCode: 1, stdout: '', stderr: 'no pull requests found' };
@@ -111,6 +120,8 @@ const runWithFakeSqlite: CommandRunner = async (file, args, options) => {
     }
     return fakePrView(args[2]);
   }
+  if (file === 'gh' && args[0] === 'pr' && args[1] === 'diff')
+    return { exitCode: 0, stdout: prDiff, stderr: '' };
   if (file === 'gh' && args[0] === 'api' && args[1] === 'graphql')
     return fakePrStack(args);
   if (file === 'gh' && isGhMerge(args)) {
@@ -241,6 +252,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     gitAddGate = null;
     prViewGate = null;
     prViewsWaiting = 0;
+    prDiff = '';
     await korev.shutdown();
     vi.useRealTimers();
     await rm(home, { recursive: true, force: true });
@@ -1086,6 +1098,110 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     );
 
     expect(existsSync(path.join(askDir, 'approved.txt'))).toBe(true);
+  });
+
+  async function explainerOf(sessionId: string) {
+    const explainer = await korev.api.explainer(sessionId);
+    if (!explainer) throw new Error('no explainer');
+    return explainer;
+  }
+
+  async function waitForExplainer(sessionId: string, status: string) {
+    await waitFor(
+      async () => (await explainerOf(sessionId)).ref.status === status,
+    );
+    return explainerOf(sessionId);
+  }
+
+  it('explains the changes of a workspace and notices when they move on', async () => {
+    const workspace = await createWorkspace();
+    await writeFile(
+      path.join(workspace.path, 'README.md'),
+      '# acme\nInstall it.\n',
+    );
+    git(workspace.path, 'commit', '-qam', 'install steps');
+    await writeFile(path.join(workspace.path, 'NOTES.md'), 'draft\n');
+
+    const started = await korev.api.startExplainer({
+      kind: 'workspace',
+      workspaceId: workspace.id,
+    });
+    if (!started.ok) throw new Error(started.message);
+    const ready = await waitForExplainer(started.value.sessionId, 'ready');
+
+    expect(started.value.askChatId).toBeNull();
+    expect(ready.content?.headline).toBe(
+      'The README now says how to install the app.',
+    );
+    expect(ready.patch).toContain('+Install it.');
+    expect(ready.patch).toContain('+++ b/NOTES.md');
+    expect(ready.latestRevision).toBe(ready.ref.revision);
+
+    await writeFile(
+      path.join(workspace.path, 'README.md'),
+      '# acme\nInstall it now.\n',
+    );
+    expect(
+      (await explainerOf(started.value.sessionId)).latestRevision,
+    ).not.toBe(ready.ref.revision);
+    const updated = await korev.api.updateExplainer(started.value.sessionId);
+    expect(updated.ok).toBe(true);
+    const fresh = await waitForExplainer(started.value.sessionId, 'ready');
+    expect(fresh.patch).toContain('+Install it now.');
+    expect(fresh.latestRevision).toBe(fresh.ref.revision);
+  });
+
+  it('explains a pull request in an Ask chat and reopens it for the same commit', async () => {
+    const repo = await addRepo();
+    openPr = {
+      number: 42,
+      url: 'https://github.com/acme/web/pull/42',
+      title: 'Add install steps',
+      author: { login: 'octo' },
+      headRefOid: 'abc123',
+      body: 'Adds the steps.',
+    };
+    prDiff = README_PATCH;
+
+    const started = await korev.api.startExplainer({
+      kind: 'pr',
+      repoId: repo.id,
+      number: 42,
+    });
+    if (!started.ok) throw new Error(started.message);
+    const ready = await waitForExplainer(started.value.sessionId, 'ready');
+    const again = await korev.api.startExplainer({
+      kind: 'pr',
+      repoId: repo.id,
+      number: 42,
+    });
+
+    const ask = (await korev.api.getState()).askChats.find(
+      (entry) => entry.id === started.value.askChatId,
+    );
+    expect(ask?.session.title).toBe('#42 Add install steps');
+    expect(ready.ref).toMatchObject({ author: 'octo', revision: 'abc123' });
+    expect(again).toEqual(started);
+  });
+
+  it('asks once for a corrected block, then marks the explanation failed', async () => {
+    const repo = await addRepo();
+    openPr = { number: 9, title: 'broken-explainer', headRefOid: 'def456' };
+    prDiff = README_PATCH;
+
+    const started = await korev.api.startExplainer({
+      kind: 'pr',
+      repoId: repo.id,
+      number: 9,
+    });
+    if (!started.ok) throw new Error(started.message);
+    const failed = await waitForExplainer(started.value.sessionId, 'failed');
+
+    const messages = (
+      await korev.api.transcript(started.value.sessionId)
+    ).filter((item) => item.kind === 'user');
+    expect(messages).toHaveLength(2);
+    expect(failed.ref.error).toContain('no ```korev-explainer block');
   });
 
   it('moves the read-only checkout to the latest default branch before each question', async () => {

@@ -10,6 +10,7 @@ import {
   type AgentAvailability,
   type AgentKind,
   type AppState,
+  type AskChat,
   type ChatItem,
   type ChatSession,
   type EditorApp,
@@ -45,6 +46,7 @@ import type { RemoteAccess } from './remote-access';
 import { askScratchPath, askWorktreePath } from './ask-worktrees';
 import { createChats, lanesElsewhereNote, type TurnPrLinks } from './chats';
 import { enableCommitSigning, signingKey } from './commit-signing';
+import { createExplainers } from './explainers';
 import { readConductorRepos, readConductorSettings } from './conductor-import';
 import {
   errorMessage,
@@ -98,6 +100,7 @@ import {
   strayWorktrees,
   deleteWorkspace,
   newChatSession,
+  reviewChatSession,
   onScriptExit,
   refreshStats,
   restoreWorkspace,
@@ -386,13 +389,23 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       return found;
     },
   };
-  const chats = createChats(ctx, (workspaceId, links) => {
-    void trackOpenedPrs(workspaceId, links)
-      .then(() => refreshPrs(workspaceId))
-      .catch(() => null);
-    ctx.background(
-      orchestration.turnFinished(links.sessionId).catch(() => undefined),
-    );
+  const chats = createChats(
+    ctx,
+    (workspaceId, links) => {
+      void trackOpenedPrs(workspaceId, links)
+        .then(() => refreshPrs(workspaceId))
+        .catch(() => null);
+      ctx.background(
+        orchestration.turnFinished(links.sessionId).catch(() => undefined),
+      );
+    },
+    (session, outcome) => explainers.turnFinished(session, outcome),
+  );
+  const explainers = createExplainers(ctx, {
+    send: (sessionId, options) => chats.send(sessionId, options),
+    isRunning: (sessionId) => chats.isRunning(sessionId),
+    findSession,
+    addAskChat,
   });
   const spotlight = createSpotlight(
     git,
@@ -825,6 +838,33 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     ];
   }
 
+  function addAskChat(repoIds: string[], session: ChatSession): AskChat {
+    for (const repoId of repoIds) ctx.repo(repoId);
+    const createdAt = deps.now().toISOString();
+    const ask = {
+      id: deps.newId(),
+      repoIds,
+      session,
+      createdAt,
+      lastMessageAt: createdAt,
+    };
+    store.state.askChats.push(ask);
+    return ask;
+  }
+
+  function findSession(sessionId: string) {
+    for (const workspace of store.state.workspaces) {
+      const session = workspace.sessions.find(
+        (entry) => entry.id === sessionId,
+      );
+      if (session) return { session, askChatId: null };
+    }
+    const ask = store.state.askChats.find(
+      (entry) => entry.session.id === sessionId,
+    );
+    return ask ? { session: ask.session, askChatId: ask.id } : null;
+  }
+
   async function deleteAskChat(askChatId: string) {
     const ask = store.state.askChats.find((entry) => entry.id === askChatId);
     if (!ask) return;
@@ -1164,11 +1204,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     repoGithubUrl: (repoId) => originGithubUrl(git, ctx.repo(repoId).path),
     async startReview(workspaceId) {
       const workspace = workspacePath(workspaceId);
-      const { reviewModel, defaultAgent } = store.state.settings;
-      const session = {
-        ...newChatSession(ctx, reviewModel?.agent ?? defaultAgent),
-        ...reviewModel,
-      };
+      const session = reviewChatSession(ctx);
       const text = await actionPrompt(
         workspaceId,
         'code_review',
@@ -1211,20 +1247,17 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       ctx.emitState();
     },
     async createAskChat(repoIds) {
-      for (const repoId of repoIds) ctx.repo(repoId);
-      const createdAt = deps.now().toISOString();
-      const ask = {
-        id: deps.newId(),
+      const ask = addAskChat(
         repoIds,
-        session: newChatSession(ctx, store.state.settings.defaultAgent),
-        createdAt,
-        lastMessageAt: createdAt,
-      };
-      store.state.askChats.push(ask);
+        newChatSession(ctx, store.state.settings.defaultAgent),
+      );
       store.save();
       ctx.emitState();
       return ask;
     },
+    startExplainer: (target) => explainers.start(target),
+    explainer: (sessionId) => explainers.get(sessionId),
+    updateExplainer: (sessionId) => explainers.update(sessionId),
     deleteAskChat,
     newSession: async (workspaceId, agent) =>
       addSession(ctx.workspace(workspaceId), agent),

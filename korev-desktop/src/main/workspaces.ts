@@ -105,6 +105,14 @@ export function newChatSession(ctx: Context, agent: AgentKind): ChatSession {
   };
 }
 
+export function reviewChatSession(ctx: Context): ChatSession {
+  const { reviewModel, defaultAgent } = ctx.store.state.settings;
+  return {
+    ...newChatSession(ctx, reviewModel?.agent ?? defaultAgent),
+    ...reviewModel,
+  };
+}
+
 export function forkChatSession(
   ctx: Context,
   session: ChatSession,
@@ -1069,7 +1077,7 @@ export async function deleteWorkspace(ctx: Context, workspaceId: string) {
   if (!workspace.archivedAt) return;
   state.workspaces = state.workspaces.filter((ws) => ws.id !== workspaceId);
   await Promise.all(
-    workspace.sessions.map((session) => ctx.store.removeTranscript(session.id)),
+    workspace.sessions.map((session) => ctx.store.removeSession(session.id)),
   );
   ctx.store.save();
   ctx.emitState();

@@ -42,6 +42,10 @@ const NO_RUNS: Result = {
   ok: false,
   message: 'The demo has no orchestration runs.',
 };
+const NO_EXPLAINERS: Result<never> = {
+  ok: false,
+  message: 'The demo cannot explain pull requests.',
+};
 const STREAM_STEP_MS = 80;
 const THINKING_MS = 1500;
 const OPENING_REPLY_DELAY_MS = 8000;
@@ -552,6 +556,9 @@ export function createDemoConnection(): Connection {
     resumeTask: async () => NO_RUNS,
     answerQuestion: async () => NO_RUNS,
     resolveGate: async () => NO_RUNS,
+    startExplainer: async () => NO_EXPLAINERS,
+    explainer: async () => null,
+    updateExplainer: async () => NO_EXPLAINERS,
   };
 
   const bridge = {

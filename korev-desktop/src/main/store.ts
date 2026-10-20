@@ -17,14 +17,21 @@ import {
   type Settings,
   type Workspace,
 } from '../shared/model';
+import type { ExplainerContent } from '../shared/explainer';
 import type { FileSystem } from './file-system';
 import { DEFAULT_REMOTE_PORT } from './remote-server';
 
 const STATE_FILE = 'korev-state.json';
 const LEGACY_CODEX_DEFAULT_MODEL = 'default';
 const TRANSCRIPTS_DIR = 'transcripts';
+const EXPLAINERS_DIR = 'explainers';
+const EXPLAINER_GUIDE = 'how-to-explain.md';
+const INTERRUPTED_EXPLAINER =
+  'Korev closed before the explanation was finished.';
 export const ATTACHMENTS_DIR = 'attachments';
 const SAVE_DELAY_MS = 400;
+const JSON_EXTENSION = '.json';
+const PATCH_EXTENSION = '.diff';
 
 export interface PersistedState {
   repos: Repo[];
@@ -99,6 +106,22 @@ function sessionWithoutLegacyCodexDefault(session: ChatSession): ChatSession {
   };
 }
 
+function explainerAfterRestart(session: ChatSession): ChatSession {
+  if (session.explainer?.status !== 'writing') return session;
+  return {
+    ...session,
+    explainer: {
+      ...session.explainer,
+      status: 'failed',
+      error: INTERRUPTED_EXPLAINER,
+    },
+  };
+}
+
+function restoredSession(session: ChatSession): ChatSession {
+  return explainerAfterRestart(sessionWithoutLegacyCodexDefault(session));
+}
+
 function sanitize(raw: unknown, home: string): PersistedState {
   const value = (raw ?? {}) as Partial<PersistedState>;
   const defaults = defaultSettings(home);
@@ -149,7 +172,7 @@ function sanitize(raw: unknown, home: string): PersistedState {
         folderId: workspace.folderId ?? null,
         prs: workspace.prs ?? [],
         sessions: workspace.sessions.map((session) => ({
-          ...sessionWithoutLegacyCodexDefault(session),
+          ...restoredSession(session),
           effort: session.effort ?? defaults.defaultEffort[session.agent],
           fast: session.fast ?? false,
           forkOnNextTurn: session.forkOnNextTurn ?? false,
@@ -163,7 +186,7 @@ function sanitize(raw: unknown, home: string): PersistedState {
     askChats: (Array.isArray(value.askChats) ? value.askChats : []).map(
       (ask) => ({
         ...ask,
-        session: sessionWithoutLegacyCodexDefault(ask.session),
+        session: restoredSession(ask.session),
         lastMessageAt: ask.lastMessageAt ?? ask.createdAt,
       }),
     ),
@@ -180,7 +203,21 @@ export interface Store {
   flush(): Promise<void>;
   loadTranscript(sessionId: string): Promise<ChatItem[]>;
   saveTranscript(sessionId: string, items: ChatItem[]): Promise<void>;
-  removeTranscript(sessionId: string): Promise<void>;
+  removeSession(sessionId: string): Promise<void>;
+  explainersDir: string;
+  explainerPatchPath(sessionId: string): string;
+  loadExplainer(sessionId: string): Promise<StoredExplainer>;
+  saveExplainerPatch(sessionId: string, patch: string): Promise<void>;
+  saveExplainerGuide(guide: string): Promise<string>;
+  saveExplainerContent(
+    sessionId: string,
+    content: ExplainerContent,
+  ): Promise<void>;
+}
+
+export interface StoredExplainer {
+  patch: string;
+  content: ExplainerContent | null;
 }
 
 export function attachmentsDir(userDataPath: string): string {
@@ -195,12 +232,28 @@ export async function openStore(
   home: string,
 ): Promise<Store> {
   const statePath = path.join(userDataPath, STATE_FILE);
-  const transcriptPath = (sessionId: string) => {
+  const sessionFile = (dir: string, sessionId: string, extension: string) => {
     if (!SESSION_ID_PATTERN.test(sessionId)) {
       throw new Error(`Invalid session id ${sessionId}`);
     }
-    return path.join(userDataPath, TRANSCRIPTS_DIR, `${sessionId}.json`);
+    return path.join(userDataPath, dir, `${sessionId}${extension}`);
   };
+  const transcriptPath = (sessionId: string) =>
+    sessionFile(TRANSCRIPTS_DIR, sessionId, JSON_EXTENSION);
+  const explainerPatchPath = (sessionId: string) =>
+    sessionFile(EXPLAINERS_DIR, sessionId, PATCH_EXTENSION);
+  const explainerContentPath = (sessionId: string) =>
+    sessionFile(EXPLAINERS_DIR, sessionId, JSON_EXTENSION);
+
+  async function readJson(file: string): Promise<unknown> {
+    const contents = await fs.read(file);
+    if (!contents) return null;
+    try {
+      return JSON.parse(contents.toString('utf8'));
+    } catch {
+      return null;
+    }
+  }
   const raw = await fs.read(statePath);
   let parsed: unknown = null;
   try {
@@ -229,17 +282,38 @@ export async function openStore(
     },
     flush,
     async loadTranscript(sessionId) {
-      const contents = await fs.read(transcriptPath(sessionId));
-      if (!contents) return [];
-      try {
-        const items: unknown = JSON.parse(contents.toString('utf8'));
-        return Array.isArray(items) ? (items as ChatItem[]) : [];
-      } catch {
-        return [];
-      }
+      const items = await readJson(transcriptPath(sessionId));
+      return Array.isArray(items) ? (items as ChatItem[]) : [];
     },
     saveTranscript: (sessionId, items) =>
       fs.writeAtomic(transcriptPath(sessionId), JSON.stringify(items)),
-    removeTranscript: (sessionId) => fs.remove(transcriptPath(sessionId)),
+    async removeSession(sessionId) {
+      await Promise.all([
+        fs.remove(transcriptPath(sessionId)),
+        fs.remove(explainerPatchPath(sessionId)),
+        fs.remove(explainerContentPath(sessionId)),
+      ]);
+    },
+    explainersDir: path.join(userDataPath, EXPLAINERS_DIR),
+    explainerPatchPath,
+    async loadExplainer(sessionId) {
+      const [patch, content] = await Promise.all([
+        fs.read(explainerPatchPath(sessionId)),
+        readJson(explainerContentPath(sessionId)),
+      ]);
+      return {
+        patch: patch?.toString('utf8') ?? '',
+        content: (content as ExplainerContent | null) ?? null,
+      };
+    },
+    saveExplainerPatch: (sessionId, patch) =>
+      fs.writeAtomic(explainerPatchPath(sessionId), patch),
+    async saveExplainerGuide(guide) {
+      const file = path.join(userDataPath, EXPLAINERS_DIR, EXPLAINER_GUIDE);
+      await fs.writeAtomic(file, guide);
+      return file;
+    },
+    saveExplainerContent: (sessionId, content) =>
+      fs.writeAtomic(explainerContentPath(sessionId), JSON.stringify(content)),
   };
 }
