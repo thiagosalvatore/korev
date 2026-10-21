@@ -73,6 +73,8 @@ let prsByUrl: Record<string, Record<string, unknown>> = {};
 let stacksByUrl: Record<string, Record<string, unknown>> = {};
 let ghMerges: string[][] = [];
 let gitAddGate: Promise<void> | null = null;
+let agentVersionGate: Promise<void> | null = null;
+let agentVersionsWaiting = 0;
 let prViewGate: Promise<void> | null = null;
 let prViewsWaiting = 0;
 let prDiff = '';
@@ -144,6 +146,10 @@ const runWithFakeSqlite: CommandRunner = async (file, args, options) => {
     return { exitCode: 0, stdout: '', stderr: '' };
   }
   if (file === 'git' && args[0] === 'add' && gitAddGate) await gitAddGate;
+  if (args[0] === '--version' && agentVersionGate) {
+    agentVersionsWaiting++;
+    await agentVersionGate;
+  }
   return runProcess(file, args, options);
 };
 
@@ -265,6 +271,8 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     stacksByUrl = {};
     ghMerges = [];
     gitAddGate = null;
+    agentVersionGate = null;
+    agentVersionsWaiting = 0;
     prViewGate = null;
     prViewsWaiting = 0;
     prDiff = '';
@@ -453,6 +461,26 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
     expect(await Promise.race([shutdown, stillWaiting])).toBe('waiting');
     releasePrView();
+    await shutdown;
+    korev = await openKorev();
+  });
+
+  it('waits for agent detection before it shuts down', async () => {
+    await korev.shutdown();
+    let releaseAgentVersion!: () => void;
+    agentVersionGate = new Promise(
+      (resolve) => (releaseAgentVersion = resolve),
+    );
+    korev = await openKorev();
+
+    await waitFor(async () => agentVersionsWaiting > 0);
+    const shutdown = korev.shutdown().then(() => 'shut down');
+    const stillWaiting = new Promise((resolve) =>
+      setTimeout(() => resolve('waiting'), 100),
+    );
+
+    expect(await Promise.race([shutdown, stillWaiting])).toBe('waiting');
+    releaseAgentVersion();
     await shutdown;
     korev = await openKorev();
   });

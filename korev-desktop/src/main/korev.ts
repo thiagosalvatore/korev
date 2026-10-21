@@ -1508,7 +1508,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
   };
 
-  void refreshAgents();
+  ctx.background(refreshAgents());
   for (const workspace of activeWorkspaces(ctx))
     ctx.background(refreshStats(ctx, workspace));
   ctx.background(refreshAllPrs());
