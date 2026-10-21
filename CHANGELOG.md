@@ -4,6 +4,14 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-10-21
+
+Workspaces start on machines that set a custom CA bundle in the login shell.
+
+### Fixed
+
+- Korev now passes the CA certificate variables from your login shell (`SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`, `GIT_SSL_CAINFO`) to git, its hooks and agents. Before, a hook that installs packages, such as `pnpm install`, could fail with a certificate error, and the workspace showed as failed.
+
 ## [0.16.1] - 2026-10-21
 
 A workspace that fails to start shows a short error and a Try again button.
