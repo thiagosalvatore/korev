@@ -905,6 +905,7 @@ const SHORTCUTS: [string, string][] = [
   ['⌘J', 'Toggle terminal'],
   ['⌘.', 'Zen mode'],
   ['⌘G', 'Toggle grid view'],
+  ['⌘⇧R', 'Review a pull request'],
   ['⌘L', 'Focus chat input'],
   ['⇧Tab', 'Toggle plan mode'],
   ['⌘⇧E', 'Toggle fast mode'],

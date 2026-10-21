@@ -966,14 +966,26 @@ test("starts an Ask to review a teammate's pull request", async () => {
   const { app, window } = await launchWithFakeGh(home);
   try {
     await window.getByRole('button', { name: 'Open project' }).click();
+    const picker = window.getByRole('dialog', {
+      name: 'Review a pull request',
+    });
+    const accelerator = await app.evaluate(({ Menu }) => {
+      const item = Menu.getApplicationMenu()
+        ?.items.flatMap((menu) => menu.submenu?.items ?? [])
+        .find((entry) => entry.label === 'Review Pull Request…');
+      item?.click();
+      return item?.accelerator;
+    });
+    expect(accelerator).toBe('CmdOrCtrl+Shift+R');
+    await expect(picker).toBeVisible();
+    await window.keyboard.press('Escape');
+    await expect(picker).toBeHidden();
+
     const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
     await sidebar.getByRole('button', { name: 'Ask', exact: true }).click();
     await window
       .getByRole('button', { name: /^Review a pull request/ })
       .click();
-    const picker = window.getByRole('dialog', {
-      name: 'Review a pull request',
-    });
     await picker.getByRole('option', { name: /#42 Add install steps/ }).click();
 
     await expect(picker).toBeHidden();

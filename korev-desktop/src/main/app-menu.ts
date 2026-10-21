@@ -9,6 +9,7 @@ export interface AppMenuOptions {
 }
 
 const SEPARATOR: MenuItemConstructorOptions = { type: 'separator' };
+const FORCE_RELOAD_ACCELERATOR = 'CmdOrCtrl+Alt+Shift+R';
 
 type CommandEntry = [label: string, accelerator: string, command: AppCommand];
 
@@ -43,6 +44,7 @@ function appSubmenu(options: AppMenuOptions): MenuItemConstructorOptions[] {
 const FILE_ENTRIES: (CommandEntry | null)[] = [
   ['New Workspace', 'CmdOrCtrl+N', 'new-workspace'],
   ['New Chat', 'CmdOrCtrl+T', 'new-chat'],
+  ['Review Pull Request…', 'CmdOrCtrl+Shift+R', 'review-pr'],
   ['Close Tab', 'CmdOrCtrl+W', 'close-tab'],
   null,
   ['Archive Workspace', 'CmdOrCtrl+Shift+A', 'archive-workspace'],
@@ -93,7 +95,11 @@ function developmentItems(
   isDevelopment: boolean,
 ): MenuItemConstructorOptions[] {
   if (!isDevelopment) return [];
-  return [SEPARATOR, { role: 'forceReload' }, { role: 'toggleDevTools' }];
+  return [
+    SEPARATOR,
+    { role: 'forceReload', accelerator: FORCE_RELOAD_ACCELERATOR },
+    { role: 'toggleDevTools' },
+  ];
 }
 
 export function appMenuTemplate(

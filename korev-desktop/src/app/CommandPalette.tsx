@@ -94,6 +94,7 @@ function paletteItems(
       id: 'review-pr',
       label: 'Review a pull request…',
       icon: 'git-pull-request',
+      hint: '⌘⇧R',
       section: 'Actions',
       run: () => openPrPicker('review'),
     },

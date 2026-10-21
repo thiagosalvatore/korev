@@ -6,7 +6,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ### New
 
-- **Review a pull request.** Press **Review a pull request** on the Ask page, or choose **Review a pull request…** in the command palette, and pick a teammate's pull request. Korev opens a read-only Ask about it, with the pull request already in the message. Say what to review, or type `/` to run a review skill.
+- **Review a pull request.** Press ⌘⇧R, press **Review a pull request** on the Ask page, or choose **Review a pull request…** in the command palette, and pick a teammate's pull request. Korev opens a read-only Ask about it, with the pull request already in the message. Say what to review, or type `/` to run a review skill.
 
 ### Fixed
 

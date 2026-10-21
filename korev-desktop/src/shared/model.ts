@@ -960,6 +960,7 @@ export type AppCommand =
   | 'open-in'
   | 'merge-pr'
   | 'fix-errors'
+  | 'review-pr'
   | 'open-diff'
   | 'cancel-agent'
   | 'toggle-theme'
