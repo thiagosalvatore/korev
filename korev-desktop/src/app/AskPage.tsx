@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Button, cn, Icon, IconButton } from '../design-system';
+import { Button, cn, Icon, IconButton, type IconName } from '../design-system';
 import type { AppState, AskChat } from '../shared/model';
 import {
   deleteAsk,
+  NEW_ASK_DRAFT_KEY,
   openAsk,
-  openExplainPicker,
+  openPrPicker,
   startAsk,
   startFromAsk,
 } from './actions';
@@ -15,8 +16,6 @@ import { useModelChoice } from './hooks';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { RepoPicker } from './RepoPicker';
 import { useUi } from './ui-store';
-
-const NEW_ASK_DRAFT = 'new-ask';
 
 export function AskForm({
   state,
@@ -43,7 +42,7 @@ export function AskForm({
     <>
       <RepoPicker state={state} selected={repoIds} onChange={setRepoIds} />
       <Composer
-        draftKey={NEW_ASK_DRAFT}
+        draftKey={NEW_ASK_DRAFT_KEY}
         agent={agent}
         models={modelChoices(state, agent)}
         loadout={loadoutChoices(state, agent)}
@@ -80,6 +79,33 @@ export function AskForm({
   );
 }
 
+function AskShortcut({
+  icon,
+  title,
+  description,
+  onClick,
+}: {
+  icon: IconName;
+  title: string;
+  description: string;
+  onClick(): void;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex cursor-pointer items-center gap-3 rounded-md border border-border-1 bg-transparent px-4 py-3 text-left hover:bg-hover"
+      onClick={onClick}
+    >
+      <Icon name={icon} size={16} className="text-accent-text" />
+      <span className="flex flex-1 flex-col gap-0.5">
+        <span className="text-sm font-medium text-fg-1">{title}</span>
+        <span className="text-xs text-fg-3">{description}</span>
+      </span>
+      <Icon name="chevron-right" size={14} className="text-fg-4" />
+    </button>
+  );
+}
+
 function NewAsk({
   state,
   initialRepoIds,
@@ -112,27 +138,18 @@ function NewAsk({
             autoFocus
             onStarted={(ask) => openAsk(ask.id)}
           />
-          <button
-            type="button"
-            className="flex cursor-pointer items-center gap-3 rounded-md border border-border-1 bg-transparent px-4 py-3 text-left hover:bg-hover"
-            onClick={openExplainPicker}
-          >
-            <Icon
-              name="book-open-text"
-              size={16}
-              className="text-accent-text"
-            />
-            <span className="flex flex-1 flex-col gap-0.5">
-              <span className="text-sm font-medium text-fg-1">
-                Explain a pull request
-              </span>
-              <span className="text-xs text-fg-3">
-                Get a plain-words walkthrough of a teammate's pull request
-                before you review it.
-              </span>
-            </span>
-            <Icon name="chevron-right" size={14} className="text-fg-4" />
-          </button>
+          <AskShortcut
+            icon="book-open-text"
+            title="Explain a pull request"
+            description="Get a plain-words walkthrough of a teammate's pull request before you review it."
+            onClick={() => openPrPicker('explain')}
+          />
+          <AskShortcut
+            icon="git-pull-request"
+            title="Review a pull request"
+            description="Pick a teammate's pull request, then say what to review or run a review skill."
+            onClick={() => openPrPicker('review')}
+          />
         </div>
       </div>
     </div>

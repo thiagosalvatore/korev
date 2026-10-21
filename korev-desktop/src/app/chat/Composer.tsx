@@ -169,7 +169,11 @@ export function Composer(props: ComposerProps) {
   }, [text]);
 
   useEffect(() => {
-    if (props.autoFocus) input.current?.focus();
+    const element = input.current;
+    if (!props.autoFocus || !element) return;
+    const end = loadDraft(draftKey).length;
+    element.focus();
+    element.setSelectionRange(end, end);
   }, [props.autoFocus, draftKey]);
 
   function update(next: string) {

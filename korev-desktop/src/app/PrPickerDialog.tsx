@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { cn, Dialog, Icon, Select } from '../../design-system';
-import { parsePrUrl } from '../../shared/explainer';
-import type { AppState, PullRequestSummary } from '../../shared/model';
-import { explainPullRequest } from '../actions';
-import { api } from '../bridge';
-import { getUi, setUi, useUi } from '../ui-store';
+import { cn, Dialog, Icon, Select } from '../design-system';
+import { parsePrUrl } from '../shared/explainer';
+import type { AppState, PullRequestSummary } from '../shared/model';
+import { explainPullRequest, reviewPullRequest } from './actions';
+import { api } from './bridge';
+import { getUi, setUi, useUi, type PrPickerPurpose } from './ui-store';
 
 const REVIEW_REQUESTED = 'review-requested:@me';
 const OPENED_BY_ME = 'author:@me';
@@ -23,6 +23,30 @@ interface Group {
   title: string;
   options: Option[];
 }
+
+interface Purpose {
+  title: string;
+  description: string;
+  verb: string;
+  choose(option: Option): Promise<void> | void;
+}
+
+const PURPOSES: Record<PrPickerPurpose, Purpose> = {
+  explain: {
+    title: 'Explain a pull request',
+    description:
+      'Korev reads the pull request and explains it in plain words, step by step. Nothing is checked out or changed.',
+    verb: 'explain',
+    choose: (option) => explainPullRequest(option.repoId, option.number),
+  },
+  review: {
+    title: 'Review a pull request',
+    description:
+      'Korev starts an Ask about the pull request. Say what to review, or run a review skill with /. Nothing is checked out or changed.',
+    verb: 'review',
+    choose: (option) => reviewPullRequest(option.repoId, option.label),
+  },
+};
 
 function toOption(repoId: string, pr: PullRequestSummary): Option {
   return {
@@ -130,7 +154,7 @@ function useGroups(
   }, [pasted, githubUrls, state.repos, open, requested, mine, search, repoId]);
 }
 
-function PrPicker({ state }: { state: AppState }) {
+function PrPicker({ state, purpose }: { state: AppState; purpose: Purpose }) {
   const [repoId, setRepoId] = useState(() => defaultRepoId(state));
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
@@ -142,7 +166,7 @@ function PrPicker({ state }: { state: AppState }) {
   async function choose(option: Option | undefined) {
     if (!option || starting !== null) return;
     setStarting(option.number);
-    await explainPullRequest(option.repoId, option.number);
+    await purpose.choose(option);
     setStarting(null);
   }
 
@@ -197,7 +221,7 @@ function PrPicker({ state }: { state: AppState }) {
           {groups && !options.length ? (
             <p className="m-0 px-3 py-4 text-sm text-fg-3">
               {pasted
-                ? `Add ${pasted.owner}/${pasted.repo} to Korev to explain its pull requests.`
+                ? `Add ${pasted.owner}/${pasted.repo} to Korev to ${purpose.verb} its pull requests.`
                 : 'No open pull requests found'}
             </p>
           ) : null}
@@ -254,17 +278,18 @@ function PrPicker({ state }: { state: AppState }) {
   );
 }
 
-export function ExplainPrDialog({ state }: { state: AppState }) {
-  const open = useUi((ui) => ui.explainPicker);
+export function PrPickerDialog({ state }: { state: AppState }) {
+  const purposeKey = useUi((ui) => ui.prPicker);
+  const purpose = PURPOSES[purposeKey ?? 'explain'];
   return (
     <Dialog
-      open={open}
-      onClose={() => setUi({ explainPicker: false })}
-      title="Explain a pull request"
-      description="Korev reads the pull request and explains it in plain words, step by step. Nothing is checked out or changed."
+      open={purposeKey !== null}
+      onClose={() => setUi({ prPicker: null })}
+      title={purpose.title}
+      description={purpose.description}
       width={DIALOG_WIDTH}
     >
-      {open ? <PrPicker state={state} /> : null}
+      {purposeKey ? <PrPicker state={state} purpose={purpose} /> : null}
     </Dialog>
   );
 }

@@ -7,7 +7,7 @@ import { AskPage } from './AskPage';
 import { BoardView } from './BoardView';
 import { api } from './bridge';
 import { CommandPalette } from './CommandPalette';
-import { ExplainPrDialog } from './explainer/ExplainPrDialog';
+import { PrPickerDialog } from './PrPickerDialog';
 import { paneCount, paneWorkspaceId } from './grid';
 import { GridView } from './GridView';
 import { useAppState, useMediaQuery } from './hooks';
@@ -78,7 +78,10 @@ function Shell({ state }: { state: AppState }) {
       ) : null}
       {page.kind === 'ask' ? (
         <AskPage
-          key={page.askChatId ?? `new:${page.repoIds.join(',')}`}
+          key={
+            page.askChatId ??
+            `new:${page.repoIds.join(',')}:${page.prefill ?? ''}`
+          }
           state={state}
           askChatId={page.askChatId}
           repoIds={page.repoIds}
@@ -91,7 +94,7 @@ function Shell({ state }: { state: AppState }) {
         <WorkspaceView key={workspace.id} state={state} workspace={workspace} />
       ) : null}
       <CommandPalette state={state} />
-      <ExplainPrDialog state={state} />
+      <PrPickerDialog state={state} />
     </div>
   );
 }

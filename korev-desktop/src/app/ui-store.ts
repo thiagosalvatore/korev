@@ -14,6 +14,8 @@ export type DiffLayout = 'unified' | 'split';
 
 export type PaletteMode = false | 'all' | 'files';
 
+export type PrPickerPurpose = 'explain' | 'review';
+
 export const GIT_PANEL_TABS = ['files', 'changes', 'pr', 'artifacts'] as const;
 
 export type GitPanelTab = (typeof GIT_PANEL_TABS)[number];
@@ -23,7 +25,12 @@ export type QuitPrompt = 'closed' | 'asking' | 'waiting';
 export type Page =
   | { kind: 'workspace' }
   | { kind: 'new-workspace'; repoId: string | null }
-  | { kind: 'ask'; askChatId: string | null; repoIds: string[] }
+  | {
+      kind: 'ask';
+      askChatId: string | null;
+      repoIds: string[];
+      prefill?: string;
+    }
   | { kind: 'settings'; section: string }
   | { kind: 'grid' }
   | { kind: 'runs' }
@@ -100,7 +107,7 @@ export interface UiState {
   askOpen: boolean;
   workspaces: Record<string, WorkspaceUi>;
   explainers: Record<string, ExplainerUi>;
-  explainPicker: boolean;
+  prPicker: PrPickerPurpose | null;
   grid: GridUi;
   palette: PaletteMode;
   diffLayout: DiffLayout;
@@ -124,7 +131,7 @@ const INITIAL: UiState = {
   askOpen: true,
   workspaces: {},
   explainers: {},
-  explainPicker: false,
+  prPicker: null,
   grid: {
     layout: '2x2',
     panes: Array<GridPane | null>(GRID_PANES).fill(null),
@@ -163,7 +170,7 @@ function load(): UiState {
       ...saved,
       gitTab: knownGitTab(saved?.gitTab),
       palette: false,
-      explainPicker: false,
+      prPicker: null,
       updateOpen: false,
       quit: 'closed',
     };

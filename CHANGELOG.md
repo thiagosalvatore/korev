@@ -4,6 +4,14 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Review a pull request.** Press **Review a pull request** on the Ask page, or choose **Review a pull request…** in the command palette, and pick a teammate's pull request. Korev opens a read-only Ask about it, with the pull request already in the message. Say what to review, or type `/` to run a review skill.
+
+### Fixed
+
+- A composer that opens with text already in it puts the cursor at the end of that text. Before, what you typed went in front of it.
+
 ## [0.16.2] - 2026-10-21
 
 Workspaces start on machines that set a custom CA bundle in the login shell.

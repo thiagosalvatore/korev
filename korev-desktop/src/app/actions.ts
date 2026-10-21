@@ -14,6 +14,7 @@ import type {
 } from '../shared/model';
 import { activeWorkspaces, workspaceLabel } from '../shared/workspaces';
 import { api } from './bridge';
+import { saveDraft } from './chat/Composer';
 import {
   focusedGridPane,
   freeTab,
@@ -32,6 +33,7 @@ import {
   type GridLayout,
   type GridPane,
   type MainTab,
+  type PrPickerPurpose,
   type WorkspacePane,
 } from './ui-store';
 
@@ -47,8 +49,14 @@ export function openNewWorkspace(repoId: string | null) {
   void api.focusWorkspaces([]);
 }
 
-export function openAsk(askChatId: string | null, repoIds: string[] = []) {
-  setUi({ page: { kind: 'ask', askChatId, repoIds } });
+export const NEW_ASK_DRAFT_KEY = 'new-ask';
+
+export function openAsk(
+  askChatId: string | null,
+  repoIds: string[] = [],
+  prefill?: string,
+) {
+  setUi({ page: { kind: 'ask', askChatId, repoIds, prefill } });
   void api.focusWorkspaces([]);
 }
 
@@ -294,15 +302,22 @@ export async function explainWorkspace(workspace: Workspace) {
   activateTab(workspace.id, `chat:${started.value.sessionId}`);
 }
 
-export function openExplainPicker() {
-  setUi({ explainPicker: true });
+export function openPrPicker(purpose: PrPickerPurpose) {
+  setUi({ prPicker: purpose });
 }
 
 export async function explainPullRequest(repoId: string, number: number) {
   const started = await api.startExplainer({ kind: 'pr', repoId, number });
   if (!reportFailure(started)) return;
-  setUi({ explainPicker: false });
+  setUi({ prPicker: null });
   openAsk(started.value.askChatId);
+}
+
+export function reviewPullRequest(repoId: string, label: string) {
+  const prefill = `Review pull request ${label}. `;
+  saveDraft(NEW_ASK_DRAFT_KEY, prefill);
+  setUi({ prPicker: null });
+  openAsk(null, [repoId], prefill);
 }
 
 export async function mergePr(workspace: Workspace, pr: PrStatus) {

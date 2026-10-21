@@ -25,6 +25,14 @@ Korev titles each Ask chat with Claude Haiku after your first message, so you ca
 
 The **Ask chats** list puts the chat with the latest message first and shows how long ago each chat had its last message.
 
+## Review a pull request
+
+Press **Review a pull request** on the Ask page, or choose **Review a pull request…** in the command palette. Pick a pull request, or paste its link. Korev opens a new Ask about that pull request's repository, with `Review pull request #<number> <title>.` already in the composer.
+
+Add what to look at, such as "check the error handling", or type `/` to run a review skill. Then send it. The agent reads the pull request with `gh pr view` and `gh pr diff`. To post the review on GitHub, ask the agent to do it. You approve the `gh` command first.
+
+To understand a pull request before you review it, use [Explain a pull request](../guides/explain-a-pull-request.mdx).
+
 ## Start a workspace from an Ask chat
 
 When you are ready to build what you discussed, press **Start workspace**. The new workspace's chat starts with the whole Ask conversation, and its agent continues from there. If the agent wrote a plan, the new chat starts with that plan.

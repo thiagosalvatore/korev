@@ -906,17 +906,19 @@ case "$1 $2" in
 esac
 `;
 
-test("explains a teammate's pull request in a read-only Ask chat", async () => {
-  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+async function launchWithFakeGh(home: string) {
   const repo = await createRepo(home);
   const fakeBin = path.join(home, 'fake-gh');
   await mkdir(fakeBin);
   await writeFile(path.join(fakeBin, 'gh'), FAKE_GH);
   await chmod(path.join(fakeBin, 'gh'), 0o755);
   await writeFile(path.join(home, '.shrc'), `export PATH=${fakeBin}:$PATH\n`);
-  const { app, window } = await launch(home, repo, {
-    ENV: path.join(home, '.shrc'),
-  });
+  return launch(home, repo, { ENV: path.join(home, '.shrc') });
+}
+
+test("explains a teammate's pull request in a read-only Ask chat", async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const { app, window } = await launchWithFakeGh(home);
   try {
     await window.getByRole('button', { name: 'Open project' }).click();
     const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
@@ -953,6 +955,35 @@ test("explains a teammate's pull request in a read-only Ask chat", async () => {
       .poll(async () => readFile(exported, 'utf8'))
       .toContain('The README now says how to install the app.');
     await waitForAgentsToFinish(window);
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test("starts an Ask to review a teammate's pull request", async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const { app, window } = await launchWithFakeGh(home);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
+    await sidebar.getByRole('button', { name: 'Ask', exact: true }).click();
+    await window
+      .getByRole('button', { name: /^Review a pull request/ })
+      .click();
+    const picker = window.getByRole('dialog', {
+      name: 'Review a pull request',
+    });
+    await picker.getByRole('option', { name: /#42 Add install steps/ }).click();
+
+    await expect(picker).toBeHidden();
+    const message = window.getByRole('textbox', { name: 'Message' });
+    await expect(message).toBeFocused();
+    await message.pressSequentially('Check the wording.');
+    await expect(message).toHaveValue(
+      'Review pull request #42 Add install steps. Check the wording.',
+    );
+    await snap(window, '17-review-pr');
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });
