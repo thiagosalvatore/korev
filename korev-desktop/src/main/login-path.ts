@@ -1,13 +1,22 @@
 import type { CommandRunner } from './command-runner';
 
-const PATH_START = '__KOREV_PATH_START__';
-const PATH_END = '__KOREV_PATH_END__';
-const SSH_AUTH_SOCK_START = '__KOREV_SSH_AUTH_SOCK_START__';
-const SSH_AUTH_SOCK_END = '__KOREV_SSH_AUTH_SOCK_END__';
-const PRINT_LOGIN_ENV = [
-  `printf ${PATH_START}; /usr/bin/printenv PATH; printf ${PATH_END}`,
-  `printf ${SSH_AUTH_SOCK_START}; /usr/bin/printenv SSH_AUTH_SOCK; printf ${SSH_AUTH_SOCK_END}`,
-].join('; ');
+const PATH_VARIABLE = 'PATH';
+const LOGIN_VARIABLES = [
+  'SSH_AUTH_SOCK',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'NODE_EXTRA_CA_CERTS',
+  'REQUESTS_CA_BUNDLE',
+  'GIT_SSL_CAINFO',
+];
+const startMarker = (name: string) => `__KOREV_${name}_START__`;
+const endMarker = (name: string) => `__KOREV_${name}_END__`;
+const PRINT_LOGIN_ENV = [PATH_VARIABLE, ...LOGIN_VARIABLES]
+  .map(
+    (name) =>
+      `printf ${startMarker(name)}; /usr/bin/printenv ${name}; printf ${endMarker(name)}`,
+  )
+  .join('; ');
 const SHELL_TIMEOUT_MS = 5000;
 export const DEFAULT_SHELL = '/bin/zsh';
 const PATH_SEPARATOR = ':';
@@ -28,9 +37,13 @@ function between(text: string, start: string, end: string): string | null {
   return text.slice(from + start.length, to).trim();
 }
 
+function printedValue(output: string, name: string): string | null {
+  return between(output, startMarker(name), endMarker(name));
+}
+
 export interface LoginEnv {
   path: string;
-  sshAuthSock?: string;
+  variables: Record<string, string>;
 }
 
 async function shellOutput(
@@ -66,10 +79,13 @@ export async function resolveLoginEnv(
   env: NodeJS.ProcessEnv,
 ): Promise<LoginEnv> {
   const output = await shellOutput(run, env);
+  const printed = LOGIN_VARIABLES.flatMap((name) => {
+    const value = printedValue(output, name);
+    return value ? [[name, value] as const] : [];
+  });
   return {
-    path: mergedPath(between(output, PATH_START, PATH_END), env),
-    sshAuthSock:
-      between(output, SSH_AUTH_SOCK_START, SSH_AUTH_SOCK_END) || undefined,
+    path: mergedPath(printedValue(output, PATH_VARIABLE), env),
+    variables: Object.fromEntries(printed),
   };
 }
 
@@ -84,8 +100,9 @@ export function childEnv(
   const inherited = Object.entries(env).filter(
     ([name]) => !isElectronVariable(name) && !GITHUB_TOKEN_VARIABLES.has(name),
   );
-  const sshAuthSock = login.sshAuthSock
-    ? { SSH_AUTH_SOCK: login.sshAuthSock }
-    : {};
-  return { ...Object.fromEntries(inherited), PATH: login.path, ...sshAuthSock };
+  return {
+    ...Object.fromEntries(inherited),
+    ...login.variables,
+    PATH: login.path,
+  };
 }

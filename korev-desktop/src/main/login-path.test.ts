@@ -5,6 +5,7 @@ import { childEnv, resolveLoginEnv } from './login-path';
 
 const INHERITED_SOCK = '/tmp/launchd/Listeners';
 const SHELL_SOCK = '/Users/me/Library/Containers/secretive/socket.ssh';
+const SHELL_CA_BUNDLE = '/etc/ssl/cert.pem';
 
 function loginShellExporting(rcExports: string): CommandRunner {
   return (_file, args, options) =>
@@ -33,5 +34,10 @@ describe('agent environment from the login shell', () => {
   it('keeps the inherited SSH agent socket when the shell fails', async () => {
     const env = await agentEnv('exit 1');
     expect(env.SSH_AUTH_SOCK).toBe(INHERITED_SOCK);
+  });
+
+  it('uses the CA bundle the login shell exports', async () => {
+    const env = await agentEnv(`export SSL_CERT_FILE=${SHELL_CA_BUNDLE}`);
+    expect(env.SSL_CERT_FILE).toBe(SHELL_CA_BUNDLE);
   });
 });
