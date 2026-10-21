@@ -43,6 +43,7 @@ export interface Context {
   terminals: Terminals;
   agentAccess: AgentAccess;
   runningSessions: Set<string>;
+  creationRetries: Map<string, () => Promise<void>>;
   planLimits: PlanLimits;
   focusedWorkspaceIds: string[];
   runtime(workspaceId: string): WorkspaceRuntime;

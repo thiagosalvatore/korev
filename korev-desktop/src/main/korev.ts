@@ -104,6 +104,7 @@ import {
   onScriptExit,
   refreshStats,
   restoreWorkspace,
+  retryCreation,
   scriptEnv,
   startScript,
   switchAgent,
@@ -347,6 +348,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       },
     }),
     runningSessions: new Set(),
+    creationRetries: new Map(),
     planLimits: {},
     focusedWorkspaceIds: [],
     runtime(workspaceId) {
@@ -1222,6 +1224,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       return sent.ok ? ok(session.id) : sent;
     },
     archiveWorkspace: (workspaceId) => archive(workspaceId),
+    retryWorkspace: async (workspaceId) => retryCreation(ctx, workspaceId),
     resumeRun: (runId) => orchestration.resumeRun(runId),
     resumeTask: (runId, taskId) => orchestration.resumeTask(runId, taskId),
     answerQuestion: (runId, questionId, answer) =>

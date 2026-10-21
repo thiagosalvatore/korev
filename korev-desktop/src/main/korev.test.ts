@@ -1030,6 +1030,35 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(runtime.message).toMatch(/Could not create the worktree/);
   });
 
+  it('creates a failed workspace again in place and sends its task on retry', async () => {
+    const repo = await addRepo();
+    const settings = (await korev.api.getState()).settings;
+    const blocker = path.join(settings.workspacesRoot, 'acme', 'retry-me');
+    await mkdir(path.join(blocker, 'x'), { recursive: true });
+    const created = await korev.api.createWorkspaces(
+      [repo.id],
+      task('retry me'),
+    );
+    if (!created.ok) throw new Error(created.message);
+    const id = created.value[0].id;
+    expect((await waitUntilCreated(id)).runtime.status).toBe('failed');
+    await rm(blocker, { recursive: true });
+
+    expect(await korev.api.retryWorkspace(id)).toEqual({
+      ok: true,
+      value: undefined,
+    });
+
+    const { workspace, runtime } = await waitUntilCreated(id);
+    expect(runtime.status).not.toBe('failed');
+    expect(workspace.archivedAt).toBeNull();
+    await waitForTurn(workspace.sessions[0].id);
+    const [prompt] = (
+      await korev.api.transcript(workspace.sessions[0].id)
+    ).filter((item) => item.kind === 'user');
+    expect(prompt.kind === 'user' && prompt.text).toBe('retry me');
+  });
+
   it('reports only the end of a noisy failing post-checkout hook', async () => {
     const hook = path.join(repoPath, '.git', 'hooks', 'post-checkout');
     await writeFile(

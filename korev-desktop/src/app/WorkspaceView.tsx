@@ -288,9 +288,7 @@ export function WorktreePending({
           <Button
             size="sm"
             icon="rotate-ccw"
-            onClick={() =>
-              retryWorkspace(workspace, runtime.pendingPrompt ?? '')
-            }
+            onClick={() => retryWorkspace(workspace)}
           >
             Try again
           </Button>

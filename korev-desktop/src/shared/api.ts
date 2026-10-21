@@ -104,6 +104,7 @@ export interface KorevApi {
   ): Promise<Result>;
   resolveGate(runId: string, gateId: string, choice: string): Promise<Result>;
   archiveWorkspace(workspaceId: string): Promise<Result>;
+  retryWorkspace(workspaceId: string): Promise<Result>;
   restoreWorkspace(workspaceId: string): Promise<Result>;
   deleteWorkspace(workspaceId: string): Promise<void>;
   focusWorkspaces(workspaceIds: string[]): Promise<void>;
@@ -223,6 +224,7 @@ export const REMOTE_METHODS = [
   'updateSession',
   'createWorkspaces',
   'archiveWorkspace',
+  'retryWorkspace',
   'listBranches',
   'listPullRequests',
   'listIssues',

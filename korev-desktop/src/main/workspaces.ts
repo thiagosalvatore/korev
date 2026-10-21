@@ -83,8 +83,6 @@ const NAMING_ARGS = [
 ];
 const NEW_SOURCE: WorkspaceSource = { kind: 'new', baseBranch: null };
 
-type CheckoutSource = Exclude<WorkspaceSource, { kind: 'new' }>;
-
 export type SendTask = (
   sessionId: string,
   options: SendOptions,
@@ -422,12 +420,20 @@ export function firstPrompt(
     .join('\n\n');
 }
 
-function failCreation(ctx: Context, workspace: Workspace, error: unknown) {
+type Retry = () => Promise<void>;
+
+function failCreation(
+  ctx: Context,
+  workspace: Workspace,
+  error: unknown,
+  retry: Retry,
+) {
   ctx.setStatus(
     workspace.id,
     'failed',
     `${WORKTREE_FAILED}: ${errorMessage(error)}`,
   );
+  ctx.creationRetries.set(workspace.id, retry);
 }
 
 async function copyLocalFiles(ctx: Context, repo: Repo, workspace: Workspace) {
@@ -449,6 +455,7 @@ async function addWorkspaceWorktree(
   repo: Repo,
   workspace: Workspace,
   from: string,
+  retry: Retry,
 ): Promise<boolean> {
   try {
     await addWorktree(
@@ -459,7 +466,7 @@ async function addWorkspaceWorktree(
       from,
     );
   } catch (error) {
-    failCreation(ctx, workspace, error);
+    failCreation(ctx, workspace, error, retry);
     return false;
   }
   await finishWorktree(ctx, repo, workspace);
@@ -483,6 +490,23 @@ function firstMessage(
   };
 }
 
+async function startWorkspace(
+  ctx: Context,
+  repo: Repo,
+  workspace: Workspace,
+  task: SendOptions | null,
+  plan: string | null,
+  acrossRepos: boolean,
+  send: SendTask,
+) {
+  void startScript(ctx, workspace, 'setup');
+  if (task && !workspace.awaitsLane)
+    await send(
+      workspace.sessions[0].id,
+      firstMessage(task, plan, repo, workspace, acrossRepos),
+    );
+}
+
 async function startCreated(
   ctx: Context,
   repos: Repo[],
@@ -497,12 +521,15 @@ async function startCreated(
   await Promise.all(
     workspaces.map(async (workspace, index) => {
       if (!created[index]) return;
-      void startScript(ctx, workspace, 'setup');
-      if (task && !workspace.awaitsLane)
-        await send(
-          workspace.sessions[0].id,
-          firstMessage(task, plan, repos[index], workspace, repos.length > 1),
-        );
+      await startWorkspace(
+        ctx,
+        repos[index],
+        workspace,
+        task,
+        plan,
+        repos.length > 1,
+        send,
+      );
     }),
   );
 }
@@ -528,6 +555,17 @@ async function prepareNamedWorkspaces(
   plan: string | null,
   send: SendTask,
 ) {
+  const retryAt = (index: number) => () =>
+    retryCreationOf(
+      ctx,
+      repos[index],
+      workspaces[index],
+      NEW_SOURCE,
+      task,
+      plan,
+      repos.length > 1,
+      send,
+    );
   let startPoints: string[];
   try {
     const [name, ...froms] = await Promise.all([
@@ -539,13 +577,21 @@ async function prepareNamedWorkspaces(
     await claimName(ctx, repos, workspaces, name);
     startPoints = froms;
   } catch (error) {
-    for (const workspace of workspaces) failCreation(ctx, workspace, error);
+    workspaces.forEach((workspace, index) =>
+      failCreation(ctx, workspace, error, retryAt(index)),
+    );
     ctx.emitState();
     return;
   }
   const created = await Promise.all(
     workspaces.map((workspace, index) =>
-      addWorkspaceWorktree(ctx, repos[index], workspace, startPoints[index]),
+      addWorkspaceWorktree(
+        ctx,
+        repos[index],
+        workspace,
+        startPoints[index],
+        retryAt(index),
+      ),
     ),
   );
   await startCreated(ctx, repos, workspaces, created, task, plan, send);
@@ -598,7 +644,7 @@ async function checkOutSource(
   ctx: Context,
   repo: Repo,
   workspace: Workspace,
-  source: CheckoutSource,
+  source: WorkspaceSource,
 ) {
   if (source.kind === 'branch') {
     if (await adoptWorktree(ctx, repo, workspace, source.branch)) return;
@@ -633,19 +679,81 @@ async function prepareSourceWorkspace(
   ctx: Context,
   repo: Repo,
   workspace: Workspace,
-  source: CheckoutSource,
+  source: WorkspaceSource,
   task: SendOptions | null,
+  plan: string | null,
+  acrossRepos: boolean,
   send: SendTask,
 ) {
   try {
     await checkOutSource(ctx, repo, workspace, source);
   } catch (error) {
-    failCreation(ctx, workspace, error);
+    failCreation(ctx, workspace, error, () =>
+      retryCreationOf(
+        ctx,
+        repo,
+        workspace,
+        source,
+        task,
+        plan,
+        acrossRepos,
+        send,
+      ),
+    );
     ctx.emitState();
     return;
   }
   await finishWorktree(ctx, repo, workspace);
-  await startCreated(ctx, [repo], [workspace], [true], task, null, send);
+  ctx.store.save();
+  ctx.emitState();
+  await startWorkspace(ctx, repo, workspace, task, plan, acrossRepos, send);
+}
+
+function ownsWorktreePath(
+  ctx: Context,
+  repo: Repo,
+  workspace: Workspace,
+  source: WorkspaceSource,
+): boolean {
+  return (
+    source.kind !== 'worktree' &&
+    workspace.path === worktreePath(ctx, repo, workspace.name)
+  );
+}
+
+async function retryCreationOf(
+  ctx: Context,
+  repo: Repo,
+  workspace: Workspace,
+  source: WorkspaceSource,
+  task: SendOptions | null,
+  plan: string | null,
+  acrossRepos: boolean,
+  send: SendTask,
+) {
+  if (ownsWorktreePath(ctx, repo, workspace, source))
+    await removeCleanWorktree(ctx.git, repo.path, workspace.path);
+  await prepareSourceWorkspace(
+    ctx,
+    repo,
+    workspace,
+    source,
+    task,
+    plan,
+    acrossRepos,
+    send,
+  );
+}
+
+export function retryCreation(ctx: Context, workspaceId: string): Result {
+  const retry = ctx.creationRetries.get(workspaceId);
+  if (!retry)
+    return { ok: false, message: 'Archive this workspace and create it again' };
+  ctx.creationRetries.delete(workspaceId);
+  ctx.setStatus(workspaceId, 'creating');
+  ctx.emitState();
+  ctx.background(retry());
+  return { ok: true, value: undefined };
 }
 
 function sourceName(source: WorkspaceSource, task: SendOptions | null) {
@@ -746,7 +854,16 @@ export function createWorkspaces(
     );
   } else {
     ctx.background(
-      prepareSourceWorkspace(ctx, repos[0], workspaces[0], source, task, send),
+      prepareSourceWorkspace(
+        ctx,
+        repos[0],
+        workspaces[0],
+        source,
+        task,
+        null,
+        false,
+        send,
+      ),
     );
   }
   return { ok: true, value: workspaces };
@@ -1037,6 +1154,7 @@ export async function archiveWorkspace(
   await removeWorktree(ctx.git, repo.path, workspace.path);
   if (deleteBranches) await deleteBranch(ctx.git, repo.path, workspace.branch);
   workspace.archivedAt = ctx.deps.now().toISOString();
+  ctx.creationRetries.delete(workspace.id);
   runtime.status = 'idle';
   runtime.unread = false;
   runtime.stats = null;

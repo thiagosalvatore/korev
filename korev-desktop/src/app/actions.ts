@@ -14,7 +14,6 @@ import type {
 } from '../shared/model';
 import { activeWorkspaces, workspaceLabel } from '../shared/workspaces';
 import { api } from './bridge';
-import { saveDraft } from './chat/Composer';
 import {
   focusedGridPane,
   freeTab,
@@ -247,11 +246,8 @@ export async function archiveWorkspace(state: AppState, workspace: Workspace) {
   else openNewWorkspace(workspace.repoId);
 }
 
-export async function retryWorkspace(workspace: Workspace, task: string) {
-  const result = await api.archiveWorkspace(workspace.id);
-  if (!reportFailure(result)) return;
-  saveDraft(NEW_WORKSPACE_DRAFT_KEY, task);
-  openNewWorkspace(workspace.repoId);
+export async function retryWorkspace(workspace: Workspace) {
+  reportFailure(await api.retryWorkspace(workspace.id));
 }
 
 export async function restoreWorkspace(workspace: Workspace) {

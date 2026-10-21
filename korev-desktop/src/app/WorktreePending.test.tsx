@@ -34,7 +34,7 @@ const runtime = {
 } as WorkspaceRuntime;
 
 describe('WorktreePending', () => {
-  it('shows the failure and puts the task back in the new workspace composer on Try again', async () => {
+  it('shows the failure and retries the same workspace on Try again', async () => {
     render(
       <WorktreePending
         state={{} as AppState}
@@ -43,15 +43,15 @@ describe('WorktreePending', () => {
       />,
     );
     expect(screen.getByText('hook broke')).toBeTruthy();
+    const page = getUi().page;
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
     await vi.waitFor(() =>
-      expect(getUi().page).toEqual({
-        kind: 'new-workspace',
-        repoId: 'posthog',
-      }),
+      expect(call).toHaveBeenCalledWith('retryWorkspace', ['ws']),
     );
-    expect(loadDraft(NEW_WORKSPACE_DRAFT_KEY)).toBe('Deprecate the mv command');
+    expect(call).not.toHaveBeenCalledWith('archiveWorkspace', ['ws']);
+    expect(getUi().page).toEqual(page);
+    expect(loadDraft(NEW_WORKSPACE_DRAFT_KEY)).toBe('');
   });
 });
