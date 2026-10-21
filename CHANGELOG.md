@@ -4,12 +4,17 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-21
+
+Review a teammate's pull request from Ask, and retry a failed workspace in place.
+
 ### New
 
 - **Review a pull request.** Press ⌘⇧R, press **Review a pull request** on the Ask page, or choose **Review a pull request…** in the command palette, and pick a teammate's pull request. Korev opens a read-only Ask about it, with the pull request already in the message. Say what to review, or type `/` to run a review skill.
 
 ### Fixed
 
+- **Try again** on a workspace that failed to start creates that workspace again in place and sends the task. Before, it archived the workspace and opened the New workspace page, so you had to create it again by hand.
 - A composer that opens with text already in it puts the cursor at the end of that text. Before, what you typed went in front of it.
 
 ## [0.16.2] - 2026-10-21
