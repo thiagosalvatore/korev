@@ -14,6 +14,7 @@ import {
   newChat,
   openBrowser,
   openTerminalTab,
+  retryWorkspace,
   terminalTabRef,
 } from './actions';
 import { ChatView } from './chat/ChatView';
@@ -24,7 +25,7 @@ import { SearchView } from './SearchView';
 import { BrowserView } from './BrowserView';
 import { XTerm } from './XTerm';
 import { fileName } from '../shared/format';
-import { worktreeProgress } from '../shared/workspaces';
+import { worktreeProgress, WORKTREE_FAILED } from '../shared/workspaces';
 import { DRAG_REGION } from './layout';
 import { GitPanel } from './GitPanel';
 import { CollapsedTerminalBar, TerminalPanel } from './TerminalPanel';
@@ -245,6 +246,10 @@ function WorkspaceWithoutWorktree(props: WorktreeStatusProps) {
   );
 }
 
+function failureDetail(message: string | null) {
+  return (message ?? '').replace(`${WORKTREE_FAILED}: `, '');
+}
+
 export function WorktreePending({
   state,
   workspace,
@@ -264,9 +269,13 @@ export function WorktreePending({
         />
       )}
       <p className="m-0 text-lg font-semibold text-fg-1">
-        {failed ? runtime.message : progress.title}
+        {failed ? WORKTREE_FAILED : progress.title}
       </p>
-      {failed ? null : (
+      {failed ? (
+        <pre className="m-0 max-h-64 w-full max-w-xl overflow-auto rounded-md bg-inset px-3 py-2 text-left font-mono text-xs break-words whitespace-pre-wrap text-danger-text select-text">
+          {failureDetail(runtime.message)}
+        </pre>
+      ) : (
         <p className="m-0 text-sm text-fg-3">{progress.detail}</p>
       )}
       {runtime.pendingPrompt ? (
@@ -275,14 +284,25 @@ export function WorktreePending({
         </p>
       ) : null}
       {failed ? (
-        <Button
-          size="sm"
-          variant="ghost"
-          icon="archive"
-          onClick={() => archiveWorkspace(state, workspace)}
-        >
-          Archive workspace
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            icon="rotate-ccw"
+            onClick={() =>
+              retryWorkspace(workspace, runtime.pendingPrompt ?? '')
+            }
+          >
+            Try again
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="archive"
+            onClick={() => archiveWorkspace(state, workspace)}
+          >
+            Archive workspace
+          </Button>
+        </div>
       ) : null}
     </div>
   );

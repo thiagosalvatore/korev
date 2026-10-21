@@ -14,6 +14,7 @@ import type {
 } from '../shared/model';
 import { activeWorkspaces, workspaceLabel } from '../shared/workspaces';
 import { api } from './bridge';
+import { saveDraft } from './chat/Composer';
 import {
   focusedGridPane,
   freeTab,
@@ -39,6 +40,8 @@ export function selectWorkspace(workspaceId: string) {
   setUi({ workspaceId, page: { kind: 'workspace' } });
   void api.focusWorkspaces([workspaceId]);
 }
+
+export const NEW_WORKSPACE_DRAFT_KEY = 'new-workspace';
 
 export function openNewWorkspace(repoId: string | null) {
   setUi({ page: { kind: 'new-workspace', repoId } });
@@ -242,6 +245,13 @@ export async function archiveWorkspace(state: AppState, workspace: Workspace) {
     remaining.find((ws) => ws.repoId === workspace.repoId) ?? remaining[0];
   if (next) selectWorkspace(next.id);
   else openNewWorkspace(workspace.repoId);
+}
+
+export async function retryWorkspace(workspace: Workspace, task: string) {
+  const result = await api.archiveWorkspace(workspace.id);
+  if (!reportFailure(result)) return;
+  saveDraft(NEW_WORKSPACE_DRAFT_KEY, task);
+  openNewWorkspace(workspace.repoId);
 }
 
 export async function restoreWorkspace(workspace: Workspace) {

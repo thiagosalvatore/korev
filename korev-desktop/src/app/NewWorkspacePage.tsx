@@ -6,7 +6,11 @@ import {
   type Repo,
   type WorkspaceSource,
 } from '../shared/model';
-import { createWorkspaces, selectWorkspace } from './actions';
+import {
+  createWorkspaces,
+  NEW_WORKSPACE_DRAFT_KEY,
+  selectWorkspace,
+} from './actions';
 import { api } from './bridge';
 import { Composer } from './chat/Composer';
 import {
@@ -25,7 +29,6 @@ import { toast } from './ui/toast';
 import { useUi } from './ui-store';
 
 const RECENT_LIMIT = 5;
-const NEW_WORKSPACE_DRAFT_KEY = 'new-workspace';
 const PLAN_ACROSS_REPOS = 'Several repositories start with a plan';
 
 function workspaceSource(

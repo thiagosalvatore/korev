@@ -18,12 +18,22 @@ const SNAPSHOT_MESSAGE = 'korev checkpoint';
 const CHECKPOINT_REF_PREFIX = 'refs/korev/checkpoints/';
 const WORKTREE_LINE = 'worktree ';
 const BRANCH_LINE = 'branch refs/heads/';
+const MAX_ERROR_LINES = 10;
 const GITHUB_REMOTE =
   /^(?:(?:https?|ssh|git):\/\/)?(?:[^@/]+@)?github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 
+function lastLines(output: string): string {
+  return output
+    .split(/[\r\n]+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-MAX_ERROR_LINES)
+    .join('\n');
+}
+
 export class GitError extends Error {
   constructor(args: readonly string[], stderr: string) {
-    super(stderr.trim() || `git ${args.join(' ')} failed`);
+    super(lastLines(stderr) || `git ${args.join(' ')} failed`);
     this.name = 'GitError';
   }
 }
@@ -185,7 +195,7 @@ async function createWorktree(
   args: string[],
 ): Promise<void> {
   await mkdir(path.dirname(worktree), { recursive: true });
-  await git.run(repo, ['worktree', 'add', ...args]);
+  await git.run(repo, ['worktree', 'add', '--quiet', ...args]);
   await prepareWorktree(git, worktree);
 }
 
@@ -261,7 +271,7 @@ export async function restoreWorktree(
   branch: string,
 ): Promise<void> {
   await git.tryRun(repo, ['worktree', 'prune']);
-  await git.run(repo, ['worktree', 'add', worktree, branch]);
+  await git.run(repo, ['worktree', 'add', '--quiet', worktree, branch]);
   await prepareWorktree(git, worktree);
 }
 

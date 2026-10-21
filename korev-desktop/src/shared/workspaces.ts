@@ -234,6 +234,8 @@ export function workspaceLabel(workspace: Workspace) {
   return workspace.label ?? workspace.name;
 }
 
+export const WORKTREE_FAILED = 'Could not create the worktree';
+
 export function worktreeProgress(
   workspace: Workspace,
   runtime: WorkspaceRuntime,

@@ -19,7 +19,7 @@ import {
 } from '../shared/model';
 import { errorMessage, terminalRef, type Context } from './context';
 import { planBlock } from '../shared/message';
-import { workspaceLabel } from '../shared/workspaces';
+import { workspaceLabel, WORKTREE_FAILED } from '../shared/workspaces';
 import {
   addBranchWorktree,
   addDetachedWorktree,
@@ -426,7 +426,7 @@ function failCreation(ctx: Context, workspace: Workspace, error: unknown) {
   ctx.setStatus(
     workspace.id,
     'failed',
-    `Could not create the worktree: ${errorMessage(error)}`,
+    `${WORKTREE_FAILED}: ${errorMessage(error)}`,
   );
 }
 

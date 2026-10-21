@@ -1030,6 +1030,25 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(runtime.message).toMatch(/Could not create the worktree/);
   });
 
+  it('reports only the end of a noisy failing post-checkout hook', async () => {
+    const hook = path.join(repoPath, '.git', 'hooks', 'post-checkout');
+    await writeFile(
+      hook,
+      '#!/bin/sh\nfor i in $(seq 200); do echo "installing $i"; done\necho "hook broke"\nexit 1\n',
+      { mode: 0o755 },
+    );
+    const repo = await addRepo();
+
+    const created = await korev.api.createWorkspaces([repo.id], null);
+
+    if (!created.ok) throw new Error(created.message);
+    const { runtime } = await waitUntilCreated(created.value[0].id);
+    expect(runtime.status).toBe('failed');
+    expect(runtime.message).toMatch(/hook broke$/);
+    expect(runtime.message).not.toMatch(/installing 1\b/);
+    expect(runtime.message!.split('\n').length).toBeLessThanOrEqual(10);
+  });
+
   async function askAndWait(repoIds: string[], text: string) {
     const ask = await korev.api.createAskChat(repoIds);
     await sendAndWait(ask.session.id, text);
