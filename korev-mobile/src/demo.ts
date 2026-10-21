@@ -443,6 +443,9 @@ export function createDemoConnection(): Connection {
       );
       return ok();
     },
+    async retryWorkspace() {
+      return ok();
+    },
     async listBranches() {
       return [DEMO_BASE_BRANCH];
     },
