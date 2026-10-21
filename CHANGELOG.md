@@ -4,6 +4,14 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-10-21
+
+A workspace that fails to start shows a short error and a Try again button.
+
+### Fixed
+
+- When Korev cannot create a workspace, it shows only the end of git's output, in a box that scrolls. Before, a long error from git or a repository hook pushed the task and the Archive button off the screen. **Try again** archives the failed workspace and opens a new one with the same task.
+
 ## [0.16.0] - 2026-10-20
 
 Get a pull request or a whole stack explained in plain words before you review it.
