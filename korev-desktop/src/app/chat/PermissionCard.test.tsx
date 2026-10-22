@@ -107,37 +107,6 @@ describe('PlanReview lanes across repositories', () => {
   });
 });
 
-describe('PermissionCard question', () => {
-  it('renders the question as markdown with its line breaks', () => {
-    render(
-      <PermissionCard
-        item={{
-          id: 'question-1',
-          kind: 'permission',
-          tool: 'AskUserQuestion',
-          summary: 'First line',
-          detail: '',
-          questions: [
-            {
-              question: 'First line\nSecond **bold**',
-              header: 'Q',
-              options: [{ label: 'Yes', description: '' }],
-              multiSelect: false,
-            },
-          ],
-          plan: null,
-          status: 'pending',
-        }}
-        onRespond={vi.fn()}
-      />,
-    );
-
-    const group = screen.getByRole('group', { name: /First line/ });
-    expect(group.querySelector('br')).not.toBeNull();
-    expect(group.querySelector('strong')?.textContent).toBe('bold');
-  });
-});
-
 describe('PermissionCard after a plan is resolved', () => {
   it('opens the approved plan', () => {
     render(

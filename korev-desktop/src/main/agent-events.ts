@@ -2,6 +2,7 @@ import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import {
   PLAN_TOOL,
+  QUESTION_TOOL,
   type AgentQuestion,
   type ChatItem,
   type PlanLimit,
@@ -490,7 +491,6 @@ export function createCodexParser(cwd: string): TurnParser {
   };
 }
 
-const QUESTION_TOOL = 'AskUserQuestion';
 const USER_INPUT_TOOLS = new Set([QUESTION_TOOL, PLAN_TOOL]);
 
 export interface ControlRequest {

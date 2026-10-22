@@ -7,6 +7,8 @@ import {
   finishedCodexPlan,
   hasWorktree,
   PLAN_TOOL,
+  QUESTION_TOOL,
+  replyToQuestions,
   type AskChat,
   type ChatItem,
   type ChatMatch,
@@ -854,10 +856,41 @@ export function createChats(
     planId: string,
     text: string,
   ): Result {
-    const answered = respondPermission(sessionId, planId, {
+    return answerWithMessage(sessionId, items, planId, text, {
       allow: false,
       message: text,
     });
+  }
+
+  function replyToQuestion(
+    sessionId: string,
+    items: ChatItem[],
+    questionId: string,
+    options: SendOptions,
+  ): Result {
+    const item = items.find((entry) => entry.id === questionId);
+    const questions = item?.kind === 'permission' ? item.questions : null;
+    const response = questions
+      ? replyToQuestions(questions, options.answers ?? {}, options.text)
+      : null;
+    if (!response) return { ok: false, message: NOT_WAITING_MESSAGE };
+    return answerWithMessage(
+      sessionId,
+      items,
+      questionId,
+      options.text,
+      response,
+    );
+  }
+
+  function answerWithMessage(
+    sessionId: string,
+    items: ChatItem[],
+    itemId: string,
+    text: string,
+    response: PermissionResponse,
+  ): Result {
+    const answered = respondPermission(sessionId, itemId, response);
     if (answered.ok) upsert(sessionId, items, userItem(text));
     return answered;
   }
@@ -887,9 +920,12 @@ export function createChats(
     const items = await transcript(sessionId);
     const active = turns.get(sessionId);
     if (active) {
-      const planId = waitingPlanId(sessionId);
+      const planId = waitingRequestId(sessionId, PLAN_TOOL);
       if (planId)
         return sendPlanFeedback(sessionId, items, planId, options.text);
+      const questionId = waitingRequestId(sessionId, QUESTION_TOOL);
+      if (questionId)
+        return replyToQuestion(sessionId, items, questionId, options);
       if (!steer(sessionId, items, active, options.text))
         queue(sessionId, items, options.text);
       return { ok: true, value: undefined };
@@ -1038,15 +1074,18 @@ export function createChats(
     return { ok: true, value: undefined };
   }
 
-  function waitingPlanId(sessionId: string): string | undefined {
+  function waitingRequestId(
+    sessionId: string,
+    tool: string,
+  ): string | undefined {
     const permissions = turns.get(sessionId)?.permissions ?? new Map();
     return Array.from(permissions).find(
-      ([, request]) => request.tool === PLAN_TOOL,
+      ([, request]) => request.tool === tool,
     )?.[0];
   }
 
   function handoffPlan(sessionId: string): Result<string> {
-    const itemId = waitingPlanId(sessionId);
+    const itemId = waitingRequestId(sessionId, PLAN_TOOL);
     const pending = itemId ? pendingPermission(sessionId, itemId) : null;
     if (pending?.item.plan == null)
       return { ok: false, message: NO_PLAN_WAITING_MESSAGE };

@@ -45,6 +45,11 @@ case "$message" in
     printf '%s\n' '{"type":"control_request","request_id":"req-lanes","request":{"subtype":"can_use_tool","tool_name":"ExitPlanMode","input":{"plan":"# Billing\n\n## Lanes\n### acme-web\nBuild the page.\n### acme-api\nAdd the endpoint."},"requires_user_interaction":true}}'
     IFS= read -r answer
     ;;
+  *ask-two-questions*)
+    printf '%s\n' '{"type":"control_request","request_id":"req-question","request":{"subtype":"can_use_tool","tool_name":"AskUserQuestion","input":{"questions":[{"question":"Which database?","header":"Database","options":[{"label":"Postgres","description":""},{"label":"SQLite","description":""}],"multiSelect":false},{"question":"Which tests?","header":"Tests","options":[{"label":"Unit","description":""},{"label":"E2E","description":""}],"multiSelect":true}]},"requires_user_interaction":true}}'
+    IFS= read -r answer
+    [ -d .context ] && echo "$answer" > .context/question-answer
+    ;;
   *make-plan*)
     echo '{"type":"assistant","message":{"id":"p1","content":[{"type":"tool_use","id":"plan-1","name":"ExitPlanMode","input":{"plan":"1. Add the login page"}}]}}'
     echo '{"type":"control_request","request_id":"req-plan","request":{"subtype":"can_use_tool","tool_name":"ExitPlanMode","input":{"plan":"1. Add the login page"},"requires_user_interaction":true}}'

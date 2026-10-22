@@ -1,15 +1,12 @@
-import { useId, useState } from 'react';
-import { Button, cn, Icon, Input, Select } from '../../design-system';
+import { useState } from 'react';
+import { Button, Icon, Input, Select } from '../../design-system';
 import {
-  answerQuestions,
-  DISMISS_QUESTION,
   KEEP_PLANNING_HINT,
   laneDrafts,
   laneHere,
   lanesToSplit,
   planLanes,
   splitLabel,
-  type AgentQuestion,
   type ChatItem,
   type LaneDraft,
   type LaneRepo,
@@ -36,8 +33,6 @@ const STATUS_LABELS: Record<Exclude<PermissionStatus, 'pending'>, string> = {
   expired: 'No longer waiting',
   'handed-off': 'Handed off to a new tab',
 };
-
-const OTHER_OPTION = 'Other';
 
 function ResolvedPlan({ plan, summary }: { plan: string; summary: string }) {
   return (
@@ -283,108 +278,6 @@ function PlanApproval({
   );
 }
 
-function QuestionField({
-  question,
-  value,
-  onChange,
-}: {
-  question: AgentQuestion;
-  value: string[];
-  onChange: (value: string[]) => void;
-}) {
-  const [other, setOther] = useState('');
-  const labelId = useId();
-  const toggle = (label: string) => {
-    if (!question.multiSelect) return onChange([label]);
-    return onChange(
-      value.includes(label)
-        ? value.filter((entry) => entry !== label)
-        : [...value, label],
-    );
-  };
-  return (
-    <fieldset aria-labelledby={labelId} className="m-0 mb-3 border-0 p-0">
-      <div id={labelId}>
-        <Markdown
-          text={question.question}
-          breaks
-          className="mb-1.5 text-sm text-fg-1"
-        />
-      </div>
-      <div className="flex flex-col gap-1">
-        {question.options.map((option) => (
-          <button
-            key={option.label}
-            type="button"
-            aria-pressed={value.includes(option.label)}
-            className={cn(
-              'flex cursor-pointer flex-col items-start rounded-md border border-border-2 bg-raised px-3 py-2 text-left hover:border-border-strong',
-              value.includes(option.label) &&
-                'border-accent-border bg-accent-subtle',
-            )}
-            onClick={() => toggle(option.label)}
-          >
-            <span className="text-sm text-fg-1">{option.label}</span>
-            {option.description ? (
-              <span className="text-xs text-fg-3">{option.description}</span>
-            ) : null}
-          </button>
-        ))}
-        <input
-          aria-label={`${OTHER_OPTION} answer to ${question.question}`}
-          value={other}
-          placeholder="Other…"
-          className="h-8 rounded-md border border-border-2 bg-inset px-2.5 text-sm text-fg-1 outline-none focus:border-accent-border"
-          onChange={(event) => {
-            setOther(event.target.value);
-            onChange(event.target.value ? [event.target.value] : []);
-          }}
-        />
-      </div>
-    </fieldset>
-  );
-}
-
-function QuestionForm({ item, onRespond }: PermissionCardProps) {
-  const questions = item.questions ?? [];
-  const [answers, setAnswers] = useState<Record<string, string[]>>({});
-  const response = answerQuestions(questions, answers);
-  return (
-    <Shell title="The agent has a question" icon="message-circle-question">
-      {questions.map((question) => (
-        <QuestionField
-          key={question.question}
-          question={question}
-          value={answers[question.question] ?? []}
-          onChange={(value) =>
-            setAnswers((current) => ({
-              ...current,
-              [question.question]: value,
-            }))
-          }
-        />
-      ))}
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={!response}
-          onClick={() => response && onRespond(response)}
-        >
-          Answer
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => onRespond(DISMISS_QUESTION)}
-        >
-          Dismiss
-        </Button>
-      </div>
-    </Shell>
-  );
-}
-
 export function PermissionCard({
   item,
   laneRepos,
@@ -401,6 +294,6 @@ export function PermissionCard({
         onHandoff={onHandoff}
       />
     );
-  if (item.questions) return <QuestionForm item={item} onRespond={onRespond} />;
+  if (item.questions) return null;
   return <ToolApproval item={item} onRespond={onRespond} />;
 }

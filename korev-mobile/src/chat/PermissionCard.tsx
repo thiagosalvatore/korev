@@ -1,22 +1,12 @@
 import { useState } from 'react';
+import { StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import {
-  Pressable,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import {
-  answerQuestions,
-  DISMISS_QUESTION,
   KEEP_PLANNING_HINT,
   laneDrafts,
   laneHere,
   lanesToSplit,
   planLanes,
   splitLabel,
-  type AgentQuestion,
   type ChatItem,
   type LaneDraft,
   type PermissionResponse,
@@ -249,105 +239,6 @@ function PlanApproval({
   );
 }
 
-function QuestionField({
-  question,
-  value,
-  onChange,
-}: {
-  question: AgentQuestion;
-  value: string[];
-  onChange: (value: string[]) => void;
-}) {
-  const styles = useStyles();
-  const theme = useTheme();
-  const [other, setOther] = useState('');
-  const toggle = (label: string) => {
-    const chosen = other ? [] : value;
-    setOther('');
-    if (!question.multiSelect) return onChange([label]);
-    return onChange(
-      chosen.includes(label)
-        ? chosen.filter((entry) => entry !== label)
-        : [...chosen, label],
-    );
-  };
-  return (
-    <View style={styles.question}>
-      <MarkdownView value={question.question} />
-      {question.options.map((option) => (
-        <Pressable
-          key={option.label}
-          accessibilityRole="button"
-          accessibilityState={{ selected: value.includes(option.label) }}
-          style={[
-            styles.option,
-            value.includes(option.label) && styles.optionSelected,
-          ]}
-          onPress={() => toggle(option.label)}
-        >
-          <Text style={styles.optionLabel}>{option.label}</Text>
-          {option.description ? (
-            <Text style={styles.optionDescription}>{option.description}</Text>
-          ) : null}
-        </Pressable>
-      ))}
-      <TextInput
-        style={styles.input}
-        value={other}
-        onChangeText={(text) => {
-          setOther(text);
-          onChange(text ? [text] : []);
-        }}
-        placeholder="Other…"
-        placeholderTextColor={theme.fg4}
-      />
-    </View>
-  );
-}
-
-function QuestionForm({ item, onRespond }: PermissionCardProps) {
-  const styles = useStyles();
-  const questions = item.questions ?? [];
-  const [answers, setAnswers] = useState<Record<string, string[]>>({});
-  const response = answerQuestions(questions, answers);
-  const { pending, run } = usePendingAction({ holdOnSuccess: true });
-  return (
-    <View style={styles.card}>
-      <Text style={styles.title}>The agent has a question</Text>
-      {questions.map((question) => (
-        <QuestionField
-          key={question.question}
-          question={question}
-          value={answers[question.question] ?? []}
-          onChange={(value) =>
-            setAnswers((current) => ({
-              ...current,
-              [question.question]: value,
-            }))
-          }
-        />
-      ))}
-      <View style={styles.actions}>
-        <Button
-          label="Answer"
-          pending={pending === 'answer'}
-          disabled={pending !== null || !response}
-          onPress={() =>
-            response && void run('answer', () => onRespond(response))
-          }
-        />
-        <Button
-          label="Dismiss"
-          variant="secondary"
-          pending={pending === 'dismiss'}
-          disabled={pending !== null}
-          onPress={() => void run('dismiss', () => onRespond(DISMISS_QUESTION))}
-        />
-      </View>
-    </View>
-  );
-}
-
 export function PermissionCard({
   item,
   laneRepos,
@@ -364,7 +255,7 @@ export function PermissionCard({
         onHandoff={onHandoff}
       />
     );
-  if (item.questions) return <QuestionForm item={item} onRespond={onRespond} />;
+  if (item.questions) return null;
   return <ToolApproval item={item} onRespond={onRespond} />;
 }
 
@@ -388,16 +279,6 @@ function makeStyles(theme: Theme) {
     laneDraft: { gap: 6 },
     laneName: { flex: 1 },
     question: { gap: 6 },
-    option: {
-      padding: 10,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: theme.border2,
-    },
-    optionSelected: {
-      borderColor: theme.accent,
-      backgroundColor: theme.accentSubtle,
-    },
     optionLabel: { color: theme.fg1, fontSize: 14, fontWeight: '600' },
     optionDescription: { color: theme.fg3, fontSize: 13 },
     input: {

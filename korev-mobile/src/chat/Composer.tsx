@@ -7,6 +7,8 @@ import { formatAttachments } from '../../../korev-desktop/src/shared/message';
 import {
   PENDING_PLAN_PLACEHOLDER,
   PLAN_FEEDBACK_PLACEHOLDER,
+  QUESTION_REPLY_PLACEHOLDER,
+  type QuestionPicks,
   STOP_BEFORE_SWITCHING,
   type AppState,
   type ChatSession,
@@ -32,12 +34,14 @@ export function Composer({
   state,
   session,
   reviewingPlan,
+  answers,
   onSend,
   onSendFailed,
 }: {
   state: AppState;
   session: ChatSession;
   reviewingPlan: boolean;
+  answers?: QuestionPicks;
   onSend(text: string): void;
   onSendFailed(): void;
 }) {
@@ -91,6 +95,7 @@ export function Composer({
         effort: session.effort,
         planMode: session.planMode,
         fast: session.fast,
+        answers,
       }),
     );
     succeeded(sent);
@@ -201,6 +206,7 @@ export function Composer({
                 placeholder={placeholder({
                   running,
                   reviewingPlan,
+                  answeringQuestion: Boolean(answers),
                   hasPendingPlan: Boolean(pendingPlan),
                 })}
                 placeholderTextColor={theme.fg4}
@@ -227,13 +233,16 @@ export function Composer({
 function placeholder({
   running,
   reviewingPlan,
+  answeringQuestion,
   hasPendingPlan,
 }: {
   running: boolean;
   reviewingPlan: boolean;
+  answeringQuestion: boolean;
   hasPendingPlan: boolean;
 }): string {
   if (reviewingPlan) return PLAN_FEEDBACK_PLACEHOLDER;
+  if (answeringQuestion) return QUESTION_REPLY_PLACEHOLDER;
   if (hasPendingPlan) return PENDING_PLAN_PLACEHOLDER;
   return running ? 'Steer or queue a message' : 'Message';
 }
