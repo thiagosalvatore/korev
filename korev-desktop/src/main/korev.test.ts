@@ -24,6 +24,7 @@ import {
   type Workspace,
   type WorkspaceSource,
 } from '../shared/model';
+import { AUTOMATION_TICK_MS } from './automations';
 import { createKorev, PR_POLL_MS, type Korev } from './korev';
 import type { RemoteSettings } from './remote-access';
 import type { Release } from './updates';
@@ -1416,6 +1417,86 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).filter((item) => item.kind === 'user');
     expect(messages).toHaveLength(2);
     expect(failed.ref.error).toContain('no ```korev-explainer block');
+  });
+
+  async function createAutomation(prompt: string) {
+    const repo = await addRepo();
+    return korev.api.createAutomation({
+      name: 'Tickets',
+      prompt,
+      intervalMinutes: 10,
+      repoIds: [repo.id],
+      enabled: true,
+    });
+  }
+
+  async function automationRuns(automationId: string) {
+    return (await korev.api.getState()).askChats.filter(
+      (ask) => ask.automationRun?.automationId === automationId,
+    );
+  }
+
+  async function runAutomationUntil(automationId: string, note: string) {
+    const started = await korev.api.runAutomation(automationId);
+    if (!started.ok) throw new Error(started.message);
+    const run = async () =>
+      (await korev.api.getState()).askChats.find(
+        (ask) => ask.id === started.value,
+      )!.automationRun!;
+    await waitFor(async () =>
+      (await run()).notes.some((entry) => entry.includes(note)),
+    );
+    return run();
+  }
+
+  it('opens a workspace for each new key a run asks for, only in its own repositories', async () => {
+    const automation = await createAutomation('sweep-tickets');
+
+    const first = await runAutomationUntil(automation.id, 'elsewhere');
+    const second = await runAutomationUntil(automation.id, 'T-1');
+
+    const { workspaces } = await korev.api.getState();
+    expect(workspaces).toHaveLength(1);
+    expect(first.workspaceIds).toEqual([workspaces[0].id]);
+    expect(second.workspaceIds).toEqual([]);
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: workspaces[0].id }),
+    );
+  });
+
+  it('notes a run whose reply has no automation block', async () => {
+    const automation = await createAutomation('say hello');
+
+    const run = await runAutomationUntil(automation.id, 'korev-automation');
+
+    expect(run.workspaceIds).toEqual([]);
+  });
+
+  it('does not start a run while the last one is still going', async () => {
+    const automation = await createAutomation('hold-turn');
+    const started = await korev.api.runAutomation(automation.id);
+    if (!started.ok) throw new Error(started.message);
+
+    const again = await korev.api.runAutomation(automation.id);
+
+    expect(again.ok).toBe(false);
+  });
+
+  it('runs an automation on the timer once it is due', async () => {
+    await korev.shutdown();
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    korev = await openKorev();
+    const automation = await createAutomation('say hello');
+
+    vi.advanceTimersByTime(AUTOMATION_TICK_MS);
+    await waitFor(
+      async () =>
+        (await automationRuns(automation.id))[0]?.automationRun?.notes
+          .length === 1,
+    );
+    vi.advanceTimersByTime(AUTOMATION_TICK_MS);
+
+    expect(await automationRuns(automation.id)).toHaveLength(1);
   });
 
   it('moves the read-only checkout to the latest default branch before each question', async () => {

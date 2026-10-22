@@ -321,6 +321,28 @@ export interface AskChat {
   session: ChatSession;
   createdAt: string;
   lastMessageAt: string;
+  automationRun?: AutomationRun;
+}
+
+export interface AutomationDraft {
+  name: string;
+  prompt: string;
+  intervalMinutes: number;
+  repoIds: string[];
+  enabled: boolean;
+}
+
+export interface Automation extends AutomationDraft {
+  id: string;
+  createdAt: string;
+  lastRunAt: string | null;
+  usedKeys: string[];
+}
+
+export interface AutomationRun {
+  automationId: string;
+  workspaceIds: string[];
+  notes: string[];
 }
 
 export interface Settings {
@@ -598,6 +620,7 @@ export interface AppState {
   workspaceFolders: WorkspaceFolder[];
   askChats: AskChat[];
   runs: OrchestrationRun[];
+  automations: Automation[];
   settings: Settings;
   runtime: Record<string, WorkspaceRuntime>;
   runningSessions: string[];

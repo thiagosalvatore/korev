@@ -2,6 +2,8 @@ import type {
   AgentKind,
   AppCommand,
   AskChat,
+  Automation,
+  AutomationDraft,
   AppState,
   ChatItem,
   ChatMatch,
@@ -112,6 +114,13 @@ export interface KorevApi {
   focusWorkspaces(workspaceIds: string[]): Promise<void>;
   createAskChat(repoIds: string[]): Promise<AskChat>;
   deleteAskChat(askChatId: string): Promise<void>;
+  createAutomation(draft: AutomationDraft): Promise<Automation>;
+  updateAutomation(
+    automationId: string,
+    patch: Partial<AutomationDraft>,
+  ): Promise<void>;
+  deleteAutomation(automationId: string): Promise<void>;
+  runAutomation(automationId: string): Promise<Result<string>>;
   startFromAsk(askChatId: string): Promise<Result<Workspace[]>>;
   newSession(workspaceId: string, agent: AgentKind): Promise<ChatSession>;
   closeSession(workspaceId: string, sessionId: string): Promise<void>;

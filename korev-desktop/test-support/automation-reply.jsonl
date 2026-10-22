@@ -1,0 +1,2 @@
+{"type":"stream_event","event":{"type":"message_start","message":{"id":"automation-1"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Two tickets need work.\n\n```korev-automation\n{\n  \"workspaces\": [\n    {\n      \"repo\": \"acme\",\n      \"key\": \"T-1\",\n      \"prompt\": \"Fix ticket T-1\"\n    },\n    {\n      \"repo\": \"elsewhere\",\n      \"key\": \"T-2\",\n      \"prompt\": \"Fix ticket T-2\"\n    }\n  ]\n}\n```"}}}

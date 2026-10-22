@@ -214,13 +214,18 @@ function content(value: unknown): ExplainerContent {
   return parsed;
 }
 
-const FENCE_PATTERN = new RegExp(
-  `\`\`\`${EXPLAINER_FENCE}[^\\n]*\\n([\\s\\S]*?)\\n\`\`\``,
-  'g',
-);
+function fencePattern(fence: string): RegExp {
+  return new RegExp(`\`\`\`${fence}[^\\n]*\\n([\\s\\S]*?)\\n\`\`\``, 'g');
+}
+
+const FENCE_PATTERN = fencePattern(EXPLAINER_FENCE);
+
+export function lastFencedBlock(reply: string, fence: string): string | null {
+  return [...reply.matchAll(fencePattern(fence))].at(-1)?.[1] ?? null;
+}
 
 export function explainerBlock(reply: string): string | null {
-  return [...reply.matchAll(FENCE_PATTERN)].at(-1)?.[1] ?? null;
+  return lastFencedBlock(reply, EXPLAINER_FENCE);
 }
 
 export function withoutExplainerBlocks(reply: string): string {

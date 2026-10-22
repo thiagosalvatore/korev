@@ -8,6 +8,7 @@ import {
   runScriptsFromText,
   type AgentKind,
   type AskChat,
+  type Automation,
   type ChatItem,
   type ChatSession,
   type OrchestrationRun,
@@ -41,6 +42,7 @@ export interface PersistedState {
   workspaceFolders: WorkspaceFolder[];
   askChats: AskChat[];
   runs: OrchestrationRun[];
+  automations: Automation[];
   settings: Settings;
 }
 
@@ -194,6 +196,7 @@ function sanitize(raw: unknown, home: string): PersistedState {
     runs: (Array.isArray(value.runs) ? value.runs : []).map(
       interruptedAfterRestart,
     ),
+    automations: Array.isArray(value.automations) ? value.automations : [],
     settings,
   };
 }

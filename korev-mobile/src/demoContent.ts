@@ -392,6 +392,7 @@ export function demoWorld(now: number): DemoWorld {
     ],
     askChats: [ask],
     runs: [],
+    automations: [],
     settings: SETTINGS,
     runtime: {
       [login.id]: demoRuntime({ status: 'working' }),

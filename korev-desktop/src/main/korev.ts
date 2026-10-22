@@ -44,6 +44,7 @@ import { detectAgents, reconcileDefaultModels } from './agents';
 import type { Dictation } from './dictation';
 import type { RemoteAccess } from './remote-access';
 import { askScratchPath, askWorktreePath } from './ask-worktrees';
+import { AUTOMATION_TICK_MS, createAutomations } from './automations';
 import { createChats, lanesElsewhereNote, type TurnPrLinks } from './chats';
 import { enableCommitSigning, signingKey } from './commit-signing';
 import { createExplainers } from './explainers';
@@ -406,13 +407,24 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         orchestration.turnFinished(links.sessionId).catch(() => undefined),
       );
     },
-    (session, outcome) => explainers.turnFinished(session, outcome),
+    (session, outcome) => {
+      explainers.turnFinished(session, outcome);
+      automations.turnFinished(session, outcome);
+    },
   );
   const explainers = createExplainers(ctx, {
     send: (sessionId, options) => chats.send(sessionId, options),
     isRunning: (sessionId) => chats.isRunning(sessionId),
     findSession,
     addAskChat,
+  });
+  const automations = createAutomations(ctx, {
+    send: (sessionId, options) => chats.send(sessionId, options),
+    isRunning: (sessionId) => chats.isRunning(sessionId),
+    addAskChat,
+    deleteAskChat,
+    createWorkspaces: (repoIds, task) =>
+      createWorkspaces(ctx, repoIds, task, chats.send),
   });
   const spotlight = createSpotlight(
     git,
@@ -456,6 +468,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       workspaceFolders,
       askChats,
       runs: store.state.runs,
+      automations: store.state.automations,
       settings,
       runtime: Object.fromEntries(
         workspaces.map((ws) => [ws.id, ctx.runtime(ws.id)]),
@@ -1270,6 +1283,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     explainer: (sessionId) => explainers.get(sessionId),
     updateExplainer: (sessionId) => explainers.update(sessionId),
     deleteAskChat,
+    createAutomation: async (draft) => automations.create(draft),
+    updateAutomation: async (automationId, patch) =>
+      automations.update(automationId, patch),
+    deleteAutomation: (automationId) => automations.remove(automationId),
+    runAutomation: (automationId) => automations.runNow(automationId),
     newSession: async (workspaceId, agent) =>
       addSession(ctx.workspace(workspaceId), agent),
     async closeSession(workspaceId, sessionId) {
@@ -1525,6 +1543,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     () => ctx.background(refreshAllPrs()),
     PR_POLL_MS,
   );
+  automations.tick();
+  const automationWatch = setInterval(automations.tick, AUTOMATION_TICK_MS);
 
   return {
     api,
@@ -1536,6 +1556,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     async shutdown() {
       shuttingDown = true;
       clearInterval(prWatch);
+      clearInterval(automationWatch);
       await spotlight.disableAll();
       await ctx.settled();
       for (const session of allSessions()) chats.stop(session.id);

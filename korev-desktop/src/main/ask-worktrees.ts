@@ -10,6 +10,7 @@ import {
 } from './git';
 
 const ASK_WORKTREE_DIR = '.ask';
+const AUTOMATIONS_DIR = '.automations';
 
 export function askWorktreePath(workspacesRoot: string, repo: Repo): string {
   return path.join(
@@ -21,6 +22,13 @@ export function askWorktreePath(workspacesRoot: string, repo: Repo): string {
 
 export function askScratchPath(workspacesRoot: string): string {
   return path.join(workspacesRoot, ASK_WORKTREE_DIR);
+}
+
+export function automationScratchPath(
+  workspacesRoot: string,
+  automationId: string,
+): string {
+  return path.join(workspacesRoot, AUTOMATIONS_DIR, automationId);
 }
 
 export async function prepareAskWorktree(

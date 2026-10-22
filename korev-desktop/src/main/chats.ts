@@ -41,7 +41,11 @@ import {
   isUserMessageAck,
   type TurnRequest,
 } from './agents';
-import { askScratchPath, prepareAskWorktree } from './ask-worktrees';
+import {
+  askScratchPath,
+  automationScratchPath,
+  prepareAskWorktree,
+} from './ask-worktrees';
 import { isSigningFailure, SIGNING_NUDGE } from './commit-signing';
 import { errorMessage, NotFoundError, type Context } from './context';
 import {
@@ -176,6 +180,11 @@ const ASK_INTRO = `You are answering questions inside Korev, a Mac app that lets
 const NO_REPO_ASK_PROMPT = [
   ASK_INTRO,
   `The user did not pick a repository. Answer the question directly. Do not edit files, create branches or commit.`,
+].join('\n');
+
+const AUTOMATION_PROMPT = [
+  `You are running an automation inside Korev, a Mac app that lets the user run many coding agents in parallel.`,
+  `Your working directory is a scratch directory, not a repository. Do not create branches or commit. Korev opens workspaces for code changes when your reply asks for them.`,
 ].join('\n');
 
 export function askSystemPrompt(repos: Repo[], checkouts: string[]): string {
@@ -503,8 +512,26 @@ export function createChats(
     };
   }
 
+  async function automationTarget(
+    root: string,
+    automationId: string,
+  ): Promise<TurnTarget> {
+    const cwd = automationScratchPath(root, automationId);
+    await mkdir(cwd, { recursive: true });
+    return {
+      cwd,
+      env: ctx.deps.env,
+      systemPrompt: AUTOMATION_PROMPT,
+      readOnly: false,
+      addDirs: await readableDirs(),
+      korevCli: false,
+    };
+  }
+
   async function askTarget(ask: AskChat): Promise<TurnTarget> {
     const root = ctx.store.state.settings.workspacesRoot;
+    if (ask.automationRun)
+      return automationTarget(root, ask.automationRun.automationId);
     if (!ask.repoIds.length) return noRepoAskTarget(root);
     const repos = ask.repoIds.map((repoId) => ctx.repo(repoId));
     const checkouts = await Promise.all(
