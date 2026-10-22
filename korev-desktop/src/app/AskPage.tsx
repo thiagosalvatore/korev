@@ -172,7 +172,7 @@ function AskChatView({ state, ask }: { state: AppState; ask: AskChat }) {
           {ask.session.title}
         </span>
         <span className="truncate text-xs text-fg-3">
-          {repoNames} · read-only
+          {ask.automationRun ? 'Automation run' : `${repoNames} · read-only`}
         </span>
         <span className="flex-1" />
         {ask.repoIds.length ? (

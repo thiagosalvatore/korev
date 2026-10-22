@@ -21,8 +21,8 @@ How the Korev desktop app looks and behaves. The tokens live in
 Three columns:
 
 - **Left sidebar** (`--sidebar-w`): Search (⌘K), New workspace (⌘N), Ask, Grid, Runs (only
-  once an agent has started an orchestration run), Board (⌘⇧B), then the Ask
-  chats, then one group per repository with its workspaces, then History (archived
+  once an agent has started an orchestration run), Board (⌘⇧B), Automations, then the Ask
+  chats (without automation runs), then one group per repository with its workspaces, then History (archived
   workspaces), then Add repository and Settings. A workspace linked across repositories
   shows once, under the repository of its lead workspace (see Linked group).
 - **Centre**: the workspace header (workspace name, branch, target branch, Open in, PR number,
@@ -43,6 +43,13 @@ coordinator's workspace, the open decisions and questions, then one row per task
 state badge, the tasks it waits for, its worker's workspace, and the worker's report under it.
 Decision cards use the permission card style (warning border). They also show at the end of the
 coordinator's chat.
+
+The **Automations** page replaces the centre and the right panel with one card per automation.
+A card has the name, a **Running** badge while a run is going, the on/off switch, **Run now**,
+**Edit** and **Delete**. Under them: the interval, the repositories and the time of the last run.
+Then the last five runs, one row each: the start time (click to open the run's chat), what it did,
+the workspaces it opened and a note for each request Korev skipped. **New automation** and
+**Edit** show the form above the cards.
 
 ## Workspace row
 

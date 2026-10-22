@@ -12,6 +12,7 @@ import type {
   AppState,
   AskChat,
 } from '../../../../korev-desktop/src/shared/model';
+import { asksNewestFirst } from '../../../../korev-desktop/src/shared/workspaces';
 import { NewAskForm } from '../../ask/NewAskForm';
 import { useAppState, useReconnect } from '../../hooks';
 import { Loading } from '../../Offline';
@@ -56,11 +57,9 @@ export default function AskChatsScreen() {
   const styles = makeStyles(useTheme());
   const { refreshing, refresh } = useReconnect();
   if (!state) return <Loading style={styles.loading} />;
-  if (!state.askChats.length)
+  const newestFirst = asksNewestFirst(state);
+  if (!newestFirst.length)
     return <NewAskForm state={state} autoFocus={false} onAsked={openAskChat} />;
-  const newestFirst = [...state.askChats].sort((a, b) =>
-    b.lastMessageAt.localeCompare(a.lastMessageAt),
-  );
   return (
     <ScrollView
       contentContainerStyle={styles.page}

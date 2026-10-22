@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Automations.** Click **Automations** in the sidebar to run a prompt every few minutes while Korev is open, for example "check my support tickets". At the end of each run the agent lists the workspaces to open, and Korev opens them in the repositories you picked. Each workspace has a key, such as a ticket id, and Korev never opens two workspaces with the same key. The Automations page shows what each run did, and each run's chat.
+
 ## [0.18.0] - 2026-10-22
 
 Share a chat as one HTML file, reuse worktrees from a pool, and find chats by what was said in them.

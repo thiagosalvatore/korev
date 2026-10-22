@@ -321,3 +321,22 @@ describe('Sidebar on the grid page', () => {
     ).toBe('page');
   });
 });
+
+describe('Sidebar Ask chats', () => {
+  it('leaves automation runs out of the Ask chats', () => {
+    const run = {
+      ...state.askChats[0],
+      id: 'a2',
+      session: { id: 'as2', title: 'Support tickets', agent: 'claude' },
+      automationRun: { automationId: 'au1', workspaceIds: [], notes: [] },
+    };
+    render(
+      <Sidebar
+        state={{ ...state, askChats: [...state.askChats, run] } as AppState}
+      />,
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Ask Support tickets' }),
+    ).toBeNull();
+  });
+});

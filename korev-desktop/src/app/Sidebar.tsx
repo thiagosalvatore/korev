@@ -39,6 +39,7 @@ import {
   archiveWorkspace,
   deleteAsk,
   openAsk,
+  openAutomations,
   openBoard,
   openGrid,
   openRuns,
@@ -953,8 +954,8 @@ function AskChats({ state }: { state: AppState }) {
     return ui.page.kind === 'ask' ? ui.page.askChatId : null;
   });
   const open = useUi((ui) => ui.askOpen);
-  if (!state.askChats.length) return null;
   const newestFirst = asksNewestFirst(state);
+  if (!newestFirst.length) return null;
   return (
     <section aria-label="Ask" className="border-b border-border-1 px-2 py-1.5">
       <button
@@ -970,7 +971,7 @@ function AskChats({ state }: { state: AppState }) {
           className={cn('transition-transform', !open && '-rotate-90')}
         />
         <span className="flex-1" />
-        <span className="font-mono text-2xs">{state.askChats.length}</span>
+        <span className="font-mono text-2xs">{newestFirst.length}</span>
       </button>
       {open ? (
         <div className="max-h-56 overflow-y-auto">
@@ -1255,6 +1256,12 @@ export function Sidebar({ state }: { state: AppState }) {
           hint="⌘⇧B"
           active={pageKind === 'board'}
           onClick={openBoard}
+        />
+        <NavRow
+          icon="calendar-clock"
+          label="Automations"
+          active={pageKind === 'automations'}
+          onClick={openAutomations}
         />
       </div>
       <AskChats state={state} />

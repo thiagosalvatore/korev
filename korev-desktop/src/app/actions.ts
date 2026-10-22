@@ -365,6 +365,10 @@ export function openBoard() {
   setUi({ page: { kind: 'board' } });
 }
 
+export function openAutomations() {
+  setUi({ page: { kind: 'automations' } });
+}
+
 export function toggleBoard() {
   if (getUi().page.kind !== 'board') return openBoard();
   setUi({ page: { kind: 'workspace' } });

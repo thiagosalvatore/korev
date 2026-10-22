@@ -136,9 +136,22 @@ export function movedFolder(
   };
 }
 
-export function asksNewestFirst(state: AppState): AskChat[] {
-  return [...state.askChats].sort((a, b) =>
-    b.lastMessageAt.localeCompare(a.lastMessageAt),
+function newestFirst(asks: AskChat[]): AskChat[] {
+  return asks.sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
+}
+
+export function asksNewestFirst(state: Pick<AppState, 'askChats'>): AskChat[] {
+  return newestFirst(state.askChats.filter((ask) => !ask.automationRun));
+}
+
+export function automationRunsNewestFirst(
+  state: Pick<AppState, 'askChats'>,
+  automationId: string,
+): AskChat[] {
+  return newestFirst(
+    state.askChats.filter(
+      (ask) => ask.automationRun?.automationId === automationId,
+    ),
   );
 }
 

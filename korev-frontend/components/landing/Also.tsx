@@ -1,5 +1,6 @@
 import {
   Archive,
+  CalendarClock,
   FileCog,
   GitPullRequest,
   History,
@@ -35,6 +36,11 @@ const FEATURES: [LucideIcon, string, string][] = [
     GitPullRequest,
     'Start from a PR or issue',
     'Create a workspace from an existing branch, pull request or GitHub issue.',
+  ],
+  [
+    CalendarClock,
+    'Automations',
+    'Run a prompt every few minutes, such as a check of your support tickets, and open a workspace for each new piece of work it finds.',
   ],
   [
     Smartphone,
