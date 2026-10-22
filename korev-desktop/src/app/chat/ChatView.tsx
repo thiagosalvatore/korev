@@ -4,6 +4,7 @@ import {
   AGENT_LABELS,
   finishedCodexPlan,
   planAwaitingReview,
+  PLAN_FEEDBACK_PLACEHOLDER,
   STOP_BEFORE_SWITCHING,
   type AppState,
   type ChatItem,
@@ -66,7 +67,6 @@ const EXPLAINER_TABS = [
   { id: 'chat', label: 'Chat', icon: 'message-square' as const },
 ];
 const EXPLAINER_PLACEHOLDER = 'Ask a question about this change';
-const PLAN_FEEDBACK_PLACEHOLDER = 'Tell the agent what to change in the plan';
 const PLAN_FEEDBACK_HINT = 'Sends feedback on the plan';
 const SWITCH_REPLAYS_CHAT =
   'Switching agents mid-chat replays the conversation, so the next reply is slower and uses more tokens';

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatAttachments } from '../../../korev-desktop/src/shared/message';
 import {
   PENDING_PLAN_PLACEHOLDER,
+  PLAN_FEEDBACK_PLACEHOLDER,
   STOP_BEFORE_SWITCHING,
   type AppState,
   type ChatSession,
@@ -30,11 +31,13 @@ const BAR_PADDING = 8;
 export function Composer({
   state,
   session,
+  reviewingPlan,
   onSend,
   onSendFailed,
 }: {
   state: AppState;
   session: ChatSession;
+  reviewingPlan: boolean;
   onSend(text: string): void;
   onSendFailed(): void;
 }) {
@@ -195,7 +198,11 @@ export function Composer({
                 style={styles.input}
                 value={text}
                 onChangeText={setText}
-                placeholder={placeholder(running, Boolean(pendingPlan))}
+                placeholder={placeholder({
+                  running,
+                  reviewingPlan,
+                  hasPendingPlan: Boolean(pendingPlan),
+                })}
                 placeholderTextColor={theme.fg4}
                 multiline
               />
@@ -217,7 +224,16 @@ export function Composer({
   );
 }
 
-function placeholder(running: boolean, hasPendingPlan: boolean): string {
+function placeholder({
+  running,
+  reviewingPlan,
+  hasPendingPlan,
+}: {
+  running: boolean;
+  reviewingPlan: boolean;
+  hasPendingPlan: boolean;
+}): string {
+  if (reviewingPlan) return PLAN_FEEDBACK_PLACEHOLDER;
   if (hasPendingPlan) return PENDING_PLAN_PLACEHOLDER;
   return running ? 'Steer or queue a message' : 'Message';
 }

@@ -741,6 +741,10 @@ export function isSubagentTool(item: ChatItem): boolean {
 
 export const PENDING_PLAN_PLACEHOLDER =
   'Add instructions, or send to implement the plan';
+export const PLAN_FEEDBACK_PLACEHOLDER =
+  'Tell the agent what to change in the plan';
+export const KEEP_PLANNING_HINT =
+  'To change the plan, send feedback from the message box below.';
 
 export function planOf(items: ChatItem[]): string | null {
   const planTool = items.findLast(

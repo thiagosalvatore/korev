@@ -17,6 +17,7 @@ import { modelLabel } from '../../../korev-desktop/src/shared/format';
 import {
   AGENT_LABELS,
   finishedCodexPlan,
+  planAwaitingReview,
   isSubagentTool,
   type AppState,
   type ChatItem,
@@ -179,18 +180,6 @@ export function Chat({
         })
     : undefined;
 
-  const keepPlanning = (feedback: string) =>
-    attempt('Korev could not send your feedback', () =>
-      api.send(session.id, {
-        text: feedback,
-        agent: session.agent,
-        model: session.model,
-        effort: session.effort,
-        planMode: true,
-        fast: session.fast,
-      }),
-    );
-
   return (
     <KeyboardAvoidingView
       style={styles.fill}
@@ -238,7 +227,6 @@ export function Chat({
                   showPlan={false}
                   laneRepos={laneRepos}
                   onApprove={approvePlan}
-                  onKeepPlanning={keepPlanning}
                   onHandoff={handoff}
                 />
               ) : null
@@ -264,6 +252,7 @@ export function Chat({
       <Composer
         state={state}
         session={session}
+        reviewingPlan={Boolean(codexPlan) || planAwaitingReview(items)}
         onSend={startSending}
         onSendFailed={() => setPending(null)}
       />

@@ -11,6 +11,7 @@ import { usePendingAction } from '../hooks';
 import { useConnection } from '../korev';
 import { useTheme, type Theme } from '../theme';
 import { Button } from '../ui';
+import { MarkdownView } from './MarkdownView';
 
 const DECISION_FAILED = 'Could not send the decision';
 const ANSWER_FAILED = 'Could not send the answer';
@@ -76,7 +77,7 @@ function QuestionCard({
   return (
     <View style={styles.card}>
       <Text style={styles.label}>The worker of {question.taskId} asks</Text>
-      <Text style={styles.body}>{question.question}</Text>
+      <MarkdownView value={question.question} />
       <View style={styles.actions}>
         {question.options.map((option) => (
           <Button

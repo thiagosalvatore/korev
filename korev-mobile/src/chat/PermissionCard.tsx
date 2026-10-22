@@ -10,6 +10,7 @@ import {
 import {
   answerQuestions,
   DISMISS_QUESTION,
+  KEEP_PLANNING_HINT,
   laneDrafts,
   laneHere,
   lanesToSplit,
@@ -172,7 +173,6 @@ export interface PlanReviewProps {
   showPlan: boolean;
   laneRepos?: Repo[];
   onApprove(lanes: PlanLane[]): Promise<boolean>;
-  onKeepPlanning(feedback: string): Promise<boolean>;
   onHandoff?(): Promise<boolean>;
 }
 
@@ -181,12 +181,9 @@ export function PlanReview({
   showPlan,
   laneRepos = [],
   onApprove,
-  onKeepPlanning,
   onHandoff,
 }: PlanReviewProps) {
   const styles = useStyles();
-  const theme = useTheme();
-  const [feedback, setFeedback] = useState('');
   const lanes = planLanes(plan, laneRepos.length ? 1 : 2);
   const { here, others } = laneHere(lanes, laneRepos);
   const [drafts, setDrafts] = useState(() => laneDrafts(others, laneRepos));
@@ -204,14 +201,7 @@ export function PlanReview({
           onChange={setDrafts}
         />
       ) : null}
-      <TextInput
-        style={styles.input}
-        value={feedback}
-        onChangeText={setFeedback}
-        placeholder="Optional: tell the agent what to change in the plan"
-        placeholderTextColor={theme.fg4}
-        multiline
-      />
+      <Text style={styles.hint}>{KEEP_PLANNING_HINT}</Text>
       <View style={styles.actions}>
         {split.length ? (
           <Button
@@ -237,15 +227,6 @@ export function PlanReview({
             onPress={() => void run('handoff', onHandoff)}
           />
         ) : null}
-        <Button
-          label="Keep planning"
-          variant="secondary"
-          pending={pending === 'keep-planning'}
-          disabled={pending !== null || !feedback.trim()}
-          onPress={() =>
-            void run('keep-planning', () => onKeepPlanning(feedback))
-          }
-        />
       </View>
     </View>
   );
@@ -264,7 +245,6 @@ function PlanApproval({
       laneRepos={laneRepos}
       onHandoff={onHandoff}
       onApprove={(lanes) => onRespond({ allow: true, lanes })}
-      onKeepPlanning={(message) => onRespond({ allow: false, message })}
     />
   );
 }
@@ -293,7 +273,7 @@ function QuestionField({
   };
   return (
     <View style={styles.question}>
-      <Text style={styles.body}>{question.question}</Text>
+      <MarkdownView value={question.question} />
       {question.options.map((option) => (
         <Pressable
           key={option.label}
@@ -401,6 +381,7 @@ function makeStyles(theme: Theme) {
     },
     title: { color: theme.fg1, fontSize: 15, fontWeight: '600' },
     body: { color: theme.fg1, fontSize: 15, lineHeight: 21 },
+    hint: { color: theme.fg3, fontSize: 13 },
     detail: { color: theme.fg2, fontFamily: MONO_FONT, fontSize: 12 },
     actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     lane: { flexDirection: 'row', alignItems: 'center', gap: 8 },

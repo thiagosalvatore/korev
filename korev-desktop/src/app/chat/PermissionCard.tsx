@@ -3,6 +3,7 @@ import { Button, cn, Icon, Input, Select } from '../../design-system';
 import {
   answerQuestions,
   DISMISS_QUESTION,
+  KEEP_PLANNING_HINT,
   laneDrafts,
   laneHere,
   lanesToSplit,
@@ -37,8 +38,6 @@ const STATUS_LABELS: Record<Exclude<PermissionStatus, 'pending'>, string> = {
 };
 
 const OTHER_OPTION = 'Other';
-const KEEP_PLANNING_HINT =
-  'To change the plan, send feedback from the message box below.';
 
 function ResolvedPlan({ plan, summary }: { plan: string; summary: string }) {
   return (
