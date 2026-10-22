@@ -4,11 +4,16 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-22
+
+Share a chat as one HTML file, reuse worktrees from a pool, and find chats by what was said in them.
+
 ### New
 
 - **Share a chat.** Press **Share chat** at the right of the tab bar, or in an Ask chat's header, to save the chat as one HTML file. Anyone can open it in a browser. It has your messages, the agent's answers, plans and each tool call, but not tool output or thinking.
 - **Worktree pool.** Set **Worktree pool** in a repository's settings, or `worktree_pool_size` in `.korev/settings.toml`, and new workspaces reuse free worktrees instead of creating one each time. A reused worktree keeps its gitignored files, such as `node_modules`, so setup is fast. Archiving a workspace frees its worktree for the next one.
 - **Search chat history.** The command palette (⌘K) now finds chats by what you and the agent wrote in them, not only by workspace name. Type a PR number such as `#292` to find the chats that mention or link that PR, and the workspace that tracks it.
+- **Recent repositories.** The repository pickers on desktop and on the phone list up to three repositories you used recently first, marked **Recent**, then every other repository by name. Ask from the sidebar now starts with no repository picked, so you choose one. Ask from a repository's row still picks that repository.
 
 ### Fixed
 
