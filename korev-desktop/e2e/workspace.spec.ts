@@ -302,6 +302,7 @@ test('asks a question about a repository without creating a workspace', async ()
     const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
     await sidebar.getByRole('button', { name: 'Ask', exact: true }).click();
     await expect(window.getByRole('heading', { name: 'Ask' })).toBeVisible();
+    await pickRepositories(window, ['acme-web']);
     await window
       .getByRole('textbox', { name: 'Message' })
       .fill('Where is the README?');
