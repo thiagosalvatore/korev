@@ -4,9 +4,19 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-22
+
+Run prompts on a timer with Automations, and answer agent questions and plans from the message box.
+
 ### New
 
 - **Automations.** Click **Automations** in the sidebar to run a prompt every few minutes while Korev is open, for example "check my support tickets". At the end of each run the agent lists the workspaces to open, and Korev opens them in the repositories you picked. Each workspace has a key, such as a ticket id, and Korev never opens two workspaces with the same key. The Automations page shows what each run did, and each run's chat.
+- **Questions above the message box.** When an agent asks a question, it shows in a panel right above the message box, on the desktop and the phone. Pick options, type your own answer in the message box, or both, then press send. Before, the question was a card in the chat with its own text field.
+- **Plan feedback from the message box.** While a plan waits for review, what you send from the message box goes to the agent as feedback on the plan, so you can use @files, #PRs, /commands and attachments in it. The plan card no longer has its own text box.
+
+### Fixed
+
+- Agent questions show their markdown, such as bold text, lists and code, on the desktop and the phone. Before, they showed the raw characters and lost their line breaks.
 
 ## [0.18.0] - 2026-10-22
 
