@@ -2341,6 +2341,37 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(approved.workspace.sessions[0].planMode).toBe(false);
   });
 
+  it('sends a message typed while a plan waits as feedback on the plan', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await korev.api.send(session.id, {
+      ...task('make-plan for the login page'),
+      planMode: true,
+    });
+    await waitFor(async () =>
+      (await korev.api.transcript(session.id)).some(
+        (item) => item.kind === 'permission',
+      ),
+    );
+    await mkdir(path.join(workspace.path, '.context'), { recursive: true });
+
+    await korev.api.send(session.id, {
+      ...task('Split step 2'),
+      planMode: true,
+    });
+
+    const answer = path.join(workspace.path, '.context', 'plan-answer');
+    await waitFor(async () => existsSync(answer));
+    expect(await readFile(answer, 'utf8')).toContain('Split step 2');
+    const items = await korev.api.transcript(session.id);
+    expect(items.find((item) => item.kind === 'permission')).toMatchObject({
+      status: 'denied',
+    });
+    expect(await userMessages(session.id)).toContain('Split step 2');
+    const { workspace: after } = await workspaceState(workspace.id);
+    expect(after.sessions[0].planMode).toBe(true);
+  });
+
   it('splits the approved plan into a linked workspace for each lane', async () => {
     const origin = await createWorkspace();
     const [session] = origin.sessions;

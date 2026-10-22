@@ -11,50 +11,6 @@ beforeEach(() => {
   } as unknown as Window['korev'];
 });
 
-function renderReview() {
-  const onKeepPlanning = vi.fn();
-  render(
-    <PlanReview
-      plan="# The plan"
-      showPlan
-      onApprove={vi.fn()}
-      onKeepPlanning={onKeepPlanning}
-    />,
-  );
-  return {
-    onKeepPlanning,
-    feedback: screen.getByRole('textbox', { name: 'Feedback on the plan' }),
-  };
-}
-
-describe('PlanReview feedback', () => {
-  it('sends the feedback on Enter', () => {
-    const { onKeepPlanning, feedback } = renderReview();
-
-    fireEvent.change(feedback, { target: { value: 'Split step 2' } });
-    fireEvent.keyDown(feedback, { key: 'Enter' });
-
-    expect(onKeepPlanning).toHaveBeenCalledWith('Split step 2');
-  });
-
-  it('keeps Shift+Enter for a new line', () => {
-    const { onKeepPlanning, feedback } = renderReview();
-
-    fireEvent.change(feedback, { target: { value: 'Split step 2' } });
-    fireEvent.keyDown(feedback, { key: 'Enter', shiftKey: true });
-
-    expect(onKeepPlanning).not.toHaveBeenCalled();
-  });
-
-  it('ignores Enter while the feedback is empty', () => {
-    const { onKeepPlanning, feedback } = renderReview();
-
-    fireEvent.keyDown(feedback, { key: 'Enter' });
-
-    expect(onKeepPlanning).not.toHaveBeenCalled();
-  });
-});
-
 describe('PlanReview lanes across repositories', () => {
   const plan = [
     '## Lanes',
@@ -77,7 +33,6 @@ describe('PlanReview lanes across repositories', () => {
         showPlan={false}
         laneRepos={repos}
         onApprove={onApprove}
-        onKeepPlanning={vi.fn()}
       />,
     );
     return onApprove;
@@ -101,7 +56,6 @@ describe('PlanReview lanes across repositories', () => {
         showPlan={false}
         laneRepos={repos}
         onApprove={onApprove}
-        onKeepPlanning={vi.fn()}
       />,
     );
 
@@ -127,7 +81,6 @@ describe('PlanReview lanes across repositories', () => {
         showPlan={false}
         laneRepos={repos}
         onApprove={onApprove}
-        onKeepPlanning={vi.fn()}
       />,
     );
 

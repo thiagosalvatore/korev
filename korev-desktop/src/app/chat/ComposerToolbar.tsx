@@ -21,6 +21,7 @@ export interface ComposerToolbarProps {
   hasSnippets: boolean;
   running: boolean;
   canSend: boolean;
+  sendHint?: string;
   usage?: TurnUsage;
   contextPicker?: ReactNode;
   dictation?: ReactNode;
@@ -36,6 +37,15 @@ export interface ComposerToolbarProps {
 
 const CHIP =
   'flex h-7 cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent px-2 text-xs text-fg-3 hover:bg-hover hover:text-fg-1';
+
+function sendHint(props: ComposerToolbarProps): string | null {
+  if (!props.canSend) return null;
+  if (props.sendHint) return props.sendHint;
+  if (!props.running) return null;
+  return props.agent === 'claude'
+    ? 'Steers the running agent'
+    : 'Queued until the agent finishes';
+}
 
 function optionItems(props: ComposerToolbarProps): MenuItem[] {
   const snippets: MenuItem[] = props.hasSnippets
@@ -104,6 +114,7 @@ export function ComposerToolbar(props: ComposerToolbarProps) {
   const modelLabel =
     props.models.find((entry) => isCurrent(props, entry))?.label ?? props.model;
   const showStop = props.running && !props.canSend;
+  const hint = sendHint(props);
   return (
     <div className="flex items-center gap-1 px-2 pb-2">
       <Menu
@@ -201,13 +212,7 @@ export function ComposerToolbar(props: ComposerToolbarProps) {
           limits={props.usage.limits}
         />
       ) : null}
-      {props.running && props.canSend ? (
-        <span className="mr-1 text-2xs text-fg-4">
-          {props.agent === 'claude'
-            ? 'Steers the running agent'
-            : 'Queued until the agent finishes'}
-        </span>
-      ) : null}
+      {hint ? <span className="mr-1 text-2xs text-fg-4">{hint}</span> : null}
       {props.dictation}
       {props.running && props.onStop ? (
         <button

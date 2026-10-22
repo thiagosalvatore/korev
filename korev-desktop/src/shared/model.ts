@@ -848,6 +848,17 @@ export function finishedCodexPlan(
   return plan ? { id: last.id, plan } : null;
 }
 
+export function planAwaitingReview(items: ChatItem[] | null): boolean {
+  return Boolean(
+    items?.some(
+      (item) =>
+        item.kind === 'permission' &&
+        item.plan !== null &&
+        item.status === 'pending',
+    ),
+  );
+}
+
 const LANES_HEADING = '## Lanes';
 const LANE_PREFIX = '### ';
 const SECTION_PREFIX = '## ';

@@ -844,25 +844,36 @@ export function createChats(
       return false;
     process.write(claudeUserMessage(text));
     turn.written += 1;
-    upsert(sessionId, items, {
-      id: ctx.deps.newId(),
-      kind: 'user',
-      text,
-      at: ctx.deps.now().toISOString(),
-      checkpoint: null,
-    });
+    upsert(sessionId, items, userItem(text));
     return true;
   }
 
+  function sendPlanFeedback(
+    sessionId: string,
+    items: ChatItem[],
+    planId: string,
+    text: string,
+  ): Result {
+    const answered = respondPermission(sessionId, planId, {
+      allow: false,
+      message: text,
+    });
+    if (answered.ok) upsert(sessionId, items, userItem(text));
+    return answered;
+  }
+
   function queue(sessionId: string, items: ChatItem[], text: string) {
-    upsert(sessionId, items, {
+    upsert(sessionId, items, { ...userItem(text), queued: true });
+  }
+
+  function userItem(text: string): Extract<ChatItem, { kind: 'user' }> {
+    return {
       id: ctx.deps.newId(),
       kind: 'user',
       text,
       at: ctx.deps.now().toISOString(),
       checkpoint: null,
-      queued: true,
-    });
+    };
   }
 
   async function send(
@@ -876,6 +887,9 @@ export function createChats(
     const items = await transcript(sessionId);
     const active = turns.get(sessionId);
     if (active) {
+      const planId = waitingPlanId(sessionId);
+      if (planId)
+        return sendPlanFeedback(sessionId, items, planId, options.text);
       if (!steer(sessionId, items, active, options.text))
         queue(sessionId, items, options.text);
       return { ok: true, value: undefined };

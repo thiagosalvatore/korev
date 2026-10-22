@@ -3,6 +3,7 @@ import { Button, Icon, Spinner, Tabs } from '../../design-system';
 import {
   AGENT_LABELS,
   finishedCodexPlan,
+  planAwaitingReview,
   STOP_BEFORE_SWITCHING,
   type AppState,
   type ChatItem,
@@ -65,6 +66,8 @@ const EXPLAINER_TABS = [
   { id: 'chat', label: 'Chat', icon: 'message-square' as const },
 ];
 const EXPLAINER_PLACEHOLDER = 'Ask a question about this change';
+const PLAN_FEEDBACK_PLACEHOLDER = 'Tell the agent what to change in the plan';
+const PLAN_FEEDBACK_HINT = 'Sends feedback on the plan';
 const SWITCH_REPLAYS_CHAT =
   'Switching agents mid-chat replays the conversation, so the next reply is slower and uses more tokens';
 
@@ -180,7 +183,7 @@ export function ChatView({
     });
   }
 
-  function send(text: string, planMode = session.planMode) {
+  function send(text: string) {
     if (session.explainer) setExplainerMode('chat');
     return api
       .send(session.id, {
@@ -188,7 +191,7 @@ export function ChatView({
         agent: session.agent,
         model: session.model,
         effort: session.effort,
-        planMode,
+        planMode: session.planMode,
         fast: session.fast,
       })
       .then(reportFailure);
@@ -197,6 +200,7 @@ export function ChatView({
   const codexPlan = workspace
     ? finishedCodexPlan(session, items, running)
     : null;
+  const reviewingPlan = Boolean(codexPlan) || planAwaitingReview(items);
   const handoff = workspace
     ? () => void handoffPlan(workspace, session.id)
     : undefined;
@@ -204,6 +208,12 @@ export function ChatView({
   const coordinatedRun = state.runs.findLast(
     (run) => run.coordinatorSessionId === session.id,
   );
+
+  function composerPlaceholder() {
+    if (explaining) return EXPLAINER_PLACEHOLDER;
+    if (reviewingPlan) return PLAN_FEEDBACK_PLACEHOLDER;
+    return placeholder;
+  }
 
   async function revert(itemId: string) {
     const result = await api.revert(session.id, itemId);
@@ -287,7 +297,6 @@ export function ChatView({
                   onApprove={(lanes) =>
                     void api.approvePlan(session.id, lanes).then(reportFailure)
                   }
-                  onKeepPlanning={(feedback) => void send(feedback, true)}
                   onHandoff={handoff}
                 />
               ) : null}
@@ -331,7 +340,8 @@ export function ChatView({
             onDiscardPendingPlan={() =>
               void api.updateSession(session.id, { pendingPlan: null })
             }
-            placeholder={explaining ? EXPLAINER_PLACEHOLDER : placeholder}
+            placeholder={composerPlaceholder()}
+            sendHint={reviewingPlan ? PLAN_FEEDBACK_HINT : undefined}
             autoFocus={autoFocus && !explaining}
             usage={{
               context: latestContext(items),

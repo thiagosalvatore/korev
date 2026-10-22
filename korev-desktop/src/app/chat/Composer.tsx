@@ -118,6 +118,7 @@ export interface ComposerProps {
   otherTabs?: ContextTab[];
   pendingPlan?: PendingPlan;
   placeholder?: string;
+  sendHint?: string;
   autoFocus?: boolean;
   usage?: TurnUsage;
   onModelChange(choice: ModelChoice): void;
@@ -529,6 +530,7 @@ export function Composer(props: ComposerProps) {
           hasSnippets={props.snippets.length > 0}
           running={running}
           canSend={canSend}
+          sendHint={props.sendHint}
           usage={props.usage}
           dictation={
             <DictationButton
