@@ -2,6 +2,7 @@ import { Button, cn, Icon, IconButton } from '../design-system';
 import {
   hasWorktree,
   type AppState,
+  type ChatSession,
   type Workspace,
   type TerminalPreset,
   type WorkspaceRuntime,
@@ -18,6 +19,7 @@ import {
   terminalTabRef,
 } from './actions';
 import { ChatView } from './chat/ChatView';
+import { ShareChatButton } from './chat/exportConversation';
 import { DiffView } from './diff/DiffView';
 import { FileView } from './FileView';
 import { PrComments } from './comments/PrComments';
@@ -135,12 +137,15 @@ function TabStrip({
   workspace,
   tabs,
   activeKey,
+  activeSession,
 }: {
   state: AppState;
   workspace: Workspace;
   tabs: TabEntry[];
   activeKey: string;
+  activeSession: ChatSession | null;
 }) {
+  const repo = state.repos.find((entry) => entry.id === workspace.repoId);
   return (
     <div className="flex h-9 flex-none items-stretch border-b border-border-1 bg-surface">
       <div
@@ -227,6 +232,14 @@ function TabStrip({
           )}
         />
       </div>
+      {activeSession ? (
+        <div className="ml-auto flex items-center px-1">
+          <ShareChatButton
+            session={activeSession}
+            context={{ repo: repo?.name ?? '', branch: workspace.branch }}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -362,6 +375,7 @@ function WorkspaceWithWorktree({
             workspace={workspace}
             tabs={tabs}
             activeKey={active?.key ?? ''}
+            activeSession={session ?? null}
           />
           {session ? (
             <ChatView

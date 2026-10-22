@@ -170,6 +170,7 @@ function FeatureGraph() {
             It can read the linked ones and leave notes in{' '}
             <code>.context/</code>
           </>,
+          'Share any chat as one HTML file',
         ]}
         card={<Linked />}
       />

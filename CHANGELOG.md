@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Share a chat.** Press **Share chat** at the right of the tab bar, or in an Ask chat's header, to save the chat as one HTML file. Anyone can open it in a browser. It has your messages, the agent's answers, plans and each tool call, but not tool output or thinking.
+
 ## [0.17.0] - 2026-10-21
 
 Review a teammate's pull request from Ask, and retry a failed workspace in place.

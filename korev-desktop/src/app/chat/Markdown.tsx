@@ -154,11 +154,15 @@ export function renderMarkdown(
   });
 }
 
+export function staticMarkdown(text: string, breaks = false): string {
+  return plainMarkdown.parse(text, { async: false, breaks });
+}
+
 export function copyMarkdown(text: string): Promise<void> {
   return navigator.clipboard.write([
     new ClipboardItem({
       'text/plain': new Blob([text], { type: 'text/plain' }),
-      'text/html': new Blob([plainMarkdown.parse(text, { async: false })], {
+      'text/html': new Blob([staticMarkdown(text)], {
         type: 'text/html',
       }),
     }),

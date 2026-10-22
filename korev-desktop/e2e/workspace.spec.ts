@@ -317,6 +317,18 @@ test('asks a question about a repository without creating a workspace', async ()
     ).toHaveCount(0);
     await snap(window, '06-ask-answer');
 
+    const shared = path.join(home, 'chat.html');
+    await app.evaluate(({ session }, savePath) => {
+      session.defaultSession.once('will-download', (_event, item) =>
+        item.setSavePath(savePath),
+      );
+    }, shared);
+    await window.getByRole('button', { name: 'Share chat' }).click();
+    await expect.poll(() => existsSync(shared)).toBe(true);
+    await expect
+      .poll(async () => readFile(shared, 'utf8'))
+      .toContain('Where is the README?');
+
     await window.getByRole('button', { name: 'Start workspace' }).click();
     await expect(
       sidebar.getByRole('button', { name: /^Workspace / }),

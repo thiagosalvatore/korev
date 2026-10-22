@@ -119,6 +119,8 @@ shows it in the chat area, so it works in a workspace tab, an Ask chat and a Gri
 - **Export HTML** writes one file with its own styles copied from the token values, light and dark
   through `prefers-color-scheme`. It has no scripts: steps are `<details>`, glossary terms are
   `<abbr>`.
+- **Share chat** saves a chat the same way: one file, no scripts, the same copied token values.
+  Tool calls are closed `<details>`, and an edit's lines use the diff add and delete colours.
 - **Banners** above the explanation: neutral while it updates, `danger` when an update failed,
   `warning` with **Update** when the change moved on.
 

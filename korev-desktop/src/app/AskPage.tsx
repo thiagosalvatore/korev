@@ -11,6 +11,7 @@ import {
 } from './actions';
 import { ChatView } from './chat/ChatView';
 import { Composer } from './chat/Composer';
+import { ShareChatButton } from './chat/exportConversation';
 import { askRepoNames, loadoutChoices, modelChoices } from '../shared/format';
 import { useModelChoice } from './hooks';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
@@ -196,6 +197,11 @@ function AskChatView({ state, ask }: { state: AppState; ask: AskChat }) {
             {ask.repoIds.length > 1 ? 'Start workspaces' : 'Start workspace'}
           </Button>
         ) : null}
+        <ShareChatButton
+          session={ask.session}
+          context={{ repo: repoNames, branch: null }}
+          className={NO_DRAG}
+        />
         <IconButton
           icon="trash-2"
           label="Delete chat"
