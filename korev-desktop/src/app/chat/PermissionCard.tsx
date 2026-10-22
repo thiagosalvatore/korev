@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Button, cn, Icon, Input, Select } from '../../design-system';
 import {
   answerQuestions,
@@ -373,6 +373,7 @@ function QuestionField({
   onChange: (value: string[]) => void;
 }) {
   const [other, setOther] = useState('');
+  const labelId = useId();
   const toggle = (label: string) => {
     if (!question.multiSelect) return onChange([label]);
     return onChange(
@@ -382,10 +383,14 @@ function QuestionField({
     );
   };
   return (
-    <fieldset className="m-0 mb-3 border-0 p-0">
-      <legend className="mb-1.5 text-sm font-medium text-fg-1">
-        {question.question}
-      </legend>
+    <fieldset aria-labelledby={labelId} className="m-0 mb-3 border-0 p-0">
+      <div id={labelId}>
+        <Markdown
+          text={question.question}
+          breaks
+          className="mb-1.5 text-sm text-fg-1"
+        />
+      </div>
       <div className="flex flex-col gap-1">
         {question.options.map((option) => (
           <button

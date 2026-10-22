@@ -20,6 +20,7 @@ import {
 import { workspaceLabel } from '../shared/workspaces';
 import { selectWorkspace } from './actions';
 import { api } from './bridge';
+import { Markdown } from './chat/Markdown';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { reportFailure } from './ui/toast';
 import { useUi } from './ui-store';
@@ -93,7 +94,7 @@ function QuestionCard({
         <Icon name="message-circle-question" size={13} />
         The worker of {question.taskId} asks
       </div>
-      <p className="m-0 text-sm text-fg-1">{question.question}</p>
+      <Markdown text={question.question} breaks className="text-sm text-fg-1" />
       {question.options.length ? (
         <div className="flex flex-wrap gap-1.5">
           {question.options.map((option) => (
