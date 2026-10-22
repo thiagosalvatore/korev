@@ -119,6 +119,7 @@ export interface ComposerProps {
   pendingPlan?: PendingPlan;
   placeholder?: string;
   sendHint?: string;
+  sendReady?: boolean;
   autoFocus?: boolean;
   usage?: TurnUsage;
   onModelChange(choice: ModelChoice): void;
@@ -216,7 +217,11 @@ export function Composer(props: ComposerProps) {
 
   const canSend =
     Boolean(
-      text.trim() || comments.length || tabContext.length || pendingPlan,
+      text.trim() ||
+      comments.length ||
+      tabContext.length ||
+      pendingPlan ||
+      props.sendReady,
     ) &&
     !sending &&
     !dictating;

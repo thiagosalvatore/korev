@@ -1,6 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
-  answerQuestions,
   DISMISS_QUESTION,
   QUESTION_REPLY_HINT,
   togglePick,
@@ -62,7 +61,6 @@ export function QuestionPanel({
   onRespond(response: PermissionResponse): Promise<boolean>;
 }) {
   const styles = makeStyles(useTheme());
-  const response = answerQuestions(questions, picks);
   const { pending, run } = usePendingAction({ holdOnSuccess: true });
   return (
     <View style={styles.panel}>
@@ -83,14 +81,6 @@ export function QuestionPanel({
         ))}
       </ScrollView>
       <View style={styles.actions}>
-        <Button
-          label="Answer"
-          pending={pending === 'answer'}
-          disabled={pending !== null || !response}
-          onPress={() =>
-            response && void run('answer', () => onRespond(response))
-          }
-        />
         <Button
           label="Dismiss"
           variant="secondary"

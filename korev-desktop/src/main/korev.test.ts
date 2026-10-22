@@ -2396,6 +2396,33 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(await userMessages(session.id)).toContain('Only smoke tests');
   });
 
+  it('answers a waiting question with the picks alone when the message is empty', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await korev.api.send(session.id, task('ask-two-questions'));
+    await waitFor(async () =>
+      (await korev.api.transcript(session.id)).some(
+        (item) => item.kind === 'permission',
+      ),
+    );
+    await mkdir(path.join(workspace.path, '.context'), { recursive: true });
+
+    await korev.api.send(session.id, {
+      ...task(''),
+      answers: {
+        'Which database?': ['SQLite'],
+        'Which tests?': ['Unit', 'E2E'],
+      },
+    });
+
+    const answer = path.join(workspace.path, '.context', 'question-answer');
+    await waitFor(async () => existsSync(answer));
+    const written = await readFile(answer, 'utf8');
+    expect(written).toContain('"Which database?":"SQLite"');
+    expect(written).toContain('"Which tests?":"Unit, E2E"');
+    expect(await userMessages(session.id)).toEqual(['ask-two-questions']);
+  });
+
   it('splits the approved plan into a linked workspace for each lane', async () => {
     const origin = await createWorkspace();
     const [session] = origin.sessions;

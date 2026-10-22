@@ -891,7 +891,7 @@ export function createChats(
     response: PermissionResponse,
   ): Result {
     const answered = respondPermission(sessionId, itemId, response);
-    if (answered.ok) upsert(sessionId, items, userItem(text));
+    if (answered.ok && text.trim()) upsert(sessionId, items, userItem(text));
     return answered;
   }
 

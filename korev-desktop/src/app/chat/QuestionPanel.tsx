@@ -1,7 +1,6 @@
 import { useId } from 'react';
 import { Button, cn, Icon } from '../../design-system';
 import {
-  answerQuestions,
   DISMISS_QUESTION,
   QUESTION_REPLY_HINT,
   togglePick,
@@ -69,7 +68,6 @@ export function QuestionPanel({
   onPick,
   onRespond,
 }: QuestionPanelProps) {
-  const response = answerQuestions(questions, picks);
   return (
     <div
       role="group"
@@ -93,14 +91,6 @@ export function QuestionPanel({
         />
       ))}
       <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={!response}
-          onClick={() => response && onRespond(response)}
-        >
-          Answer
-        </Button>
         <Button
           size="sm"
           variant="ghost"

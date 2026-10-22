@@ -748,7 +748,7 @@ export const KEEP_PLANNING_HINT =
   'To change the plan, send feedback from the message box below.';
 export const QUESTION_REPLY_PLACEHOLDER = 'Type your own answer';
 export const QUESTION_REPLY_HINT =
-  'Or type your own answer in the message box below.';
+  'Pick an option, type your own answer below, or both. Then send.';
 
 export function planOf(items: ChatItem[]): string | null {
   const planTool = items.findLast(
@@ -905,6 +905,32 @@ export const DISMISS_QUESTION: PermissionResponse = {
 
 export type QuestionPicks = Record<string, string[]>;
 
+export interface PickedAnswers {
+  itemId: string;
+  picks: QuestionPicks;
+}
+
+const NO_PICKS: QuestionPicks = {};
+
+export function picksFor(
+  picked: PickedAnswers | null,
+  itemId: string | undefined,
+): QuestionPicks {
+  return picked && picked.itemId === itemId ? picked.picks : NO_PICKS;
+}
+
+export function withPick(
+  picked: PickedAnswers | null,
+  itemId: string,
+  question: string,
+  labels: string[],
+): PickedAnswers {
+  return {
+    itemId,
+    picks: { ...picksFor(picked, itemId), [question]: labels },
+  };
+}
+
 export function togglePick(
   question: AgentQuestion,
   picked: string[],
@@ -918,16 +944,17 @@ export function togglePick(
 
 export function replyToQuestions(
   questions: AgentQuestion[],
-  picks: Record<string, string[]>,
+  picks: QuestionPicks,
   reply: string,
 ): PermissionResponse | null {
+  const typed = reply.trim() ? [reply.trim()] : [];
   const pickedAll = questions.every(
     (question) => picks[question.question]?.length,
   );
   const answerFor = (question: AgentQuestion) => {
     const picked = picks[question.question] ?? [];
-    if (!picked.length) return [reply];
-    return pickedAll ? [...picked, reply] : picked;
+    if (!picked.length) return typed;
+    return pickedAll ? [...picked, ...typed] : picked;
   };
   return answerQuestions(
     questions,

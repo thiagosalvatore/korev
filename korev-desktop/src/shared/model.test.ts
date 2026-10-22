@@ -59,6 +59,25 @@ describe('replyToQuestions', () => {
     });
   });
 
+  it('sends only the picks when there is no reply', () => {
+    expect(
+      replyToQuestions(
+        questions,
+        { 'Which database?': ['Postgres'], 'Which tests?': ['Unit'] },
+        ' ',
+      ),
+    ).toEqual({
+      allow: true,
+      answers: { 'Which database?': 'Postgres', 'Which tests?': 'Unit' },
+    });
+  });
+
+  it('waits for a pick or a reply for every question', () => {
+    expect(
+      replyToQuestions(questions, { 'Which database?': ['Postgres'] }, ''),
+    ).toBeNull();
+  });
+
   it('adds the reply to every answer when you picked an option for each', () => {
     expect(
       replyToQuestions(

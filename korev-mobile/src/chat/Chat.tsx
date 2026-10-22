@@ -16,6 +16,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { modelLabel } from '../../../korev-desktop/src/shared/format';
 import {
   AGENT_LABELS,
+  answerQuestions,
   finishedCodexPlan,
   planAwaitingReview,
   questionAwaitingAnswer,
@@ -25,7 +26,9 @@ import {
   type ChatSession,
   type PermissionResponse,
   type PlanLane,
-  type QuestionPicks,
+  picksFor,
+  withPick,
+  type PickedAnswers,
   type Repo,
 } from '../../../korev-desktop/src/shared/model';
 import { attempt } from '../attempt';
@@ -50,7 +53,6 @@ import { QuestionPanel } from './QuestionPanel';
 import { WorkingIndicator } from './WorkingIndicator';
 
 const FADE_MS = 150;
-const NO_PICKS: QuestionPicks = {};
 const MODE_HEIGHT = 30;
 
 type ChatMode = 'explainer' | 'chat';
@@ -144,10 +146,7 @@ export function Chat({
   const [scrolledBack, setScrolledBack] = useState(false);
   const [pending, setPending] = useState<PendingSend | null>(null);
   const [mode, setMode] = useState<ChatMode>('explainer');
-  const [picked, setPicked] = useState<{
-    itemId: string;
-    picks: QuestionPicks;
-  } | null>(null);
+  const [picked, setPicked] = useState<PickedAnswers | null>(null);
   const explaining = Boolean(session.explainer) && mode === 'explainer';
   const running = state.runningSessions.includes(session.id);
   const shown = items && withPendingMessage(items, pending);
@@ -168,8 +167,7 @@ export function Chat({
 
   const codexPlan = finishedCodexPlan(session, items, running);
   const question = questionAwaitingAnswer(items);
-  const picks =
-    question && picked?.itemId === question.id ? picked.picks : NO_PICKS;
+  const picks = picksFor(picked, question?.id);
 
   const trackScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) =>
     setScrolledBack(event.nativeEvent.contentOffset.y > windowHeight);
@@ -266,10 +264,9 @@ export function Chat({
           questions={question.questions}
           picks={picks}
           onPick={(questionText, labels) =>
-            setPicked({
-              itemId: question.id,
-              picks: { ...picks, [questionText]: labels },
-            })
+            setPicked((current) =>
+              withPick(current, question.id, questionText, labels),
+            )
           }
           onRespond={(response) => respond(question.id, response)}
         />
@@ -279,6 +276,9 @@ export function Chat({
         session={session}
         reviewingPlan={Boolean(codexPlan) || planAwaitingReview(items)}
         answers={question ? picks : undefined}
+        sendReady={Boolean(
+          question?.questions && answerQuestions(question.questions, picks),
+        )}
         onSend={startSending}
         onSendFailed={() => setPending(null)}
       />

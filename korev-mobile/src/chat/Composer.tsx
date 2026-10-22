@@ -35,6 +35,7 @@ export function Composer({
   session,
   reviewingPlan,
   answers,
+  sendReady = false,
   onSend,
   onSendFailed,
 }: {
@@ -42,6 +43,7 @@ export function Composer({
   session: ChatSession;
   reviewingPlan: boolean;
   answers?: QuestionPicks;
+  sendReady?: boolean;
   onSend(text: string): void;
   onSendFailed(): void;
 }) {
@@ -68,7 +70,7 @@ export function Composer({
   const dictating = dictation.phase !== 'idle';
   const sending = usePendingAction();
   const canSend =
-    Boolean(text.trim() || pendingPlan || attachments.length) &&
+    Boolean(text.trim() || pendingPlan || attachments.length || sendReady) &&
     !dictating &&
     !uploading &&
     sending.pending === null;

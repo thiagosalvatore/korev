@@ -3,12 +3,15 @@ import { Button, Icon, Spinner, Tabs } from '../../design-system';
 import {
   AGENT_LABELS,
   finishedCodexPlan,
+  answerQuestions,
   planAwaitingReview,
   PLAN_FEEDBACK_PLACEHOLDER,
   QUESTION_REPLY_PLACEHOLDER,
   questionAwaitingAnswer,
   type PermissionResponse,
-  type QuestionPicks,
+  picksFor,
+  withPick,
+  type PickedAnswers,
   STOP_BEFORE_SWITCHING,
   type AppState,
   type ChatItem,
@@ -74,7 +77,6 @@ const EXPLAINER_TABS = [
 const EXPLAINER_PLACEHOLDER = 'Ask a question about this change';
 const PLAN_FEEDBACK_HINT = 'Sends feedback on the plan';
 const QUESTION_REPLY_SEND_HINT = 'Answers the question';
-const NO_PICKS: QuestionPicks = {};
 const SWITCH_REPLAYS_CHAT =
   'Switching agents mid-chat replays the conversation, so the next reply is slower and uses more tokens';
 
@@ -154,10 +156,7 @@ export function ChatView({
       : NO_COMMENTS,
   );
   const [draftVersion, setDraftVersion] = useState(0);
-  const [picked, setPicked] = useState<{
-    itemId: string;
-    picks: QuestionPicks;
-  } | null>(null);
+  const [picked, setPicked] = useState<PickedAnswers | null>(null);
   const agent = state.agents.find((entry) => entry.agent === session.agent);
   const archived = Boolean(workspace?.archivedAt);
   const chatRepoId = workspace?.repoId ?? repoId ?? null;
@@ -195,8 +194,10 @@ export function ChatView({
   }
 
   const question = questionAwaitingAnswer(items);
-  const picks =
-    question && picked?.itemId === question.id ? picked.picks : NO_PICKS;
+  const picks = picksFor(picked, question?.id);
+  const answerReady = Boolean(
+    question?.questions && answerQuestions(question.questions, picks),
+  );
 
   function send(text: string) {
     if (session.explainer) setExplainerMode('chat');
@@ -220,7 +221,7 @@ export function ChatView({
   }
 
   function pick(itemId: string, questionText: string, labels: string[]) {
-    setPicked({ itemId, picks: { ...picks, [questionText]: labels } });
+    setPicked((current) => withPick(current, itemId, questionText, labels));
   }
 
   const codexPlan = workspace
@@ -384,6 +385,7 @@ export function ChatView({
               }
               placeholder={composerPlaceholder()}
               sendHint={composerSendHint()}
+              sendReady={answerReady}
               autoFocus={autoFocus && !explaining}
               usage={{
                 context: latestContext(items),
