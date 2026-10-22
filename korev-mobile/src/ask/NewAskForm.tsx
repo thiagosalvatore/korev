@@ -5,7 +5,7 @@ import type {
   AskChat,
 } from '../../../korev-desktop/src/shared/model';
 import { insertDictation } from '../../../korev-desktop/src/shared/dictation';
-import { repoSections } from '../../../korev-desktop/src/shared/workspaces';
+import { pickerRepos } from '../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../attempt';
 import { MicButton, RecordingBar } from '../VoiceInput';
 import { useDictation } from '../dictation';
@@ -36,9 +36,7 @@ export function NewAskForm({
   const { api } = useConnection();
   const theme = useTheme();
   const styles = makeStyles(theme);
-  const repos = repoSections(state).flatMap((section) => section.repos);
-  const firstRepoId = initialRepoId ?? repos[0]?.id;
-  const [repoIds, setRepoIds] = useState(firstRepoId ? [firstRepoId] : []);
+  const [repoIds, setRepoIds] = useState(initialRepoId ? [initialRepoId] : []);
   const [question, setQuestion] = useState('');
   const asking = usePendingAction();
   const { agent, model, effort, choose } = useModelChoice(state.settings);
@@ -76,7 +74,7 @@ export function NewAskForm({
         Repositories
       </Text>
       <RepoPicker
-        repos={repos}
+        repos={pickerRepos(state)}
         selected={repoIds}
         multiple
         onToggle={(repoId) => setRepoIds(toggled(repoIds, repoId))}

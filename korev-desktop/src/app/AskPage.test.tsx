@@ -25,6 +25,7 @@ const responses: Record<string, unknown> = {
 
 const state = {
   repos: [],
+  workspaces: [],
   askChats: [ask],
   agents: [],
   runs: [],
@@ -64,6 +65,20 @@ describe('AskPage', () => {
     await waitFor(() =>
       expect(window.korev.call).toHaveBeenCalledWith('createAskChat', [[]]),
     );
+  });
+
+  it('starts with no repository chosen', () => {
+    render(
+      <AskPage
+        state={{ ...state, repos: [{ id: 'r1', name: 'korev' }] } as AppState}
+        askChatId={null}
+        repoIds={[]}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Repositories' }).textContent,
+    ).toBe('Choose repositories');
   });
 
   it('has no Start workspace for an Ask chat without a repository', () => {

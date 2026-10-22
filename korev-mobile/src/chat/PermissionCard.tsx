@@ -155,7 +155,7 @@ function LaneList({
           </View>
           {draft.repoId && draft.split ? (
             <RepoPicker
-              repos={repos}
+              repos={repos.map((repo) => ({ repo, recent: false }))}
               selected={[draft.repoId]}
               label={`Repository for ${draft.name}`}
               onToggle={(repoId) => update(index, { repoId })}

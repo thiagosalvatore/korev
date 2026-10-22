@@ -27,6 +27,39 @@ export function repoSections(state: AppState): RepoSection[] {
   });
 }
 
+const RECENT_REPO_COUNT = 3;
+
+export interface PickerRepo {
+  repo: Repo;
+  recent: boolean;
+}
+
+export function pickerRepos(
+  state: Pick<AppState, 'repos' | 'workspaces' | 'askChats'>,
+): PickerRepo[] {
+  const lastUsed = new Map<string, string>();
+  const use = (repoId: string, at: string) => {
+    if (at > (lastUsed.get(repoId) ?? '')) lastUsed.set(repoId, at);
+  };
+  for (const workspace of state.workspaces)
+    use(workspace.repoId, workspace.createdAt);
+  for (const ask of state.askChats)
+    for (const repoId of ask.repoIds) use(repoId, ask.createdAt);
+  const recent = state.repos
+    .filter((repo) => lastUsed.has(repo.id))
+    .sort((a, b) => lastUsed.get(b.id)!.localeCompare(lastUsed.get(a.id)!))
+    .slice(0, RECENT_REPO_COUNT);
+  const rest = state.repos
+    .filter((repo) => !recent.includes(repo))
+    .sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+    );
+  return [
+    ...recent.map((repo) => ({ repo, recent: true })),
+    ...rest.map((repo) => ({ repo, recent: false })),
+  ];
+}
+
 export type SidebarOrder = Pick<AppState, 'repos' | 'folders' | 'rootOrder'>;
 
 export type MovedOrder = Pick<AppState, 'repos' | 'rootOrder'>;

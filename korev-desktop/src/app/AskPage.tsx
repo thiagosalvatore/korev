@@ -28,11 +28,7 @@ export function AskForm({
   autoFocus: boolean;
   onStarted(ask: AskChat): void;
 }) {
-  const [repoIds, setRepoIds] = useState(
-    initialRepoIds.length
-      ? initialRepoIds
-      : state.repos.slice(0, 1).map((repo) => repo.id),
-  );
+  const [repoIds, setRepoIds] = useState(initialRepoIds);
   const { agent, model, effort, setEffort, choose } = useModelChoice(
     state.settings,
   );

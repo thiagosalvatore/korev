@@ -12,6 +12,7 @@ import {
   crossRepoLead,
   folderRuns,
   laneRepos,
+  pickerRepos,
   repoSections,
   waitsForLane,
 } from './workspaces';
@@ -267,5 +268,39 @@ describe('boardColumn', () => {
   it('splits idle workspaces by whether you have read the last turn', () => {
     expect(boardColumn(runtime('idle', true))).toBe('done');
     expect(boardColumn(runtime('idle', false))).toBe('idle');
+  });
+});
+
+describe('pickerRepos', () => {
+  it('lists the three most recently used repositories first, then the rest by name', () => {
+    const order = pickerRepos({
+      repos: [
+        repo('zeta'),
+        repo('Beta'),
+        repo('alpha'),
+        repo('used-first'),
+        repo('used-by-ask'),
+        repo('used-latest'),
+        repo('gamma'),
+      ],
+      workspaces: [
+        workspace('w1', 'used-first', '2026-01-01'),
+        workspace('w2', 'used-latest', '2026-03-01'),
+        workspace('w3', 'gamma', '2025-12-01'),
+      ],
+      askChats: [
+        { repoIds: ['used-by-ask'], createdAt: '2026-02-01' },
+      ] as AppState['askChats'],
+    });
+
+    expect(order.map(({ repo, recent }) => [repo.id, recent])).toEqual([
+      ['used-latest', true],
+      ['used-by-ask', true],
+      ['used-first', true],
+      ['alpha', false],
+      ['Beta', false],
+      ['gamma', false],
+      ['zeta', false],
+    ]);
   });
 });

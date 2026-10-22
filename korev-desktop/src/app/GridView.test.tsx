@@ -118,7 +118,7 @@ describe('GridView', () => {
     await waitFor(() =>
       expect(getUi().grid.panes[0]).toEqual({ askChatId: 'a1' }),
     );
-    expect(window.korev.call).toHaveBeenCalledWith('createAskChat', [['r1']]);
+    expect(window.korev.call).toHaveBeenCalledWith('createAskChat', [[]]);
   });
 
   it('shows a dropped Ask chat in the pane', () => {

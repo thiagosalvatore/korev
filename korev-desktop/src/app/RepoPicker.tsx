@@ -1,13 +1,14 @@
 import { useCallback, useRef, useState, type KeyboardEvent } from 'react';
 import { cn, Icon, Input } from '../design-system';
 import { pickerLabel } from '../shared/format';
-import type { AppState, Repo } from '../shared/model';
+import type { AppState } from '../shared/model';
+import { pickerRepos, type PickerRepo } from '../shared/workspaces';
 import { focusComposer } from './actions';
 import { PANEL, useDismiss } from './ui/Menu';
 
-function matching(repos: Repo[], query: string): Repo[] {
+function matching(repos: PickerRepo[], query: string): PickerRepo[] {
   const needle = query.trim().toLowerCase();
-  return repos.filter((repo) => repo.name.toLowerCase().includes(needle));
+  return repos.filter(({ repo }) => repo.name.toLowerCase().includes(needle));
 }
 
 export function RepoPicker({
@@ -28,7 +29,7 @@ export function RepoPicker({
   const close = useCallback(() => setOpen(false), []);
   useDismiss(root, open, close);
   const picked = state.repos.filter((repo) => selected.includes(repo.id));
-  const visible = matching(state.repos, query);
+  const visible = matching(pickerRepos(state), query);
 
   function toggle(repoId: string) {
     onChange(
@@ -39,7 +40,7 @@ export function RepoPicker({
   }
 
   function proceed() {
-    if (!selected.length && visible[active]) toggle(visible[active].id);
+    if (!selected.length && visible[active]) toggle(visible[active].repo.id);
     close();
     focusComposer();
   }
@@ -55,7 +56,7 @@ export function RepoPicker({
     }
     if (event.key === ' ' && visible[active]) {
       event.preventDefault();
-      toggle(visible[active].id);
+      toggle(visible[active].repo.id);
     }
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -100,7 +101,7 @@ export function RepoPicker({
             onKeyDown={onSearchKey}
           />
           <div className="mt-1">
-            {visible.map((repo, index) => (
+            {visible.map(({ repo, recent }, index) => (
               <label
                 key={repo.id}
                 className={cn(
@@ -115,6 +116,12 @@ export function RepoPicker({
                   onChange={() => toggle(repo.id)}
                 />
                 <span className="min-w-0 flex-1 truncate">{repo.name}</span>
+                {recent ? (
+                  <span className="flex items-center gap-1 text-xs text-fg-4">
+                    <Icon name="history" size={11} />
+                    Recent
+                  </span>
+                ) : null}
               </label>
             ))}
             {visible.length ? null : (

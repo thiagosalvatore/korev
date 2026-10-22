@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AppState, Repo } from '../shared/model';
+import type { AppState, Repo, Workspace } from '../shared/model';
 import { RepoPicker } from './RepoPicker';
 
 afterEach(cleanup);
@@ -15,12 +15,18 @@ function repo(name: string): Repo {
   };
 }
 
+function pickerState(repos: Repo[], workspaces: Workspace[] = []): AppState {
+  return { repos, workspaces, askChats: [] } as unknown as AppState;
+}
+
 describe('RepoPicker', () => {
   it('filters repositories by search and keeps the list open while toggling', () => {
     const onChange = vi.fn();
-    const state = {
-      repos: [repo('posthog'), repo('korev'), repo('posthog-js')],
-    } as AppState;
+    const state = pickerState([
+      repo('posthog'),
+      repo('korev'),
+      repo('posthog-js'),
+    ]);
     render(
       <RepoPicker state={state} selected={['korev']} onChange={onChange} />,
     );
@@ -44,7 +50,7 @@ describe('RepoPicker', () => {
 
   it('toggles the highlighted repository with Space and keeps the list open', () => {
     const onChange = vi.fn();
-    const state = { repos: [repo('posthog'), repo('korev')] } as AppState;
+    const state = pickerState([repo('posthog'), repo('korev')]);
     render(<RepoPicker state={state} selected={[]} onChange={onChange} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Repositories' }));
@@ -52,7 +58,7 @@ describe('RepoPicker', () => {
     fireEvent.keyDown(search, { key: 'ArrowDown' });
     fireEvent.keyDown(search, { key: ' ' });
 
-    expect(onChange).toHaveBeenCalledWith(['korev']);
+    expect(onChange).toHaveBeenCalledWith(['posthog']);
     expect(
       screen.getByRole('dialog', { name: 'Choose repositories' }),
     ).toBeTruthy();
@@ -60,7 +66,7 @@ describe('RepoPicker', () => {
 
   it('picks the first match and closes on Enter when nothing is chosen', () => {
     const onChange = vi.fn();
-    const state = { repos: [repo('posthog'), repo('korev')] } as AppState;
+    const state = pickerState([repo('posthog'), repo('korev')]);
     render(
       <RepoPicker
         state={state}
@@ -78,5 +84,21 @@ describe('RepoPicker', () => {
     expect(
       screen.queryByRole('dialog', { name: 'Choose repositories' }),
     ).toBeNull();
+  });
+
+  it('lists recently used repositories first, marked Recent, then the rest by name', () => {
+    const state = pickerState(
+      [repo('posthog'), repo('zed'), repo('korev')],
+      [{ repoId: 'zed', createdAt: '2026-01-01' } as Workspace],
+    );
+    render(
+      <RepoPicker state={state} selected={[]} onChange={vi.fn()} defaultOpen />,
+    );
+
+    expect(
+      screen
+        .getAllByRole('checkbox')
+        .map((box) => box.closest('label')?.textContent),
+    ).toEqual(['zedRecent', 'korev', 'posthog']);
   });
 });

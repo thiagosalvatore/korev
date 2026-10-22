@@ -16,7 +16,10 @@ import {
   type Workspace,
 } from '../../../korev-desktop/src/shared/model';
 import { insertDictation } from '../../../korev-desktop/src/shared/dictation';
-import { repoSections } from '../../../korev-desktop/src/shared/workspaces';
+import {
+  pickerRepos,
+  repoSections,
+} from '../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../attempt';
 import { succeeded } from '../haptics';
 import { MicButton, RecordingBar } from '../VoiceInput';
@@ -90,7 +93,7 @@ function NewWorkspaceForm({
         Repository
       </Text>
       <RepoPicker
-        repos={repos}
+        repos={pickerRepos(state)}
         selected={repoId ? [repoId] : []}
         onToggle={setRepoId}
       />

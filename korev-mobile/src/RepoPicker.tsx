@@ -2,7 +2,7 @@ import { ChevronDown } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { pickerLabel } from '../../korev-desktop/src/shared/format';
-import type { Repo } from '../../korev-desktop/src/shared/model';
+import type { PickerRepo } from '../../korev-desktop/src/shared/workspaces';
 import { ROW_ICON_SIZE } from './ListRow';
 import { PickerSheet } from './PickerSheet';
 import { RepoAvatar } from './RepoAvatar';
@@ -16,7 +16,7 @@ export function RepoPicker({
   label = 'Repositories',
   onToggle,
 }: {
-  repos: Repo[];
+  repos: PickerRepo[];
   selected: string[];
   multiple?: boolean;
   label?: string;
@@ -25,7 +25,9 @@ export function RepoPicker({
   const theme = useTheme();
   const styles = makeStyles(theme);
   const [open, setOpen] = useState(false);
-  const picked = repos.filter((repo) => selected.includes(repo.id));
+  const picked = repos
+    .map(({ repo }) => repo)
+    .filter((repo) => selected.includes(repo.id));
 
   function pick(repoId: string) {
     onToggle(repoId);
@@ -53,9 +55,10 @@ export function RepoPicker({
       <PickerSheet
         title={multiple ? 'Choose repositories' : 'Choose a repository'}
         visible={open}
-        options={repos.map((repo) => ({
+        options={repos.map(({ repo, recent }) => ({
           key: repo.id,
           label: repo.name,
+          detail: recent ? 'Recent' : undefined,
           icon: <RepoAvatar repo={repo} />,
           selected: selected.includes(repo.id),
         }))}

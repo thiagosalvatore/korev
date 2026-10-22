@@ -31,6 +31,7 @@ function stateWith(repos: Repo[]): AppState {
   return {
     repos,
     workspaces: [],
+    askChats: [],
     agents: [],
     settings: {
       defaultAgent: 'claude',
