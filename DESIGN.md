@@ -50,7 +50,10 @@ A card has the name, a **Running** badge while a run is going, the on/off switch
 the time of the next run.
 Then the last five runs, one row each: the start time (click to open the run's chat), what it did,
 the workspaces it opened and a note for each request Korev skipped. **New automation** and
-**Edit** show the form above the cards.
+**Edit** show the form above the cards. With no automations, the page shows what an automation
+does instead: a headline, **New automation**, three steps (runs on your schedule, checks your
+tools, opens workspaces) and three examples. An example opens the form with its name, prompt
+and schedule filled in.
 
 ## Workspace row
 

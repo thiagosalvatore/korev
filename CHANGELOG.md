@@ -7,6 +7,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 ### New
 
 - **Automation schedules.** Run an automation at set times, such as 09:00 and 17:30, or repeat it every few minutes or hours. Pick the days it runs on, such as weekdays only, and limit a repeating automation to a time window, such as 09:00 to 18:00. Each automation shows when its next run starts. Before, an automation could only repeat every few minutes, every day.
+- **Automation examples.** With no automations yet, the Automations page says what an automation does and offers three examples to start from, such as a morning review of your pull requests.
 
 ## [0.19.0] - 2026-10-22
 

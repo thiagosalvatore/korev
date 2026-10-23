@@ -23,6 +23,7 @@ import {
 import { openAsk, selectWorkspace } from './actions';
 import { api } from './bridge';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
+import { AutomationsEmptyState } from './AutomationsEmptyState';
 import { RepoPicker } from './RepoPicker';
 import { ScheduleField } from './ScheduleField';
 import { reportFailure } from './ui/toast';
@@ -34,11 +35,21 @@ const DEFAULT_SCHEDULE: AutomationSchedule = {
   days: ALL_DAYS,
   window: null,
 };
+const NEW_DRAFT: AutomationDraft = {
+  name: '',
+  prompt: '',
+  schedule: DEFAULT_SCHEDULE,
+  repoIds: [],
+  enabled: true,
+};
 const RUNS_SHOWN = 5;
 const PROMPT_TEXTAREA_CLASS =
   'resize-y rounded-sm border border-border-2 bg-inset px-2.5 py-2 text-sm text-fg-1 outline-none focus:border-accent-border';
 
-type Editing = Automation | 'new' | null;
+interface Editing {
+  automationId: string | null;
+  draft: AutomationDraft;
+}
 
 function opened(count: number): string {
   return count === 1 ? 'Opened 1 workspace' : `Opened ${count} workspaces`;
@@ -59,19 +70,17 @@ function repoNames(state: AppState, automation: Automation): string {
 
 function AutomationForm({
   state,
-  automation,
+  editing: { automationId, draft: initial },
   onDone,
 }: {
   state: AppState;
-  automation: Automation | null;
+  editing: Editing;
   onDone(): void;
 }) {
-  const [name, setName] = useState(automation?.name ?? '');
-  const [prompt, setPrompt] = useState(automation?.prompt ?? '');
-  const [schedule, setSchedule] = useState(
-    automation?.schedule ?? DEFAULT_SCHEDULE,
-  );
-  const [repoIds, setRepoIds] = useState(automation?.repoIds ?? []);
+  const [name, setName] = useState(initial.name);
+  const [prompt, setPrompt] = useState(initial.prompt);
+  const [schedule, setSchedule] = useState(initial.schedule);
+  const [repoIds, setRepoIds] = useState(initial.repoIds);
   const valid = name.trim() && prompt.trim() && !scheduleError(schedule);
 
   function save() {
@@ -80,10 +89,10 @@ function AutomationForm({
       prompt,
       schedule,
       repoIds,
-      enabled: automation?.enabled ?? true,
+      enabled: initial.enabled,
     };
-    void (automation
-      ? api.updateAutomation(automation.id, draft)
+    void (automationId
+      ? api.updateAutomation(automationId, draft)
       : api.createAutomation(draft));
     onDone();
   }
@@ -121,7 +130,7 @@ function AutomationForm({
       </div>
       <div className="flex gap-2">
         <Button type="submit" size="sm" variant="primary" disabled={!valid}>
-          {automation ? 'Save' : 'Create automation'}
+          {automationId ? 'Save' : 'Create automation'}
         </Button>
         <Button size="sm" variant="ghost" onClick={onDone}>
           Cancel
@@ -256,9 +265,10 @@ function AutomationCard({
 
 export function AutomationsPage({ state }: { state: AppState }) {
   const sidebar = useUi((ui) => ui.sidebar);
-  const [editing, setEditing] = useState<Editing>(
-    state.automations.length ? null : 'new',
-  );
+  const [editing, setEditing] = useState<Editing | null>(null);
+  const empty = !state.automations.length;
+  const startNew = (draft = NEW_DRAFT) =>
+    setEditing({ automationId: null, draft });
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <div
@@ -271,12 +281,12 @@ export function AutomationsPage({ state }: { state: AppState }) {
         <h1 className="m-0 flex-1 text-sm font-semibold text-fg-1">
           Automations
         </h1>
-        {editing ? null : (
+        {editing || empty ? null : (
           <Button
             size="sm"
             icon="plus"
             className={NO_DRAG}
-            onClick={() => setEditing('new')}
+            onClick={() => startNew()}
           >
             New automation
           </Button>
@@ -284,25 +294,32 @@ export function AutomationsPage({ state }: { state: AppState }) {
       </div>
       <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-6">
         <div className="flex w-full max-w-[820px] flex-col gap-4">
-          <p className="m-0 text-sm text-fg-3">
-            An automation runs a prompt on a schedule while Korev is open. It
-            can open a workspace for each piece of work it finds, and it never
-            opens two for the same ticket.
-          </p>
+          {empty ? null : (
+            <p className="m-0 text-sm text-fg-3">
+              An automation runs a prompt on a schedule while Korev is open. It
+              can open a workspace for each piece of work it finds, and it never
+              opens two for the same ticket.
+            </p>
+          )}
           {editing ? (
             <AutomationForm
-              key={editing === 'new' ? 'new' : editing.id}
+              key={editing.automationId ?? 'new'}
               state={state}
-              automation={editing === 'new' ? null : editing}
+              editing={editing}
               onDone={() => setEditing(null)}
             />
+          ) : null}
+          {empty && !editing ? (
+            <AutomationsEmptyState onCreate={startNew} />
           ) : null}
           {state.automations.map((automation) => (
             <AutomationCard
               key={automation.id}
               state={state}
               automation={automation}
-              onEdit={() => setEditing(automation)}
+              onEdit={() =>
+                setEditing({ automationId: automation.id, draft: automation })
+              }
             />
           ))}
         </div>

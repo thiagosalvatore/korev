@@ -69,6 +69,7 @@ describe('AutomationsPage', () => {
   it('creates an automation from the form', () => {
     render(<AutomationsPage state={{ ...state, automations: [] }} />);
 
+    fireEvent.click(screen.getByRole('button', { name: 'New automation' }));
     fireEvent.change(screen.getByLabelText('Name'), {
       target: { value: 'Triage' },
     });
@@ -93,6 +94,20 @@ describe('AutomationsPage', () => {
         enabled: true,
       },
     ]);
+  });
+
+  it('explains automations and starts one from an example', () => {
+    render(<AutomationsPage state={{ ...state, automations: [] }} />);
+
+    expect(
+      screen.getByRole('heading', { name: 'Put agents on a schedule' }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Morning PR review/ }));
+
+    expect(screen.getByLabelText<HTMLInputElement>('Name').value).toBe(
+      'Morning PR review',
+    );
+    expect(screen.getByText(/Weekdays at 09:00/)).toBeTruthy();
   });
 
   it('shows what each run did', () => {
