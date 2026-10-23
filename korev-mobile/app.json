@@ -24,9 +24,7 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "plugins": [
@@ -55,7 +53,8 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Korev uses the microphone to turn what you say into text."
+          "microphonePermission": "Korev uses the microphone to turn what you say into text.",
+          "enableBackgroundPlayback": false
         }
       ],
       [
