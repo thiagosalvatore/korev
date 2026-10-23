@@ -11,7 +11,18 @@ const NAMES = [
   ['dark mode', 'dark-mode-settings', 'Dark mode setting'],
   ['flaky', 'fix-flaky-checkout', 'Flaky checkout test'],
   ['billing', 'billing-page', 'Billing page plan'],
+  ['CSV export', 'fix-csv-export-timeout', 'CSV export timeout'],
+  ['invoice date', 'invoice-date-time-zone', 'Invoice date time zone'],
+  ['password reset', 'fix-double-reset-email', 'Double password reset email'],
 ];
+
+const AUTOMATION_FENCE = 'korev-automation';
+const BUG_ISSUES = [
+  ['#142', 'CSV export times out for workspaces with more than 10k rows', 'Fix ticket #142: the CSV export times out for workspaces with more than 10k rows. Stream the rows instead of building the file in memory, and add a test with 20k rows.'],
+  ['#145', 'Invoice date shows in UTC, not the user time zone', 'Fix ticket #145: the invoice date on the invoices page shows in UTC. Show it in the time zone of the signed-in user, and add a test.'],
+  ['#151', 'Password reset email is sent twice', 'Fix ticket #151: a password reset email is sent twice when the user double-clicks Send. Send it once per request, and add a test.'],
+];
+const PACE_MS = Number(process.env.KOREV_DOCS_PACE_MS ?? 0);
 
 function namesFor(text) {
   return NAMES.find(([words]) => text.includes(words)) ?? ['', 'task', 'Task'];
@@ -27,6 +38,10 @@ function stdinText() {
 
 if (args.includes('--version')) {
   console.log('9.9.9 (Claude Code)');
+  process.exit(0);
+}
+if (args === 'auth status') {
+  console.log(JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', email: 'alex@example.com' }));
   process.exit(0);
 }
 if (args.includes('You title chat conversations')) {
@@ -159,6 +174,36 @@ function rateLimitTurn() {
   );
 }
 
+function pause() {
+  return new Promise((resolve) => setTimeout(resolve, PACE_MS));
+}
+
+async function automationTurn() {
+  say('I will list the open bug tickets on GitHub.');
+  await pause();
+  useTool(
+    'Bash',
+    { command: 'gh issue list --label bug --assignee @me' },
+    BUG_ISSUES.map(([key, title]) => `${key}\t${title}`).join('\n'),
+  );
+  await pause();
+  const workspaces = BUG_ISSUES.map(([key, , prompt]) => ({ repo: 'acme-web', key, prompt }));
+  say(
+    `Three bug tickets need a code change, and none of them is in progress.\n\n\`\`\`${AUTOMATION_FENCE}\n${JSON.stringify({ workspaces }, null, 2)}\n\`\`\``,
+  );
+}
+
+async function ticketTurn(message) {
+  const [, title] = BUG_ISSUES.find(([key]) => message.includes(key));
+  say(`I will reproduce “${title}” first, then fix it.`);
+  await pause();
+  useTool('Grep', { pattern: title.split(' ')[0], path: process.cwd() }, 'src/app.ts');
+  await pause();
+  useTool('Bash', { command: 'npm test' }, ' Test Files  1 passed (1)\n      Tests  3 passed (3)');
+  await pause();
+  smallTurn();
+}
+
 function smallTurn() {
   say('Done. The change is in the diff.');
   writeSource('NOTES.md', 'Work in progress.\n');
@@ -169,7 +214,11 @@ async function main() {
   const message = (await lines.next()).value ?? '';
   emit({ type: 'system', subtype: 'init' });
 
-  if (message.includes('billing')) {
+  if (message.includes(AUTOMATION_FENCE)) {
+    await automationTurn();
+  } else if (BUG_ISSUES.some(([key]) => message.includes(key))) {
+    await ticketTurn(message);
+  } else if (message.includes('billing')) {
     say("I read the settings routes and the sidebar. Here's the plan.");
     const plan = { plan: BILLING_PLAN };
     emit({ type: 'assistant', message: { id: 'plan', content: [{ type: 'tool_use', id: 'plan-1', name: 'ExitPlanMode', input: plan }] } });

@@ -2,6 +2,7 @@ import {
   _electron as electron,
   expect,
   test,
+  type ElectronApplication,
   type Page,
 } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
@@ -18,6 +19,10 @@ const THEMES: ThemePreference[] = ['dark', 'light'];
 const THEME_SETTLE_MS = 400;
 const WINDOW_SIZE = { width: 1440, height: 900 };
 const RETINA_SCALE = 2;
+const AUTOMATION_NAME = 'Bug tickets';
+const AUTOMATION_PROMPT =
+  'Read the open bug tickets on GitHub that are assigned to me. For each one that is not in progress and needs a code change, open a workspace to fix it.';
+const WEEKEND = ['Saturday', 'Sunday'];
 
 const SAMPLE_FILES: Record<string, string> = {
   'README.md': '# acme-web\n\nThe Acme dashboard and its API.\n',
@@ -199,6 +204,26 @@ async function captureAll(window: Page) {
   await window.getByRole('textbox', { name: 'Message' }).press('Enter');
   await expect(window.getByText('config/limits.json')).toBeVisible();
   await capture(window, 'ask');
+
+  await sidebar.getByRole('button', { name: 'Automations' }).click();
+  await window.getByRole('button', { name: 'New automation' }).click();
+  await window.getByLabel('Name').fill(AUTOMATION_NAME);
+  await window.getByLabel('Prompt').fill(AUTOMATION_PROMPT);
+  for (const day of WEEKEND) await window.getByLabel(day).click();
+  await window.getByRole('button', { name: 'Repositories' }).click();
+  await window.getByRole('checkbox', { name: 'acme-web' }).check();
+  await window.getByRole('button', { name: 'Repositories' }).click();
+  await window.getByRole('button', { name: 'Create automation' }).click();
+  const card = window.getByRole('region', { name: AUTOMATION_NAME });
+  await card.getByRole('button', { name: 'Run now' }).click();
+  await expect(card.getByText('Opened 3 workspaces')).toBeVisible();
+  await capture(window, 'automations');
+}
+
+async function quitNow(app: ElectronApplication, window: Page) {
+  const closed = app.close();
+  await window.getByRole('button', { name: 'Quit now' }).click();
+  await closed;
 }
 
 test('captures the docs screenshots', async () => {
@@ -210,7 +235,7 @@ test('captures the docs screenshots', async () => {
   try {
     await captureAll(window);
   } finally {
-    await app.close();
+    await quitNow(app, window);
     await rm(home, { recursive: true, force: true });
   }
 });
