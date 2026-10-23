@@ -9,15 +9,16 @@ import type {
   Result,
   SendOptions,
   Workspace,
+  WorkspaceSource,
 } from '../shared/model';
 import { describeSchedule, nextRunAt, scheduleError } from '../shared/schedule';
 import type { TurnOutcome } from './chats';
 import { errorMessage, NotFoundError, type Context } from './context';
+import { fetchPrStatus } from './pull-requests';
 import { newChatSession } from './workspaces';
 
 export const AUTOMATION_TICK_MS = 60_000;
 const AUTOMATION_FENCE = 'korev-automation';
-const MAX_WORKSPACES_PER_RUN = 5;
 const MAX_USED_KEYS = 500;
 const MAX_RUNS_KEPT = 20;
 const STILL_RUNNING = 'This automation is still running.';
@@ -26,7 +27,8 @@ const INCOMPLETE_ENTRY = 'Skipped a workspace without a repo, key or prompt.';
 
 const SHAPE = `{
   "workspaces": [
-    { "repo": "repository name", "key": "TICKET-123", "prompt": "Everything the agent in the workspace needs to do the work." }
+    { "repo": "repository name", "key": "TICKET-123", "prompt": "Everything the agent in the workspace needs to do the work." },
+    { "repo": "repository name", "key": "PR-456", "pr": 456, "prompt": "What to do on the pull request." }
   ]
 }`;
 
@@ -34,6 +36,7 @@ interface RequestedWorkspace {
   repo: string;
   key: string;
   prompt: string;
+  pr: number | null;
 }
 
 export interface AutomationHost {
@@ -41,7 +44,11 @@ export interface AutomationHost {
   isRunning(sessionId: string): boolean;
   addAskChat(repoIds: string[], session: ChatSession): AskChat;
   deleteAskChat(askChatId: string): Promise<void>;
-  createWorkspaces(repoIds: string[], task: SendOptions): Result<Workspace[]>;
+  createWorkspaces(
+    repoIds: string[],
+    task: SendOptions,
+    source?: WorkspaceSource,
+  ): Result<Workspace[]>;
 }
 
 export interface Automations {
@@ -57,12 +64,18 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function prNumber(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : null;
+}
+
 function requestedWorkspace(value: unknown): RequestedWorkspace {
   const entry = (value ?? {}) as Record<string, unknown>;
   return {
     repo: text(entry.repo),
     key: text(entry.key),
     prompt: text(entry.prompt),
+    pr: prNumber(entry.pr),
   };
 }
 
@@ -181,6 +194,7 @@ export function createAutomations(
         ? `Korev can open a workspace for each piece of work that needs code changes: a git worktree on a new branch, where a coding agent starts with the prompt you write. You can open workspaces in these repositories: ${repos.join(', ')}.`
         : `This automation has no repositories, so do not ask Korev to open workspaces.`,
       `Give each workspace a key that names what it handles, such as a ticket id. Korev never opens two workspaces with the same key.${usedKeys}`,
+      `When the work is on an existing pull request, put its number in "pr". Korev then checks out the branch of that pull request instead of a new branch.`,
       `The agent in a workspace knows only the prompt you write, so put the details, the links and what done looks like in it.`,
       `End your reply with exactly one fenced block that starts with \`\`\`${AUTOMATION_FENCE} and holds JSON in this shape. Use an empty list when there is nothing to open:`,
       '',
@@ -221,22 +235,57 @@ export function createAutomations(
     saveAndEmit();
   }
 
-  function openWorkspace(
+  async function pullRequestSource(
+    repo: Repo,
+    key: string,
+    number: number,
+  ): Promise<Result<WorkspaceSource>> {
+    const pr = await fetchPrStatus(
+      ctx.deps.run,
+      ctx.deps.env,
+      repo.path,
+      String(number),
+    );
+    if (!pr)
+      return {
+        ok: false,
+        message: `Could not find pull request #${number} in ${repo.name}.`,
+      };
+    if (pr.state !== 'OPEN')
+      return {
+        ok: false,
+        message: `Skipped ${key}: pull request #${number} is ${pr.state.toLowerCase()}.`,
+      };
+    return {
+      ok: true,
+      value: {
+        kind: 'pr',
+        number,
+        branch: pr.headRefName,
+        baseBranch: pr.baseRefName || repo.defaultBranch,
+      },
+    };
+  }
+
+  async function openWorkspace(
     automation: Automation,
     run: AutomationRun,
     entry: RequestedWorkspace,
-  ): string | null {
+  ): Promise<string | null> {
     if (!entry.repo || !entry.key || !entry.prompt) return INCOMPLETE_ENTRY;
-    if (run.workspaceIds.length >= MAX_WORKSPACES_PER_RUN)
-      return `Skipped ${entry.key}: a run opens at most ${MAX_WORKSPACES_PER_RUN} workspaces.`;
     if (automation.usedKeys.includes(entry.key))
       return `Skipped ${entry.key}: it already has a workspace.`;
     const repo = allowedRepo(automation, entry.repo);
     if (!repo)
       return `Skipped ${entry.key}: ${entry.repo} is not one of this automation's repositories.`;
+    const source = entry.pr
+      ? await pullRequestSource(repo, entry.key, entry.pr)
+      : null;
+    if (source && !source.ok) return source.message;
     const created = host.createWorkspaces(
       [repo.id],
       defaultTask(entry.prompt, ctx.store.state.settings.defaultPlanMode),
+      source?.value,
     );
     if (!created.ok)
       return `Could not open a workspace for ${entry.key}: ${created.message}`;
@@ -247,13 +296,13 @@ export function createAutomations(
     return null;
   }
 
-  function openWorkspaces(
+  async function openWorkspaces(
     automation: Automation,
     run: AutomationRun,
     requested: RequestedWorkspace[],
   ) {
     for (const entry of requested) {
-      const note = openWorkspace(automation, run, entry);
+      const note = await openWorkspace(automation, run, entry);
       if (note) record(run, note);
     }
     saveAndEmit();
@@ -277,7 +326,7 @@ export function createAutomations(
     if (outcome.stopped) return record(run, STOPPED);
     const parsed = parseAutomationReply(outcome.reply);
     if (!parsed.ok) return record(run, parsed.message);
-    openWorkspaces(automation, run, parsed.value);
+    ctx.background(openWorkspaces(automation, run, parsed.value));
   }
 
   function tick() {

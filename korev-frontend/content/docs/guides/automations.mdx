@@ -29,11 +29,12 @@ Nobody watches a run, so its tool calls run without approval, as they do in a wo
 
 At the end of its reply, the agent lists the workspaces to open. Each one has a repository, a key and a prompt. The key names what the workspace handles, such as a ticket id. Korev then opens each workspace and sends the prompt to a new agent there, with the same defaults as a workspace you create.
 
+When the work is on a pull request that is already open, the agent also gives the PR number. Korev then checks out that PR's branch, the same way as **Create from… → Pull request**, and the workspace tracks the PR. If the PR is merged or closed, Korev skips it.
+
 Korev checks each request first:
 
 - **The repository must be one of the automation's.** Requests for other repositories are skipped.
 - **One workspace per key.** Korev remembers every key the automation used and skips repeats, so a ticket gets one workspace, not one every 10 minutes. The agent also sees the keys already used.
-- **At most five workspaces per run.**
 - **One run at a time.** A run does not start while the last one is still going.
 
 When a run opens workspaces, Korev sends a notification.

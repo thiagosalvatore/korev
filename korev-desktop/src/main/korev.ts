@@ -424,8 +424,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     isRunning: (sessionId) => chats.isRunning(sessionId),
     addAskChat,
     deleteAskChat,
-    createWorkspaces: (repoIds, task) =>
-      createWorkspaces(ctx, repoIds, task, chats.send),
+    createWorkspaces: (repoIds, task, source) =>
+      createWorkspaces(ctx, repoIds, task, chats.send, null, source),
   });
   const spotlight = createSpotlight(
     git,

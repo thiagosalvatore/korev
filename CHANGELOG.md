@@ -4,6 +4,15 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Automations open pull requests.** When an automation finds work on a pull request that is already open, the workspace it opens checks out that PR's branch and tracks the PR. Before, it always made a new branch, so the workspace had no link to the PR.
+
+### Fixed
+
+- An automation opens every workspace its run asks for. Before, a run opened at most five and skipped the rest.
+- The runs on the Automations page wrap their workspace buttons inside the card. Before, a run with many workspaces ran past the card's edge.
+
 ## [0.20.0] - 2026-10-23
 
 Run automations at set times of day and on chosen weekdays, and start from an example.

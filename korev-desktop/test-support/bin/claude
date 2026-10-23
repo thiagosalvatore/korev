@@ -111,6 +111,9 @@ case "$message" in
   *sweep-tickets*)
     cat "$(dirname "$0")/../automation-reply.jsonl"
     ;;
+  *sweep-prs*)
+    cat "$(dirname "$0")/../automation-pr-reply.jsonl"
+    ;;
   *)
     echo "written by the fake agent" > agent-note.txt
     ;;

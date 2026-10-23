@@ -1469,6 +1469,36 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     );
   });
 
+  it('opens every workspace a run asks for, on the PR branch when it names an open PR', async () => {
+    const elsewhere = path.join(home, 'elsewhere');
+    git(repoPath, 'worktree', 'add', elsewhere, '-b', 'feature/login');
+    prsByNumber = {
+      '7': {
+        number: 7,
+        state: 'OPEN',
+        url: BRANCH_PR_URL,
+        headRefName: 'feature/login',
+        baseRefName: 'main',
+      },
+      '8': {
+        number: 8,
+        state: 'MERGED',
+        url: 'https://github.com/acme/web/pull/8',
+      },
+    };
+    const automation = await createAutomation('sweep-prs');
+
+    const run = await runAutomationUntil(automation.id, 'PR-8');
+
+    const { workspace } = await waitUntilCreated(run.workspaceIds[0]);
+    expect(run.workspaceIds).toHaveLength(6);
+    expect(workspace).toMatchObject({
+      branch: 'feature/login',
+      path: realpathSync(elsewhere),
+    });
+    expect(run.notes).toEqual(['Skipped PR-8: pull request #8 is merged.']);
+  });
+
   it('notes a run whose reply has no automation block', async () => {
     const automation = await createAutomation('say hello');
 

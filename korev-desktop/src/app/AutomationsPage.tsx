@@ -148,7 +148,7 @@ function RunRow({ state, ask }: { state: AppState; ask: AskChat }) {
   );
   return (
     <li className="flex flex-col gap-1 border-t border-border-1 py-2">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <Button
           size="sm"
           variant="ghost"
@@ -159,7 +159,10 @@ function RunRow({ state, ask }: { state: AppState; ask: AskChat }) {
           {timeAgo(ask.createdAt)}
         </Button>
         <span
-          className={cn('text-xs', running ? 'text-warning-text' : 'text-fg-3')}
+          className={cn(
+            'whitespace-nowrap text-xs',
+            running ? 'text-warning-text' : 'text-fg-3',
+          )}
         >
           {runSummary(run, running)}
         </span>
