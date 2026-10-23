@@ -69,7 +69,7 @@ export interface DiffComment {
 export interface WorkspaceUi {
   extraTabs: MainTab[];
   activeKey: string | null;
-  terminalTab: TerminalKind;
+  terminalTab: TerminalKind | null;
   comments: DiffComment[];
   runScriptId?: string | null;
   viewed?: Record<string, string>;
@@ -147,7 +147,7 @@ const INITIAL: UiState = {
 export const EMPTY_WORKSPACE_UI: WorkspaceUi = {
   extraTabs: [],
   activeKey: null,
-  terminalTab: 'shell',
+  terminalTab: null,
   comments: [],
 };
 

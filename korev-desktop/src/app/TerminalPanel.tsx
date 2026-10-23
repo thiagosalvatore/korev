@@ -274,7 +274,7 @@ export function TerminalPanel({
                 ? ('loader-circle' as const)
                 : undefined,
           }))}
-          value={tab}
+          value={tab ?? ''}
           onChange={(id) =>
             updateWorkspaceUi(workspace.id, () => ({
               terminalTab: id as TerminalKind,
@@ -318,6 +318,8 @@ export function TerminalPanel({
       <div className={cn('flex min-h-0 flex-1 flex-col')}>
         {workspace.archivedAt ? (
           <p className="m-0 p-4 text-sm text-fg-3">Archived workspace.</p>
+        ) : !tab ? (
+          <div className="flex-1 bg-inset" />
         ) : showScriptEmpty ? (
           <ScriptEmptyState
             workspace={workspace}
