@@ -226,6 +226,7 @@ function WorkspaceRow({
   const runtime = state.runtime[workspace.id];
   const stats = runtime?.stats;
   const hasStats = stats && (stats.additions > 0 || stats.deletions > 0);
+  const notice = runtime?.message ?? runtime?.setupError;
   const title = member ? member.repo : workspace.branch;
   const label = workspaceLabel(workspace);
   const [renaming, setRenaming] = useState(false);
@@ -286,10 +287,8 @@ function WorkspaceRow({
                 </span>
               </>
             )}
-            {runtime?.message ? (
-              <span className="truncate text-danger-text">
-                · {runtime.message}
-              </span>
+            {notice ? (
+              <span className="truncate text-danger-text">· {notice}</span>
             ) : null}
           </span>
         </span>

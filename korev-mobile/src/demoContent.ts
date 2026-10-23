@@ -154,6 +154,7 @@ export function demoRuntime(
     prs: [],
     strayWorktrees: [],
     message: null,
+    setupError: null,
     pendingPrompt: null,
     runUrl: null,
     ...patch,

@@ -406,8 +406,7 @@ export type WorkspaceStatus =
   | 'failed'
   | 'setting-up'
   | 'working'
-  | 'waiting'
-  | 'error';
+  | 'waiting';
 
 export interface DiffStats {
   additions: number;
@@ -471,6 +470,7 @@ export interface WorkspaceRuntime {
   prs: PrStatus[];
   strayWorktrees: GitWorktree[];
   message: string | null;
+  setupError: string | null;
   pendingPrompt: string | null;
   runUrl: string | null;
 }

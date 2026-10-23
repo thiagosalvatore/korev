@@ -410,7 +410,10 @@ export async function startScript(
   if (kind === 'run' && config.runMode === 'nonconcurrent') {
     stopOtherRunScripts(ctx, workspace);
   }
-  if (kind === 'setup') ctx.setStatus(workspace.id, 'setting-up');
+  if (kind === 'setup') {
+    ctx.setStatus(workspace.id, 'setting-up');
+    ctx.runtime(workspace.id).setupError = null;
+  }
   if (kind === 'run') ctx.runtime(workspace.id).runUrl = null;
   ctx.terminals.start(terminalRef(workspace.id, kind), {
     cwd: runScript?.cwd
@@ -439,15 +442,10 @@ export async function onScriptExit(
   const workspace = ctx.store.state.workspaces.find(
     (ws) => ws.id === workspaceId,
   );
-  if (exitCode === 0) {
-    ctx.setStatus(workspaceId, 'idle');
-    if (workspace) refreshStatus(workspace);
-  } else
-    ctx.setStatus(
-      workspaceId,
-      'error',
-      `Setup script failed (exit ${exitCode})`,
-    );
+  if (exitCode !== 0)
+    runtime.setupError = `Setup script failed (exit ${exitCode})`;
+  ctx.setStatus(workspaceId, 'idle');
+  if (workspace) refreshStatus(workspace);
   ctx.emitState();
   if (exitCode !== 0 || !workspace || workspace.archivedAt) return;
   const config = await workspaceConfig(ctx, workspace);

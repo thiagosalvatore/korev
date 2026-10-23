@@ -335,7 +335,6 @@ const BOARD_COLUMN_BY_STATUS: Record<
   BoardColumn
 > = {
   waiting: 'needs-you',
-  error: 'needs-you',
   failed: 'needs-you',
   working: 'working',
   'setting-up': 'working',
@@ -345,5 +344,6 @@ const BOARD_COLUMN_BY_STATUS: Record<
 
 export function boardColumn(runtime: WorkspaceRuntime): BoardColumn {
   if (runtime.status !== 'idle') return BOARD_COLUMN_BY_STATUS[runtime.status];
+  if (runtime.setupError) return 'needs-you';
   return runtime.unread ? 'done' : 'idle';
 }

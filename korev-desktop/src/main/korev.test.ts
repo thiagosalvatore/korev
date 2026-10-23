@@ -2301,6 +2301,40 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     await korev.api.stop(session.id);
   });
 
+  it('keeps the workspace working when its setup script fails during a turn', async () => {
+    const repo = await addRepo();
+    await korev.api.updateRepoScripts(repo.id, {
+      ...repo.scripts,
+      setup: 'npm ci',
+    });
+    ptyExits.length = 0;
+    const created = await korev.api.createWorkspaces([repo.id], {
+      text: 'hold-turn',
+      agent: 'claude',
+      model: 'claude-sonnet-5-5',
+      effort: 'high',
+      planMode: false,
+      fast: false,
+    });
+    if (!created.ok) throw new Error(created.message);
+    const [workspace] = created.value;
+    const [session] = workspace.sessions;
+    await waitFor(async () =>
+      (await korev.api.getState()).runningSessions.includes(session.id),
+    );
+
+    ptyExits[0]({ exitCode: 1 });
+
+    await waitFor(
+      async () =>
+        (await workspaceState(workspace.id)).runtime.status !== 'setting-up',
+    );
+    const { runtime } = await workspaceState(workspace.id);
+    expect(runtime.status).toBe('working');
+    expect(runtime.setupError).toBe('Setup script failed (exit 1)');
+    await korev.api.stop(session.id);
+  });
+
   it('waits for the user to approve a tool call when approvals are on', async () => {
     await korev.api.updateSettings({ toolApprovals: true });
     const workspace = await createWorkspace();

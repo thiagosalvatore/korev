@@ -99,7 +99,6 @@ const STATUSES_KEPT_BY_TURNS = new Set([
   'archiving',
   'failed',
   'setting-up',
-  'error',
 ]);
 
 export function replayPrompt(history: ChatItem[], text: string): string {

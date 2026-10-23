@@ -257,7 +257,6 @@ describe('boardColumn', () => {
 
   it('puts each status in its column', () => {
     expect(boardColumn(runtime('waiting'))).toBe('needs-you');
-    expect(boardColumn(runtime('error'))).toBe('needs-you');
     expect(boardColumn(runtime('failed'))).toBe('needs-you');
     expect(boardColumn(runtime('working'))).toBe('working');
     expect(boardColumn(runtime('setting-up'))).toBe('working');
@@ -268,6 +267,13 @@ describe('boardColumn', () => {
   it('splits idle workspaces by whether you have read the last turn', () => {
     expect(boardColumn(runtime('idle', true))).toBe('done');
     expect(boardColumn(runtime('idle', false))).toBe('idle');
+  });
+
+  it('asks for you when the setup script failed and no agent is working', () => {
+    const failedSetup = (status: WorkspaceRuntime['status']) =>
+      ({ status, setupError: 'Setup script failed' }) as WorkspaceRuntime;
+    expect(boardColumn(failedSetup('idle'))).toBe('needs-you');
+    expect(boardColumn(failedSetup('working'))).toBe('working');
   });
 });
 

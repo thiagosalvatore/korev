@@ -113,7 +113,7 @@ function StatusIcon({
     return (
       <MessageCircleQuestion size={ROW_ICON_SIZE} color={theme.warningText} />
     );
-  if (runtime.status === 'error' || runtime.status === 'failed')
+  if (runtime.status === 'failed' || runtime.setupError)
     return <TriangleAlert size={ROW_ICON_SIZE} color={theme.dangerText} />;
   const pr = primaryPr(workspace, runtime);
   if (!pr) return <GitBranch size={ROW_ICON_SIZE} color={theme.fg4} />;
@@ -174,6 +174,7 @@ function WorkspaceRow({
 }) {
   const { api } = useConnection();
   const stats = runtime?.stats;
+  const notice = runtime?.message ?? runtime?.setupError;
   const hasStats = stats && (stats.additions > 0 || stats.deletions > 0);
   const archive = async () =>
     succeeded(
@@ -217,9 +218,7 @@ function WorkspaceRow({
             {member
               ? memberDetail(workspace, member)
               : workspaceLabel(workspace)}
-            {runtime?.message ? (
-              <Text style={styles.error}> · {runtime.message}</Text>
-            ) : null}
+            {notice ? <Text style={styles.error}> · {notice}</Text> : null}
           </>
         }
         end={

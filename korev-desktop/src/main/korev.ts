@@ -268,6 +268,7 @@ const IDLE: WorkspaceRuntime = {
   prs: [],
   strayWorktrees: [],
   message: null,
+  setupError: null,
   pendingPrompt: null,
   runUrl: null,
 };
