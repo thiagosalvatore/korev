@@ -22,7 +22,7 @@ const MISSING_FILE_CODE = 'ENOENT';
 const EXISTING_FILE_CODE = 'EEXIST';
 const TEMP_SUFFIX = '.tmp';
 
-function isMissingFile(error: unknown): boolean {
+export function isMissingFile(error: unknown): boolean {
   return (error as NodeJS.ErrnoException)?.code === MISSING_FILE_CODE;
 }
 

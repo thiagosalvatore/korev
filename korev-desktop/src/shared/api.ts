@@ -11,6 +11,7 @@ import type {
   ChatUpdate,
   EditorId,
   FileChange,
+  FileContents,
   IssueSummary,
   PermissionResponse,
   PlanLane,
@@ -185,7 +186,7 @@ export interface KorevApi {
   ): Promise<Result>;
   prThreads(workspaceId: string, prUrl: string): Promise<PrThread[]>;
   listFiles(workspaceId: string): Promise<string[]>;
-  readFile(workspaceId: string, path: string): Promise<string | null>;
+  readFile(workspaceId: string, path: string): Promise<FileContents>;
   readImage(sessionId: string, path: string): Promise<string | null>;
   listArtifacts(workspaceId: string): Promise<string[]>;
   showFileMenu(workspaceId: string, path: string): Promise<void>;

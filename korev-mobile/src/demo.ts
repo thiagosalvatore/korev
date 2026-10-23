@@ -471,7 +471,7 @@ export function createDemoConnection(): Connection {
       return [];
     },
     async readFile() {
-      return null;
+      return { kind: 'missing' };
     },
     async readImage() {
       return null;

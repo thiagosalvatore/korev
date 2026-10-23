@@ -1056,6 +1056,11 @@ export type Result<T = void> =
   | { ok: true; value: T }
   | { ok: false; message: string };
 
+export type FileContents =
+  | { kind: 'text'; text: string }
+  | { kind: 'missing' }
+  | { kind: 'not-text' };
+
 export interface TerminalSize {
   cols: number;
   rows: number;

@@ -8,7 +8,7 @@ import {
 import type { ThemedToken } from 'shiki/core';
 import { Button, cn, Icon, Spinner } from '../design-system';
 import { fileName, imageType } from '../shared/format';
-import type { Workspace } from '../shared/model';
+import type { FileContents, Workspace } from '../shared/model';
 import { api } from './bridge';
 import { Markdown } from './chat/Markdown';
 import { highlightFile } from './highlightFile';
@@ -17,6 +17,8 @@ import { reportFailure, toast } from './ui/toast';
 const MARKDOWN_FILE = /\.(md|markdown)$/i;
 const SAVE_KEY = 's';
 const SELECT_ALL_KEY = 'a';
+
+type UnavailableReason = Exclude<FileContents, { kind: 'text' }>['kind'];
 
 function isShortcut(event: KeyboardEvent, key: string): boolean {
   return (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === key;
@@ -159,19 +161,55 @@ function ReadOnlyContents({
   );
 }
 
-function Unavailable() {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-2 text-fg-3">
-      <Icon name="file-x" size={22} />
-      <p className="m-0 text-sm">This file can't be shown here.</p>
-    </div>
-  );
-}
-
 function FileHeader({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-9 flex-none items-center gap-2 border-b border-border-1 bg-surface px-3">
       {children}
+    </div>
+  );
+}
+
+function FilePath({ file }: { file: string }) {
+  return (
+    <span className="min-w-0 flex-1 truncate font-mono text-xs text-fg-2">
+      {file}
+    </span>
+  );
+}
+
+function Unavailable({
+  workspace,
+  file,
+  reason,
+}: {
+  workspace: Workspace;
+  file: string;
+  reason: UnavailableReason;
+}) {
+  const missing = reason === 'missing';
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <FileHeader>
+        <FilePath file={file} />
+      </FileHeader>
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-fg-3">
+        <Icon name="file-x" size={22} />
+        <p className="m-0 text-sm">
+          {missing
+            ? "This file doesn't exist in this workspace."
+            : "Korev can't preview this file."}
+        </p>
+        {missing ? null : (
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="external-link"
+            onClick={() => void api.showFileMenu(workspace.id, file)}
+          >
+            Open outside Korev
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -185,13 +223,12 @@ function ImageFile({ workspace, file }: FileViewProps) {
   }, [workspace.id, file]);
 
   if (source === undefined) return <Spinner />;
-  if (source === null) return <Unavailable />;
+  if (source === null)
+    return <Unavailable workspace={workspace} file={file} reason="not-text" />;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <FileHeader>
-        <span className="min-w-0 flex-1 truncate font-mono text-xs text-fg-2">
-          {file}
-        </span>
+        <FilePath file={file} />
       </FileHeader>
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
         <img
@@ -218,30 +255,30 @@ function TextFile({
   line,
   editing: startEditing,
 }: FileViewProps) {
-  const [contents, setContents] = useState<string | null | undefined>(
-    undefined,
-  );
+  const [read, setRead] = useState<FileContents | undefined>(undefined);
   const [editing, setEditing] = useState(startEditing);
   const [draft, setDraft] = useState('');
 
   useEffect(() => {
-    setContents(undefined);
-    void api.readFile(workspace.id, file).then((text) => {
-      setContents(text);
-      setDraft(text ?? '');
+    setRead(undefined);
+    void api.readFile(workspace.id, file).then((result) => {
+      setRead(result);
+      setDraft(result.kind === 'text' ? result.text : '');
     });
   }, [workspace.id, file]);
 
   async function save() {
     const result = await api.writeFile(workspace.id, file, draft);
     if (!reportFailure(result)) return;
-    setContents(draft);
+    setRead({ kind: 'text', text: draft });
     setEditing(false);
     toast(`Saved ${file}`, 'success');
   }
 
-  if (contents === undefined) return <Spinner />;
-  if (contents === null) return <Unavailable />;
+  if (read === undefined) return <Spinner />;
+  if (read.kind !== 'text')
+    return <Unavailable workspace={workspace} file={file} reason={read.kind} />;
+  const contents = read.text;
   const dirty = draft !== contents;
   return (
     <div className="flex min-h-0 flex-1 flex-col">

@@ -2122,9 +2122,27 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
     expect(
       await korev.api.readFile(workspace.id, '~/.claude/plans/crab.md'),
-    ).toBe('# Plan\n');
-    expect(await korev.api.readFile(workspace.id, plan)).toBe('# Plan\n');
+    ).toEqual({ kind: 'text', text: '# Plan\n' });
+    expect(await korev.api.readFile(workspace.id, plan)).toEqual({
+      kind: 'text',
+      text: '# Plan\n',
+    });
     expect((await korev.api.writeFile(workspace.id, plan, 'x')).ok).toBe(false);
+  });
+
+  it('tells missing files apart from files it cannot show as text', async () => {
+    const workspace = await createWorkspace();
+    const contextDir = path.join(workspace.path, '.context');
+    await mkdir(contextDir, { recursive: true });
+    await writeFile(path.join(contextDir, 'big.log'), 'x'.repeat(2_000_000));
+    await writeFile(path.join(contextDir, 'doc.pdf'), Buffer.from([37, 0, 80]));
+
+    const read = (file: string) => korev.api.readFile(workspace.id, file);
+
+    expect(await read('.context/big.log')).toEqual({ kind: 'not-text' });
+    expect(await read('.context/doc.pdf')).toEqual({ kind: 'not-text' });
+    expect(await read('.context')).toEqual({ kind: 'not-text' });
+    expect(await read('.context/gone.md')).toEqual({ kind: 'missing' });
   });
 
   it('copies only the gitignored files that .worktreeinclude names', async () => {

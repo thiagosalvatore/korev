@@ -15,6 +15,7 @@ import {
   type ChatSession,
   type EditorApp,
   type EditorId,
+  type FileContents,
   latestPlan,
   type PlanLane,
   planLanes,
@@ -56,7 +57,7 @@ import {
   type Context,
   type CoreDeps,
 } from './context';
-import type { FileSystem } from './file-system';
+import { isMissingFile, type FileSystem } from './file-system';
 import {
   changedFiles,
   cloneRepo,
@@ -315,6 +316,18 @@ function insideWorkspace(root: string, file: string): string | null {
 }
 
 const HOME_PREFIX = `~${path.sep}`;
+const NUL_BYTE = 0;
+
+async function readTextFile(file: string): Promise<FileContents> {
+  try {
+    const contents = await readFile(file);
+    if (contents.length > FILE_MAX_BYTES || contents.includes(NUL_BYTE))
+      return { kind: 'not-text' };
+    return { kind: 'text', text: contents.toString('utf8') };
+  } catch (error) {
+    return isMissingFile(error) ? { kind: 'missing' } : { kind: 'not-text' };
+  }
+}
 
 function readablePath(root: string, home: string, file: string): string {
   if (file.startsWith(HOME_PREFIX))
@@ -1366,16 +1379,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     async listFiles(workspaceId) {
       return listFiles(git, workspacePath(workspaceId).path);
     },
-    async readFile(workspaceId, file) {
-      const target = readablePath(
-        workspacePath(workspaceId).path,
-        deps.home,
-        file,
-      );
-      const contents = await readFile(target).catch(() => null);
-      if (!contents || contents.length > FILE_MAX_BYTES) return null;
-      return contents.toString('utf8');
-    },
+    readFile: (workspaceId, file) =>
+      readTextFile(
+        readablePath(workspacePath(workspaceId).path, deps.home, file),
+      ),
     readImage: (sessionId, file) =>
       imageDataUrl(readablePath(sessionRoot(sessionId), deps.home, file)),
     async showFileMenu(workspaceId, file) {
