@@ -1424,7 +1424,12 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     return korev.api.createAutomation({
       name: 'Tickets',
       prompt,
-      intervalMinutes: 10,
+      schedule: {
+        kind: 'interval',
+        minutes: 10,
+        days: [0, 1, 2, 3, 4, 5, 6],
+        window: null,
+      },
       repoIds: [repo.id],
       enabled: true,
     });

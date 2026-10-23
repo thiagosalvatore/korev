@@ -46,7 +46,8 @@ coordinator's chat.
 
 The **Automations** page replaces the centre and the right panel with one card per automation.
 A card has the name, a **Running** badge while a run is going, the on/off switch, **Run now**,
-**Edit** and **Delete**. Under them: the interval, the repositories and the time of the last run.
+**Edit** and **Delete**. Under them: the schedule, the repositories, the time of the last run and
+the time of the next run.
 Then the last five runs, one row each: the start time (click to open the run's chat), what it did,
 the workspaces it opened and a note for each request Korev skipped. **New automation** and
 **Edit** show the form above the cards.

@@ -74,6 +74,23 @@ describe('openStore', () => {
     expect(store.state.workspaces[0].folderId).toBeNull();
   });
 
+  it('turns a saved minute interval into an every-day schedule', async () => {
+    const store = await openStore(
+      fileSystemWith({ automations: [{ id: 'au1', intervalMinutes: 15 }] }),
+      '/user-data',
+      '/home',
+    );
+    expect(store.state.automations[0]).toEqual({
+      id: 'au1',
+      schedule: {
+        kind: 'interval',
+        minutes: 15,
+        days: [0, 1, 2, 3, 4, 5, 6],
+        window: null,
+      },
+    });
+  });
+
   it('has not seen any version yet on a fresh install', async () => {
     const store = await openStore(fileSystemWith({}), '/user-data', '/home');
     expect(store.state.settings.lastSeenVersion).toBeNull();

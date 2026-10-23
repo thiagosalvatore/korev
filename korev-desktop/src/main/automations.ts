@@ -10,14 +10,13 @@ import type {
   SendOptions,
   Workspace,
 } from '../shared/model';
+import { describeSchedule, nextRunAt, scheduleError } from '../shared/schedule';
 import type { TurnOutcome } from './chats';
 import { errorMessage, NotFoundError, type Context } from './context';
 import { newChatSession } from './workspaces';
 
 export const AUTOMATION_TICK_MS = 60_000;
 const AUTOMATION_FENCE = 'korev-automation';
-const MINUTE_MS = 60_000;
-const MIN_INTERVAL_MINUTES = 1;
 const MAX_WORKSPACES_PER_RUN = 5;
 const MAX_USED_KEYS = 500;
 const MAX_RUNS_KEPT = 20;
@@ -113,13 +112,13 @@ export function createAutomations(
     const prompt = draft.prompt.trim();
     if (!name) throw new Error('An automation needs a name');
     if (!prompt) throw new Error('An automation needs a prompt');
-    if (!(draft.intervalMinutes >= MIN_INTERVAL_MINUTES))
-      throw new Error('An automation runs at most once a minute');
+    const invalidSchedule = scheduleError(draft.schedule);
+    if (invalidSchedule) throw new Error(invalidSchedule);
     for (const repoId of draft.repoIds) ctx.repo(repoId);
     return {
       name,
       prompt,
-      intervalMinutes: Math.round(draft.intervalMinutes),
+      schedule: draft.schedule,
       repoIds: draft.repoIds,
       enabled: draft.enabled,
     };
@@ -137,10 +136,12 @@ export function createAutomations(
 
   function isDue(automation: Automation): boolean {
     if (!automation.enabled) return false;
-    if (!automation.lastRunAt) return true;
-    const elapsed =
-      ctx.deps.now().getTime() - new Date(automation.lastRunAt).getTime();
-    return elapsed >= automation.intervalMinutes * MINUTE_MS;
+    const next = nextRunAt(
+      automation.schedule,
+      automation.lastRunAt ? new Date(automation.lastRunAt) : null,
+      new Date(automation.createdAt),
+    );
+    return next !== null && next <= ctx.deps.now();
   }
 
   function allowedRepo(automation: Automation, name: string): Repo | null {
@@ -175,7 +176,7 @@ export function createAutomations(
       automation.prompt,
       '',
       '---',
-      `Korev runs this prompt every ${automation.intervalMinutes} minutes. Nobody watches this chat while you work, so do not ask questions. Do the work, then say what you found.`,
+      `Korev runs this prompt on a schedule: ${describeSchedule(automation.schedule)}. Nobody watches this chat while you work, so do not ask questions. Do the work, then say what you found.`,
       repos.length
         ? `Korev can open a workspace for each piece of work that needs code changes: a git worktree on a new branch, where a coding agent starts with the prompt you write. You can open workspaces in these repositories: ${repos.join(', ')}.`
         : `This automation has no repositories, so do not ask Korev to open workspaces.`,

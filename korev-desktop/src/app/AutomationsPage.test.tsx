@@ -8,7 +8,12 @@ const automation: Automation = {
   id: 'au1',
   name: 'Support tickets',
   prompt: 'Sweep my tickets',
-  intervalMinutes: 10,
+  schedule: {
+    kind: 'interval',
+    minutes: 10,
+    days: [1, 2, 3, 4, 5],
+    window: null,
+  },
   repoIds: ['r1'],
   enabled: true,
   createdAt: '2026-01-01T00:00:00Z',
@@ -70,16 +75,20 @@ describe('AutomationsPage', () => {
     fireEvent.change(screen.getByLabelText('Prompt'), {
       target: { value: 'Read my new tickets' },
     });
-    fireEvent.change(screen.getByLabelText('Every (minutes)'), {
-      target: { value: '15' },
+    fireEvent.click(screen.getByRole('tab', { name: 'At set times' }));
+    fireEvent.change(screen.getByLabelText('Time 1'), {
+      target: { value: '09:30' },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Saturday' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sunday' }));
+    expect(screen.getByText(/Weekdays at 09:30/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Create automation' }));
 
     expect(window.korev.call).toHaveBeenCalledWith('createAutomation', [
       {
         name: 'Triage',
         prompt: 'Read my new tickets',
-        intervalMinutes: 15,
+        schedule: { kind: 'times', times: ['09:30'], days: [1, 2, 3, 4, 5] },
         repoIds: [],
         enabled: true,
       },

@@ -40,7 +40,7 @@ const FEATURES: [LucideIcon, string, string][] = [
   [
     CalendarClock,
     'Automations',
-    'Run a prompt every few minutes, such as a check of your support tickets, and open a workspace for each new piece of work it finds.',
+    'Run a prompt on a schedule, such as a check of your support tickets every 10 minutes on weekdays, and open a workspace for each new piece of work it finds.',
   ],
   [
     Smartphone,

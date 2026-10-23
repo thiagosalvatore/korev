@@ -1,19 +1,24 @@
 ---
 title: Automations
-description: 'Run a prompt on a timer and let it open workspaces.'
+description: 'Run a prompt on a schedule and let it open workspaces.'
 ---
 
-An automation runs a prompt every few minutes while Korev is open. It can open a workspace for each piece of work it finds. For example, it can check your support tickets every 10 minutes and open a workspace for each new one that needs a code change.
+An automation runs a prompt on a schedule while Korev is open, such as every 10 minutes or at 09:00 on weekdays. It can open a workspace for each piece of work it finds. For example, it can check your support tickets every 10 minutes and open a workspace for each new one that needs a code change.
 
 ## Create one
 
 1. Click **Automations** in the sidebar, then **New automation**.
 2. Give it a name and write the prompt. Say what to look at and when a workspace is worth opening, for example: "Read my open support tickets. For each one assigned to me that is not in progress and needs a code change, open a workspace to fix it."
-3. Set how often it runs, in minutes.
+3. Set when it runs:
+   - **Repeat** runs it every few minutes or hours. Turn on **Only between** to run it only in a time window, such as 09:00 to 18:00.
+   - **At set times** runs it at one or more times of day, such as 09:00 and 17:30.
+   - Click the days to pick which days it runs on. All seven days are on at first.
+
+   The line under the schedule says when the next run starts.
 4. Pick the repositories it can open workspaces in. Leave this empty for an automation that only reports.
 5. Click **Create automation**.
 
-The first run starts within a minute. Click **Run now** to start one at once, and use the switch to pause the automation.
+A **Repeat** automation starts its first run within a minute, or when its time window opens. An **At set times** automation waits for its next time. Click **Run now** to start one at once, and use the switch to pause the automation.
 
 ## What a run does
 
@@ -45,5 +50,6 @@ Click a run's time to open its chat and read the whole reply. You can send it a 
 
 ## Limits
 
-- Automations run only while Korev is open. Closing the window is fine, but quitting stops them. When Korev starts again, an automation that is due runs once. It does not catch up on missed runs.
-- The interval is in minutes. There is no schedule for a time of day yet.
+- Automations run only while Korev is open. Closing the window is fine, but quitting stops them. When Korev starts again, an automation that missed a run runs once. It does not catch up on every missed run.
+- Times are in your Mac's time zone.
+- A time window cannot go past midnight. Its end must be later than its start.

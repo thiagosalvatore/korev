@@ -7,7 +7,15 @@ import type {
   Automation,
   AutomationDraft,
   AutomationRun,
+  AutomationSchedule,
 } from '../shared/model';
+import {
+  ALL_DAYS,
+  describeSchedule,
+  formatNextRun,
+  nextRunAt,
+  scheduleError,
+} from '../shared/schedule';
 import {
   automationRunsNewestFirst,
   workspaceLabel,
@@ -16,19 +24,21 @@ import { openAsk, selectWorkspace } from './actions';
 import { api } from './bridge';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { RepoPicker } from './RepoPicker';
+import { ScheduleField } from './ScheduleField';
 import { reportFailure } from './ui/toast';
 import { useUi } from './ui-store';
 
-const DEFAULT_INTERVAL_MINUTES = 10;
+const DEFAULT_SCHEDULE: AutomationSchedule = {
+  kind: 'interval',
+  minutes: 10,
+  days: ALL_DAYS,
+  window: null,
+};
 const RUNS_SHOWN = 5;
 const PROMPT_TEXTAREA_CLASS =
   'resize-y rounded-sm border border-border-2 bg-inset px-2.5 py-2 text-sm text-fg-1 outline-none focus:border-accent-border';
 
 type Editing = Automation | 'new' | null;
-
-function every(minutes: number): string {
-  return minutes === 1 ? 'Every minute' : `Every ${minutes} minutes`;
-}
 
 function opened(count: number): string {
   return count === 1 ? 'Opened 1 workspace' : `Opened ${count} workspaces`;
@@ -58,22 +68,17 @@ function AutomationForm({
 }) {
   const [name, setName] = useState(automation?.name ?? '');
   const [prompt, setPrompt] = useState(automation?.prompt ?? '');
-  const [minutes, setMinutes] = useState(
-    String(automation?.intervalMinutes ?? DEFAULT_INTERVAL_MINUTES),
+  const [schedule, setSchedule] = useState(
+    automation?.schedule ?? DEFAULT_SCHEDULE,
   );
   const [repoIds, setRepoIds] = useState(automation?.repoIds ?? []);
-  const intervalMinutes = Number(minutes);
-  const valid =
-    name.trim() &&
-    prompt.trim() &&
-    Number.isInteger(intervalMinutes) &&
-    intervalMinutes >= 1;
+  const valid = name.trim() && prompt.trim() && !scheduleError(schedule);
 
   function save() {
     const draft: AutomationDraft = {
       name,
       prompt,
-      intervalMinutes,
+      schedule,
       repoIds,
       enabled: automation?.enabled ?? true,
     };
@@ -107,14 +112,7 @@ function AutomationForm({
           onChange={(event) => setPrompt(event.target.value)}
         />
       </label>
-      <Input
-        label="Every (minutes)"
-        type="number"
-        min={1}
-        value={minutes}
-        className="w-40"
-        onChange={(event) => setMinutes(event.target.value)}
-      />
+      <ScheduleField schedule={schedule} onChange={setSchedule} />
       <div className="flex flex-col gap-1.5">
         <span className="type-label text-fg-2">
           Repositories it can open workspaces in
@@ -177,6 +175,16 @@ function RunRow({ state, ask }: { state: AppState; ask: AskChat }) {
   );
 }
 
+function nextRun(automation: Automation): string {
+  if (!automation.enabled) return ' · Off';
+  const next = nextRunAt(
+    automation.schedule,
+    automation.lastRunAt ? new Date(automation.lastRunAt) : null,
+    new Date(automation.createdAt),
+  );
+  return next ? ` · Next run ${formatNextRun(next, new Date())}` : '';
+}
+
 function AutomationCard({
   state,
   automation,
@@ -231,8 +239,9 @@ function AutomationCard({
         </Button>
       </div>
       <p className="m-0 text-xs text-fg-3">
-        {every(automation.intervalMinutes)} · {repoNames(state, automation)}
+        {describeSchedule(automation.schedule)} · {repoNames(state, automation)}
         {lastRun}
+        {nextRun(automation)}
       </p>
       {runs.length ? (
         <ul className="m-0 list-none p-0">
@@ -276,9 +285,9 @@ export function AutomationsPage({ state }: { state: AppState }) {
       <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-6">
         <div className="flex w-full max-w-[820px] flex-col gap-4">
           <p className="m-0 text-sm text-fg-3">
-            An automation runs a prompt on a timer while Korev is open. It can
-            open a workspace for each piece of work it finds, and it never opens
-            two for the same ticket.
+            An automation runs a prompt on a schedule while Korev is open. It
+            can open a workspace for each piece of work it finds, and it never
+            opens two for the same ticket.
           </p>
           {editing ? (
             <AutomationForm

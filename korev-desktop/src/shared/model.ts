@@ -324,10 +324,26 @@ export interface AskChat {
   automationRun?: AutomationRun;
 }
 
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface TimeWindow {
+  from: string;
+  until: string;
+}
+
+export type AutomationSchedule =
+  | {
+      kind: 'interval';
+      minutes: number;
+      days: Weekday[];
+      window: TimeWindow | null;
+    }
+  | { kind: 'times'; times: string[]; days: Weekday[] };
+
 export interface AutomationDraft {
   name: string;
   prompt: string;
-  intervalMinutes: number;
+  schedule: AutomationSchedule;
   repoIds: string[];
   enabled: boolean;
 }

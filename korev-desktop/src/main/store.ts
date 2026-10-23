@@ -19,6 +19,7 @@ import {
   type Workspace,
 } from '../shared/model';
 import type { ExplainerContent } from '../shared/explainer';
+import { ALL_DAYS } from '../shared/schedule';
 import type { FileSystem } from './file-system';
 import { DEFAULT_REMOTE_PORT } from './remote-server';
 
@@ -44,6 +45,24 @@ export interface PersistedState {
   runs: OrchestrationRun[];
   automations: Automation[];
   settings: Settings;
+}
+
+type AutomationBeforeSchedules = Automation & { intervalMinutes?: number };
+
+function withSchedule({
+  intervalMinutes,
+  ...automation
+}: AutomationBeforeSchedules): Automation {
+  if (automation.schedule || intervalMinutes === undefined) return automation;
+  return {
+    ...automation,
+    schedule: {
+      kind: 'interval',
+      minutes: intervalMinutes,
+      days: ALL_DAYS,
+      window: null,
+    },
+  };
 }
 
 function interruptedAfterRestart(run: OrchestrationRun): OrchestrationRun {
@@ -196,7 +215,10 @@ function sanitize(raw: unknown, home: string): PersistedState {
     runs: (Array.isArray(value.runs) ? value.runs : []).map(
       interruptedAfterRestart,
     ),
-    automations: Array.isArray(value.automations) ? value.automations : [],
+    automations: (Array.isArray(value.automations)
+      ? value.automations
+      : []
+    ).map(withSchedule),
     settings,
   };
 }

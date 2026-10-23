@@ -30,7 +30,7 @@ Each task gets a git worktree with its own chats, terminal, diff and pull reques
 - **Review.** The Changes tab lists every file that differs from the target branch. Comment on lines, then send all the comments to the agent as one message, or open a review chat with its own model.
 - **Explain.** Get a plain-words walkthrough of any pull request before you review it, yours or a teammate's, or a whole stack. Each step shows the real lines it talks about, and Korev lists every changed file the explanation leaves out.
 - **Ship.** The header always shows the next git step: **Create PR** → **Fix errors** → **Merge** → **Archive**. Failing checks and GitHub review comments go to the agent with their links.
-- **Automations.** Run a prompt every few minutes, such as a check of your support tickets. It can open a workspace for each new ticket that needs a fix, and never opens two for the same ticket.
+- **Automations.** Run a prompt on a schedule, such as a check of your support tickets every 10 minutes on weekdays or a PR digest at 09:00. It can open a workspace for each new ticket that needs a fix, and never opens two for the same ticket.
 - **Ask and linked workspaces.** Ask reads the default branch and cannot edit files. When the plan is ready, start one linked workspace per repository with the whole conversation.
 - **The agents you already have.** Korev runs the `claude` and `codex` CLIs with their own sign-in, MCP servers and skills, and uses `gh` for pull requests and checks.
 - **Your phone.** Follow and steer your agents from the [phone app](https://korev.ai/docs/guides/use-korev-from-your-phone), over Tailscale.
