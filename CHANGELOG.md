@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-10-25
+
+Automations open workspaces on pull requests that are already open, and file links say why a file can't be shown.
+
 ### New
 
 - **Automations open pull requests.** When an automation finds work on a pull request that is already open, the workspace it opens checks out that PR's branch and tracks the PR. Before, it always made a new branch, so the workspace had no link to the PR.
@@ -12,6 +16,8 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 - An automation opens every workspace its run asks for. Before, a run opened at most five and skipped the rest.
 - The runs on the Automations page wrap their workspace buttons inside the card. Before, a run with many workspaces ran past the card's edge.
+- A file link in a chat that Korev can't show, such as a video, now says why: the file is missing, or it is too big or not text. For a file that is too big or not text, it offers **Open outside Korev**. Before, every case said only "This file can't be shown here," and small binary files showed as garbled text.
+- A new workspace in a repo with no commits now opens. Korev makes an empty first commit on the base branch. Before, it failed with "invalid reference: main".
 
 ## [0.20.0] - 2026-10-23
 
