@@ -2252,6 +2252,26 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(workspace.path).not.toBe(repoPath);
   });
 
+  it('creates a workspace in a repo with no commits and pushes its first commit', async () => {
+    const origin = path.join(home, 'empty-origin.git');
+    const empty = path.join(home, 'empty');
+    execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin]);
+    execFileSync('git', ['init', '-q', '-b', 'main', empty]);
+    git(empty, 'config', 'user.email', 'dev@example.com');
+    git(empty, 'config', 'user.name', 'Dev');
+    git(empty, 'config', 'commit.gpgsign', 'false');
+    git(empty, 'remote', 'add', 'origin', origin);
+    chosenDirectory = empty;
+
+    const workspace = await createWorkspace();
+
+    const { runtime } = await workspaceState(workspace.id);
+    expect(runtime.status).toBe('idle');
+    expect(git(workspace.path, 'rev-parse', 'HEAD')).toBe(
+      git(origin, 'rev-parse', 'main'),
+    );
+  });
+
   it('names the workspace and branch after the issue it starts from', async () => {
     const workspace = await createWorkspace(null, {
       kind: 'issue',

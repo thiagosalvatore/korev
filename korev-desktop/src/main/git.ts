@@ -15,6 +15,7 @@ const ORIGIN_HEAD_PREFIX = 'refs/remotes/origin/';
 const FALLBACK_BRANCH = 'main';
 const BINARY_STAT = '-';
 const SNAPSHOT_MESSAGE = 'korev checkpoint';
+const INITIAL_COMMIT_MESSAGE = 'Initial commit';
 const CHECKPOINT_REF_PREFIX = 'refs/korev/checkpoints/';
 const WORKTREE_LINE = 'worktree ';
 const BRANCH_LINE = 'branch refs/heads/';
@@ -143,8 +144,32 @@ async function hasRemoteBranch(git: Git, repo: string, branch: string) {
   return (await git.tryRun(repo, ['rev-parse', '--verify', ref])) !== null;
 }
 
+async function isEmptyRepo(git: Git, repo: string): Promise<boolean> {
+  return (
+    (await git.stdout(repo, ['rev-list', '-n', '1', '--all'])).trim() === ''
+  );
+}
+
+async function seedBaseBranch(git: Git, repo: string, base: string) {
+  const emptyTree = (await git.stdout(repo, ['mktree'], '')).trim();
+  const commit = await git.run(repo, [
+    'commit-tree',
+    emptyTree,
+    '-m',
+    INITIAL_COMMIT_MESSAGE,
+  ]);
+  await git.tryRun(repo, [
+    'update-ref',
+    `refs/heads/${base}`,
+    commit.trim(),
+    '',
+  ]);
+  await git.tryRun(repo, ['push', 'origin', base]);
+}
+
 export async function startPoint(git: Git, repo: string, base: string) {
   await git.tryRun(repo, ['fetch', 'origin', base]);
+  if (await isEmptyRepo(git, repo)) await seedBaseBranch(git, repo, base);
   return (await hasRemoteBranch(git, repo, base)) ? `origin/${base}` : base;
 }
 
