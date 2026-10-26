@@ -12,6 +12,7 @@ const REMOTE_EVENTS: ReadonlySet<keyof KorevEvents> = new Set([
   'state',
   'chat',
   'toast',
+  'announce',
 ]);
 
 export const DEFAULT_REMOTE_PORT = 7420;

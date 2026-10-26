@@ -549,6 +549,9 @@ export function createDemoConnection(): Connection {
     async transcribe() {
       return DEMO_DICTATION;
     },
+    async runVoiceCommand() {
+      return { reply: '' };
+    },
     async moveRepo(repoId, destination) {
       setState({ ...state, ...movedRepo(state, repoId, destination) });
     },

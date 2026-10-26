@@ -60,6 +60,7 @@ import {
 } from './git';
 import { rangeFiles } from './git-review';
 import { findPrUrls } from './pull-requests';
+import type { Attention } from './voice-commands';
 import { withPrompt } from './repo-config';
 import { attachmentsDir } from './store';
 import { isUntitledName } from './workspace-setup';
@@ -100,6 +101,14 @@ const STATUSES_KEPT_BY_TURNS = new Set([
   'failed',
   'setting-up',
 ]);
+
+function turnEndAttention(
+  failure: string | null,
+  planReady: boolean,
+): Attention {
+  if (failure) return { kind: 'failed' };
+  return { kind: planReady ? 'plan' : 'finished' };
+}
 
 export function replayPrompt(history: ChatItem[], text: string): string {
   const conversation = conversationText(history, REPLAY_ITEM_CHARS);
@@ -337,6 +346,7 @@ export function createChats(
   ctx: Context,
   onWorkspaceTurnFinished: (workspaceId: string, links: TurnPrLinks) => void,
   onSessionTurnFinished: (session: ChatSession, outcome: TurnOutcome) => void,
+  onAttention: (workspace: Workspace, attention: Attention) => void,
 ): Chats {
   const transcripts = new Map<string, ChatItem[]>();
   // Conversation text of transcripts not loaded in `transcripts`, so search
@@ -403,9 +413,15 @@ export function createChats(
     );
   }
 
-  function alertUser(owner: Owner, title: string, body: string) {
+  function alertUser(
+    owner: Owner,
+    title: string,
+    body: string,
+    attention: Attention,
+  ) {
     if (owner.kind !== 'workspace') return;
     const { workspace } = owner;
+    onAttention(workspace, attention);
     if (!isWatching(workspace) && ctx.store.state.settings.notificationSound)
       ctx.deps.playSound();
     if (!ctx.deps.isWindowFocused())
@@ -454,6 +470,7 @@ export function createChats(
       failure
         ? `${workspaceLabel(workspace)}: ${failure}`
         : workspaceLabel(workspace),
+      turnEndAttention(failure, codexPlan !== null),
     );
   }
 
@@ -625,14 +642,18 @@ export function createChats(
     }
     const itemId = `${turn.id}:permission:${request.requestId}`;
     turn.permissions.set(itemId, request);
-    upsert(session.id, items, permissionItem(itemId, request, cwd));
+    const item = permissionItem(itemId, request, cwd);
+    upsert(session.id, items, item);
     refreshStatus(turn.owner);
     ctx.emitState();
     const name =
       turn.owner.kind === 'workspace'
         ? workspaceLabel(turn.owner.workspace)
         : 'Ask';
-    alertUser(turn.owner, AGENT_NEEDS_INPUT_TITLE, name);
+    alertUser(turn.owner, AGENT_NEEDS_INPUT_TITLE, name, {
+      kind: 'permission',
+      item,
+    });
   }
 
   function nudgeAboutSigning(

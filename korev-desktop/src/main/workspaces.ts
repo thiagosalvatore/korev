@@ -71,21 +71,19 @@ const NAMING_SYSTEM_PROMPT =
 const TITLE_SYSTEM_PROMPT =
   "You title chat conversations. Given the user's first message, reply with a 2 to 4 word title in sentence case, without quotes or trailing punctuation, and nothing else.";
 const SURROUNDING_QUOTES = /^["'`]+|["'`]+$/g;
-const NAMING_ARGS = [
+const QUICK_MODEL_ARGS = [
   '-p',
   '--model',
   NAMING_MODEL,
   '--no-session-persistence',
-  '--output-format',
-  'text',
   '--tools',
   '',
   '--setting-sources',
   '',
   '--disable-slash-commands',
   '--strict-mcp-config',
-  '--system-prompt',
 ];
+const TEXT_REPLY_ARGS = ['--output-format', 'text', '--system-prompt'];
 const NEW_SOURCE: WorkspaceSource = { kind: 'new', baseBranch: null };
 const POOL_DIR = '.pool';
 
@@ -107,6 +105,23 @@ export function newChatSession(ctx: Context, agent: AgentKind): ChatSession {
     agentSessionId: null,
     forkOnNextTurn: false,
     createdAt: ctx.deps.now().toISOString(),
+  };
+}
+
+export function defaultTask(
+  ctx: Context,
+  prompt: string,
+  planMode: boolean,
+): SendOptions {
+  const { defaultAgent, defaultModels, defaultEffort } =
+    ctx.store.state.settings;
+  return {
+    text: prompt,
+    agent: defaultAgent,
+    model: defaultModels[defaultAgent],
+    effort: defaultEffort[defaultAgent],
+    planMode,
+    fast: false,
   };
 }
 
@@ -206,21 +221,33 @@ export async function renameBranchPrompt(
   return (await loadRepoConfig(repo, repo.path)).prompts.rename_branch;
 }
 
+export async function askQuickModel(
+  ctx: Context,
+  args: string[],
+  stdin: string,
+): Promise<string | null> {
+  const result = await ctx.deps
+    .run('claude', [...QUICK_MODEL_ARGS, ...args], {
+      cwd: tmpdir(),
+      env: ctx.deps.env,
+      stdin,
+      timeoutMs: NAMING_TIMEOUT_MS,
+    })
+    .catch(() => null);
+  return result?.exitCode === 0 ? result.stdout : null;
+}
+
 async function askNamingModel(
   ctx: Context,
   systemPrompt: string,
   task: string,
 ): Promise<string | null> {
-  const result = await ctx.deps
-    .run('claude', [...NAMING_ARGS, systemPrompt], {
-      cwd: tmpdir(),
-      env: ctx.deps.env,
-      stdin: `Task:\n${task.slice(0, NAMING_TASK_CHARS)}`,
-      timeoutMs: NAMING_TIMEOUT_MS,
-    })
-    .catch(() => null);
-  if (result?.exitCode !== 0) return null;
-  return result.stdout.trim().split('\n').at(-1)?.trim() || null;
+  const reply = await askQuickModel(
+    ctx,
+    [...TEXT_REPLY_ARGS, systemPrompt],
+    `Task:\n${task.slice(0, NAMING_TASK_CHARS)}`,
+  );
+  return reply?.trim().split('\n').at(-1)?.trim() || null;
 }
 
 export async function suggestName(

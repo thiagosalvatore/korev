@@ -1,5 +1,6 @@
 import type {
   AgentKind,
+  Announcement,
   AppCommand,
   AskChat,
   Automation,
@@ -37,6 +38,7 @@ import type {
   TerminalPreset,
   TerminalOutput,
   TerminalSize,
+  VoiceReply,
   Workspace,
   WorkspaceFolder,
 } from './model';
@@ -203,6 +205,10 @@ export interface KorevApi {
   unregisterPushToken(token: string): Promise<void>;
   prepareDictation(): Promise<void>;
   transcribe(audioBase64: string): Promise<string>;
+  runVoiceCommand(
+    spoken: string,
+    options?: { awake?: boolean },
+  ): Promise<VoiceReply>;
   checkForUpdates(): Promise<boolean>;
   installUpdate(): Promise<Result>;
   dismissWhatsNew(): Promise<void>;
@@ -266,6 +272,7 @@ export const REMOTE_METHODS = [
   'deleteAskChat',
   'prepareDictation',
   'transcribe',
+  'runVoiceCommand',
   'moveRepo',
   'moveFolder',
   'resumeRun',
@@ -297,6 +304,7 @@ export interface KorevEvents {
   command: AppCommand;
   'focus-workspace': string;
   toast: Toast;
+  announce: Announcement;
 }
 
 export type Unsubscribe = () => void;

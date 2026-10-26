@@ -15,7 +15,7 @@ import { describeSchedule, nextRunAt, scheduleError } from '../shared/schedule';
 import type { TurnOutcome } from './chats';
 import { errorMessage, NotFoundError, type Context } from './context';
 import { fetchPrStatus } from './pull-requests';
-import { newChatSession } from './workspaces';
+import { defaultTask, newChatSession } from './workspaces';
 
 export const AUTOMATION_TICK_MS = 60_000;
 const AUTOMATION_FENCE = 'korev-automation';
@@ -165,19 +165,6 @@ export function createAutomations(
     );
   }
 
-  function defaultTask(prompt: string, planMode: boolean): SendOptions {
-    const { defaultAgent, defaultModels, defaultEffort } =
-      ctx.store.state.settings;
-    return {
-      text: prompt,
-      agent: defaultAgent,
-      model: defaultModels[defaultAgent],
-      effort: defaultEffort[defaultAgent],
-      planMode,
-      fast: false,
-    };
-  }
-
   function runPrompt(automation: Automation): string {
     const repos = ctx.store.state.repos
       .filter((repo) => automation.repoIds.includes(repo.id))
@@ -225,7 +212,7 @@ export function createAutomations(
     await pruneRuns(automation.id);
     const sent = await host.send(
       session.id,
-      defaultTask(runPrompt(automation), false),
+      defaultTask(ctx, runPrompt(automation), false),
     );
     return sent.ok ? { ok: true, value: ask.id } : sent;
   }
@@ -284,7 +271,7 @@ export function createAutomations(
     if (source && !source.ok) return source.message;
     const created = host.createWorkspaces(
       [repo.id],
-      defaultTask(entry.prompt, ctx.store.state.settings.defaultPlanMode),
+      defaultTask(ctx, entry.prompt, ctx.store.state.settings.defaultPlanMode),
       source?.value,
     );
     if (!created.ok)

@@ -2611,6 +2611,30 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(await userMessages(session.id)).toEqual(['ask-two-questions']);
   });
 
+  it('announces a waiting question and answers it with the option spoken back', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await korev.api.send(session.id, task('ask-two-questions'));
+    await waitFor(async () =>
+      emit.mock.calls.some(([event]) => event === 'announce'),
+    );
+    await mkdir(path.join(workspace.path, '.context'), { recursive: true });
+
+    await korev.api.runVoiceCommand('Korev, option two');
+
+    expect(emit).toHaveBeenCalledWith('announce', {
+      workspaceId: workspace.id,
+      text: expect.stringContaining(
+        'asks: Which database? Option 1, Postgres.',
+      ),
+    });
+    const answer = path.join(workspace.path, '.context', 'question-answer');
+    await waitFor(async () => existsSync(answer));
+    expect(await readFile(answer, 'utf8')).toContain(
+      '"Which database?":"SQLite"',
+    );
+  });
+
   it('splits the approved plan into a linked workspace for each lane', async () => {
     const origin = await createWorkspace();
     const [session] = origin.sessions;

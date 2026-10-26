@@ -772,6 +772,17 @@ export interface PermissionResponse {
   lanes?: PlanLane[];
 }
 
+export interface VoiceReply {
+  reply: string;
+  openWorkspaceId?: string;
+  listening?: boolean;
+}
+
+export interface Announcement {
+  workspaceId: string;
+  text: string;
+}
+
 export const PLAN_TOOL = 'ExitPlanMode';
 export const QUESTION_TOOL = 'AskUserQuestion';
 

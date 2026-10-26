@@ -2,6 +2,11 @@
 case " $* " in
   *" --version "*) echo "9.9.9 (Claude Code)"; exit 0 ;;
   " auth status ") echo '{"loggedIn":true,"authMethod":"claude.ai","email":"fake@example.com"}'; exit 0 ;;
+  *"You are the voice of Korev"*)
+    case "$(cat)" in
+      *"option two"*) echo '{"structured_output":{"action":"reply","text":"","answers":{"Which database?":["SQLite"],"Which tests?":["Unit"]},"reply":"Answered"}}' ;;
+    esac
+    exit 0 ;;
   *"You title chat conversations"*) cat > /dev/null; echo "Finding the README"; exit 0 ;;
   *" text "*) cat > /dev/null; echo "add-agent-note"; exit 0 ;;
 esac

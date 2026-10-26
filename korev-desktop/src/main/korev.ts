@@ -119,6 +119,7 @@ import {
   type SendTask,
   activeWorkspaces,
 } from './workspaces';
+import { createVoiceCommands } from './voice-commands';
 
 export const PR_POLL_MS = 30_000;
 const PR_CLOCK_SKEW_MS = 60_000;
@@ -425,7 +426,19 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       explainers.turnFinished(session, outcome);
       automations.turnFinished(session, outcome);
     },
+    (workspace, attention) => voice.announce(workspace, attention),
   );
+  const voice = createVoiceCommands(ctx, {
+    transcript: (sessionId) => chats.transcript(sessionId),
+    waitingSessions: () => chats.waitingSessions(),
+    isRunning: (sessionId) => chats.isRunning(sessionId),
+    createWorkspaces: (repoIds, task) => api.createWorkspaces(repoIds, task),
+    send: (sessionId, options) => api.send(sessionId, options),
+    respondPermission: (sessionId, itemId, response) =>
+      api.respondPermission(sessionId, itemId, response),
+    approvePlan: (sessionId, lanes) => api.approvePlan(sessionId, lanes),
+    stop: (sessionId) => api.stop(sessionId),
+  });
   const explainers = createExplainers(ctx, {
     send: (sessionId, options) => chats.send(sessionId, options),
     isRunning: (sessionId) => chats.isRunning(sessionId),
@@ -1517,6 +1530,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         audioBase64,
         store.state.settings.dictationLanguage,
       ),
+    runVoiceCommand: (spoken, options) => voice.run(spoken, options),
     checkForUpdates,
     installUpdate: async () =>
       update ? deps.installUpdate(update) : fail('No update is available'),

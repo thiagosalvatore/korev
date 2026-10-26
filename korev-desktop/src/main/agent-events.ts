@@ -539,7 +539,7 @@ export function permissionItem(
   id: string,
   request: ControlRequest,
   cwd: string,
-): ChatItem {
+): Extract<ChatItem, { kind: 'permission' }> {
   const { tool, input } = request;
   return {
     id,
