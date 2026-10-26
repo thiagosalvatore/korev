@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-10-26
+
+Turn on hands-free mode with ⌘⇧H to talk to Korev and hear when an agent needs you.
+
 ### New
 
 - **Hands-free mode.** Talk to Korev and hear when an agent needs you. Korev says out loud when an agent asks a question, has a plan ready, wants to run a tool, or finishes. To turn it on, press ⌘⇧H, click the microphone at the top of the sidebar, or pick **Hands-free mode** in the command palette (⌘K). The first time, Korev downloads its voice model of 550 MB. Start each sentence with "Korev", for example "Korev, create a new workspace on the acme-web repo to plan a login page", "Korev, option two" or "Korev, approve the plan". Or say "Korev", wait for the chime, then say the command. Korev ignores everything that does not start with "Korev". It needs the `claude` CLI, even when your agent is Codex.
