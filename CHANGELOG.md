@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Hands-free on the phone.** Drive Korev by voice from the phone app. Turn on **Hands-free** at the top of the **Workspaces** tab. Start each sentence with "Korev", for example "Korev, create a new workspace on the korev repo to plan login". Or say "Korev", wait for Korev to say "Yes?", and then say the command. Korev says out loud when an agent asks a question, has a plan ready, asks to use a tool, finishes, or fails, and you answer by voice. It works only while the app is open, and the screen stays on. Your Mac needs the voice model (Korev offers to download it the first time) and the `claude` CLI.
+
 ## [0.21.0] - 2026-10-25
 
 Automations open workspaces on pull requests that are already open, and file links say why a file can't be shown.

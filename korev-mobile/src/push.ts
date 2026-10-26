@@ -1,11 +1,11 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import type { RemotePairing } from '../../korev-desktop/src/shared/model';
 import { call } from './connection';
+import { openWorkspace } from './navigation';
 
 const ANDROID_CHANNEL_ID = 'default';
 const ANDROID_CHANNEL_NAME = 'Korev';
@@ -53,6 +53,6 @@ export function useOpenTappedWorkspace() {
       response?.notification.request.content.data?.workspaceId;
     if (typeof workspaceId !== 'string') return;
     Notifications.clearLastNotificationResponse();
-    router.push({ pathname: '/workspace/[id]', params: { id: workspaceId } });
+    openWorkspace(workspaceId);
   }, [response]);
 }

@@ -12,7 +12,7 @@ import { Alert } from 'react-native';
 import { attempt } from './attempt';
 import { useConnection } from './korev';
 
-const SPEECH_RECORDING: RecordingOptions = {
+export const SPEECH_RECORDING: RecordingOptions = {
   ...RecordingPresets.HIGH_QUALITY,
   sampleRate: 16_000,
   numberOfChannels: 1,
@@ -20,6 +20,16 @@ const SPEECH_RECORDING: RecordingOptions = {
   isMeteringEnabled: true,
 };
 const METERING_INTERVAL_MS = 50;
+
+export async function allowMicrophone(): Promise<boolean> {
+  const permission = await requestRecordingPermissionsAsync();
+  if (!permission.granted)
+    Alert.alert(
+      'Korev cannot use the microphone',
+      'Allow microphone access for Korev in Settings to use voice input.',
+    );
+  return permission.granted;
+}
 
 export type DictationPhase = 'idle' | 'recording' | 'transcribing';
 
@@ -31,14 +41,7 @@ export function useDictation(onText: (text: string) => void) {
   const [locked, setLocked] = useState(false);
 
   async function start() {
-    const permission = await requestRecordingPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(
-        'Korev cannot use the microphone',
-        'Allow microphone access for Korev in Settings to use voice input.',
-      );
-      return;
-    }
+    if (!(await allowMicrophone())) return;
     void api.prepareDictation().catch(() => undefined);
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
     await recorder.prepareToRecordAsync();

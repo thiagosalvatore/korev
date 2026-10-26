@@ -20,6 +20,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import type { KorevApi } from '../../korev-desktop/src/shared/api';
 import type { DictationStatus } from '../../korev-desktop/src/shared/model';
 import { attempt } from './attempt';
 import type { Dictation } from './dictation';
@@ -53,6 +54,17 @@ function formatElapsed(ms: number): string {
   return `${Math.floor(seconds / SECONDS_PER_MINUTE)}:${rest}`;
 }
 
+export async function downloadVoiceModel(api: KorevApi) {
+  const started = await attempt('Korev could not start the download', () =>
+    api.prepareDictation(),
+  );
+  if (started)
+    Alert.alert(
+      'Downloading the voice model',
+      'Your Mac is downloading the voice model (550 MB). Voice input works when it finishes.',
+    );
+}
+
 export function MicButton({
   status,
   dictation,
@@ -63,17 +75,6 @@ export function MicButton({
   const { api } = useConnection();
   const theme = useTheme();
   const styles = makeStyles(theme);
-
-  async function downloadModel() {
-    const started = await attempt('Korev could not start the download', () =>
-      api.prepareDictation(),
-    );
-    if (started)
-      Alert.alert(
-        'Downloading the voice model',
-        'Your Mac is downloading the voice model (550 MB). Voice input works when it finishes.',
-      );
-  }
 
   if (!status) return null;
   if (status.status === 'downloading')
@@ -94,7 +95,7 @@ export function MicButton({
         label="Voice input"
         icon={<Mic size={ICON_SIZE} color={theme.fg2} />}
         background={theme.bgActive}
-        onPress={() => void downloadModel()}
+        onPress={() => void downloadVoiceModel(api)}
       />
     );
   if (dictation.locked)
