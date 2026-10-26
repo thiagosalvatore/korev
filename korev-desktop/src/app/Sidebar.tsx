@@ -58,6 +58,7 @@ import {
   WORKSPACE_DRAG_TYPE,
 } from './dnd';
 import { focusedGridPane, paneAskChatId, paneWorkspaceId } from './grid';
+import { HandsFreeButton } from './HandsFree';
 import { DRAG_REGION, NO_DRAG } from './layout';
 import { RemoteDevices } from './RemoteDevices';
 import { Menu, type MenuItem } from './ui/Menu';
@@ -1205,6 +1206,7 @@ export function Sidebar({ state }: { state: AppState }) {
           DRAG_REGION,
         )}
       >
+        <HandsFreeButton />
         <IconButton
           icon="panel-left"
           label="Hide sidebar"

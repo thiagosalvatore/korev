@@ -289,6 +289,7 @@ export type QuitChoice = 'quit' | 'wait' | 'cancel';
 
 export interface DesktopApi {
   chooseQuit(choice: QuitChoice): void;
+  setHandsFree(on: boolean): void;
 }
 
 export interface Toast {

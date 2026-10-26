@@ -3,11 +3,11 @@ import { api } from '../bridge';
 import { toast } from '../ui/toast';
 import { readAsBase64 } from './attachments';
 
-const RECORDING_TYPE = 'audio/mp4;codecs=mp4a.40.2';
+export const RECORDING_TYPE = 'audio/mp4;codecs=mp4a.40.2';
 
 export type DictationPhase = 'idle' | 'recording' | 'transcribing';
 
-function failed(error: unknown) {
+export function failed(error: unknown) {
   toast(error instanceof Error ? error.message : String(error), 'danger');
 }
 

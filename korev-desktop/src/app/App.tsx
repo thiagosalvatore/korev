@@ -11,6 +11,7 @@ import { CommandPalette } from './CommandPalette';
 import { PrPickerDialog } from './PrPickerDialog';
 import { paneCount, paneWorkspaceId } from './grid';
 import { GridView } from './GridView';
+import { HandsFree } from './HandsFree';
 import { useAppState, useMediaQuery } from './hooks';
 import { DRAG_REGION } from './layout';
 import { NewWorkspacePage } from './NewWorkspacePage';
@@ -124,6 +125,7 @@ export function App() {
     <>
       {state.repos.length ? <Shell state={state} /> : <Welcome state={state} />}
       <ReleaseNotesDialog state={state} />
+      <HandsFree status={state.dictation} />
       <QuitDialog state={state} />
       <Toaster>
         <QuitPending state={state} />

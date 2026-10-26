@@ -4,8 +4,8 @@ import type { DictationPhase } from './dictation';
 import { isDictationShortcut } from './DictationButton';
 
 const BAR_COUNT = 160;
-const SAMPLE_MS = 50;
-const ANALYSER_SIZE = 1024;
+export const SAMPLE_MS = 50;
+export const ANALYSER_SIZE = 1024;
 const LEVEL_GAIN = 1.8;
 const MIN_BAR_HEIGHT = 0.08;
 const SECONDS_PER_MINUTE = 60;
@@ -13,7 +13,7 @@ const MS_PER_SECOND = 1000;
 
 const SILENCE: number[] = Array.from({ length: BAR_COUNT }, () => 0);
 
-function loudness(samples: Float32Array): number {
+export function loudness(samples: Float32Array): number {
   const power =
     samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length;
   return Math.min(1, Math.sqrt(Math.sqrt(power)) * LEVEL_GAIN);

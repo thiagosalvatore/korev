@@ -910,6 +910,7 @@ const SHORTCUTS: [string, string][] = [
   ['⇧Tab', 'Toggle plan mode'],
   ['⌘⇧E', 'Toggle fast mode'],
   ['⌘⇧S', 'Start or stop voice input'],
+  ['⌘⇧H', 'Turn hands-free mode on or off'],
   ['⌘⇧/', 'Cycle effort level'],
   ['⌃⌘1–5', 'Pick a loadout model'],
   ['⌘;', 'Insert snippet'],

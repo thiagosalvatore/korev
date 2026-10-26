@@ -89,6 +89,8 @@ const WORKSPACE_ENTRIES: (CommandEntry | null)[] = [
 const CHAT_ENTRIES: (CommandEntry | null)[] = [
   ['Focus Chat Input', 'CmdOrCtrl+L', 'focus-composer'],
   ['Cancel Agent', 'CmdOrCtrl+Shift+Backspace', 'cancel-agent'],
+  null,
+  ['Toggle Hands-Free Mode', 'CmdOrCtrl+Shift+H', 'toggle-hands-free'],
 ];
 
 function developmentItems(

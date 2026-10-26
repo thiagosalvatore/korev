@@ -42,6 +42,10 @@ export function selectWorkspace(workspaceId: string) {
   void api.focusWorkspaces([workspaceId]);
 }
 
+export function toggleHandsFree() {
+  setUi((ui) => ({ handsFree: !ui.handsFree }));
+}
+
 export const NEW_WORKSPACE_DRAFT_KEY = 'new-workspace';
 
 export function openNewWorkspace(repoId: string | null) {

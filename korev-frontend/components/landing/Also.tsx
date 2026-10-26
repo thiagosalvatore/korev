@@ -1,5 +1,6 @@
 import {
   Archive,
+  AudioLines,
   CalendarClock,
   FileCog,
   GitPullRequest,
@@ -41,6 +42,11 @@ const FEATURES: [LucideIcon, string, string][] = [
     CalendarClock,
     'Automations',
     'Run a prompt on a schedule, such as a check of your support tickets every 10 minutes on weekdays, and open a workspace for each new piece of work it finds.',
+  ],
+  [
+    AudioLines,
+    'Hands-free mode',
+    'Say "Korev, create a workspace to plan the login page" and it happens. Korev reads out questions and plans, and you answer by voice.',
   ],
   [
     Smartphone,

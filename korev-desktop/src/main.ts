@@ -198,14 +198,29 @@ function playSound() {
 }
 
 let sleepBlocker: number | null = null;
+const awakeReasons = { agentsRunning: false, handsFree: false };
 
-function keepAwake(on: boolean) {
+function applySleepBlocker() {
+  const on = awakeReasons.agentsRunning || awakeReasons.handsFree;
   if (on && sleepBlocker === null) {
     sleepBlocker = powerSaveBlocker.start('prevent-app-suspension');
   }
   if (!on && sleepBlocker !== null) {
     powerSaveBlocker.stop(sleepBlocker);
     sleepBlocker = null;
+  }
+}
+
+function keepAwake(on: boolean) {
+  awakeReasons.agentsRunning = on;
+  applySleepBlocker();
+}
+
+function setHandsFree(on: boolean) {
+  awakeReasons.handsFree = on;
+  applySleepBlocker();
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.setBackgroundThrottling(!on);
   }
 }
 
@@ -455,7 +470,7 @@ app.whenReady().then(async () => {
     quit: () => app.quit(),
   });
   quitGate = gate;
-  const desktopApi: DesktopApi = { chooseQuit: gate.choose };
+  const desktopApi: DesktopApi = { chooseQuit: gate.choose, setHandsFree };
   registerIpcHandlers(ipcMain, { ...korev.api, ...desktopApi }, (url) =>
     isAppUrl(url, appOrigin),
   );

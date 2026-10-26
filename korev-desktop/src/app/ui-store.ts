@@ -114,6 +114,7 @@ export interface UiState {
   diffLayout: DiffLayout;
   updateOpen: boolean;
   quit: QuitPrompt;
+  handsFree: boolean;
 }
 
 const STORAGE_KEY = 'korev:ui';
@@ -142,6 +143,7 @@ const INITIAL: UiState = {
   diffLayout: 'unified',
   updateOpen: false,
   quit: 'closed',
+  handsFree: false,
 };
 
 export const EMPTY_WORKSPACE_UI: WorkspaceUi = {
@@ -174,6 +176,7 @@ function load(): UiState {
       prPicker: null,
       updateOpen: false,
       quit: 'closed',
+      handsFree: false,
     };
   } catch {
     return INITIAL;

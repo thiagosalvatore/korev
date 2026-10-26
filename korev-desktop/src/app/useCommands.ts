@@ -27,6 +27,7 @@ import {
   selectWorkspace,
   toggleBoard,
   toggleGrid,
+  toggleHandsFree,
   toggleRunScript,
 } from './actions';
 import { api, on } from './bridge';
@@ -106,6 +107,8 @@ export function runCommand(state: AppState, command: AppCommand) {
       return toggleGrid();
     case 'toggle-board':
       return toggleBoard();
+    case 'toggle-hands-free':
+      return toggleHandsFree();
     case 'toggle-theme':
       return void api.updateSettings({
         theme: THEME_CYCLE[state.settings.theme],

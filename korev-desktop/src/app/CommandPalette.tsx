@@ -18,6 +18,7 @@ import {
   openSettings,
   restoreWorkspace,
   selectWorkspace,
+  toggleHandsFree,
 } from './actions';
 import { fuzzyRank } from './fuzzy';
 import { api } from './bridge';
@@ -114,6 +115,14 @@ function paletteItems(
       icon: 'network',
       section: 'Actions',
       run: openRuns,
+    },
+    {
+      id: 'hands-free',
+      label: 'Hands-free mode',
+      icon: 'audio-lines',
+      hint: '⌘⇧H',
+      section: 'Actions',
+      run: toggleHandsFree,
     },
     ...(current
       ? [

@@ -1,0 +1,50 @@
+---
+title: Hands-free mode
+description: 'Talk to Korev and hear when an agent needs you, without the keyboard.'
+---
+
+In hands-free mode, Korev listens to the microphone all the time. Start a sentence with "Korev" and Korev does what you say, then answers out loud. When an agent asks a question, has a plan ready, wants to run a tool, or finishes, Korev says so. You can keep playing a game or cooking while your agents work.
+
+## Turn it on
+
+1. Do one of these:
+   - Press ⌘⇧H.
+   - Click the microphone at the top of the sidebar.
+   - Open the command palette (⌘K) and pick **Hands-free mode**.
+   - Pick **Chat → Toggle Hands-Free Mode** in the menu bar.
+2. The first time, Korev asks to download the voice model of 550 MB. Hands-free mode starts when the download finishes. If you already use [voice input](../reference/composer.mdx#voice-input), the model is already there.
+3. Allow Korev to use the microphone if macOS asks.
+
+While Korev listens, the sidebar button shows a sound wave. Do the same thing again to turn it off. Korev always starts with hands-free mode off.
+
+## Talk to it
+
+Start each sentence with "Korev". Korev ignores everything else, such as game audio or people in the room. For example:
+
+- "Korev, create a new workspace on the acme-web repo to plan a login page."
+- "Korev, option two."
+- "Korev, approve the plan."
+- "Korev, open billing."
+- "Korev, what did billing say?"
+- "Korev, stop."
+
+You can also say only "Korev" and wait for the chime. Then say the command, without "Korev", within 8 seconds.
+
+When you do not say which workspace, Korev uses the last one it told you about, or the last one you opened. So after "login asks: Which database?", "Korev, option two" answers that question.
+
+Korev changes what is on screen only when you ask, such as with "Korev, open billing".
+
+## What Korev says
+
+- A question, with its options: "login asks: Which database? Option 1, Postgres. Option 2, SQLite."
+- A plan that is ready, a tool that waits for your approval, and a turn that finished or failed.
+- The answer to each command.
+
+Korev does not listen while it speaks, so it does not hear itself.
+
+## Limits
+
+- Korev understands each sentence with a quick call to Claude Haiku, so hands-free mode needs the `claude` CLI, even when your agent is Codex. It takes about 2 to 4 seconds from the end of your sentence to the action.
+- You cannot interrupt Korev while it speaks.
+- You cannot archive, merge or delete by voice.
+- While hands-free mode is on, your Mac does not go to sleep.

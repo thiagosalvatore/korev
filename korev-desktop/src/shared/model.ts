@@ -1117,6 +1117,7 @@ export type AppCommand =
   | 'toggle-zen'
   | 'toggle-grid'
   | 'toggle-board'
+  | 'toggle-hands-free'
   | 'quick-open'
   | 'search-files'
   | 'confirm-quit'
