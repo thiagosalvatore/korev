@@ -322,6 +322,7 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
       title: RUN_PAUSED_TITLE,
       body: `${workspaceLabel(coordinator)} reached ${MAX_WAKES_PER_RUN} messages. Resume the run to keep going.`,
       workspaceId: coordinator.id,
+      sessionId: run.coordinatorSessionId,
     });
   }
 
@@ -716,6 +717,7 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
         title: DECISION_NEEDED_TITLE,
         body: gate.question,
         workspaceId: run.coordinatorWorkspaceId,
+        sessionId: run.coordinatorSessionId,
       });
       return done(
         `Created ${gate.id}. ${task.id} is blocked until the user picks an option in Korev. End your turn: the choice arrives as a message.`,

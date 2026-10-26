@@ -37,7 +37,7 @@ function pushMessage(token: string, notice: Notice) {
     to: token,
     title: notice.title,
     body: notice.body,
-    data: { workspaceId: notice.workspaceId },
+    data: { workspaceId: notice.workspaceId, sessionId: notice.sessionId },
     sound: 'default',
     priority: 'high',
   };

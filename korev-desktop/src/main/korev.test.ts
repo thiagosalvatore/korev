@@ -861,6 +861,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       title: 'Agent finished',
       body: workspace.name,
       workspaceId: workspace.id,
+      sessionId: workspace.sessions[0].id,
     });
   });
 

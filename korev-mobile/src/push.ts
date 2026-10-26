@@ -49,10 +49,15 @@ export async function unregisterFromPush(
 export function useOpenTappedWorkspace() {
   const response = Notifications.useLastNotificationResponse();
   useEffect(() => {
-    const workspaceId =
-      response?.notification.request.content.data?.workspaceId;
+    const data = response?.notification.request.content.data;
+    const workspaceId = data?.workspaceId;
     if (typeof workspaceId !== 'string') return;
     Notifications.clearLastNotificationResponse();
-    router.push({ pathname: '/workspace/[id]', params: { id: workspaceId } });
+    const sessionId =
+      typeof data?.sessionId === 'string' ? data.sessionId : undefined;
+    router.push({
+      pathname: '/workspace/[id]',
+      params: sessionId ? { id: workspaceId, sessionId } : { id: workspaceId },
+    });
   }, [response]);
 }

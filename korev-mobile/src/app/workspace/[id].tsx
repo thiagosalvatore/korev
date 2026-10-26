@@ -144,10 +144,13 @@ function SessionTabs({
 }
 
 export default function WorkspaceScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, sessionId } = useLocalSearchParams<{
+    id: string;
+    sessionId?: string;
+  }>();
   const state = useAppState();
   const styles = makeStyles(useTheme());
-  const [selectedId, setSelectedId] = useState<string>();
+  const [selectedId, setSelectedId] = useState(sessionId);
   const workspace = state?.workspaces.find((entry) => entry.id === id);
   const runtime = workspace && state?.runtime[workspace.id];
   const archiving = !!workspace?.archivedAt || runtime?.status === 'archiving';

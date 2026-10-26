@@ -16,6 +16,7 @@ export interface Notice {
   title: string;
   body: string;
   workspaceId: string;
+  sessionId?: string;
 }
 
 export interface CoreDeps {

@@ -8,6 +8,7 @@ const NOTICE = {
   title: 'api ✨ needs your input',
   body: 'Fix the flaky test',
   workspaceId: 'w1',
+  sessionId: 's1',
 };
 
 describe('phone notifications', () => {
@@ -56,7 +57,7 @@ describe('push notifications', () => {
           to,
           title: NOTICE.title,
           body: NOTICE.body,
-          data: { workspaceId: 'w1' },
+          data: { workspaceId: 'w1', sessionId: 's1' },
         }),
       ),
     );

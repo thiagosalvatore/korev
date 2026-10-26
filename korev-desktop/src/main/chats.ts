@@ -415,6 +415,7 @@ export function createChats(
 
   function alertUser(
     owner: Owner,
+    sessionId: string,
     title: string,
     body: string,
     attention: Attention,
@@ -425,7 +426,7 @@ export function createChats(
     if (!isWatching(workspace) && ctx.store.state.settings.notificationSound)
       ctx.deps.playSound();
     if (!ctx.deps.isWindowFocused())
-      ctx.deps.notify({ title, body, workspaceId: workspace.id });
+      ctx.deps.notify({ title, body, workspaceId: workspace.id, sessionId });
   }
 
   function expirePermissions(
@@ -466,6 +467,7 @@ export function createChats(
     const failure = last?.kind === 'result' && !last.ok ? last.text : null;
     alertUser(
       { kind: 'workspace', workspace },
+      session.id,
       failure ? AGENT_FAILED_TITLE : AGENT_FINISHED_TITLE,
       failure
         ? `${workspaceLabel(workspace)}: ${failure}`
@@ -650,7 +652,7 @@ export function createChats(
       turn.owner.kind === 'workspace'
         ? workspaceLabel(turn.owner.workspace)
         : 'Ask';
-    alertUser(turn.owner, AGENT_NEEDS_INPUT_TITLE, name, {
+    alertUser(turn.owner, session.id, AGENT_NEEDS_INPUT_TITLE, name, {
       kind: 'permission',
       item,
     });
