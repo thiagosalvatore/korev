@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -11,6 +10,7 @@ import {
 import {
   hasWorktree,
   type AppState,
+  type ChatSession,
   type Workspace,
 } from '../../../../korev-desktop/src/shared/model';
 import {
@@ -26,14 +26,16 @@ import { RunDecisions } from '../../chat/RunDecisions';
 import { useAppState, usePendingAction } from '../../hooks';
 import { Loading } from '../../Offline';
 import { useConnection } from '../../korev';
+import { PickerButton, type PickerOption } from '../../PickerSheet';
 import { PrBar } from '../../PrBar';
 import { useTheme, type Theme } from '../../theme';
-import { CHROME_FONT_SCALE, touchSlop } from '../../ui';
+import { CHROME_FONT_SCALE, MIN_TOUCH_TARGET, touchSlop } from '../../ui';
 import { WorktreePending } from '../../WorktreePending';
 
 type Styles = ReturnType<typeof makeStyles>;
 
-const TAB_HEIGHT = 32;
+const NEW_CHAT_HEIGHT = 32;
+const NEEDS_YOU = 'Needs you';
 
 function waitingSessionIds(state: AppState): ReadonlySet<string> {
   return new Set(state.waitingSessions ?? []);
@@ -61,16 +63,16 @@ function waitingHint(state: AppState, workspace: Workspace) {
   return `This workspace's agent starts when you approve the plan in ${groupRepoName(state, lead)}.`;
 }
 
-function SessionTabs({
+function SessionBar({
   state,
   workspace,
-  selectedId,
+  selected,
   onSelect,
   styles,
 }: {
   state: AppState;
   workspace: Workspace;
-  selectedId: string | undefined;
+  selected: ChatSession | undefined;
   onSelect: (sessionId: string) => void;
   styles: Styles;
 }) {
@@ -79,6 +81,24 @@ function SessionTabs({
   const { pending, run } = usePendingAction();
   const creating = pending !== null;
   const waiting = waitingSessionIds(state);
+  const otherChatWaits = workspace.sessions.some(
+    (session) => session.id !== selected?.id && waiting.has(session.id),
+  );
+
+  function sessionIcon(sessionId: string) {
+    if (state.runningSessions.includes(sessionId))
+      return <ActivityIndicator size="small" color={theme.accentText} />;
+    if (waiting.has(sessionId)) return <View style={styles.waitingDot} />;
+    return undefined;
+  }
+
+  const options: PickerOption[] = workspace.sessions.map((session) => ({
+    key: session.id,
+    label: session.title,
+    detail: waiting.has(session.id) ? NEEDS_YOU : undefined,
+    icon: sessionIcon(session.id),
+    selected: session.id === selected?.id,
+  }));
 
   async function newChat() {
     const session = await api.newSession(
@@ -89,43 +109,28 @@ function SessionTabs({
   }
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.tabsBar}
-      contentContainerStyle={styles.tabs}
-    >
-      {workspace.sessions.map((session) => (
-        <Pressable
-          key={session.id}
-          accessibilityRole="tab"
-          hitSlop={touchSlop(TAB_HEIGHT)}
-          accessibilityState={{ selected: session.id === selectedId }}
-          accessibilityHint={
-            waiting.has(session.id) ? 'Needs your input' : undefined
-          }
-          style={[styles.tab, session.id === selectedId && styles.tabSelected]}
-          onPress={() => onSelect(session.id)}
-        >
-          {state.runningSessions.includes(session.id) ? (
-            <ActivityIndicator size="small" color={theme.accentText} />
-          ) : null}
-          {waiting.has(session.id) ? <View style={styles.waitingDot} /> : null}
-          <Text
-            maxFontSizeMultiplier={CHROME_FONT_SCALE}
-            style={styles.tabText}
-            numberOfLines={1}
-          >
-            {session.title}
-          </Text>
-        </Pressable>
-      ))}
+    <View style={styles.sessionBar}>
+      {selected ? (
+        <PickerButton
+          label="Chats"
+          value={selected.title}
+          title="Chats"
+          options={options}
+          onSelect={onSelect}
+        />
+      ) : null}
+      {otherChatWaits ? (
+        <View
+          accessibilityLabel="Another chat needs you"
+          style={styles.waitingDot}
+        />
+      ) : null}
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ busy: creating }}
         disabled={creating}
-        hitSlop={touchSlop(TAB_HEIGHT)}
-        style={styles.tab}
+        hitSlop={touchSlop(NEW_CHAT_HEIGHT)}
+        style={styles.newChat}
         onPress={() =>
           void run('new-chat', () =>
             attempt('Korev could not start a chat', newChat),
@@ -135,11 +140,14 @@ function SessionTabs({
         {creating ? (
           <ActivityIndicator size="small" color={theme.accentText} />
         ) : null}
-        <Text maxFontSizeMultiplier={CHROME_FONT_SCALE} style={styles.tabText}>
+        <Text
+          maxFontSizeMultiplier={CHROME_FONT_SCALE}
+          style={styles.newChatText}
+        >
           + New chat
         </Text>
       </Pressable>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -183,10 +191,10 @@ export default function WorkspaceScreen() {
         onExplained={setSelectedId}
       />
       {coordinatedRun ? <RunDecisions run={coordinatedRun} /> : null}
-      <SessionTabs
+      <SessionBar
         state={state}
         workspace={workspace}
-        selectedId={session?.id}
+        selected={session}
         onSelect={setSelectedId}
         styles={styles}
       />
@@ -211,24 +219,25 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
     fill: { flex: 1 },
     empty: { padding: 24, color: theme.fg3, textAlign: 'center' },
-    tabsBar: {
-      flexGrow: 0,
+    sessionBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      minHeight: MIN_TOUCH_TARGET,
+      paddingHorizontal: 16,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: theme.border1,
     },
-    tabs: { paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
-    tab: {
+    newChat: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      minHeight: TAB_HEIGHT,
-      maxWidth: 180,
+      minHeight: NEW_CHAT_HEIGHT,
+      marginLeft: 'auto',
       paddingHorizontal: 10,
-      paddingVertical: 6,
       borderRadius: 6,
     },
-    tabSelected: { backgroundColor: theme.bgActive },
-    tabText: { flexShrink: 1, color: theme.fg2, fontSize: 13 },
+    newChatText: { color: theme.fg2, fontSize: 13 },
     waitingDot: {
       width: 7,
       height: 7,
