@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import {
   Archive,
   ChevronDown,
@@ -48,13 +47,14 @@ import {
   workspaceLabel,
 } from '../../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../../attempt';
+import { HandsFreeToggle } from '../../HandsFree';
 import { succeeded } from '../../haptics';
 import { useAppState, useReconnect } from '../../hooks';
 import { useConnection } from '../../korev';
 import { ListRow, ROW_ICON_SIZE } from '../../ListRow';
 import { lifted } from '../../haptics';
 import { Loading } from '../../Offline';
-import { openNewWorkspace } from '../../navigation';
+import { openNewWorkspace, openWorkspace } from '../../navigation';
 import { RepoAvatar } from '../../RepoAvatar';
 import { ReorderList } from '../../ReorderList';
 import { MONO_FONT, useTheme, type Theme } from '../../theme';
@@ -235,12 +235,7 @@ function WorkspaceRow({
             {runtime?.unread ? <View style={styles.dot} /> : null}
           </>
         }
-        onPress={() =>
-          router.push({
-            pathname: '/workspace/[id]',
-            params: { id: workspace.id },
-          })
-        }
+        onPress={() => openWorkspace(workspace.id)}
       />
     </ReanimatedSwipeable>
   );
@@ -450,6 +445,7 @@ export default function WorkspacesScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={refresh} />
       }
     >
+      <HandsFreeToggle dictation={state.dictation} />
       {reordering ? (
         <ReorderList
           state={state}

@@ -90,6 +90,18 @@ Tap the microphone next to **Send** to speak instead of typing. This also works 
 
 The phone app cannot attach files yet, and opening a workspace on the phone does not mark it as read on the Mac.
 
+## Hands-free
+
+Talk to Korev without touching the phone. Turn on **Hands-free** at the top of the **Workspaces** tab. The line under the toggle shows what Korev does: it listens, works on what you said, or speaks.
+
+Start each sentence with "Korev", for example "Korev, create a new workspace on the korev repo to plan login". You can also say "Korev", wait for Korev to say "Yes?", and then say the command. Korev can start a workspace, answer a question or a plan, approve or deny a tool request, stop an agent, open a workspace, and tell you what an agent said. Korev ignores sentences that do not start with "Korev".
+
+Korev says out loud when an agent asks a question, has a plan ready, asks to use a tool, finishes, or fails. Then answer by voice, for example "Korev, approve the plan".
+
+- Hands-free works only while the app is open and in front. The screen stays on. When you switch to another app or lock the phone, Korev stops listening, and it starts again when you come back.
+- The Mac needs the voice model and the `claude` CLI. If the model is missing, the toggle offers to download it. Korev uses Claude Haiku to understand the command, also when your default agent is Codex.
+- The phone does not listen while it speaks, so you cannot interrupt it.
+
 ## Pull request
 
 The bar at the top of a workspace shows its pull request and the next step, the same as the button in the Korev workspace header:

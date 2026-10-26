@@ -11,3 +11,7 @@ export function openNewAsk() {
 export function openExplainPullRequest() {
   router.push('/ask/explain');
 }
+
+export function openWorkspace(id: string) {
+  router.push({ pathname: '/workspace/[id]', params: { id } });
+}
