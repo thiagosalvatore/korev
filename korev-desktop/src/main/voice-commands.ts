@@ -10,16 +10,11 @@ import {
   type VoiceReply,
   type Workspace,
 } from '../shared/model';
+import { stripWakeWord } from '../shared/voice';
 import { workspaceLabel } from '../shared/workspaces';
 import type { Context } from './context';
 import { askQuickModel, defaultTask } from './workspaces';
 
-const WAKE_WORDS = ['korev', 'corev', 'koref', 'carev', 'core of', 'core v'];
-const GREETINGS = ['hey', 'ok', 'okay'];
-const WAKE_WORD = new RegExp(
-  `^\\W*(?:(?:${GREETINGS.join('|')})\\W+)?(?:${WAKE_WORDS.map((word) => word.replace(' ', '\\W+')).join('|')})\\b\\W*`,
-  'i',
-);
 const PLAN_CHARS = 4_000;
 const MESSAGE_CHARS = 1_500;
 const SILENT: VoiceReply = { reply: '' };
@@ -112,11 +107,6 @@ export interface VoiceActions {
   ): Promise<Result>;
   approvePlan(sessionId: string, lanes: PlanLane[]): Promise<Result>;
   stop(sessionId: string): Promise<void>;
-}
-
-export function stripWakeWord(spoken: string): string | null {
-  const wake = WAKE_WORD.exec(spoken);
-  return wake ? spoken.slice(wake[0].length).trim() : null;
 }
 
 function spokenQuestion(question: AgentQuestion): string {

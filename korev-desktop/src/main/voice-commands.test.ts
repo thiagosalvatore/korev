@@ -6,7 +6,6 @@ import { defaultSettings } from './store';
 import {
   announcement,
   createVoiceCommands,
-  stripWakeWord,
   type VoiceCommand,
 } from './voice-commands';
 
@@ -119,21 +118,6 @@ function setup(transcripts: Record<string, ChatItem[]> = {}) {
     run.mockResolvedValueOnce(haikuSays(command));
   return { voice, actions, run, emit, reply };
 }
-
-describe('stripWakeWord', () => {
-  it.each([
-    ['Korev, open login', 'open login'],
-    ['Hey Corev create a workspace', 'create a workspace'],
-    ['Core of. What is waiting?', 'What is waiting?'],
-    ['korev', ''],
-  ])('finds the wake word in %j', (spoken, command) => {
-    expect(stripWakeWord(spoken)).toBe(command);
-  });
-
-  it('ignores a sentence that does not start with the wake word', () => {
-    expect(stripWakeWord('Thanks for watching, see you next time')).toBe(null);
-  });
-});
 
 describe('announcement', () => {
   it('reads a question with numbered options', () => {

@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### Fixed
+
+- Hands-free mode now hears "Korev" in more accents. Before, Korev often ignored a sentence because it wrote the name as "Koriv", "Corevi" or "Core F".
+
 ## [0.22.0] - 2026-10-26
 
 Turn on hands-free mode with ⌘⇧H to talk to Korev and hear when an agent needs you.
