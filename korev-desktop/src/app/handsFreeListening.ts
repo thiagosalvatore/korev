@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import type { ListeningPhase } from '../shared/model';
+import { stripWakeWord } from '../shared/voice';
 import { selectWorkspace } from './actions';
 import { api, on } from './bridge';
 import { readAsBase64 } from './chat/attachments';
@@ -65,8 +67,21 @@ function listen(microphone: MediaStream): () => void {
   let handling = false;
   let speaking = 0;
   let awakeUntil = 0;
+  let sentenceAwake = false;
+  let phase: ListeningPhase = 'hidden';
   let stopped = false;
   const utterances = new Set<SpeechSynthesisUtterance>();
+
+  function show(next: ListeningPhase, level = 0) {
+    if (next === phase && next !== 'listening') return;
+    phase = next;
+    void api.showListening({ phase: next, level });
+  }
+
+  function settle() {
+    if (speaking > 0 || handling) return;
+    show(Date.now() < awakeUntil ? 'listening' : 'hidden');
+  }
 
   function record() {
     if (stopped || handling || speaking > 0 || recorder) return;
@@ -74,6 +89,7 @@ function listen(microphone: MediaStream): () => void {
     chunks = [];
     media.ondataavailable = (event) => chunks.push(event.data);
     sentence = { startedAt: Date.now(), lastSpeechAt: null };
+    sentenceAwake = false;
     media.start();
     recorder = media;
   }
@@ -90,11 +106,13 @@ function listen(microphone: MediaStream): () => void {
   function say(text: string): Promise<void> {
     speaking += 1;
     stopRecording(() => undefined);
+    show('speaking');
     return new Promise((resolve) => {
       const utterance = new SpeechSynthesisUtterance(text);
       const done = () => {
         utterances.delete(utterance);
         speaking -= 1;
+        settle();
         record();
         resolve();
       };
@@ -105,11 +123,11 @@ function listen(microphone: MediaStream): () => void {
     });
   }
 
-  async function runSentence(recording: Blob) {
+  async function runSentence(recording: Blob, awake: boolean) {
     const spoken = await api.transcribe(await readAsBase64(recording));
     if (!spoken) return;
-    const awake = Date.now() < awakeUntil;
-    awakeUntil = 0;
+    if (!awake && stripWakeWord(spoken) === null) return;
+    show('thinking');
     const answer = await api.runVoiceCommand(spoken, { awake });
     if (answer.listening) {
       playChime(context);
@@ -119,24 +137,37 @@ function listen(microphone: MediaStream): () => void {
     if (answer.reply) await say(answer.reply);
   }
 
-  function handle(recording: Blob) {
-    runSentence(recording)
+  function handle(recording: Blob, awake: boolean) {
+    runSentence(recording, awake)
       .catch(failed)
       .finally(() => {
         handling = false;
+        settle();
         record();
       });
+  }
+
+  function noticeFirstSpeech(now: number) {
+    sentenceAwake = now < awakeUntil;
+    if (sentenceAwake) awakeUntil = 0;
   }
 
   function sample() {
     if (!recorder) return;
     analyser.getFloatTimeDomainData(samples);
-    const step = listenStep(sentence, loudness(samples), Date.now());
+    const level = loudness(samples);
+    const now = Date.now();
+    const wasQuiet = sentence.lastSpeechAt === null;
+    const step = listenStep(sentence, level, now);
     sentence = step.sentence;
+    if (wasQuiet && sentence.lastSpeechAt !== null) noticeFirstSpeech(now);
+    const awaitingCommand = sentenceAwake || now < awakeUntil;
+    show(awaitingCommand ? 'listening' : 'hidden', level);
     if (step.action === 'drop') stopRecording(record);
     if (step.action !== 'send') return;
     handling = true;
-    stopRecording(handle);
+    const awake = sentenceAwake;
+    stopRecording((recording) => handle(recording, awake));
   }
 
   const timer = setInterval(sample, SAMPLE_MS);
@@ -145,6 +176,7 @@ function listen(microphone: MediaStream): () => void {
 
   return () => {
     stopped = true;
+    show('hidden');
     clearInterval(timer);
     stopAnnouncing();
     stopRecording(() => undefined);

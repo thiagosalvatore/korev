@@ -4,9 +4,14 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Listening wave.** In hands-free mode, a colored wave shows at the bottom of the screen, over every app, when Korev hears "Korev". It moves while Korev thinks, while it waits for your command, and while it speaks.
+
 ### Fixed
 
 - Hands-free mode now hears "Korev" in more accents. Before, Korev often ignored a sentence because it wrote the name as "Koriv", "Corevi" or "Core F".
+- After you say "Korev" and hear the chime, Korev no longer ignores a command that you start within 8 seconds but finish later.
 
 ## [0.22.0] - 2026-10-26
 

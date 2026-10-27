@@ -783,6 +783,13 @@ export interface Announcement {
   text: string;
 }
 
+export type ListeningPhase = 'hidden' | 'listening' | 'thinking' | 'speaking';
+
+export interface ListeningState {
+  phase: ListeningPhase;
+  level: number;
+}
+
 export const PLAN_TOOL = 'ExitPlanMode';
 export const QUESTION_TOOL = 'AskUserQuestion';
 

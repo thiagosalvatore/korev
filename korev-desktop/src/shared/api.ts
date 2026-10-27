@@ -14,6 +14,7 @@ import type {
   FileChange,
   FileContents,
   IssueSummary,
+  ListeningState,
   PermissionResponse,
   PlanLane,
   PullRequestSummary,
@@ -290,6 +291,7 @@ export type QuitChoice = 'quit' | 'wait' | 'cancel';
 export interface DesktopApi {
   chooseQuit(choice: QuitChoice): void;
   setHandsFree(on: boolean): void;
+  showListening(state: ListeningState): void;
 }
 
 export interface Toast {
@@ -306,6 +308,7 @@ export interface KorevEvents {
   'focus-workspace': string;
   toast: Toast;
   announce: Announcement;
+  listening: ListeningState;
 }
 
 export type Unsubscribe = () => void;

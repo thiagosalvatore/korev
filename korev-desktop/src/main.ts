@@ -47,6 +47,7 @@ import {
   type Release,
 } from './main/updates';
 import { tailnetStarter } from './main/tailnet';
+import { createListeningWindow } from './main/listening-window';
 import { loadWhisper } from './main/whisper';
 import { restorableBounds } from './main/window-bounds';
 
@@ -93,6 +94,32 @@ useSeparateDevData();
 
 let korevApp: Korev | null = null;
 let quitGate: QuitGate | null = null;
+
+const PRELOAD_PATH = path.join(__dirname, 'preload.cjs');
+
+function loadRenderer(window: BrowserWindow, hash?: string) {
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    const url = new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    if (hash) url.hash = hash;
+    void window.loadURL(url.toString());
+    return;
+  }
+  void window.loadFile(
+    path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
+    { hash },
+  );
+}
+
+const listeningWindow = createListeningWindow({
+  preload: PRELOAD_PATH,
+  load: loadRenderer,
+});
+
+function mainWindow(): BrowserWindow | undefined {
+  return BrowserWindow.getAllWindows().find(
+    (window) => !listeningWindow.owns(window),
+  );
+}
 
 function korevCliDir(): string {
   return app.isPackaged
@@ -169,7 +196,7 @@ function showNotice(korev: () => Korev | null, notice: Notice) {
   notification.on('close', () => shownNotices.delete(notification));
   notification.on('click', () => {
     shownNotices.delete(notification);
-    const [window] = BrowserWindow.getAllWindows();
+    const window = mainWindow();
     if (!window) return;
     if (window.isMinimized()) window.restore();
     window.show();
@@ -222,6 +249,8 @@ function setHandsFree(on: boolean) {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.setBackgroundThrottling(!on);
   }
+  if (on) listeningWindow.open();
+  else listeningWindow.close();
 }
 
 async function chooseDirectory(): Promise<string | null> {
@@ -366,7 +395,7 @@ function askQuitNatively(running: number): QuitChoice {
 }
 
 function askQuit(running: number, gate: QuitGate) {
-  const [window] = BrowserWindow.getAllWindows();
+  const window = mainWindow();
   if (!window) {
     setImmediate(() => gate.choose(askQuitNatively(running)));
     return;
@@ -433,7 +462,7 @@ const createWindow = (korev: Korev) => {
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: TRAFFIC_LIGHT_POSITION,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      preload: PRELOAD_PATH,
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
@@ -441,14 +470,8 @@ const createWindow = (korev: Korev) => {
     },
   });
   rememberBounds(mainWindow, korev);
-
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-  } else {
-    mainWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );
-  }
+  mainWindow.on('closed', () => setHandsFree(false));
+  loadRenderer(mainWindow);
 };
 
 app.on('web-contents-created', (_event, contents) =>
@@ -470,7 +493,11 @@ app.whenReady().then(async () => {
     quit: () => app.quit(),
   });
   quitGate = gate;
-  const desktopApi: DesktopApi = { chooseQuit: gate.choose, setHandsFree };
+  const desktopApi: DesktopApi = {
+    chooseQuit: gate.choose,
+    setHandsFree,
+    showListening: listeningWindow.show,
+  };
   registerIpcHandlers(ipcMain, { ...korev.api, ...desktopApi }, (url) =>
     isAppUrl(url, appOrigin),
   );
@@ -494,7 +521,7 @@ app.whenReady().then(async () => {
   watchForUpdates(korev);
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (!mainWindow()) {
       createWindow(korev);
     }
   });

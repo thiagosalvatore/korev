@@ -1,3 +1,4 @@
+export const LISTENING_HASH = 'listening';
 const WORD = /[\p{L}\p{N}]+/gu;
 const LEADING_PUNCTUATION = /^[^\p{L}\p{N}]+/u;
 const ACCENT = /\p{M}/gu;
