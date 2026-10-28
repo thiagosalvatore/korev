@@ -200,6 +200,29 @@ function General({ settings }: { settings: Settings }) {
         />
       </Row>
       <Row
+        title="Sound file"
+        description={`Plays ${settings.notificationSoundFile.split('/').pop() || 'Glass, the macOS sound'}. Choose an MP3, M4A, WAV or AIFF file to play instead.`}
+      >
+        <div className="flex items-center gap-2">
+          {settings.notificationSoundFile ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => update({ notificationSoundFile: '' })}
+            >
+              Use default
+            </Button>
+          ) : null}
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => void api.chooseNotificationSound()}
+          >
+            Choose…
+          </Button>
+        </div>
+      </Row>
+      <Row
         title="Keep Mac awake"
         description="Stop your Mac from sleeping while an agent is working. The display can still turn off."
       >

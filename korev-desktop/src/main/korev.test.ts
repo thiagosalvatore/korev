@@ -175,8 +175,9 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
   let home: string;
   let repoPath: string;
   let chosenDirectory: string;
+  let chosenSoundFile: string | null;
   let korev: Korev;
-  let playSound: Mock<() => void>;
+  let playSound: Mock<(file: string) => void>;
   let notify: Mock<(notice: Notice) => void>;
   let windowFocused: boolean;
   let keepAwake: Mock<(on: boolean) => void>;
@@ -219,6 +220,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       now: () => new Date(),
       newId: () => randomUUID(),
       chooseDirectory: async () => chosenDirectory,
+      chooseSoundFile: async () => chosenSoundFile,
       openPath: async () => undefined,
       showFileMenu,
       openExternal: async () => undefined,
@@ -251,6 +253,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     home = await mkdtemp(path.join(tmpdir(), 'korev-core-'));
     repoPath = await initRepo('acme');
     chosenDirectory = repoPath;
+    chosenSoundFile = null;
     playSound = vi.fn();
     notify = vi.fn();
     windowFocused = true;
@@ -849,7 +852,32 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
     await sendAndWait(workspace.sessions[0].id, 'Add a note');
 
-    expect(playSound).toHaveBeenCalledOnce();
+    expect(playSound).toHaveBeenCalledExactlyOnceWith('');
+  });
+
+  it('plays the chosen sound file when a turn finishes', async () => {
+    chosenSoundFile = '/Users/dev/Music/ding.mp3';
+    await korev.api.chooseNotificationSound();
+    playSound.mockClear();
+    const workspace = await createWorkspace();
+
+    await sendAndWait(workspace.sessions[0].id, 'Add a note');
+
+    expect(playSound).toHaveBeenCalledExactlyOnceWith(chosenSoundFile);
+  });
+
+  it('previews a chosen sound file and keeps the sound when the picker is cancelled', async () => {
+    chosenSoundFile = '/Users/dev/Music/ding.mp3';
+    await korev.api.chooseNotificationSound();
+    chosenSoundFile = null;
+    await korev.api.chooseNotificationSound();
+
+    expect(playSound).toHaveBeenCalledExactlyOnceWith(
+      '/Users/dev/Music/ding.mp3',
+    );
+    expect(korev.settings().notificationSoundFile).toBe(
+      '/Users/dev/Music/ding.mp3',
+    );
   });
 
   it('notifies that the agent finished, naming the workspace, when Korev is not in focus', async () => {

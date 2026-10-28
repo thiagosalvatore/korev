@@ -87,6 +87,7 @@ const SETTINGS: Settings = {
   editor: 'cursor',
   notifications: true,
   notificationSound: true,
+  notificationSoundFile: '',
   keepAwake: true,
   signAgentCommits: false,
   remoteAccess: true,

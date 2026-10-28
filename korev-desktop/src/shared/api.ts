@@ -51,6 +51,7 @@ export interface KorevApi {
   addRepo(): Promise<Result<Repo | null>>;
   cloneRepo(url: string): Promise<Result<Repo>>;
   importFromConductor(): Promise<{ repos: number; settings: number }>;
+  chooseNotificationSound(): Promise<void>;
   removeRepo(repoId: string): Promise<void>;
   updateRepo(
     repoId: string,

@@ -423,8 +423,9 @@ export function createChats(
     if (owner.kind !== 'workspace') return;
     const { workspace } = owner;
     onAttention(workspace, attention);
-    if (!isWatching(workspace) && ctx.store.state.settings.notificationSound)
-      ctx.deps.playSound();
+    const { settings } = ctx.store.state;
+    if (!isWatching(workspace) && settings.notificationSound)
+      ctx.deps.playSound(settings.notificationSoundFile);
     if (!ctx.deps.isWindowFocused())
       ctx.deps.notify({ title, body, workspaceId: workspace.id, sessionId });
   }

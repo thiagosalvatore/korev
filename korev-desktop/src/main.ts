@@ -58,6 +58,7 @@ const DEV_ICON_PATH = '../../assets/icon.png';
 const DEV_USER_DATA_DIR = 'Korev Dev';
 const COMMAND_EVENT = 'command';
 const FINISHED_SOUND = '/System/Library/Sounds/Glass.aiff';
+const SOUND_EXTENSIONS = ['mp3', 'm4a', 'aac', 'wav', 'aiff', 'aif', 'caf'];
 const REMOTE_TOKEN_FILE = 'remote-token';
 const PUSH_TOKENS_FILE = 'push-tokens.json';
 const TAILNET_STATE_DIR = 'tailscale';
@@ -214,13 +215,16 @@ async function pushToPairedPhones(notice: Notice) {
   for (const token of stale) await remote.unregisterPushToken(token);
 }
 
-function playSound() {
+function playSound(file: string) {
   if (process.platform !== 'darwin') {
     shell.beep();
     return;
   }
-  execFile('afplay', [FINISHED_SOUND], (error) => {
-    if (error) console.warn(error.message);
+  execFile('afplay', [file || FINISHED_SOUND], (error) => {
+    if (!error) return;
+    console.warn(error.message);
+    // A moved or unreadable custom file should not silence notifications.
+    if (file) playSound('');
   });
 }
 
@@ -258,6 +262,19 @@ async function chooseDirectory(): Promise<string | null> {
   const options: Electron.OpenDialogOptions = {
     properties: ['openDirectory'],
     buttonLabel: 'Open project',
+  };
+  const result = window
+    ? await dialog.showOpenDialog(window, options)
+    : await dialog.showOpenDialog(options);
+  return result.canceled ? null : (result.filePaths[0] ?? null);
+}
+
+async function chooseSoundFile(): Promise<string | null> {
+  const window = BrowserWindow.getFocusedWindow();
+  const options: Electron.OpenDialogOptions = {
+    properties: ['openFile'],
+    filters: [{ name: 'Audio', extensions: SOUND_EXTENSIONS }],
+    buttonLabel: 'Use sound',
   };
   const result = window
     ? await dialog.showOpenDialog(window, options)
@@ -339,6 +356,7 @@ async function createKorevApp(): Promise<Korev> {
     now: () => new Date(),
     newId: () => randomUUID(),
     chooseDirectory,
+    chooseSoundFile,
     openPath: async (target) => {
       const problem = await shell.openPath(target);
       if (problem) console.warn(problem);

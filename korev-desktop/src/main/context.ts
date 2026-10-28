@@ -29,7 +29,7 @@ export interface CoreDeps {
   cliDir: string;
   emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]): void;
   notify(notice: Notice): void;
-  playSound(): void;
+  playSound(file: string): void;
   isWindowFocused(): boolean;
   setBadge(count: number): void;
   keepAwake(on: boolean): void;

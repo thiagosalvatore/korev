@@ -234,6 +234,7 @@ export interface KorevDeps extends CoreDeps {
   fs: FileSystem;
   spawnPty: SpawnPty;
   chooseDirectory(): Promise<string | null>;
+  chooseSoundFile(): Promise<string | null>;
   openPath(target: string): Promise<void>;
   showFileMenu(file: string): void;
   openExternal(url: string): Promise<void>;
@@ -1057,6 +1058,12 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       return registerRepo(destination);
     },
     importFromConductor,
+    async chooseNotificationSound() {
+      const file = await deps.chooseSoundFile();
+      if (!file) return;
+      await updateSettings({ notificationSoundFile: file });
+      deps.playSound(file);
+    },
     async removeRepo(repoId) {
       const { state } = store;
       const workspaces = state.workspaces.filter((ws) => ws.repoId === repoId);

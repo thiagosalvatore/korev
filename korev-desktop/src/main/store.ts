@@ -99,6 +99,7 @@ export function defaultSettings(home: string): Settings {
     editor: 'cursor',
     notifications: true,
     notificationSound: true,
+    notificationSoundFile: '',
     keepAwake: true,
     signAgentCommits: false,
     remoteAccess: false,

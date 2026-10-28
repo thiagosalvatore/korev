@@ -7,6 +7,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 ### New
 
 - **Message times.** Each message you send shows the date and time you sent it, and the line under a finished turn shows when the turn finished. This works on your Mac and on your phone.
+- **Your own notification sound.** In Settings → General → Sound file, choose an MP3, M4A, WAV or AIFF file, and Korev plays it instead of the Glass sound. Korev plays the file once when you choose it, so you can hear it.
 
 ## [0.23.0] - 2026-10-27
 

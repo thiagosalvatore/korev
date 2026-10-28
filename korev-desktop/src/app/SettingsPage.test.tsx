@@ -150,3 +150,40 @@ describe('Remote settings', () => {
     expect(screen.getByText('iPhone connected')).toBeTruthy();
   });
 });
+
+describe('Sound file setting', () => {
+  function soundState(notificationSoundFile: string): AppState {
+    return {
+      ...STATE,
+      settings: { ...STATE.settings, notificationSoundFile },
+    };
+  }
+
+  it('names the chosen file and goes back to the default sound', () => {
+    render(
+      <SettingsPage
+        state={soundState('/Users/dev/Music/ding.mp3')}
+        section="general"
+      />,
+    );
+
+    expect(screen.getByText(/Plays ding\.mp3\./)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Use default' }));
+
+    expect(window.korev.call).toHaveBeenCalledWith('updateSettings', [
+      { notificationSoundFile: '' },
+    ]);
+  });
+
+  it('opens the file picker', () => {
+    render(<SettingsPage state={soundState('')} section="general" />);
+
+    expect(screen.queryByRole('button', { name: 'Use default' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose…' }));
+
+    expect(window.korev.call).toHaveBeenCalledWith(
+      'chooseNotificationSound',
+      [],
+    );
+  });
+});

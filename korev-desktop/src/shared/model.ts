@@ -382,6 +382,7 @@ export interface Settings {
   editor: EditorId;
   notifications: boolean;
   notificationSound: boolean;
+  notificationSoundFile: string;
   keepAwake: boolean;
   signAgentCommits: boolean;
   remoteAccess: boolean;
