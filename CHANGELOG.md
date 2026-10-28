@@ -4,10 +4,19 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-28
+
+See when you sent each message, pick your own notification sound, and let Ask chats run commands without asking.
+
 ### New
 
 - **Message times.** Each message you send shows the date and time you sent it, and the line under a finished turn shows when the turn finished. This works on your Mac and on your phone.
 - **Your own notification sound.** In Settings → General → Sound file, choose an MP3, M4A, WAV or AIFF file, and Korev plays it instead of the Glass sound. Korev plays the file once when you choose it, so you can hear it.
+- **Ask chats without approvals.** When "Ask before tool calls" is off, turn on "Ask chats follow the same behavior" in Settings → Agents, and Ask chats run commands without asking you first. Ask chats still cannot edit files.
+
+### Fixed
+
+- Two workspaces that you create at the same time no longer get the same worktree.
 
 ## [0.23.0] - 2026-10-27
 
