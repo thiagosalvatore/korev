@@ -1185,10 +1185,13 @@ async function runArchiveScript(
 }
 
 function realPath(target: string): string {
+  const absolute = path.resolve(target);
   try {
-    return realpathSync(target);
+    return realpathSync(absolute);
   } catch {
-    return path.resolve(target);
+    const parent = path.dirname(absolute);
+    if (parent === absolute) return absolute;
+    return path.join(realPath(parent), path.basename(absolute));
   }
 }
 
