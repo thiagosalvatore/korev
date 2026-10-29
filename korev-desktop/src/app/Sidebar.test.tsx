@@ -339,4 +339,20 @@ describe('Sidebar Ask chats', () => {
       screen.queryByRole('button', { name: 'Ask Support tickets' }),
     ).toBeNull();
   });
+
+  it('marks an Ask chat that waits for your input', () => {
+    render(
+      <Sidebar
+        state={{
+          ...state,
+          runningSessions: ['as1'],
+          waitingSessions: ['as1'],
+        }}
+      />,
+    );
+    const row = screen.getByRole('button', {
+      name: 'Ask How does login work?',
+    });
+    expect(within(row).getByTitle('Waiting for your input')).toBeTruthy();
+  });
 });

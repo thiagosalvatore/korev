@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState } from '../shared/model';
@@ -32,29 +33,41 @@ afterEach(() => {
   localStorage.clear();
 });
 
-beforeEach(() => {
+function mockKorev(prompts: Record<string, string>) {
   window.korev = {
-    call: vi.fn(async (method: string) =>
-      method === 'listPullRequests' ? [pullRequest] : null,
-    ),
+    call: vi.fn(async (method: string) => {
+      if (method === 'listPullRequests') return [pullRequest];
+      if (method === 'repoConfig') return { prompts };
+      return null;
+    }),
     on: () => () => {},
   } as unknown as Window['korev'];
-});
+}
+
+beforeEach(() => mockKorev({}));
+
+function openReviewPicker() {
+  act(() => setUi({ prPicker: 'review' }));
+  render(<PrPickerDialog state={state} />);
+}
+
+async function pickPullRequest() {
+  const [option] = await screen.findAllByRole('option', {
+    name: /#42 Add install steps/,
+  });
+  fireEvent.click(option);
+  await waitFor(() => expect(getUi().prPicker).toBeNull());
+}
 
 describe('PrPickerDialog', () => {
   it('opens a new Ask about the picked pull request to review it', async () => {
-    act(() => setUi({ prPicker: 'review' }));
-    render(<PrPickerDialog state={state} />);
+    openReviewPicker();
 
     expect(
       screen.getByRole('dialog', { name: 'Review a pull request' }),
     ).toBeTruthy();
-    const [option] = await screen.findAllByRole('option', {
-      name: /#42 Add install steps/,
-    });
-    fireEvent.click(option);
+    await pickPullRequest();
 
-    expect(getUi().prPicker).toBeNull();
     expect(getUi().page).toMatchObject({
       kind: 'ask',
       askChatId: null,
@@ -62,6 +75,18 @@ describe('PrPickerDialog', () => {
     });
     expect(loadDraft(NEW_ASK_DRAFT_KEY)).toBe(
       'Review pull request #42 Add install steps. ',
+    );
+  });
+
+  it('adds the code review prompt of the repository to the review', async () => {
+    mockKorev({
+      code_review: 'Use the /review skill to review these changes.',
+    });
+    openReviewPicker();
+    await pickPullRequest();
+
+    expect(loadDraft(NEW_ASK_DRAFT_KEY)).toBe(
+      'Review pull request #42 Add install steps. Use the /review skill to review these changes. ',
     );
   });
 });

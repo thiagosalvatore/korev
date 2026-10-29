@@ -4,6 +4,11 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### Fixed
+
+- An Ask chat that waits for you to approve a command now shows the yellow question icon in the sidebar, like a workspace does.
+- "Review a pull request" now adds your repository's Code review prompt to the message.
+
 ## [0.24.0] - 2026-10-28
 
 See when you sent each message, pick your own notification sound, and let Ask chats run commands without asking.

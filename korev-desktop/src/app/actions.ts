@@ -317,8 +317,10 @@ export async function explainPullRequest(repoId: string, number: number) {
   openAsk(started.value.askChatId);
 }
 
-export function reviewPullRequest(repoId: string, label: string) {
-  const prefill = `Review pull request ${label}. `;
+export async function reviewPullRequest(repoId: string, label: string) {
+  const { prompts } = await api.repoConfig(repoId);
+  const reviewInstructions = prompts.code_review?.trim();
+  const prefill = `Review pull request ${label}. ${reviewInstructions ? `${reviewInstructions} ` : ''}`;
   saveDraft(NEW_ASK_DRAFT_KEY, prefill);
   setUi({ prPicker: null });
   openAsk(null, [repoId], prefill);
