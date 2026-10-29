@@ -130,6 +130,18 @@ function prSummary(pr: PrStatus): string {
   return `PR #${pr.number} · ${prIcon(pr).label}`;
 }
 
+function WaitingIcon() {
+  return (
+    <span title="Waiting for your input">
+      <Icon
+        name="message-circle-question"
+        size={14}
+        className="text-warning-text"
+      />
+    </span>
+  );
+}
+
 function StatusIcon({
   workspace,
   runtime,
@@ -147,17 +159,7 @@ function StatusIcon({
       />
     );
   }
-  if (runtime.status === 'waiting') {
-    return (
-      <span title="Waiting for your input">
-        <Icon
-          name="message-circle-question"
-          size={14}
-          className="text-warning-text"
-        />
-      </span>
-    );
-  }
+  if (runtime.status === 'waiting') return <WaitingIcon />;
   if (column === 'needs-you') {
     return (
       <Icon name="triangle-alert" size={14} className="text-danger-text" />
@@ -977,6 +979,7 @@ function AskChats({ state }: { state: AppState }) {
         <div className="max-h-56 overflow-y-auto">
           {newestFirst.map((ask) => {
             const running = state.runningSessions.includes(ask.session.id);
+            const waiting = state.waitingSessions.includes(ask.session.id);
             return (
               <div
                 key={ask.id}
@@ -995,15 +998,24 @@ function AskChats({ state }: { state: AppState }) {
                     'bg-active text-fg-1 hover:bg-active',
                 )}
               >
-                <Icon
-                  name={running ? 'loader-circle' : 'message-circle-question'}
-                  size={14}
-                  className={cn(
-                    running ? 'animate-spin text-accent-text' : 'text-fg-4',
-                  )}
-                />
+                {waiting ? (
+                  <WaitingIcon />
+                ) : (
+                  <Icon
+                    name={running ? 'loader-circle' : 'message-circle-question'}
+                    size={14}
+                    className={cn(
+                      running ? 'animate-spin text-accent-text' : 'text-fg-4',
+                    )}
+                  />
+                )}
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">
+                  <span
+                    className={cn(
+                      'block truncate text-sm',
+                      waiting ? 'font-semibold text-fg-1' : 'font-medium',
+                    )}
+                  >
                     {ask.session.title}
                   </span>
                   <span className="block truncate text-xs text-fg-3">
