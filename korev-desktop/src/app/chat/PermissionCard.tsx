@@ -15,7 +15,8 @@ import {
   type PlanLane,
 } from '../../shared/model';
 import { planFileName } from '../../shared/message';
-import { Markdown } from './Markdown';
+import { toast } from '../ui/toast';
+import { copyMarkdown, Markdown } from './Markdown';
 import { PlanChip } from './PlanChip';
 
 type PermissionItem = Extract<ChatItem, { kind: 'permission' }>;
@@ -256,6 +257,17 @@ export function PlanReview({
             Hand off
           </Button>
         ) : null}
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="copy"
+          onClick={async () => {
+            await copyMarkdown(plan);
+            toast('Copied the plan');
+          }}
+        >
+          Copy plan
+        </Button>
       </div>
     </Shell>
   );
