@@ -107,6 +107,30 @@ describe('PlanReview lanes across repositories', () => {
   });
 });
 
+describe('PlanReview copy', () => {
+  it('copies the plan as markdown', async () => {
+    const write = vi.fn(async () => {});
+    vi.stubGlobal('navigator', { clipboard: { write } });
+    vi.stubGlobal(
+      'ClipboardItem',
+      class {
+        constructor(readonly items: Record<string, Blob>) {}
+      },
+    );
+    const plan = '# Ship it\n\n- Step one.';
+    render(<PlanReview plan={plan} showPlan onApprove={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy plan' }));
+
+    await vi.waitFor(() => expect(write).toHaveBeenCalled());
+    const [[[{ items }]]] = write.mock.calls as unknown as [
+      [[{ items: Record<string, Blob> }]],
+    ];
+    expect(await items['text/plain'].text()).toBe(plan);
+    vi.unstubAllGlobals();
+  });
+});
+
 describe('PermissionCard after a plan is resolved', () => {
   it('opens the approved plan', () => {
     render(
