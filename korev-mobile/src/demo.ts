@@ -15,6 +15,7 @@ import {
 import {
   movedFolder,
   movedRepo,
+  reviewChatOf,
 } from '../../korev-desktop/src/shared/workspaces';
 import { without, withRunning, withRuntime, workspaceOf } from './appState';
 import { apiFor, createEventListeners } from './bridge';
@@ -25,6 +26,7 @@ import {
   DEMO_BASE_BRANCH,
   DEMO_DICTATION,
   DEMO_REPLY,
+  DEMO_REVIEW_REPLY,
   DENIED_REPLY,
   demoPullRequest,
   demoRepoUrl,
@@ -46,9 +48,9 @@ const NO_EXPLAINERS: Result<never> = {
   ok: false,
   message: 'The demo cannot explain pull requests.',
 };
-const NO_REVIEWS: Result<never> = {
+const NO_PULL_REQUEST: Result<never> = {
   ok: false,
-  message: 'The demo cannot review pull requests.',
+  message: 'The demo has no such pull request.',
 };
 const STREAM_STEP_MS = 80;
 const THINKING_MS = 1500;
@@ -414,9 +416,38 @@ export function createDemoConnection(): Connection {
       return [];
     },
     async pullRequestInbox() {
-      return ok([]);
+      return ok(world.inbox);
     },
-    reviewPullRequest: async () => NO_REVIEWS,
+    async reviewPullRequest(repoId, prNumber) {
+      const pr = world.inbox.find(
+        (entry) => entry.repoId === repoId && entry.number === prNumber,
+      );
+      if (!pr) return NO_PULL_REQUEST;
+      const reviewing = reviewChatOf(state, pr.url);
+      if (reviewing) return ok({ askChatId: reviewing.id });
+      const ask = {
+        id: newId('ask'),
+        repoIds: [repoId],
+        session: demoSession(
+          newId('session'),
+          `Review #${pr.number} ${pr.title}`,
+          now(),
+        ),
+        createdAt: now(),
+        lastMessageAt: now(),
+        reviewOf: pr.url,
+      };
+      setState({ ...state, askChats: [...state.askChats, ask] });
+      addItem(ask.session.id, {
+        id: newId('user'),
+        kind: 'user',
+        text: `Review pull request #${pr.number} ${pr.title} (${pr.url}).`,
+        at: now(),
+        checkpoint: null,
+      });
+      streamReply(ask.session.id, DEMO_REVIEW_REPLY);
+      return ok({ askChatId: ask.id });
+    },
     async slashCommands() {
       return [];
     },

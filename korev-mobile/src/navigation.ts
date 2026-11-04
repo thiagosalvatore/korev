@@ -8,6 +8,6 @@ export function openNewAsk() {
   router.push('/ask/new');
 }
 
-export function openExplainPullRequest() {
-  router.push('/ask/explain');
+export function openPullRequests() {
+  router.push('/pulls');
 }

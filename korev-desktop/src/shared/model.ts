@@ -196,6 +196,65 @@ export interface InboxPullRequest {
   checks: Exclude<CheckState, 'skipped'> | null;
 }
 
+export const INBOX_GROUPS: {
+  reason: InboxReason;
+  title: string;
+  empty: string;
+}[] = [
+  {
+    reason: 'review-requested',
+    title: 'Waiting for your review',
+    empty: 'Nobody is waiting for your review.',
+  },
+  {
+    reason: 'authored',
+    title: 'Opened by you',
+    empty: 'You have no open pull requests.',
+  },
+];
+
+export interface InboxStatus {
+  label: string;
+  tone: 'neutral' | 'success' | 'warning' | 'danger';
+}
+
+const INBOX_STATUSES: (InboxStatus & {
+  shows(pr: InboxPullRequest): boolean;
+})[] = [
+  { label: 'Draft', tone: 'neutral', shows: (pr) => pr.isDraft },
+  {
+    label: 'Checks failing',
+    tone: 'danger',
+    shows: (pr) => pr.checks === 'failure',
+  },
+  {
+    label: 'Checks running',
+    tone: 'warning',
+    shows: (pr) => pr.checks === 'pending',
+  },
+  {
+    label: 'Approved',
+    tone: 'success',
+    shows: (pr) => pr.reviewDecision === 'APPROVED',
+  },
+  {
+    label: 'Changes requested',
+    tone: 'warning',
+    shows: (pr) => pr.reviewDecision === 'CHANGES_REQUESTED',
+  },
+  {
+    label: 'Conflicts',
+    tone: 'danger',
+    shows: (pr) => pr.mergeable === 'CONFLICTING',
+  },
+];
+
+export function inboxStatuses(pr: InboxPullRequest): InboxStatus[] {
+  return INBOX_STATUSES.filter((status) => status.shows(pr)).map(
+    ({ label, tone }) => ({ label, tone }),
+  );
+}
+
 export interface IssueSummary {
   number: number;
   title: string;

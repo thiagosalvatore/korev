@@ -77,6 +77,32 @@ describe('demo connection', () => {
     );
   });
 
+  it('reviews a pull request waiting for review in one Ask chat', async () => {
+    const inbox = await connection.api.pullRequestInbox();
+    if (!inbox.ok) throw new Error(inbox.message);
+    const waiting = inbox.value.find((pr) => pr.reason === 'review-requested')!;
+    expect(inbox.value.some((pr) => pr.reason === 'authored')).toBe(true);
+
+    const started = await connection.api.reviewPullRequest(
+      waiting.repoId,
+      waiting.number,
+    );
+    const again = await connection.api.reviewPullRequest(
+      waiting.repoId,
+      waiting.number,
+    );
+
+    if (!started.ok) throw new Error(started.message);
+    const { askChats, runningSessions } = await connection.api.getState();
+    const ask = askChats.find((entry) => entry.id === started.value.askChatId);
+    expect(ask).toMatchObject({
+      reviewOf: waiting.url,
+      session: { title: `Review #${waiting.number} ${waiting.title}` },
+    });
+    expect(runningSessions).toContain(ask!.session.id);
+    expect(again).toEqual(started);
+  });
+
   it('stops waiting once the question is answered', async () => {
     const { sessionId } = waitingQuestion(await connection.api.getState());
     const question = (await connection.api.transcript(sessionId)).find(

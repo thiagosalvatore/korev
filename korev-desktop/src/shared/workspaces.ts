@@ -144,6 +144,22 @@ export function asksNewestFirst(state: Pick<AppState, 'askChats'>): AskChat[] {
   return newestFirst(state.askChats.filter((ask) => !ask.automationRun));
 }
 
+export function reviewChatOf(
+  state: Pick<AppState, 'askChats'>,
+  prUrl: string,
+): AskChat | undefined {
+  return state.askChats.find((ask) => ask.reviewOf === prUrl);
+}
+
+export function workspaceOfPr(
+  state: Pick<AppState, 'workspaces'>,
+  prUrl: string,
+): Workspace | undefined {
+  return state.workspaces.find((workspace) =>
+    workspace.prs.some((tracked) => tracked.url === prUrl),
+  );
+}
+
 export function automationRunsNewestFirst(
   state: Pick<AppState, 'askChats'>,
   automationId: string,

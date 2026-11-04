@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Badge,
-  Button,
-  cn,
-  Icon,
-  IconButton,
-  type BadgeTone,
-} from '../design-system';
+import { Badge, Button, cn, Icon, IconButton } from '../design-system';
 import { timeAgo } from '../shared/format';
-import type {
-  AppState,
-  InboxPullRequest,
-  InboxReason,
-  Result,
+import {
+  INBOX_GROUPS,
+  inboxStatuses,
+  type AppState,
+  type InboxPullRequest,
+  type Result,
 } from '../shared/model';
+import { reviewChatOf, workspaceOfPr } from '../shared/workspaces';
 import {
   checkOutPullRequest,
   explainPullRequest,
@@ -26,52 +21,6 @@ import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { useUi } from './ui-store';
 
 const REFRESH_MS = 120_000;
-
-const GROUPS: { reason: InboxReason; title: string; empty: string }[] = [
-  {
-    reason: 'review-requested',
-    title: 'Waiting for your review',
-    empty: 'Nobody is waiting for your review.',
-  },
-  {
-    reason: 'authored',
-    title: 'Opened by you',
-    empty: 'You have no open pull requests.',
-  },
-];
-
-const STATUSES: {
-  label: string;
-  tone: BadgeTone;
-  shows(pr: InboxPullRequest): boolean;
-}[] = [
-  { label: 'Draft', tone: 'neutral', shows: (pr) => pr.isDraft },
-  {
-    label: 'Checks failing',
-    tone: 'danger',
-    shows: (pr) => pr.checks === 'failure',
-  },
-  {
-    label: 'Checks running',
-    tone: 'warning',
-    shows: (pr) => pr.checks === 'pending',
-  },
-  {
-    label: 'Approved',
-    tone: 'success',
-    shows: (pr) => pr.reviewDecision === 'APPROVED',
-  },
-  {
-    label: 'Changes requested',
-    tone: 'warning',
-    shows: (pr) => pr.reviewDecision === 'CHANGES_REQUESTED',
-  },
-  {
-    label: 'Conflicts',
-    tone: 'danger',
-    shows: (pr) => pr.mergeable === 'CONFLICTING',
-  },
-];
 
 function useInbox() {
   const [inbox, setInbox] = useState<Result<InboxPullRequest[]> | null>(null);
@@ -94,10 +43,8 @@ function PullRequestRow({
   pr: InboxPullRequest;
 }) {
   const label = `#${pr.number} ${pr.title}`;
-  const review = state.askChats.find((ask) => ask.reviewOf === pr.url);
-  const workspace = state.workspaces.find((ws) =>
-    ws.prs.some((tracked) => tracked.url === pr.url),
-  );
+  const review = reviewChatOf(state, pr.url);
+  const workspace = workspaceOfPr(state, pr.url);
   const repo = state.repos.find((entry) => entry.id === pr.repoId);
   return (
     <li
@@ -121,7 +68,7 @@ function PullRequestRow({
         </span>
       </div>
       <div className="flex flex-none items-center gap-1">
-        {STATUSES.filter((status) => status.shows(pr)).map((status) => (
+        {inboxStatuses(pr).map((status) => (
           <Badge key={status.label} tone={status.tone}>
             {status.label}
           </Badge>
@@ -174,7 +121,7 @@ function InboxGroups({
   if (!inbox) return <p className="m-0 text-sm text-fg-3">Loading…</p>;
   if (!inbox.ok)
     return <p className="m-0 text-sm text-danger-text">{inbox.message}</p>;
-  return GROUPS.map((group) => {
+  return INBOX_GROUPS.map((group) => {
     const prs = inbox.value.filter((pr) => pr.reason === group.reason);
     return (
       <section

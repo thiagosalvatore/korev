@@ -1,8 +1,8 @@
 import { Tabs } from 'expo-router';
 import type { ReactNode } from 'react';
 import {
-  BookOpenText,
   FolderGit2,
+  GitPullRequest,
   MessageCircleQuestion,
   Plus,
   Settings,
@@ -12,9 +12,9 @@ import type { RemotePairing } from '../../../../korev-desktop/src/shared/model';
 import { useAppState } from '../../hooks';
 import { useKorev } from '../../korev';
 import {
-  openExplainPullRequest,
   openNewAsk,
   openNewWorkspace,
+  openPullRequests,
 } from '../../navigation';
 import { confirmUnpair } from '../../Offline';
 import { useOpenTappedWorkspace } from '../../push';
@@ -181,11 +181,11 @@ export default function TabsLayout() {
           headerRight: () => (
             <View style={styles.headerButtons}>
               <HeaderButton
-                label="Explain a pull request"
-                onPress={openExplainPullRequest}
+                label="Pull requests"
+                onPress={openPullRequests}
                 styles={styles}
               >
-                <BookOpenText size={HEADER_ICON_SIZE} color={theme.fg2} />
+                <GitPullRequest size={HEADER_ICON_SIZE} color={theme.fg2} />
               </HeaderButton>
               <HeaderButton
                 label="Ask a question"
