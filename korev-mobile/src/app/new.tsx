@@ -33,6 +33,7 @@ import { useTheme, type Theme } from '../theme';
 import { Button, CHROME_FONT_SCALE } from '../ui';
 
 const LOADING_STYLE = { marginTop: 40 };
+const INPUT_MAX_HEIGHT = 240;
 
 function openWorkspace(workspace: Workspace) {
   router.replace({ pathname: '/workspace/[id]', params: { id: workspace.id } });
@@ -160,6 +161,7 @@ function makeStyles(theme: Theme) {
     label: { color: theme.fg3, fontSize: 13, fontWeight: '600' },
     input: {
       minHeight: 140,
+      maxHeight: INPUT_MAX_HEIGHT,
       padding: 12,
       borderRadius: 12,
       borderWidth: 1,
