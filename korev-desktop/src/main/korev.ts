@@ -1364,12 +1364,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     revert: (sessionId, itemId) => chats.revert(sessionId, itemId),
     async changes(workspaceId) {
       const workspace = workspacePath(workspaceId);
-      const files = await refreshStats(ctx, workspace);
-      return files.length
-        ? files
-        : changedFiles(git, workspace.path, workspace.baseBranch).catch(
-            () => [],
-          );
+      if (!workspace.archivedAt) return refreshStats(ctx, workspace);
+      return changedFiles(git, workspace.path, workspace.baseBranch).catch(
+        () => [],
+      );
     },
     async fileDiff(workspaceId, file, range) {
       const workspace = workspacePath(workspaceId);

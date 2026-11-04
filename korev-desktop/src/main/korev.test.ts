@@ -74,6 +74,8 @@ let prsByUrl: Record<string, Record<string, unknown>> = {};
 let stacksByUrl: Record<string, Record<string, unknown>> = {};
 let ghMerges: string[][] = [];
 let gitAddGate: Promise<void> | null = null;
+let mergeBaseGate: Promise<void> | null = null;
+let mergeBasesStarted = 0;
 let agentVersionGate: Promise<void> | null = null;
 let agentVersionsWaiting = 0;
 let prViewGate: Promise<void> | null = null;
@@ -147,6 +149,10 @@ const runWithFakeSqlite: CommandRunner = async (file, args, options) => {
     return { exitCode: 0, stdout: '', stderr: '' };
   }
   if (file === 'git' && args[0] === 'add' && gitAddGate) await gitAddGate;
+  if (file === 'git' && args[0] === 'merge-base') {
+    mergeBasesStarted++;
+    if (mergeBaseGate) await mergeBaseGate;
+  }
   if (args[0] === '--version' && agentVersionGate) {
     agentVersionsWaiting++;
     await agentVersionGate;
@@ -275,6 +281,8 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     stacksByUrl = {};
     ghMerges = [];
     gitAddGate = null;
+    mergeBaseGate = null;
+    mergeBasesStarted = 0;
     agentVersionGate = null;
     agentVersionsWaiting = 0;
     prViewGate = null;
@@ -828,6 +836,25 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(idle).toContain('I added agent-note.txt.');
     const [run] = (await korev.api.getState()).runs;
     expect(run.tasks[0].status).toBe('dispatched');
+  });
+
+  it('runs one change check at a time for a workspace', async () => {
+    const workspace = await createWorkspace();
+    await writeFile(path.join(workspace.path, 'note.txt'), 'hi\n');
+    mergeBasesStarted = 0;
+    await korev.api.changes(workspace.id);
+    const mergeBasesPerCheck = mergeBasesStarted;
+    mergeBasesStarted = 0;
+    let releaseMergeBase!: () => void;
+    mergeBaseGate = new Promise((resolve) => (releaseMergeBase = resolve));
+
+    const checks = [1, 2, 3].map(() => korev.api.changes(workspace.id));
+    await waitFor(async () => mergeBasesStarted > 0);
+    releaseMergeBase();
+
+    for (const files of await Promise.all(checks))
+      expect(files.map((file) => file.path)).toEqual(['note.txt']);
+    expect(mergeBasesStarted).toBe(mergeBasesPerCheck);
   });
 
   it('shows the user message before the checkpoint is taken', async () => {
