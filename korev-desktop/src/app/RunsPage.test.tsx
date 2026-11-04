@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState, OrchestrationRun } from '../shared/model';
-import { RunsPage } from './RunsPage';
+import { RunDecisions, RunsPage } from './RunsPage';
 
 const call = vi.fn(async () => ({ ok: true, value: undefined }));
 
@@ -63,5 +63,13 @@ describe('RunsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'no' }));
 
     expect(call).toHaveBeenCalledWith('resolveGate', ['run-1', 'g1', 'no']);
+  });
+
+  it('offers to resume a paused run next to its decisions', () => {
+    render(<RunDecisions run={{ ...run, paused: true }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume run' }));
+
+    expect(call).toHaveBeenCalledWith('resumeRun', ['run-1']);
   });
 });

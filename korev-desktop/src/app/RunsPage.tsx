@@ -8,6 +8,7 @@ import {
   type BadgeTone,
 } from '../design-system';
 import {
+  MAX_WAKES_PER_RUN,
   pendingDecisions,
   taskState,
   type AppState,
@@ -78,6 +79,30 @@ function GateCard({
   );
 }
 
+function PausedCard({ run }: { run: OrchestrationRun }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-surface p-3.5 shadow-1">
+      <div className="flex items-center gap-1.5 text-xs text-fg-3">
+        <Icon name="pause" size={13} />
+        Run paused
+      </div>
+      <p className="m-0 text-sm text-fg-1">
+        This run reached {MAX_WAKES_PER_RUN} messages. Messages to and from its
+        workers wait until you resume it.
+      </p>
+      <div>
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={() => api.resumeRun(run.id).then(reportFailure)}
+        >
+          Resume run
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function QuestionCard({
   run,
   question,
@@ -128,9 +153,10 @@ function QuestionCard({
 
 export function RunDecisions({ run }: { run: OrchestrationRun }) {
   const { gates, questions } = pendingDecisions(run);
-  if (!gates.length && !questions.length) return null;
+  if (!run.paused && !gates.length && !questions.length) return null;
   return (
     <div className="flex flex-col gap-2">
+      {run.paused ? <PausedCard run={run} /> : null}
       {gates.map((gate) => (
         <GateCard key={gate.id} run={run} gate={gate} />
       ))}
@@ -207,18 +233,7 @@ function RunCard({ state, run }: { state: AppState; run: OrchestrationRun }) {
         <h2 className="m-0 min-w-0 flex-1 truncate type-h3 text-fg-1">
           {run.objective || UNTITLED_RUN}
         </h2>
-        {run.paused ? (
-          <>
-            <Badge tone="warning">Paused</Badge>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => api.resumeRun(run.id).then(reportFailure)}
-            >
-              Resume run
-            </Button>
-          </>
-        ) : null}
+        {run.paused ? <Badge tone="warning">Paused</Badge> : null}
         {archived ? (
           <span className="text-xs text-fg-3">Coordinator archived</span>
         ) : (
