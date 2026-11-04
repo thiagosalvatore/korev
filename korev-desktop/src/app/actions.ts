@@ -3,6 +3,7 @@ import type {
   AskChat,
   AppState,
   EditorId,
+  InboxPullRequest,
   PrStatus,
   PrThread,
   Result,
@@ -373,6 +374,25 @@ export function openBoard() {
 
 export function openAutomations() {
   setUi({ page: { kind: 'automations' } });
+}
+
+export function openPullRequests() {
+  setUi({ page: { kind: 'pull-requests' } });
+}
+
+export async function reviewInboxPullRequest(pr: InboxPullRequest) {
+  const started = await api.reviewPullRequest(pr.repoId, pr.number);
+  if (reportFailure(started)) openAsk(started.value.askChatId);
+}
+
+export async function checkOutPullRequest(pr: InboxPullRequest) {
+  const created = await api.createWorkspaces([pr.repoId], null, {
+    kind: 'pr',
+    number: pr.number,
+    branch: pr.headRefName,
+    baseBranch: pr.baseRefName,
+  });
+  if (reportFailure(created)) selectWorkspace(created.value[0].id);
 }
 
 export function toggleBoard() {

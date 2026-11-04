@@ -1,0 +1,34 @@
+---
+title: Pull request inbox
+description: 'See every pull request that waits for your review, and every pull request you opened, and start a review in one click.'
+---
+
+**Pull requests** in the sidebar lists two groups of open pull requests, across every repository you added to Korev:
+
+- **Waiting for your review**: pull requests that ask for your review.
+- **Opened by you**: your own pull requests.
+
+Pull requests in repositories that are not in Korev do not show. To see them, add the repository with **Add repository**.
+
+Korev reads the list with `gh`, so `gh` must be installed and signed in. The list updates when you open the page, every two minutes while it is open, and when you press the refresh button. You can also open it from the command palette (⌘K) with **Pull requests**.
+
+## What each row shows
+
+Each row shows the repository, the author, the branch and when the pull request last changed. Labels show what needs attention:
+
+| Label                 | Meaning                                       |
+| --------------------- | --------------------------------------------- |
+| **Draft**             | The pull request is a draft                   |
+| **Checks failing**    | At least one check failed                     |
+| **Checks running**    | Checks have not finished                      |
+| **Approved**          | The pull request has the reviews it needs     |
+| **Changes requested** | A reviewer asked for changes                  |
+| **Conflicts**         | The branch has conflicts with its base branch |
+
+## Act on a pull request
+
+- **Review** opens a read-only [Ask](../concepts/ask.mdx) chat named **Review #N title** and starts the review at once. You do not type anything. The agent reads the pull request with `gh pr view` and `gh pr diff`. Nothing is checked out. The review uses your [review model](../concepts/agents-and-modes.mdx#review-model) and the repository's code review prompt, if you set one in [the repository settings](./configure-your-repository.mdx).
+- **Open review** shows instead of **Review** when a review chat for the pull request already exists. It opens that chat and does not start a new review.
+- **Explain** opens a plain-words walkthrough. See [Explain a pull request](./explain-a-pull-request.mdx).
+- **Check out** creates a workspace on the pull request's branch. When a workspace already has the pull request, the button says **Open workspace** and opens it.
+- The arrow button opens the pull request on GitHub.

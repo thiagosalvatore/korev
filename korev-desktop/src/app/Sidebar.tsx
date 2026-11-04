@@ -41,6 +41,7 @@ import {
   openAsk,
   openAutomations,
   openBoard,
+  openPullRequests,
   openGrid,
   openRuns,
   openIn,
@@ -1270,6 +1271,12 @@ export function Sidebar({ state }: { state: AppState }) {
             hint="⌘⇧B"
             active={pageKind === 'board'}
             onClick={openBoard}
+          />
+          <NavRow
+            icon="git-pull-request"
+            label="Pull requests"
+            active={pageKind === 'pull-requests'}
+            onClick={openPullRequests}
           />
           <NavRow
             icon="calendar-clock"

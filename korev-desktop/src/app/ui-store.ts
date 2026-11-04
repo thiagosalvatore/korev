@@ -35,7 +35,8 @@ export type Page =
   | { kind: 'grid' }
   | { kind: 'runs' }
   | { kind: 'board' }
-  | { kind: 'automations' };
+  | { kind: 'automations' }
+  | { kind: 'pull-requests' };
 
 export type GridLayout = '2x1' | '1x2' | '2x2';
 

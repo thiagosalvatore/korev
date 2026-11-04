@@ -914,6 +914,11 @@ case "$1 $2" in
       *) echo '[]' ;;
     esac ;;
   "pr view") echo '{"number":42,"url":"https://github.com/acme/web/pull/42","title":"Add install steps","author":{"login":"octo"},"headRefOid":"abc123","body":"Adds the steps."}' ;;
+  "api graphql")
+    case "$*" in
+      *search*) echo '{"data":{"review":{"nodes":[{"number":42,"title":"Add install steps","url":"https://github.com/acme/web/pull/42","isDraft":false,"updatedAt":"2026-11-04T10:00:00Z","headRefName":"octo/install","baseRefName":"main","reviewDecision":"REVIEW_REQUIRED","mergeable":"MERGEABLE","author":{"login":"octo"},"repository":{"url":"https://github.com/acme/web"},"commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"FAILURE"}}}]}}]},"mine":{"nodes":[]}}}' ;;
+      *) exit 1 ;;
+    esac ;;
   "pr diff") printf 'diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1,2 @@\n # acme\n+Install it.\n' ;;
   *) exit 1 ;;
 esac
@@ -926,7 +931,10 @@ async function launchWithFakeGh(home: string) {
   await writeFile(path.join(fakeBin, 'gh'), FAKE_GH);
   await chmod(path.join(fakeBin, 'gh'), 0o755);
   await writeFile(path.join(home, '.shrc'), `export PATH=${fakeBin}:$PATH\n`);
-  return launch(home, repo, { ENV: path.join(home, '.shrc') });
+  return {
+    ...(await launch(home, repo, { ENV: path.join(home, '.shrc') })),
+    repo,
+  };
 }
 
 test("explains a teammate's pull request in a read-only Ask chat", async () => {
@@ -967,6 +975,37 @@ test("explains a teammate's pull request in a read-only Ask chat", async () => {
     await expect
       .poll(async () => readFile(exported, 'utf8'))
       .toContain('The README now says how to install the app.');
+    await waitForAgentsToFinish(window);
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('reviews a pull request from the inbox in one click', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const { app, window, repo } = await launchWithFakeGh(home);
+  try {
+    git(repo, 'remote', 'add', 'origin', 'https://github.com/acme/web.git');
+    await window.getByRole('button', { name: 'Open project' }).click();
+    const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
+    await sidebar.getByRole('button', { name: 'Pull requests' }).click();
+
+    const row = window
+      .getByRole('region', { name: 'Waiting for your review' })
+      .getByRole('listitem', { name: /#42 Add install steps/ });
+    await expect(row.getByText('Checks failing')).toBeVisible();
+    await snap(window, '18-pull-request-inbox');
+    await row.getByRole('button', { name: 'Review' }).click();
+
+    await expect(window.getByText('I added agent-note.txt.')).toBeVisible();
+    await expect(
+      sidebar.getByRole('button', { name: 'Ask Review #42 Add install steps' }),
+    ).toBeVisible();
+    await sidebar.getByRole('button', { name: 'Pull requests' }).click();
+    await expect(
+      row.getByRole('button', { name: 'Open review' }),
+    ).toBeVisible();
     await waitForAgentsToFinish(window);
   } finally {
     await app.close();

@@ -9,6 +9,7 @@ import { BoardView } from './BoardView';
 import { api } from './bridge';
 import { CommandPalette } from './CommandPalette';
 import { PrPickerDialog } from './PrPickerDialog';
+import { PullRequestsPage } from './PullRequestsPage';
 import { paneCount, paneWorkspaceId } from './grid';
 import { GridView } from './GridView';
 import { HandsFree } from './HandsFree';
@@ -93,6 +94,9 @@ function Shell({ state }: { state: AppState }) {
       {page.kind === 'runs' ? <RunsPage state={state} /> : null}
       {page.kind === 'board' ? <BoardView state={state} /> : null}
       {page.kind === 'automations' ? <AutomationsPage state={state} /> : null}
+      {page.kind === 'pull-requests' ? (
+        <PullRequestsPage state={state} />
+      ) : null}
       {page.kind === 'workspace' && workspace ? (
         <WorkspaceView key={workspace.id} state={state} workspace={workspace} />
       ) : null}
