@@ -1227,85 +1227,87 @@ export function Sidebar({ state }: { state: AppState }) {
           onClick={() => setUi({ sidebar: false })}
         />
       </div>
-      <div className="flex flex-col gap-0.5 px-2 pb-2">
-        <NavRow
-          icon="search"
-          label="Search"
-          hint="⌘K"
-          active={paletteOpen}
-          onClick={() => setUi({ palette: 'all' })}
-        />
-        <NavRow
-          icon="square-pen"
-          label="New workspace"
-          hint="⌘N"
-          active={pageKind === 'new-workspace'}
-          onClick={() => openNewWorkspace(null)}
-        />
-        <NavRow
-          icon="message-circle-question"
-          label="Ask"
-          active={pageKind === 'ask'}
-          onClick={() => openAsk(null)}
-        />
-        <NavRow
-          icon="layout-grid"
-          label="Grid"
-          hint="⌘G"
-          active={pageKind === 'grid'}
-          onClick={openGrid}
-        />
-        {state.runs.length ? (
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="flex flex-col gap-0.5 px-2 pb-2">
           <NavRow
-            icon="network"
-            label="Runs"
-            active={pageKind === 'runs'}
-            onClick={openRuns}
+            icon="search"
+            label="Search"
+            hint="⌘K"
+            active={paletteOpen}
+            onClick={() => setUi({ palette: 'all' })}
           />
-        ) : null}
-        <NavRow
-          icon="square-kanban"
-          label="Board"
-          hint="⌘⇧B"
-          active={pageKind === 'board'}
-          onClick={openBoard}
-        />
-        <NavRow
-          icon="calendar-clock"
-          label="Automations"
-          active={pageKind === 'automations'}
-          onClick={openAutomations}
-        />
-      </div>
-      <AskChats state={state} />
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-1">
-        {repoSections(state).map(({ folder, repos }) => {
-          const groups = repos.map((repo) => (
-            <RepoGroup
-              key={repo.id}
-              state={state}
-              repo={repo}
-              folderId={folder?.id ?? null}
-              workspaces={active.filter(
-                (ws) => sidebarRepoId(leads, ws) === repo.id,
-              )}
-              leads={leads}
-              selectedId={selectedId}
-              indexOf={indexOf}
+          <NavRow
+            icon="square-pen"
+            label="New workspace"
+            hint="⌘N"
+            active={pageKind === 'new-workspace'}
+            onClick={() => openNewWorkspace(null)}
+          />
+          <NavRow
+            icon="message-circle-question"
+            label="Ask"
+            active={pageKind === 'ask'}
+            onClick={() => openAsk(null)}
+          />
+          <NavRow
+            icon="layout-grid"
+            label="Grid"
+            hint="⌘G"
+            active={pageKind === 'grid'}
+            onClick={openGrid}
+          />
+          {state.runs.length ? (
+            <NavRow
+              icon="network"
+              label="Runs"
+              active={pageKind === 'runs'}
+              onClick={openRuns}
             />
-          ));
-          return folder ? (
-            <FolderSection key={folder.id} folder={folder}>
-              {groups}
-            </FolderSection>
-          ) : (
-            <Fragment key={repos[0].id}>{groups}</Fragment>
-          );
-        })}
-        <RootEndDropZone />
+          ) : null}
+          <NavRow
+            icon="square-kanban"
+            label="Board"
+            hint="⌘⇧B"
+            active={pageKind === 'board'}
+            onClick={openBoard}
+          />
+          <NavRow
+            icon="calendar-clock"
+            label="Automations"
+            active={pageKind === 'automations'}
+            onClick={openAutomations}
+          />
+        </div>
+        <AskChats state={state} />
+        <div className="flex-1 px-2 pt-1">
+          {repoSections(state).map(({ folder, repos }) => {
+            const groups = repos.map((repo) => (
+              <RepoGroup
+                key={repo.id}
+                state={state}
+                repo={repo}
+                folderId={folder?.id ?? null}
+                workspaces={active.filter(
+                  (ws) => sidebarRepoId(leads, ws) === repo.id,
+                )}
+                leads={leads}
+                selectedId={selectedId}
+                indexOf={indexOf}
+              />
+            ));
+            return folder ? (
+              <FolderSection key={folder.id} folder={folder}>
+                {groups}
+              </FolderSection>
+            ) : (
+              <Fragment key={repos[0].id}>{groups}</Fragment>
+            );
+          })}
+          <RootEndDropZone />
+        </div>
+        <History state={state} />
       </div>
-      <History state={state} />
-      <div className="flex items-center gap-1 border-t border-border-1 p-2">
+      <div className="flex flex-none items-center gap-1 border-t border-border-1 p-2">
         <AddRepositoryMenu
           trigger={(toggle) => (
             <button
