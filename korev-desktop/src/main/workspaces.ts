@@ -6,6 +6,7 @@ import {
   type AgentKind,
   type ChatSession,
   type ModelSetting,
+  type FileChange,
   type GitWorktree,
   type LaneRepo,
   type PlanLane,
@@ -479,8 +480,23 @@ export async function onScriptExit(
   if (config.autoRunAfterSetup) await startScript(ctx, workspace, 'run');
 }
 
-export async function refreshStats(ctx: Context, workspace: Workspace) {
-  if (workspace.archivedAt) return [];
+const statsRefreshes = new Map<string, Promise<FileChange[]>>();
+
+export function refreshStats(
+  ctx: Context,
+  workspace: Workspace,
+): Promise<FileChange[]> {
+  if (workspace.archivedAt) return Promise.resolve([]);
+  const running = statsRefreshes.get(workspace.id);
+  if (running) return running;
+  const refresh = loadStats(ctx, workspace).finally(() =>
+    statsRefreshes.delete(workspace.id),
+  );
+  statsRefreshes.set(workspace.id, refresh);
+  return refresh;
+}
+
+async function loadStats(ctx: Context, workspace: Workspace) {
   try {
     const files = await changedFiles(
       ctx.git,
