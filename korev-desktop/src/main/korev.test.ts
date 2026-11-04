@@ -1435,6 +1435,42 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(again).toEqual(started);
   });
 
+  it('reviews a pull request in an Ask chat with the repository review prompt, once', async () => {
+    const repo = await addRepo();
+    await korev.api.updateRepo(repo.id, {
+      prompts: { code_review: 'Use the house review skill.' },
+    });
+    openPr = {
+      number: 42,
+      url: 'https://github.com/acme/web/pull/42',
+      title: 'Add install steps',
+      state: 'OPEN',
+      headRefName: 'octo/install',
+      baseRefName: 'main',
+    };
+
+    const started = await korev.api.reviewPullRequest(repo.id, 42);
+    if (!started.ok) throw new Error(started.message);
+    const ask = (await korev.api.getState()).askChats.find(
+      (entry) => entry.id === started.value.askChatId,
+    );
+    await waitForTurn(ask!.session.id);
+    const again = await korev.api.reviewPullRequest(repo.id, 42);
+
+    const prompts = (await korev.api.transcript(ask!.session.id)).filter(
+      (item) => item.kind === 'user',
+    );
+    expect(ask?.session.title).toBe('Review #42 Add install steps');
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0].kind === 'user' && prompts[0].text).toEqual(
+      expect.stringContaining('https://github.com/acme/web/pull/42'),
+    );
+    expect(prompts[0].kind === 'user' && prompts[0].text).toEqual(
+      expect.stringContaining('Use the house review skill.'),
+    );
+    expect(again).toEqual(started);
+  });
+
   it('explains a pull request together with the open ones it builds on', async () => {
     const repo = await addRepo();
     prsByNumber = {

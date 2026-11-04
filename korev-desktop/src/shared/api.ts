@@ -13,6 +13,7 @@ import type {
   EditorId,
   FileChange,
   FileContents,
+  InboxPullRequest,
   IssueSummary,
   ListeningState,
   PermissionResponse,
@@ -92,6 +93,11 @@ export interface KorevApi {
     query?: string,
   ): Promise<PullRequestSummary[]>;
   listIssues(repoId: string, query?: string): Promise<IssueSummary[]>;
+  pullRequestInbox(): Promise<Result<InboxPullRequest[]>>;
+  reviewPullRequest(
+    repoId: string,
+    prNumber: number,
+  ): Promise<Result<{ askChatId: string }>>;
   setBaseBranch(workspaceId: string, branch: string): Promise<void>;
   setKeepAfterMerge(workspaceId: string, keep: boolean): Promise<void>;
   renameWorkspace(workspaceId: string, label: string): Promise<void>;
@@ -249,6 +255,8 @@ export const REMOTE_METHODS = [
   'listBranches',
   'listPullRequests',
   'listIssues',
+  'pullRequestInbox',
+  'reviewPullRequest',
   'slashCommands',
   'changes',
   'fileDiff',

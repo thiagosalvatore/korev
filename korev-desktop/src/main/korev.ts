@@ -16,6 +16,7 @@ import {
   type EditorApp,
   type EditorId,
   type FileContents,
+  type InboxPullRequest,
   latestPlan,
   type PlanLane,
   planLanes,
@@ -77,6 +78,7 @@ import {
   onPrBranch,
   fetchPrThreads,
   fixChecksPrompt,
+  inboxReviewPrompt,
   mergePr,
   resolveConflictsPrompt,
   reviewPrompt,
@@ -88,7 +90,7 @@ import {
   withPrompt,
 } from './repo-config';
 import { listSkills } from './skills';
-import { listIssues, listPullRequests } from './sources';
+import { listInbox, listIssues, listPullRequests } from './sources';
 import { rangeFileDiff, rangeFiles, searchFiles } from './git-review';
 import { findLocalUrl } from './workspace-setup';
 import { createOrchestration } from './orchestration';
@@ -900,6 +902,72 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     return ask;
   }
 
+  function sendPrompt(session: ChatSession, text: string): Promise<Result> {
+    return chats.send(session.id, {
+      text,
+      agent: session.agent,
+      model: session.model,
+      effort: session.effort,
+      planMode: false,
+      fast: session.fast,
+    });
+  }
+
+  async function repoIdsByGithubUrl(): Promise<Map<string, string>> {
+    const repoIds = new Map<string, string>();
+    const origins = await Promise.all(
+      store.state.repos.map(async (repo) => ({
+        url: (await originGithubUrl(git, repo.path))?.toLowerCase(),
+        repoId: repo.id,
+      })),
+    );
+    for (const { url, repoId } of origins)
+      if (url && !repoIds.has(url)) repoIds.set(url, repoId);
+    return repoIds;
+  }
+
+  async function pullRequestInbox(): Promise<Result<InboxPullRequest[]>> {
+    const repoIds = await repoIdsByGithubUrl();
+    if (!repoIds.size) return ok([]);
+    return listInbox(deps.run, deps.env, deps.home, repoIds);
+  }
+
+  async function reviewPullRequest(
+    repoId: string,
+    prNumber: number,
+  ): Promise<Result<{ askChatId: string }>> {
+    const repo = ctx.repo(repoId);
+    const pr = await fetchPrStatus(
+      deps.run,
+      deps.env,
+      repo.path,
+      String(prNumber),
+    );
+    if (!pr)
+      return {
+        ok: false,
+        message: `Could not find pull request #${prNumber} in ${repo.name}.`,
+      };
+    const reviewing = store.state.askChats.find(
+      (ask) => ask.reviewOf === pr.url,
+    );
+    if (reviewing) return ok({ askChatId: reviewing.id });
+    const session: ChatSession = {
+      ...chatSessionOn(ctx, store.state.settings.reviewModel),
+      title: `Review #${pr.number} ${pr.title}`,
+    };
+    const ask = addAskChat([repoId], session);
+    ask.reviewOf = pr.url;
+    store.save();
+    ctx.emitState();
+    const { prompts } = await loadRepoConfig(repo, repo.path);
+    const sent = await sendPrompt(
+      session,
+      withPrompt(inboxReviewPrompt(pr), prompts.code_review),
+    );
+    return sent.ok ? ok({ askChatId: ask.id }) : sent;
+  }
+
   function findSession(sessionId: string) {
     for (const workspace of store.state.workspaces) {
       const session = workspace.sessions.find(
@@ -1214,6 +1282,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       listPullRequests(deps.run, deps.env, ctx.repo(repoId).path, query),
     listIssues: (repoId, query) =>
       listIssues(deps.run, deps.env, ctx.repo(repoId).path, query),
+    pullRequestInbox,
+    reviewPullRequest,
     async setBaseBranch(workspaceId, branch) {
       const workspace = ctx.workspace(workspaceId);
       if (!branch.trim()) return;
@@ -1268,14 +1338,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         reviewPrompt(ctx.runtime(workspaceId).prs),
       );
       workspace.sessions.push(session);
-      const sent = await chats.send(session.id, {
-        text,
-        agent: session.agent,
-        model: session.model,
-        effort: session.effort,
-        planMode: false,
-        fast: session.fast,
-      });
+      const sent = await sendPrompt(session, text);
       return sent.ok ? ok(session.id) : sent;
     },
     archiveWorkspace: (workspaceId) => archive(workspaceId),

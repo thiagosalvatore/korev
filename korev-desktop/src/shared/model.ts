@@ -178,6 +178,24 @@ export interface PullRequestSummary {
   isDraft: boolean;
 }
 
+export type InboxReason = 'review-requested' | 'authored';
+
+export interface InboxPullRequest {
+  repoId: string;
+  reason: InboxReason;
+  number: number;
+  title: string;
+  url: string;
+  author: string;
+  isDraft: boolean;
+  headRefName: string;
+  baseRefName: string;
+  updatedAt: string;
+  reviewDecision: PrStatus['reviewDecision'];
+  mergeable: PrStatus['mergeable'];
+  checks: Exclude<CheckState, 'skipped'> | null;
+}
+
 export interface IssueSummary {
   number: number;
   title: string;
@@ -324,6 +342,7 @@ export interface AskChat {
   createdAt: string;
   lastMessageAt: string;
   automationRun?: AutomationRun;
+  reviewOf?: string;
 }
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;

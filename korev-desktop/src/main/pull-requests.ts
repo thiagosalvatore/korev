@@ -1,6 +1,7 @@
 import {
   mergeScope,
   type CheckState,
+  type InboxPullRequest,
   type PrCheck,
   type PrStack,
   type PrComment,
@@ -195,6 +196,15 @@ export function parsePrStack(json: string): PrStack | null {
   };
 }
 
+export function rollupCheckState(
+  state: string | undefined,
+): InboxPullRequest['checks'] {
+  if (!state) return null;
+  if (FAILED_STATUS_STATES.has(state)) return 'failure';
+  if (RUNNING_STATUS_STATES.has(state)) return 'pending';
+  return 'success';
+}
+
 function readyToMerge(pr: StackPullRequest): boolean {
   const checks = pr.commits?.nodes[0]?.commit.statusCheckRollup?.state ?? '';
   return (
@@ -368,6 +378,14 @@ export function reviewPrompt(prs: PrStatus[]): string {
         `- #${pr.number} ${pr.title} (${pr.url}): ${pr.headRefName} into ${pr.baseRefName}`,
     ),
     'Read each one with `gh pr view` and `gh pr diff`, and review it against its own base branch. Also review local changes that are not pushed yet.',
+    REVIEW_FINDINGS,
+  ].join('\n');
+}
+
+export function inboxReviewPrompt(pr: PrStatus): string {
+  return [
+    `Review pull request #${pr.number} ${pr.title} (${pr.url}): ${pr.headRefName} into ${pr.baseRefName}.`,
+    'Read it with `gh pr view` and `gh pr diff`. Nothing is checked out.',
     REVIEW_FINDINGS,
   ].join('\n');
 }

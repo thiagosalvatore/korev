@@ -46,6 +46,10 @@ const NO_EXPLAINERS: Result<never> = {
   ok: false,
   message: 'The demo cannot explain pull requests.',
 };
+const NO_REVIEWS: Result<never> = {
+  ok: false,
+  message: 'The demo cannot review pull requests.',
+};
 const STREAM_STEP_MS = 80;
 const THINKING_MS = 1500;
 const OPENING_REPLY_DELAY_MS = 8000;
@@ -409,6 +413,10 @@ export function createDemoConnection(): Connection {
     async listIssues() {
       return [];
     },
+    async pullRequestInbox() {
+      return ok([]);
+    },
+    reviewPullRequest: async () => NO_REVIEWS,
     async slashCommands() {
       return [];
     },
