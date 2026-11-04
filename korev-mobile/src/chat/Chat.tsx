@@ -31,6 +31,7 @@ import {
   type PickedAnswers,
   type Repo,
 } from '../../../korev-desktop/src/shared/model';
+import { trackAnswer } from '../answered';
 import { attempt } from '../attempt';
 import { succeeded, warned } from '../haptics';
 import { useRepoGithubUrl, useTranscript } from '../hooks';
@@ -161,8 +162,13 @@ export function Chat({
   };
 
   const respond = (itemId: string, response: PermissionResponse) =>
-    attempt('Korev could not send your answer', () =>
-      api.respondPermission(session.id, itemId, response),
+    trackAnswer(
+      session.id,
+      { itemId, status: response.allow ? 'allowed' : 'denied' },
+      () =>
+        attempt('Korev could not send your answer', () =>
+          api.respondPermission(session.id, itemId, response),
+        ),
     ).then(response.allow ? succeeded : warned);
 
   const codexPlan = finishedCodexPlan(session, items, running);
@@ -176,8 +182,10 @@ export function Chat({
     list.current?.scrollToOffset({ offset: 0, animated: true });
 
   const approvePlan = (lanes: PlanLane[]) =>
-    attempt('Korev could not approve the plan', () =>
-      api.approvePlan(session.id, lanes),
+    trackAnswer(session.id, { itemId: null, status: 'allowed' }, () =>
+      attempt('Korev could not approve the plan', () =>
+        api.approvePlan(session.id, lanes),
+      ),
     ).then(succeeded);
 
   const handoff = onHandoff

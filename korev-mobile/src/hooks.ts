@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { Keyboard, Platform } from 'react-native';
 import {
   upsertChatItem,
@@ -7,6 +13,13 @@ import {
   type ModelChoice,
   type Settings,
 } from '../../korev-desktop/src/shared/model';
+import {
+  currentAnswers,
+  forgetCaughtUp,
+  subscribeAnswers,
+  withAnswered,
+  withAnsweredItems,
+} from './answered';
 import type { ConnectionStatus } from './connection';
 import { useConnection } from './korev';
 
@@ -15,21 +28,30 @@ export function useConnectionStatus(): ConnectionStatus {
   return useSyncExternalStore(connection.onStatus, connection.status);
 }
 
+function useAnswers() {
+  return useSyncExternalStore(subscribeAnswers, currentAnswers);
+}
+
 export function useAppState(): AppState | null {
   const connection = useConnection();
+  const answers = useAnswers();
   const [state, setState] = useState<AppState | null>(null);
   useEffect(() => {
     let received = 0;
+    const accept = (next: AppState) => {
+      forgetCaughtUp(next);
+      setState(next);
+    };
     const stopState = connection.on('state', (next) => {
       received++;
-      setState(next);
+      accept(next);
     });
     const refresh = () => {
       const before = received;
       void connection.api
         .getState()
         .then((fresh) => {
-          if (received === before) setState(fresh);
+          if (received === before) accept(fresh);
         })
         .catch(() => undefined);
     };
@@ -40,11 +62,12 @@ export function useAppState(): AppState | null {
       stopConnect();
     };
   }, [connection]);
-  return state;
+  return useMemo(() => state && withAnswered(state, answers), [state, answers]);
 }
 
 export function useTranscript(sessionId: string): ChatItem[] | null {
   const connection = useConnection();
+  const answer = useAnswers().get(sessionId);
   const [items, setItems] = useState<ChatItem[] | null>(null);
   useEffect(() => {
     let loaded: ChatItem[] | null = null;
@@ -80,7 +103,10 @@ export function useTranscript(sessionId: string): ChatItem[] | null {
       stopConnect();
     };
   }, [connection, sessionId]);
-  return items;
+  return useMemo(
+    () => items && withAnsweredItems(items, answer),
+    [items, answer],
+  );
 }
 
 export function useReconnect() {
