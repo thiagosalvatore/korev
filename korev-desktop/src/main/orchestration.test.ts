@@ -1,16 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import type {
-  ChatItem,
-  OrchestrationRun,
-  Result,
-  Workspace,
+import {
+  MAX_WAKES_PER_RUN,
+  type ChatItem,
+  type OrchestrationRun,
+  type Result,
+  type Workspace,
 } from '../shared/model';
 import type { Context } from './context';
-import {
-  createOrchestration,
-  MAX_RUN_DEPTH,
-  MAX_WAKES_PER_RUN,
-} from './orchestration';
+import { createOrchestration, MAX_RUN_DEPTH } from './orchestration';
 import { defaultSettings } from './store';
 
 const OK: Result = { ok: true, value: undefined };

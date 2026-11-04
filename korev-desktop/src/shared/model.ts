@@ -303,6 +303,8 @@ export function taskState(
   return task.deps.every(completed) ? 'ready' : 'pending';
 }
 
+export const MAX_WAKES_PER_RUN = 100;
+
 export function pendingDecisions(run: OrchestrationRun) {
   return {
     gates: run.gates.filter((gate) => gate.resolution === null),

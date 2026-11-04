@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 import {
   AGENT_KINDS,
+  MAX_WAKES_PER_RUN,
   taskState,
   type AgentKind,
   type ChatItem,
@@ -20,7 +21,6 @@ import { errorMessage, type Context } from './context';
 import { commitsBehind } from './git';
 
 export const MAX_RUN_DEPTH = 2;
-export const MAX_WAKES_PER_RUN = 100;
 export const STALE_COMMIT_LIMIT = 20;
 const TASK_ID_PREFIX = 't';
 const COORDINATOR = '@coordinator';
@@ -29,6 +29,9 @@ const OUTCOMES: TaskOutcome[] = ['succeeded', 'failed'];
 const SETTABLE_STATUSES = ['pending', 'completed', 'failed'] as const;
 const LIST_SEPARATOR = ',';
 const RUN_PAUSED_TITLE = 'Orchestration paused';
+const RESUME_PLACES =
+  "in the coordinator's chat, or on the Runs page in the left sidebar of Korev";
+const RUN_PAUSED = `This run is paused. The user has to click Resume run ${RESUME_PLACES}.`;
 const DECISION_NEEDED_TITLE = 'Decision needed';
 const QUESTION_ID_PREFIX = 'q';
 const GATE_ID_PREFIX = 'g';
@@ -320,7 +323,7 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
     const coordinator = ctx.workspace(run.coordinatorWorkspaceId);
     ctx.deps.notify({
       title: RUN_PAUSED_TITLE,
-      body: `${workspaceLabel(coordinator)} reached ${MAX_WAKES_PER_RUN} messages. Resume the run to keep going.`,
+      body: `${workspaceLabel(coordinator)} reached ${MAX_WAKES_PER_RUN} messages. Click Resume run ${RESUME_PLACES}.`,
       workspaceId: coordinator.id,
       sessionId: run.coordinatorSessionId,
     });
@@ -345,7 +348,7 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
     if (run.paused)
       return Promise.resolve({
         ok: false,
-        message: 'This run is paused. The user has to resume it in Korev.',
+        message: RUN_PAUSED,
       });
     return deps.continueChat(sessionId, text);
   }
@@ -437,7 +440,7 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
       return done(
         [
           `Objective: ${run.objective || '(none)'}`,
-          run.paused ? 'Paused: waiting for the user to resume the run.' : null,
+          run.paused ? RUN_PAUSED : null,
           ...run.tasks.map((task) => taskLine(run, task)),
         ]
           .filter(Boolean)
@@ -521,10 +524,7 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
         'allow-stale': 'boolean',
       });
       const run = requireRun(call.sessionId);
-      if (run.paused)
-        throw new CliError(
-          'This run is paused. The user has to resume it in Korev.',
-        );
+      if (run.paused) throw new CliError(RUN_PAUSED);
       const task = findTask(run, values.task);
       const state = taskState(run, task);
       if (state === 'pending')
