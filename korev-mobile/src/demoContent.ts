@@ -8,6 +8,7 @@ import {
   type ChatItem,
   type CheckState,
   type ChatSession,
+  type InboxPullRequest,
   type PrStatus,
   type Repo,
   type Settings,
@@ -23,6 +24,11 @@ const MINUTE_MS = 60_000;
 
 export const DEMO_REPLY =
   'This is the Korev demo, so no agent is running. With your Mac paired, the agent would now work on this in its own worktree, and you would watch every step here as it happens.';
+
+export const DEMO_REVIEW_REPLY =
+  'This is the Korev demo, so no agent is running. With your Mac paired, the agent would now read the pull request with gh and list what to fix, most severe first.';
+
+const DEMO_LOGIN = 'you';
 
 export const DEMO_DICTATION =
   'Add a loading state to the billing page while the card is saved.';
@@ -259,8 +265,33 @@ function tool(
   };
 }
 
+function inboxEntry(
+  repo: Repo,
+  pr: PrStatus,
+  reason: InboxPullRequest['reason'],
+  author: string,
+  checks: InboxPullRequest['checks'],
+): InboxPullRequest {
+  return {
+    repoId: repo.id,
+    reason,
+    number: pr.number,
+    title: pr.title,
+    url: pr.url,
+    author,
+    isDraft: pr.isDraft,
+    headRefName: pr.headRefName,
+    baseRefName: pr.baseRefName,
+    updatedAt: pr.createdAt,
+    reviewDecision: pr.reviewDecision,
+    mergeable: pr.mergeable,
+    checks,
+  };
+}
+
 export interface DemoWorld {
   state: AppState;
+  inbox: InboxPullRequest[];
   transcripts: Map<string, ChatItem[]>;
   replies: { sessionId: string; text: string }[];
 }
@@ -597,8 +628,43 @@ export function demoWorld(now: number): DemoWorld {
     ],
   ]);
 
+  const inbox = [
+    inboxEntry(
+      WEB,
+      demoPullRequest(
+        WEB,
+        96,
+        'Cache search results per query',
+        'sam/search-cache',
+        ago(25),
+        { reviewDecision: 'REVIEW_REQUIRED' },
+      ),
+      'review-requested',
+      'sam',
+      'success',
+    ),
+    inboxEntry(
+      API,
+      demoPullRequest(
+        API,
+        93,
+        'Rate limit the webhook sender',
+        'priya/webhook-limits',
+        ago(65),
+        { reviewDecision: 'REVIEW_REQUIRED', mergeable: 'CONFLICTING' },
+      ),
+      'review-requested',
+      'priya',
+      'failure',
+    ),
+    inboxEntry(API, webhooksPr, 'authored', DEMO_LOGIN, 'pending'),
+    inboxEntry(API, checkoutPr, 'authored', DEMO_LOGIN, 'failure'),
+    inboxEntry(API, searchPr, 'authored', DEMO_LOGIN, 'success'),
+  ];
+
   return {
     state,
+    inbox,
     transcripts,
     replies: [
       {

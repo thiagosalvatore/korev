@@ -40,8 +40,8 @@ function Screens() {
             options={{ title: 'Ask a question', presentation: 'modal' }}
           />
           <Stack.Screen
-            name="ask/explain"
-            options={{ title: 'Explain a pull request', presentation: 'modal' }}
+            name="pulls"
+            options={{ title: 'Pull requests', presentation: 'modal' }}
           />
           <Stack.Screen name="ask/[id]" options={{ title: '' }} />
         </Stack.Protected>

@@ -116,7 +116,7 @@ function FeatureGraph() {
           'Unified or split, with Viewed to collapse a file',
           '“N files changed” after each turn shows only that turn',
           'Open a review chat with its own model',
-          'Review a teammate’s pull request from Ask, with your own skill',
+          'Pull requests lists what waits for your review; Review starts it in one click',
         ]}
         card={<Review />}
       />

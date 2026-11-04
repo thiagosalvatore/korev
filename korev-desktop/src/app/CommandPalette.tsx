@@ -9,6 +9,7 @@ import {
   openPrPicker,
   newChat,
   openBoard,
+  openPullRequests,
   openDiff,
   openFile,
   openSearch,
@@ -108,6 +109,13 @@ function paletteItems(
       hint: '⌘⇧R',
       section: 'Actions',
       run: () => openPrPicker('review'),
+    },
+    {
+      id: 'pull-requests',
+      label: 'Pull requests',
+      icon: 'git-pull-request',
+      section: 'Actions',
+      run: openPullRequests,
     },
     {
       id: 'runs',
