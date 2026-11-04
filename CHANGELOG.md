@@ -4,7 +4,18 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-04
+
+Copy a plan before you approve it, and Korev no longer stalls git on a slow repository.
+
+### New
+
+- **Copy plan.** The "Plan ready for review" card has a Copy plan button next to Hand off. When you paste the plan into Slack or a doc, its headings and lists keep their format.
+
 ### Fixed
+
+- On a slow repository, Korev no longer starts hundreds of git processes and stalls git for every workspace.
+- On your phone's New workspace screen, a long task no longer pushes Create and start off the screen. The task field stops growing and scrolls inside.
 
 - An Ask chat that waits for you to approve a command now shows the yellow question icon in the sidebar, like a workspace does.
 - "Review a pull request" now adds your repository's Code review prompt to the message.
