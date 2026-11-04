@@ -8,6 +8,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 - An Ask chat that waits for you to approve a command now shows the yellow question icon in the sidebar, like a workspace does.
 - "Review a pull request" now adds your repository's Code review prompt to the message.
+- On your phone, approving a plan or answering the agent now shows the agent working right away, in the chat and in the workspace list, before your Mac replies.
 
 ## [0.24.0] - 2026-10-28
 

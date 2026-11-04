@@ -11,12 +11,12 @@ import {
   type PermissionResponse,
   type Result,
   type Workspace,
-  type WorkspaceRuntime,
 } from '../../korev-desktop/src/shared/model';
 import {
   movedFolder,
   movedRepo,
 } from '../../korev-desktop/src/shared/workspaces';
+import { without, withRunning, withRuntime, workspaceOf } from './appState';
 import { apiFor, createEventListeners } from './bridge';
 import type { Connection, ConnectionStatus } from './connection';
 import {
@@ -81,15 +81,6 @@ function branchFrom(text: string, fallback: string): string {
   return words.slice(0, BRANCH_WORDS).join('-') || fallback;
 }
 
-function workspaceOf(
-  state: AppState,
-  sessionId: string,
-): Workspace | undefined {
-  return state.workspaces.find((workspace) =>
-    workspace.sessions.some((session) => session.id === sessionId),
-  );
-}
-
 function sessionOf(
   state: AppState,
   sessionId: string,
@@ -113,22 +104,6 @@ function withWorkspace(
   };
 }
 
-function withRuntime(
-  state: AppState,
-  workspaceId: string | undefined,
-  change: (runtime: WorkspaceRuntime) => Partial<WorkspaceRuntime>,
-): AppState {
-  if (!workspaceId) return state;
-  const runtime = state.runtime[workspaceId] ?? demoRuntime();
-  return {
-    ...state,
-    runtime: {
-      ...state.runtime,
-      [workspaceId]: { ...runtime, ...change(runtime) },
-    },
-  };
-}
-
 function withSession(
   state: AppState,
   sessionId: string,
@@ -147,27 +122,6 @@ function withSession(
       session: changeIfMatch(ask.session),
     })),
   };
-}
-
-function without(list: string[], id: string): string[] {
-  return list.filter((entry) => entry !== id);
-}
-
-function withRunning(
-  state: AppState,
-  sessionId: string,
-  running: boolean,
-): AppState {
-  const next = {
-    ...state,
-    runningSessions: running
-      ? [...without(state.runningSessions, sessionId), sessionId]
-      : without(state.runningSessions, sessionId),
-    waitingSessions: without(state.waitingSessions, sessionId),
-  };
-  return withRuntime(next, workspaceOf(state, sessionId)?.id, () =>
-    running ? { status: 'working' } : { status: 'idle', unread: true },
-  );
 }
 
 function withWaiting(state: AppState, sessionId: string): AppState {
