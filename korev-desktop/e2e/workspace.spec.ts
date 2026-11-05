@@ -300,7 +300,7 @@ test('asks a question about a repository without creating a workspace', async ()
   try {
     await window.getByRole('button', { name: 'Open project' }).click();
     const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
-    await sidebar.getByRole('button', { name: 'Ask', exact: true }).click();
+    await sidebar.getByRole('button', { name: 'New Ask', exact: true }).click();
     await expect(window.getByRole('heading', { name: 'Ask' })).toBeVisible();
     await pickRepositories(window, ['acme-web']);
     await window
@@ -943,7 +943,7 @@ test("explains a teammate's pull request in a read-only Ask chat", async () => {
   try {
     await window.getByRole('button', { name: 'Open project' }).click();
     const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
-    await sidebar.getByRole('button', { name: 'Ask', exact: true }).click();
+    await sidebar.getByRole('button', { name: 'New Ask', exact: true }).click();
     await window
       .getByRole('button', { name: /^Explain a pull request/ })
       .click();
@@ -1034,7 +1034,7 @@ test("starts an Ask to review a teammate's pull request", async () => {
     await expect(picker).toBeHidden();
 
     const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
-    await sidebar.getByRole('button', { name: 'Ask', exact: true }).click();
+    await sidebar.getByRole('button', { name: 'New Ask', exact: true }).click();
     await window
       .getByRole('button', { name: /^Review a pull request/ })
       .click();

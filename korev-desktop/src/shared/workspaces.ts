@@ -204,6 +204,8 @@ export function automationRunsNewestFirst(
   );
 }
 
+const ACROSS_REPOS_ORDER = -1;
+
 export function activeWorkspaces(state: AppState): Workspace[] {
   const repoOrder = new Map(
     repoSections(state)
@@ -212,7 +214,8 @@ export function activeWorkspaces(state: AppState): Workspace[] {
   );
   const active = state.workspaces.filter((ws) => !ws.archivedAt);
   const leads = crossRepoLeads(state);
-  const folderOf = (ws: Workspace) => sidebarFolderId(leads, ws);
+  const folderOf = (ws: Workspace) =>
+    isAcrossRepos(leads, ws) ? null : (ws.folderId ?? null);
   const groupStart = startTimes(active, (ws) => ws.groupId);
   const folderStart = startTimes(active, folderOf);
   const groupStartOf = (ws: Workspace) =>
@@ -222,7 +225,9 @@ export function activeWorkspaces(state: AppState): Workspace[] {
     return (folderId && folderStart.get(folderId)) || groupStartOf(ws);
   };
   const orderOf = (ws: Workspace) =>
-    repoOrder.get(sidebarRepoId(leads, ws)) ?? 0;
+    isAcrossRepos(leads, ws)
+      ? ACROSS_REPOS_ORDER
+      : (repoOrder.get(ws.repoId) ?? 0);
   return active.sort(
     (a, b) =>
       orderOf(a) - orderOf(b) ||
@@ -296,26 +301,15 @@ export function sidebarRepoId(
   return lead?.repoId ?? workspace.repoId;
 }
 
-export function sidebarFolderId(
-  leads: Map<string, Workspace>,
-  workspace: Workspace,
-): string | null {
-  const lead = workspace.groupId ? leads.get(workspace.groupId) : undefined;
-  return (lead ?? workspace).folderId ?? null;
-}
-
 export interface FolderRun {
   folderId: string | null;
   workspaces: Workspace[];
 }
 
-export function folderRuns(
-  workspaces: Workspace[],
-  leads: Map<string, Workspace>,
-): FolderRun[] {
+export function folderRuns(workspaces: Workspace[]): FolderRun[] {
   const runs: FolderRun[] = [];
   for (const workspace of workspaces) {
-    const folderId = sidebarFolderId(leads, workspace);
+    const folderId = workspace.folderId ?? null;
     const last = runs.at(-1);
     if (last?.folderId === folderId) last.workspaces.push(workspace);
     else runs.push({ folderId, workspaces: [workspace] });

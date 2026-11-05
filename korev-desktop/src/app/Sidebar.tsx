@@ -26,19 +26,22 @@ import {
   type WorkspaceRuntime,
 } from '../shared/model';
 import {
+  acrossReposIn,
   activeWorkspaces,
-  asksNewestFirst,
+  askSections,
+  asksWaitingForYou,
   boardColumn,
   crossRepoLead,
   crossRepoLeads,
   folderRuns,
+  isAcrossRepos,
   repoSections,
   sidebarEntries,
-  sidebarRepoId,
   waitsForLane,
   waitsForYou,
   workspaceLabel,
   workspacesWaitingForYou,
+  type AcrossReposCounts,
 } from '../shared/workspaces';
 import {
   archiveWorkspace,
@@ -79,23 +82,18 @@ function NavRow({
   icon,
   label,
   hint,
-  title,
-  iconClassName = 'text-fg-3',
   active = false,
   onClick,
 }: {
   icon: IconName;
   label: string;
   hint?: string;
-  title?: string;
-  iconClassName?: string;
   active?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      title={title}
       aria-current={active ? 'page' : undefined}
       className={cn(
         ROW,
@@ -104,7 +102,7 @@ function NavRow({
       )}
       onClick={onClick}
     >
-      <Icon name={icon} size={15} className={iconClassName} />
+      <Icon name={icon} size={15} className="text-fg-3" />
       <span className="flex-1">{label}</span>
       {hint ? (
         <Kbd className="opacity-0 group-hover:opacity-100">{hint}</Kbd>
@@ -223,19 +221,27 @@ function UnreadDot() {
   );
 }
 
+function isWaitingAsk(state: AppState, ask: AskChat): boolean {
+  return state.waitingSessions.includes(ask.session.id);
+}
+
 function HiddenWaitingDot({
   state,
   workspaces,
+  asks = [],
 }: {
   state: AppState;
   workspaces: Workspace[];
+  asks?: AskChat[];
 }) {
   const waiting = workspaces.filter((ws) => waitsForYou(state.runtime[ws.id]));
-  if (!waiting.length) return null;
-  const needsInput = waiting.some(
-    (ws) => boardColumn(state.runtime[ws.id]!) === 'needs-you',
-  );
-  const label = `${waiting.length} waiting for you`;
+  const waitingAsks = asks.filter((ask) => isWaitingAsk(state, ask));
+  const count = waiting.length + waitingAsks.length;
+  if (!count) return null;
+  const needsInput =
+    waitingAsks.length > 0 ||
+    waiting.some((ws) => boardColumn(state.runtime[ws.id]!) === 'needs-you');
+  const label = `${count} waiting for you`;
   return (
     <span
       aria-label={label}
@@ -255,10 +261,33 @@ function WaitingForYou({
   state: AppState;
   selectedId: string | null;
 }) {
+  const selectedAskId = useSelectedAskId();
   const waiting = workspacesWaitingForYou(state);
-  if (!waiting.length) return null;
+  const asks = asksWaitingForYou(state);
+  if (!waiting.length && !asks.length) return null;
+  const needsYou = waiting.filter(
+    (ws) => boardColumn(state.runtime[ws.id]!) === 'needs-you',
+  );
+  const done = waiting.filter((ws) => !needsYou.includes(ws));
   const repoName = (workspace: Workspace) =>
     state.repos.find((repo) => repo.id === workspace.repoId)?.name ?? '';
+  const workspaceRow = (workspace: Workspace) => {
+    const runtime = state.runtime[workspace.id]!;
+    const label = workspaceLabel(workspace);
+    const repo = repoName(workspace);
+    return (
+      <WaitingRow
+        key={workspace.id}
+        label={`Open ${label} in ${repo}`}
+        icon={<StatusIcon workspace={workspace} runtime={runtime} />}
+        title={label}
+        detail={repo}
+        selected={workspace.id === selectedId}
+        unread={runtime.unread}
+        onClick={() => selectWorkspace(workspace.id)}
+      />
+    );
+  };
   return (
     <section
       aria-label="Waiting for you"
@@ -266,41 +295,72 @@ function WaitingForYou({
     >
       <div className="flex h-7 items-center gap-1.5 px-2 type-overline text-fg-4">
         Waiting for you
-        <Badge count>{waiting.length}</Badge>
+        <Badge count>{waiting.length + asks.length}</Badge>
       </div>
-      {waiting.map((workspace) => {
-        const runtime = state.runtime[workspace.id]!;
-        const label = workspaceLabel(workspace);
-        const repo = repoName(workspace);
-        const selected = workspace.id === selectedId;
-        return (
-          <button
-            key={workspace.id}
-            type="button"
-            aria-label={`Open ${label} in ${repo}`}
-            aria-current={selected ? 'page' : undefined}
-            className={cn(
-              ROW,
-              'h-8',
-              selected && 'bg-active text-fg-1 hover:bg-active',
-            )}
-            onClick={() => selectWorkspace(workspace.id)}
-          >
-            <span className="flex w-4 flex-none justify-center">
-              <StatusIcon workspace={workspace} runtime={runtime} />
-            </span>
-            <span className="truncate font-semibold text-fg-1">{label}</span>
-            <span className="flex-1 truncate text-xs text-fg-3">{repo}</span>
-            {runtime.unread ? <UnreadDot /> : null}
-          </button>
-        );
-      })}
+      {needsYou.map(workspaceRow)}
+      {asks.map((ask) => (
+        <WaitingRow
+          key={ask.id}
+          label={`Open Ask ${ask.session.title}`}
+          icon={<WaitingIcon />}
+          title={ask.session.title}
+          detail={`Ask · ${askRepoNames(state, ask)}`}
+          selected={ask.id === selectedAskId}
+          unread={false}
+          onClick={() => openAsk(ask.id)}
+        />
+      ))}
+      {done.map(workspaceRow)}
     </section>
   );
 }
 
+function WaitingRow({
+  label,
+  icon,
+  title,
+  detail,
+  selected,
+  unread,
+  onClick,
+}: {
+  label: string;
+  icon: ReactNode;
+  title: string;
+  detail: string;
+  selected: boolean;
+  unread: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-current={selected ? 'page' : undefined}
+      className={cn(
+        ROW,
+        'h-8',
+        selected && 'bg-active text-fg-1 hover:bg-active',
+      )}
+      onClick={onClick}
+    >
+      <span className="flex w-4 flex-none justify-center">{icon}</span>
+      <span className="truncate font-semibold text-fg-1">{title}</span>
+      <span className="flex-1 truncate text-xs text-fg-3">{detail}</span>
+      {unread ? <UnreadDot /> : null}
+    </button>
+  );
+}
+
+function useSelectedAskId(): string | null {
+  return useUi((ui) => {
+    if (ui.page.kind === 'grid') return paneAskChatId(focusedGridPane(ui.grid));
+    return ui.page.kind === 'ask' ? ui.page.askChatId : null;
+  });
+}
+
 interface GroupMember {
-  repo: string;
+  repo: Repo;
   waitsOn: string | null;
 }
 
@@ -321,14 +381,13 @@ function WorkspaceRow({
   const stats = runtime?.stats;
   const hasStats = stats && (stats.additions > 0 || stats.deletions > 0);
   const notice = runtime?.message ?? runtime?.setupError;
-  const title = member ? member.repo : workspace.branch;
+  const title = member ? member.repo.name : workspace.branch;
   const label = workspaceLabel(workspace);
   const [renaming, setRenaming] = useState(false);
   const [naming, setNaming] = useState(false);
-  const folderHolder = crossRepoLead(state, workspace) ?? workspace;
   async function createFolderWithWorkspace(name: string) {
-    const folder = await api.createWorkspaceFolder(folderHolder.repoId, name);
-    await api.moveWorkspace(folderHolder.id, folder.id);
+    const folder = await api.createWorkspaceFolder(workspace.repoId, name);
+    await api.moveWorkspace(workspace.id, folder.id);
   }
   return (
     <>
@@ -337,7 +396,9 @@ function WorkspaceRow({
         tabIndex={0}
         aria-current={selected ? 'page' : undefined}
         aria-label={
-          member ? `Workspace ${label} in ${member.repo}` : `Workspace ${label}`
+          member
+            ? `Workspace ${label} in ${member.repo.name}`
+            : `Workspace ${label}`
         }
         {...draggable(WORKSPACE_DRAG_TYPE, workspace.id)}
         onClick={() => selectWorkspace(workspace.id)}
@@ -357,14 +418,15 @@ function WorkspaceRow({
         <span className="min-w-0 flex-1">
           <span
             className={cn(
-              'block truncate text-sm',
+              'flex items-center gap-1.5 text-sm',
               runtime?.unread || runtime?.status === 'waiting'
                 ? 'font-semibold text-fg-1'
                 : 'font-medium',
             )}
             title={title}
           >
-            {title}
+            {member ? <RepoAvatar repo={member.repo} size="sm" /> : null}
+            <span className="truncate">{title}</span>
           </span>
           <span className="flex items-center gap-1.5 text-xs text-fg-3">
             {member ? (
@@ -434,14 +496,16 @@ function WorkspaceRow({
                 hint: '⌘⇧A',
                 onSelect: () => void archiveWorkspace(state, workspace),
               },
-              ...moveToFolderItems(
-                state.workspaceFolders.filter(
-                  (folder) => folder.repoId === folderHolder.repoId,
-                ),
-                folderHolder.folderId ?? null,
-                (target) => void api.moveWorkspace(folderHolder.id, target),
-                () => setNaming(true),
-              ),
+              ...(member
+                ? []
+                : moveToFolderItems(
+                    state.workspaceFolders.filter(
+                      (folder) => folder.repoId === workspace.repoId,
+                    ),
+                    workspace.folderId ?? null,
+                    (target) => void api.moveWorkspace(workspace.id, target),
+                    () => setNaming(true),
+                  )),
             ]}
             trigger={({ toggle }) => (
               <IconButton
@@ -489,7 +553,27 @@ function repoIcon(repoId: string): Promise<string | null> {
   return icon;
 }
 
-function RepoAvatar({ repo }: { repo: Repo }) {
+const AVATAR_SIZES = { md: 'size-5 text-2xs', sm: 'size-4 text-[9px]' };
+
+const REPO_NAME_PARTS = /[-_./]/;
+const AVATAR_INITIALS = 2;
+
+function repoInitials(name: string): string {
+  return name
+    .split(REPO_NAME_PARTS)
+    .filter(Boolean)
+    .slice(0, AVATAR_INITIALS)
+    .map((part) => part.charAt(0))
+    .join('');
+}
+
+function RepoAvatar({
+  repo,
+  size = 'md',
+}: {
+  repo: Repo;
+  size?: keyof typeof AVATAR_SIZES;
+}) {
   const [icon, setIcon] = useState<string | null>(null);
   useEffect(() => {
     void repoIcon(repo.id).then(setIcon);
@@ -499,14 +583,22 @@ function RepoAvatar({ repo }: { repo: Repo }) {
       <img
         src={icon}
         alt=""
-        className="size-5 flex-none rounded-xs object-contain"
+        className={cn(
+          AVATAR_SIZES[size],
+          'flex-none rounded-xs object-contain',
+        )}
         onError={() => setIcon(null)}
       />
     );
   }
   return (
-    <span className="flex size-5 flex-none items-center justify-center rounded-xs bg-accent-subtle font-mono text-2xs font-semibold text-accent-text uppercase">
-      {repo.name.charAt(0)}
+    <span
+      className={cn(
+        AVATAR_SIZES[size],
+        'flex flex-none items-center justify-center rounded-xs bg-accent-subtle font-mono font-semibold text-accent-text uppercase',
+      )}
+    >
+      {repoInitials(repo.name)}
     </span>
   );
 }
@@ -522,10 +614,14 @@ function toggled(list: string[], id: string): string[] {
     : [...list, id];
 }
 
-function useCollapsed(
-  key: 'collapsedRepos' | 'expandedRepos' | 'collapsedFolders',
-  id: string,
-) {
+type FoldList =
+  | 'collapsedRepos'
+  | 'expandedRepos'
+  | 'collapsedFolders'
+  | 'collapsedLinked'
+  | 'collapsedAsks';
+
+function useCollapsed(key: FoldList, id: string) {
   const listed = useUi((ui) => ui[key].includes(id));
   const toggle = () => setUi((ui) => ({ [key]: toggled(ui[key], id) }));
   return [key === 'expandedRepos' ? !listed : listed, toggle] as const;
@@ -636,9 +732,9 @@ function WorkspaceFolderSection({
   const drop = useDropTarget({
     [WORKSPACE_DRAG_TYPE]: (draggedId) => {
       const dragged = state.workspaces.find((ws) => ws.id === draggedId);
-      const holder = dragged && (crossRepoLead(state, dragged) ?? dragged);
-      if (holder?.repoId === folder.repoId)
-        void api.moveWorkspace(holder.id, folder.id);
+      if (!dragged || crossRepoLead(state, dragged)) return;
+      if (dragged.repoId === folder.repoId)
+        void api.moveWorkspace(dragged.id, folder.id);
     },
   });
   return (
@@ -720,6 +816,31 @@ function WorkspaceFolderSection({
   );
 }
 
+function repoOf(state: AppState, repoId: string): Repo | undefined {
+  return state.repos.find((repo) => repo.id === repoId);
+}
+
+function MemberChip({
+  state,
+  workspace,
+}: {
+  state: AppState;
+  workspace: Workspace;
+}) {
+  const repo = repoOf(state, workspace.repoId);
+  const runtime = state.runtime[workspace.id];
+  if (!repo) return null;
+  return (
+    <span
+      title={repo.name}
+      className="flex h-5 items-center gap-1 rounded-sm bg-active px-1"
+    >
+      <RepoAvatar repo={repo} size="sm" />
+      {runtime ? <StatusIcon workspace={workspace} runtime={runtime} /> : null}
+    </span>
+  );
+}
+
 function LinkedGroup({
   state,
   lead,
@@ -733,34 +854,296 @@ function LinkedGroup({
   selectedId: string | null;
   indexOf: (workspace: Workspace) => number;
 }) {
-  const repoName = (workspace: Workspace) =>
-    state.repos.find((repo) => repo.id === workspace.repoId)?.name ?? '';
+  const [collapsed, toggle] = useCollapsed('collapsedLinked', lead.groupId!);
+  const leadRepo = repoOf(state, lead.repoId)?.name ?? '';
   return (
     <div
       role="group"
       aria-label={`Linked workspace ${workspaceLabel(lead)}`}
       className="flex flex-col gap-0.5"
     >
-      <div className="flex h-6 items-center gap-1.5 px-2 text-xs text-fg-3">
-        <Icon name="link" size={11} />
-        <span className="truncate">{workspaceLabel(lead)}</span>
-      </div>
-      <div className="flex flex-col gap-0.5 pl-3">
-        {members.map((workspace) => (
-          <WorkspaceRow
-            key={workspace.id}
-            state={state}
-            workspace={workspace}
-            selected={workspace.id === selectedId}
-            index={indexOf(workspace)}
-            member={{
-              repo: repoName(workspace),
-              waitsOn: waitsForLane(state, workspace) ? repoName(lead) : null,
-            }}
-          />
-        ))}
-      </div>
+      <button
+        type="button"
+        aria-expanded={!collapsed}
+        className={cn(ROW, 'min-h-11 py-1.5')}
+        onClick={toggle}
+      >
+        <span className="flex w-4 justify-center self-start pt-0.5">
+          <Icon name="link" size={14} className="text-fg-3" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold text-fg-1">
+            {workspaceLabel(lead)}
+          </span>
+          <span className="mt-0.5 flex flex-wrap gap-1">
+            {members.map((workspace) => (
+              <MemberChip
+                key={workspace.id}
+                state={state}
+                workspace={workspace}
+              />
+            ))}
+          </span>
+        </span>
+        <Icon
+          name="chevron-down"
+          size={12}
+          className={cn(
+            'mt-1 self-start text-fg-4 transition-transform',
+            collapsed && '-rotate-90',
+          )}
+        />
+      </button>
+      {collapsed ? null : (
+        <div className="ml-4 flex flex-col gap-0.5 border-l border-border-2 pl-1.5">
+          {members.flatMap((workspace) => {
+            const repo = repoOf(state, workspace.repoId);
+            if (!repo) return [];
+            return (
+              <WorkspaceRow
+                key={workspace.id}
+                state={state}
+                workspace={workspace}
+                selected={workspace.id === selectedId}
+                index={indexOf(workspace)}
+                member={{
+                  repo,
+                  waitsOn: waitsForLane(state, workspace) ? leadRepo : null,
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
+  );
+}
+
+function AskRepos({ state, ask }: { state: AppState; ask: AskChat }) {
+  return (
+    <>
+      {ask.repoIds.map((repoId) => {
+        const repo = repoOf(state, repoId);
+        return repo ? <RepoAvatar key={repoId} repo={repo} size="sm" /> : null;
+      })}
+      <span className="truncate">{askRepoNames(state, ask)}</span>
+    </>
+  );
+}
+
+function AskRow({
+  state,
+  ask,
+  detail,
+}: {
+  state: AppState;
+  ask: AskChat;
+  detail?: ReactNode;
+}) {
+  const selected = useSelectedAskId() === ask.id;
+  const running = state.runningSessions.includes(ask.session.id);
+  const waiting = isWaitingAsk(state, ask);
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-current={selected ? 'page' : undefined}
+      aria-label={`Ask ${ask.session.title}`}
+      {...draggable(ASK_DRAG_TYPE, ask.id)}
+      onClick={() => openAsk(ask.id)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') openAsk(ask.id);
+      }}
+      className={cn(
+        'group flex min-h-9 cursor-pointer items-center gap-2 rounded-md py-1 pr-1.5 pl-2 text-fg-2 hover:bg-hover',
+        selected && 'bg-active text-fg-1 hover:bg-active',
+      )}
+    >
+      {waiting ? (
+        <WaitingIcon />
+      ) : (
+        <Icon
+          name={running ? 'loader-circle' : 'message-square'}
+          size={14}
+          className={cn(running ? 'text-accent-text' : 'text-fg-4')}
+        />
+      )}
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn(
+            'block truncate text-sm',
+            waiting ? 'font-semibold text-fg-1' : 'font-medium',
+          )}
+        >
+          {ask.session.title}
+        </span>
+        {detail ? (
+          <span className="flex items-center gap-1.5 text-xs text-fg-3">
+            {detail}
+          </span>
+        ) : null}
+      </span>
+      <span className="text-2xs text-fg-4 group-hover:hidden">
+        {timeAgo(ask.lastMessageAt)}
+      </span>
+      <span className="hidden group-hover:flex">
+        <IconButton
+          icon="trash-2"
+          label={`Delete ${ask.session.title}`}
+          size="sm"
+          onClick={(event) => {
+            event.stopPropagation();
+            void deleteAsk(ask);
+          }}
+        />
+      </span>
+    </div>
+  );
+}
+
+function AcrossRepos({
+  state,
+  groups,
+  asks,
+  leads,
+  selectedId,
+  indexOf,
+}: {
+  state: AppState;
+  groups: Workspace[][];
+  asks: AskChat[];
+  leads: Map<string, Workspace>;
+  selectedId: string | null;
+  indexOf: (workspace: Workspace) => number;
+}) {
+  if (!groups.length && !asks.length) return null;
+  return (
+    <section
+      aria-label="Across repos"
+      className="mb-2 flex flex-col gap-0.5 border-b border-border-1 pb-2"
+    >
+      <div className="flex h-7 items-center gap-1.5 px-2 type-overline text-fg-4">
+        Across repos
+        <Badge count>{groups.length + asks.length}</Badge>
+      </div>
+      {groups.map((members) => (
+        <LinkedGroup
+          key={members[0].groupId}
+          state={state}
+          lead={leads.get(members[0].groupId!)!}
+          members={members}
+          selectedId={selectedId}
+          indexOf={indexOf}
+        />
+      ))}
+      {asks.map((ask) => (
+        <AskRow
+          key={ask.id}
+          state={state}
+          ask={ask}
+          detail={<AskRepos state={state} ask={ask} />}
+        />
+      ))}
+    </section>
+  );
+}
+
+function FoldChevron({ collapsed }: { collapsed: boolean }) {
+  return (
+    <Icon
+      name="chevron-down"
+      size={12}
+      className={cn(
+        'text-fg-4 transition-transform',
+        collapsed && '-rotate-90',
+      )}
+    />
+  );
+}
+
+function AsksFold({
+  state,
+  repoId,
+  asks,
+}: {
+  state: AppState;
+  repoId: string;
+  asks: AskChat[];
+}) {
+  const [collapsed, toggle] = useCollapsed('collapsedAsks', repoId);
+  return (
+    <div role="group" aria-label="Asks" className="flex flex-col gap-0.5">
+      <button
+        type="button"
+        aria-expanded={!collapsed}
+        className={cn(ROW, 'h-7 text-xs text-fg-3')}
+        onClick={toggle}
+      >
+        <FoldChevron collapsed={collapsed} />
+        <Icon name="messages-square" size={13} />
+        <span>Asks</span>
+        <span className="font-mono text-2xs text-fg-4">{asks.length}</span>
+        {collapsed ? (
+          <HiddenWaitingDot state={state} workspaces={[]} asks={asks} />
+        ) : null}
+      </button>
+      {collapsed ? null : (
+        <div className="max-h-56 overflow-y-auto pl-3">
+          {asks.map((ask) => (
+            <AskRow key={ask.id} state={state} ask={ask} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AlsoAcrossRepos({ counts }: { counts: AcrossReposCounts }) {
+  const parts = [
+    counts.linked ? `${counts.linked} linked` : null,
+    counts.asks ? `${counts.asks} ${counts.asks === 1 ? 'Ask' : 'Asks'}` : null,
+  ].filter(Boolean);
+  if (!parts.length) return null;
+  return (
+    <p className="flex h-6 items-center gap-1.5 px-2 text-xs text-fg-4">
+      <Icon name="link" size={11} />
+      Also in {parts.join(', ')} above
+    </p>
+  );
+}
+
+const NO_REPOSITORY = 'no-repository';
+
+function NoRepository({ state, asks }: { state: AppState; asks: AskChat[] }) {
+  const [collapsed, toggle] = useCollapsed('collapsedRepos', NO_REPOSITORY);
+  if (!asks.length) return null;
+  return (
+    <section aria-label="No repository" className="mb-2">
+      <button
+        type="button"
+        aria-expanded={!collapsed}
+        className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2 text-left hover:bg-hover"
+        onClick={toggle}
+      >
+        <span className="flex size-5 flex-none items-center justify-center rounded-xs border border-dashed border-border-2 text-fg-4">
+          <Icon name="message-square" size={11} />
+        </span>
+        <span className="truncate text-sm font-semibold text-fg-1">
+          No repository
+        </span>
+        <FoldChevron collapsed={collapsed} />
+        {collapsed ? (
+          <HiddenWaitingDot state={state} workspaces={[]} asks={asks} />
+        ) : null}
+      </button>
+      {collapsed ? null : (
+        <div className="mt-0.5 max-h-56 overflow-y-auto">
+          {asks.map((ask) => (
+            <AskRow key={ask.id} state={state} ask={ask} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -769,7 +1152,8 @@ function RepoGroup({
   repo,
   folderId,
   workspaces,
-  leads,
+  asks,
+  acrossRepos,
   selectedId,
   indexOf,
 }: {
@@ -777,12 +1161,18 @@ function RepoGroup({
   repo: Repo;
   folderId: string | null;
   workspaces: Workspace[];
-  leads: Map<string, Workspace>;
+  asks: AskChat[];
+  acrossRepos: AcrossReposCounts;
   selectedId: string | null;
   indexOf: (workspace: Workspace) => number;
 }) {
+  const hasWork =
+    workspaces.length > 0 ||
+    asks.length > 0 ||
+    acrossRepos.linked > 0 ||
+    acrossRepos.asks > 0;
   const [collapsed, toggle] = useCollapsed(
-    workspaces.length > 0 ? 'collapsedRepos' : 'expandedRepos',
+    hasWork ? 'collapsedRepos' : 'expandedRepos',
     repo.id,
   );
   const [naming, setNaming] = useState(false);
@@ -799,27 +1189,15 @@ function RepoGroup({
     await api.moveRepo(repo.id, { folderId: folder.id, beforeId: null });
   }
   const entriesOf = (members: Workspace[]) =>
-    sidebarEntries(members, leads).map(([first, ...rest]) => {
-      const lead = first.groupId ? leads.get(first.groupId) : undefined;
-      return lead ? (
-        <LinkedGroup
-          key={first.id}
-          state={state}
-          lead={lead}
-          members={[first, ...rest]}
-          selectedId={selectedId}
-          indexOf={indexOf}
-        />
-      ) : (
-        <WorkspaceRow
-          key={first.id}
-          state={state}
-          workspace={first}
-          selected={first.id === selectedId}
-          index={indexOf(first)}
-        />
-      );
-    });
+    members.map((workspace) => (
+      <WorkspaceRow
+        key={workspace.id}
+        state={state}
+        workspace={workspace}
+        selected={workspace.id === selectedId}
+        index={indexOf(workspace)}
+      />
+    ));
   return (
     <section aria-label={repo.name} className="mb-2">
       <div
@@ -849,7 +1227,11 @@ function RepoGroup({
             )}
           />
           {collapsed ? (
-            <HiddenWaitingDot state={state} workspaces={workspaces} />
+            <HiddenWaitingDot
+              state={state}
+              workspaces={workspaces}
+              asks={asks}
+            />
           ) : null}
         </button>
         <span className="hidden gap-0.5 group-hover:flex has-[[role=menu]]:flex">
@@ -860,7 +1242,7 @@ function RepoGroup({
             onClick={() => openSettings(`repo:${repo.id}`)}
           />
           <IconButton
-            icon="message-circle-question"
+            icon="message-square-plus"
             label={`Ask about ${repo.name}`}
             size="sm"
             onClick={() => openAsk(null, [repo.id])}
@@ -905,7 +1287,7 @@ function RepoGroup({
       ) : null}
       {collapsed ? null : (
         <div className="mt-0.5 flex flex-col gap-0.5">
-          {folderRuns(workspaces, leads).map((run) => {
+          {folderRuns(workspaces).map((run) => {
             const folder = state.workspaceFolders.find(
               (entry) => entry.id === run.folderId,
             );
@@ -933,6 +1315,10 @@ function RepoGroup({
               New workspace
             </button>
           ) : null}
+          {asks.length ? (
+            <AsksFold state={state} repoId={repo.id} asks={asks} />
+          ) : null}
+          <AlsoAcrossRepos counts={acrossRepos} />
         </div>
       )}
     </section>
@@ -943,11 +1329,13 @@ function FolderSection({
   state,
   folder,
   workspaces,
+  asks,
   children,
 }: {
   state: AppState;
   folder: RepoFolder;
   workspaces: Workspace[];
+  asks: AskChat[];
   children: ReactNode;
 }) {
   const [collapsed, toggle] = useCollapsed('collapsedFolders', folder.id);
@@ -982,7 +1370,11 @@ function FolderSection({
             className={cn('transition-transform', collapsed && '-rotate-90')}
           />
           {collapsed ? (
-            <HiddenWaitingDot state={state} workspaces={workspaces} />
+            <HiddenWaitingDot
+              state={state}
+              workspaces={workspaces}
+              asks={asks}
+            />
           ) : null}
         </button>
         <span className="hidden group-hover:flex has-[[role=menu]]:flex">
@@ -1053,76 +1445,6 @@ function RootEndDropZone() {
   );
 }
 
-function AskChatList({ state, asks }: { state: AppState; asks: AskChat[] }) {
-  const selectedId = useUi((ui) => {
-    if (ui.page.kind === 'grid') return paneAskChatId(focusedGridPane(ui.grid));
-    return ui.page.kind === 'ask' ? ui.page.askChatId : null;
-  });
-  return (
-    <div className="max-h-56 overflow-y-auto pl-3">
-      {asks.map((ask) => {
-        const running = state.runningSessions.includes(ask.session.id);
-        const waiting = state.waitingSessions.includes(ask.session.id);
-        return (
-          <div
-            key={ask.id}
-            role="button"
-            tabIndex={0}
-            aria-current={ask.id === selectedId ? 'page' : undefined}
-            aria-label={`Ask ${ask.session.title}`}
-            {...draggable(ASK_DRAG_TYPE, ask.id)}
-            onClick={() => openAsk(ask.id)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') openAsk(ask.id);
-            }}
-            className={cn(
-              'group flex min-h-9 cursor-pointer items-center gap-2 rounded-md py-1 pr-1.5 pl-2 text-fg-2 hover:bg-hover',
-              ask.id === selectedId && 'bg-active text-fg-1 hover:bg-active',
-            )}
-          >
-            {waiting ? (
-              <WaitingIcon />
-            ) : (
-              <Icon
-                name={running ? 'loader-circle' : 'message-circle-question'}
-                size={14}
-                className={cn(running ? 'text-accent-text' : 'text-fg-4')}
-              />
-            )}
-            <span className="min-w-0 flex-1">
-              <span
-                className={cn(
-                  'block truncate text-sm',
-                  waiting ? 'font-semibold text-fg-1' : 'font-medium',
-                )}
-              >
-                {ask.session.title}
-              </span>
-              <span className="block truncate text-xs text-fg-3">
-                {askRepoNames(state, ask)}
-              </span>
-            </span>
-            <span className="text-2xs text-fg-4 group-hover:hidden">
-              {timeAgo(ask.lastMessageAt)}
-            </span>
-            <span className="hidden group-hover:flex">
-              <IconButton
-                icon="trash-2"
-                label={`Delete ${ask.session.title}`}
-                size="sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void deleteAsk(ask);
-                }}
-              />
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 interface NavEntry {
   id: string;
   icon: IconName;
@@ -1133,8 +1455,7 @@ interface NavEntry {
   open: () => void;
 }
 
-const ASK_ENTRY_ID = 'ask';
-const WAITING_ASK_TITLE = 'An Ask chat is waiting for you';
+const NEW_ASK_ID = 'ask';
 const SHOW_IN_SIDEBAR = 'Show in sidebar';
 
 const NAV_ENTRIES: NavEntry[] = [
@@ -1193,9 +1514,9 @@ const NAV_ENTRIES: NavEntry[] = [
     open: openAutomations,
   },
   {
-    id: ASK_ENTRY_ID,
-    icon: 'message-circle-question',
-    label: 'Ask',
+    id: NEW_ASK_ID,
+    icon: 'message-square-plus',
+    label: 'New Ask',
     page: 'ask',
     open: () => openAsk(null),
   },
@@ -1204,53 +1525,12 @@ const NAV_ENTRIES: NavEntry[] = [
 function useActiveNavEntry(): (entry: NavEntry) => boolean {
   const pageKind = useUi((ui) => ui.page.kind);
   const paletteOpen = useUi((ui) => ui.palette !== false);
-  return (entry) =>
-    entry.page === null ? paletteOpen : entry.page === pageKind;
-}
-
-function AskEntry({
-  state,
-  asks,
-  waitingAsk,
-  active,
-}: {
-  state: AppState;
-  asks: AskChat[];
-  waitingAsk: AskChat | undefined;
-  active: boolean;
-}) {
-  const open = useUi((ui) => ui.askOpen);
-  return (
-    <>
-      <div className="flex items-center gap-0.5">
-        <NavRow
-          icon="message-circle-question"
-          label="Ask"
-          title={waitingAsk ? WAITING_ASK_TITLE : undefined}
-          iconClassName={waitingAsk ? 'text-warning-text' : undefined}
-          active={active}
-          onClick={() => openAsk(null)}
-        />
-        {asks.length ? (
-          <button
-            type="button"
-            aria-label="Ask chats"
-            aria-expanded={open}
-            className="flex h-7 flex-none cursor-pointer items-center gap-1 rounded-md border-0 bg-transparent px-1.5 text-fg-4 hover:bg-hover hover:text-fg-2"
-            onClick={() => setUi({ askOpen: !open })}
-          >
-            <span className="font-mono text-2xs">{asks.length}</span>
-            <Icon
-              name="chevron-down"
-              size={12}
-              className={cn('transition-transform', !open && '-rotate-90')}
-            />
-          </button>
-        ) : null}
-      </div>
-      {open && asks.length ? <AskChatList state={state} asks={asks} /> : null}
-    </>
-  );
+  const askChatOpen = useSelectedAskId() !== null;
+  return (entry) => {
+    if (entry.page === null) return paletteOpen;
+    if (entry.id === NEW_ASK_ID && askChatOpen) return false;
+    return entry.page === pageKind;
+  };
 }
 
 function Pages({ state }: { state: AppState }) {
@@ -1261,10 +1541,6 @@ function Pages({ state }: { state: AppState }) {
     (entry) => !hidden.includes(entry.id) && (entry.shown?.(state) ?? true),
   );
   if (!entries.length) return null;
-  const asks = asksNewestFirst(state);
-  const waitingAsk = asks.find((ask) =>
-    state.waitingSessions.includes(ask.session.id),
-  );
   if (compact) {
     return (
       <div
@@ -1272,27 +1548,18 @@ function Pages({ state }: { state: AppState }) {
         aria-label="Pages"
         className="flex justify-between border-b border-border-1 px-2 pb-2"
       >
-        {entries.map((entry) => {
-          const isAsk = entry.id === ASK_ENTRY_ID;
-          const waiting = isAsk && waitingAsk !== undefined;
-          return (
-            <IconButton
-              key={entry.id}
-              icon={entry.icon}
-              label={entry.label}
-              title={waiting ? WAITING_ASK_TITLE : entry.label}
-              size="sm"
-              aria-current={isActive(entry) ? 'page' : undefined}
-              className={cn(
-                isActive(entry) && 'bg-active text-fg-1',
-                waiting && 'text-warning-text',
-              )}
-              onClick={() =>
-                isAsk && waitingAsk ? openAsk(waitingAsk.id) : entry.open()
-              }
-            />
-          );
-        })}
+        {entries.map((entry) => (
+          <IconButton
+            key={entry.id}
+            icon={entry.icon}
+            label={entry.label}
+            title={entry.label}
+            size="sm"
+            aria-current={isActive(entry) ? 'page' : undefined}
+            className={cn(isActive(entry) && 'bg-active text-fg-1')}
+            onClick={entry.open}
+          />
+        ))}
       </div>
     );
   }
@@ -1302,26 +1569,16 @@ function Pages({ state }: { state: AppState }) {
       aria-label="Pages"
       className="flex flex-col gap-0.5 border-b border-border-1 px-2 pb-2"
     >
-      {entries.map((entry) =>
-        entry.id === ASK_ENTRY_ID ? (
-          <AskEntry
-            key={entry.id}
-            state={state}
-            asks={asks}
-            waitingAsk={waitingAsk}
-            active={isActive(entry)}
-          />
-        ) : (
-          <NavRow
-            key={entry.id}
-            icon={entry.icon}
-            label={entry.label}
-            hint={entry.hint}
-            active={isActive(entry)}
-            onClick={entry.open}
-          />
-        ),
-      )}
+      {entries.map((entry) => (
+        <NavRow
+          key={entry.id}
+          icon={entry.icon}
+          label={entry.label}
+          hint={entry.hint}
+          active={isActive(entry)}
+          onClick={entry.open}
+        />
+      ))}
     </div>
   );
 }
@@ -1527,7 +1784,11 @@ export function Sidebar({ state }: { state: AppState }) {
   });
   const active = activeWorkspaces(state);
   const leads = crossRepoLeads(state);
+  const asks = askSections(state);
   const indexOf = (workspace: Workspace) => active.indexOf(workspace);
+  const workspacesOf = (repo: Repo) =>
+    active.filter((ws) => ws.repoId === repo.id && !isAcrossRepos(leads, ws));
+  const asksOf = (repo: Repo) => asks.byRepo.get(repo.id) ?? [];
   return (
     <nav
       aria-label="Workspaces"
@@ -1553,9 +1814,18 @@ export function Sidebar({ state }: { state: AppState }) {
         <Pages state={state} />
         <div className="flex-1 px-2 pt-1">
           <WaitingForYou state={state} selectedId={selectedId} />
+          <AcrossRepos
+            state={state}
+            groups={sidebarEntries(
+              active.filter((ws) => isAcrossRepos(leads, ws)),
+              leads,
+            )}
+            asks={asks.acrossRepos}
+            leads={leads}
+            selectedId={selectedId}
+            indexOf={indexOf}
+          />
           {repoSections(state).map(({ folder, repos }) => {
-            const workspacesOf = (repo: Repo) =>
-              active.filter((ws) => sidebarRepoId(leads, ws) === repo.id);
             const groups = repos.map((repo) => (
               <RepoGroup
                 key={repo.id}
@@ -1563,7 +1833,8 @@ export function Sidebar({ state }: { state: AppState }) {
                 repo={repo}
                 folderId={folder?.id ?? null}
                 workspaces={workspacesOf(repo)}
-                leads={leads}
+                asks={asksOf(repo)}
+                acrossRepos={acrossReposIn(state, repo.id)}
                 selectedId={selectedId}
                 indexOf={indexOf}
               />
@@ -1574,6 +1845,7 @@ export function Sidebar({ state }: { state: AppState }) {
                 state={state}
                 folder={folder}
                 workspaces={repos.flatMap(workspacesOf)}
+                asks={repos.flatMap(asksOf)}
               >
                 {groups}
               </FolderSection>
@@ -1582,6 +1854,7 @@ export function Sidebar({ state }: { state: AppState }) {
             );
           })}
           <RootEndDropZone />
+          <NoRepository state={state} asks={asks.noRepo} />
         </div>
         <History state={state} />
       </div>

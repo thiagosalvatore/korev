@@ -18,7 +18,7 @@ import {
   History,
   Link,
   LoaderCircle,
-  MessageCircleQuestion,
+  MessageSquarePlus,
   PanelRightClose,
   Paperclip,
   Pencil,
@@ -215,11 +215,13 @@ export function Sidebar({
   repos,
   selected,
   askSelected,
+  across = [],
   askChats = [],
 }: {
   repos: Repo[];
   selected: string | null;
   askSelected?: boolean;
+  across?: Workspace[];
   askChats?: { title: string; ago: string }[];
 }) {
   return (
@@ -238,15 +240,33 @@ export function Sidebar({
         New workspace<span className="k">⌘N</span>
       </div>
       <div className={`km-nav${askSelected && !askChats.length ? ' sel' : ''}`}>
-        <MessageCircleQuestion size={14} />
-        Ask
+        <MessageSquarePlus size={14} />
+        New Ask
       </div>
-      {askChats.map((chat) => (
-        <div key={chat.title} className={`km-sub${askSelected ? ' sel' : ''}`}>
-          {chat.title}
-          <span className="ago">{chat.ago}</span>
+      {across.length || askChats.length ? (
+        <div>
+          <div className="km-sec">
+            <Link size={12} />
+            Across repos
+          </div>
+          {across.map((w) => (
+            <WorkspaceRow
+              key={w.id}
+              workspace={w}
+              selected={w.id === selected}
+            />
+          ))}
+          {askChats.map((chat) => (
+            <div
+              key={chat.title}
+              className={`km-sub${askSelected ? ' sel' : ''}`}
+            >
+              {chat.title}
+              <span className="ago">{chat.ago}</span>
+            </div>
+          ))}
         </div>
-      ))}
+      ) : null}
       {repos.map((repo) => (
         <div key={repo.name}>
           <RepoHeading name={repo.name} />
