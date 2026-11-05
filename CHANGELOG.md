@@ -4,10 +4,20 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-05
+
+Review pull requests in one click from the new Pull requests page, and shape the sidebar the way you work.
+
 ### New
 
+- **Pull requests.** A new Pull requests page, on your Mac and on your phone, lists the pull requests that wait for your review and the ones you opened, across all your repositories. Review starts a review at once, with no prompt to type. Each row also lets you explain the pull request, check out its branch in a workspace, or open it on GitHub. On your phone, tap the pull request icon on the Ask tab.
+- **Resume run in the chat.** When a run pauses after 100 messages, the coordinator's chat now shows a Resume run button, so you no longer have to find the run on the Runs page.
 - **Customize the sidebar.** The new Customize sidebar icon hides the pages you do not use and can show the rest as one row of icons, so your workspaces start higher up. Your Ask chats now sit under Ask, at the end of the pages.
 - **Waiting for you.** Workspaces that ask you something, failed, or finished while you were elsewhere now also show at the top of the sidebar, so you no longer scroll down to a repository to find them. A collapsed repository or folder shows a dot when a workspace in it waits for you.
+
+### Fixed
+
+- In a short window, the bottom of the sidebar no longer gets cut off. The whole sidebar now scrolls, and Settings stays visible at the bottom.
 
 ## [0.25.0] - 2026-11-04
 
