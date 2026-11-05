@@ -136,6 +136,8 @@
     border: 1px solid var(--border-2);
     padding: 5px 9px;
     text-align: left;
+    /* `anywhere` lets the table layout shrink a column to one letter; this keeps whole words. */
+    overflow-wrap: break-word;
   }
   .kv-md th {
     background: var(--bg-hover);

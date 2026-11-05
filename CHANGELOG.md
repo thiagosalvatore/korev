@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### Fixed
+
+- Tables in the chat no longer split short words like "Workspace" across lines. Each column is now at least as wide as its longest word, and the long column wraps instead.
+
 ## [0.28.0] - 2026-11-05
 
 See work that spans repositories in one place, and find your Ask chats in their repository, on your Mac and on your phone.
