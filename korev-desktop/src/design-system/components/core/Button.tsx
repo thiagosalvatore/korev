@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes } from 'react';
 import { cn } from '../../cn';
 import { Icon, type IconName } from './Icon';
 import { Kbd } from './Kbd';
+import { LoadingRing } from './LoadingRing';
 import { usePendingClick, type ClickHandler } from './usePendingClick';
 
 export type ButtonVariant =
@@ -26,7 +27,7 @@ export interface ButtonProps extends Omit<
 }
 
 const BASE =
-  'inline-flex h-control-md cursor-pointer items-center justify-center gap-1.5 rounded-sm border border-transparent px-3 font-sans text-sm leading-none font-medium tracking-[-0.005em] whitespace-nowrap select-none transition-[background-color,border-color,color,transform] duration-(--dur-fast) ease-out focus-visible:shadow-focus enabled:active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-45';
+  'inline-flex h-control-md cursor-pointer items-center justify-center gap-1.5 rounded-sm border border-transparent px-3 font-sans text-sm leading-none font-medium tracking-[-0.005em] whitespace-nowrap select-none transition-[background-color,border-color,color,transform] duration-(--dur-fast) ease-out focus-visible:shadow-focus enabled:active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:not-aria-busy:opacity-45';
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
@@ -77,7 +78,7 @@ export function Button({
       {...rest}
     >
       {busy ? (
-        <Icon name="loader-circle" size={iconSize} className="animate-spin" />
+        <LoadingRing size={iconSize} />
       ) : icon ? (
         <Icon name={icon} size={iconSize} />
       ) : null}

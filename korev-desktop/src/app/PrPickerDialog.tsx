@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { cn, Dialog, Icon, Select } from '../design-system';
+import {
+  cn,
+  Dialog,
+  Icon,
+  LoadingRing,
+  Select,
+  SkeletonRows,
+} from '../design-system';
 import { parsePrUrl } from '../shared/explainer';
 import type { AppState, PullRequestSummary } from '../shared/model';
 import { explainPullRequest, reviewPullRequest } from './actions';
@@ -216,7 +223,7 @@ function PrPicker({ state, purpose }: { state: AppState; purpose: Purpose }) {
           className="max-h-80 overflow-y-auto p-1"
         >
           {groups === null ? (
-            <p className="m-0 px-3 py-4 text-sm text-fg-3">Loading…</p>
+            <SkeletonRows rows={4} lines={2} className="px-3 py-3" />
           ) : null}
           {groups && !options.length ? (
             <p className="m-0 px-3 py-4 text-sm text-fg-3">
@@ -247,11 +254,7 @@ function PrPicker({ state, purpose }: { state: AppState; purpose: Purpose }) {
                     onClick={() => void choose(option)}
                   >
                     {starting === option.number ? (
-                      <Icon
-                        name="loader-circle"
-                        size={13}
-                        className="animate-spin text-fg-3"
-                      />
+                      <LoadingRing size={13} className="text-fg-3" />
                     ) : (
                       <Icon
                         name={

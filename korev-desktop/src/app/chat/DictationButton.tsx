@@ -52,7 +52,6 @@ export function DictationButton({
         icon="loader-circle"
         label="Turning speech into text"
         size="sm"
-        className="[&_svg]:animate-spin"
         disabled
       />
     );

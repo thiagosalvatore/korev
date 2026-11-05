@@ -48,7 +48,7 @@ const CHECK_ICONS: Record<CheckState, { icon: IconName; className: string }> = {
   failure: { icon: 'circle-x', className: 'text-danger-text' },
   pending: {
     icon: 'loader-circle',
-    className: 'animate-spin text-warning-text',
+    className: 'text-warning-text',
   },
   skipped: { icon: 'circle-slash', className: 'text-fg-4' },
 };

@@ -1,4 +1,4 @@
-import { Button, cn, Icon, IconButton } from '../design-system';
+import { Button, cn, Icon, IconButton, LoadingRing } from '../design-system';
 import {
   hasWorktree,
   type AppState,
@@ -181,11 +181,7 @@ function TabStrip({
               }}
             >
               {entry.running ? (
-                <Icon
-                  name="loader-circle"
-                  size={13}
-                  className="animate-spin text-accent-text"
-                />
+                <LoadingRing size={13} className="text-accent-text" />
               ) : (
                 <Icon
                   name={
@@ -275,11 +271,7 @@ export function WorktreePending({
       {failed ? (
         <Icon name="triangle-alert" size={22} className="text-danger-text" />
       ) : (
-        <Icon
-          name="loader-circle"
-          size={22}
-          className="animate-spin text-accent-text"
-        />
+        <LoadingRing size={22} className="text-accent-text" />
       )}
       <p className="m-0 text-lg font-semibold text-fg-1">
         {failed ? WORKTREE_FAILED : progress.title}

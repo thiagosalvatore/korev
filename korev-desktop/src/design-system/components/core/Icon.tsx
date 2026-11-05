@@ -3,8 +3,11 @@ import type { LucideIcon } from 'lucide-react';
 import type { IconName } from 'lucide-react/dynamic';
 import type { SVGProps } from 'react';
 import { cn } from '../../cn';
+import { LoadingRing } from './LoadingRing';
 
 export type { IconName };
+
+export const LOADING_ICON = 'loader-circle' satisfies IconName;
 
 const glyphs = lucide as unknown as Record<string, LucideIcon | undefined>;
 
@@ -29,6 +32,8 @@ export function Icon({
   className,
   ...rest
 }: IconProps) {
+  if (name === LOADING_ICON)
+    return <LoadingRing size={size} className={className} />;
   const Glyph = glyphs[toComponentName(name)];
   if (!Glyph) return null;
   return (
