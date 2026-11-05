@@ -668,9 +668,13 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     );
   }
 
-  function sendWithHistory(history: ChatItem[]): SendTask {
+  function sendWithHistory(
+    history: ChatItem[],
+    onSeeded: () => Promise<void> = async () => {},
+  ): SendTask {
     return async (sessionId, options) => {
       await chats.seed(sessionId, history);
+      await onSeeded();
       return chats.send(sessionId, options);
     };
   }
@@ -1247,7 +1251,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
           planMode: false,
           fast: ask.session.fast,
         },
-        sendWithHistory(history),
+        sendWithHistory(history, () => deleteAskChat(askChatId)),
         plan,
       );
     },
