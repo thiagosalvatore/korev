@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Button, Icon, Spinner, Tabs } from '../../design-system';
+import { Button, cn, Icon, Spinner, Tabs } from '../../design-system';
 import {
   AGENT_LABELS,
   finishedCodexPlan,
@@ -161,6 +161,7 @@ export function ChatView({
   const archived = Boolean(workspace?.archivedAt);
   const chatRepoId = workspace?.repoId ?? repoId ?? null;
   const repoUrl = useRepoGithubUrl(chatRepoId);
+  const wide = useUi((ui) => ui.wideChat);
   const explainerMode = useUi(
     (ui) => (ui.explainers[session.id] ?? EMPTY_EXPLAINER_UI).mode,
   );
@@ -316,6 +317,7 @@ export function ChatView({
           }
           laneRepos={repos}
           repoUrl={repoUrl}
+          wide={wide}
           footer={
             <>
               {codexPlan ? (
@@ -337,7 +339,7 @@ export function ChatView({
       ) : (
         <Spinner />
       )}
-      <div className="mx-auto w-full max-w-[820px] px-6 pb-4">
+      <div className={cn('mx-auto w-full px-6 pb-4', !wide && 'max-w-[820px]')}>
         {archived ? (
           <p className="m-0 rounded-md bg-active px-3 py-2 text-sm text-fg-2">
             This workspace is archived. Unarchive it from History to keep
