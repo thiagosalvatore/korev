@@ -1,5 +1,6 @@
 import { Children, Fragment, useEffect, useState, type ReactNode } from 'react';
 import {
+  Badge,
   Button,
   cn,
   Dialog,
@@ -34,7 +35,9 @@ import {
   sidebarEntries,
   sidebarRepoId,
   waitsForLane,
+  waitsForYou,
   workspaceLabel,
+  workspacesWaitingForYou,
 } from '../shared/workspaces';
 import {
   archiveWorkspace,
@@ -216,6 +219,91 @@ function LinkedIcon({
   );
 }
 
+function UnreadDot() {
+  return (
+    <span
+      aria-label="Unread"
+      className="size-1.5 flex-none rounded-full bg-accent"
+    />
+  );
+}
+
+function HiddenWaitingDot({
+  state,
+  workspaces,
+}: {
+  state: AppState;
+  workspaces: Workspace[];
+}) {
+  const waiting = workspaces.filter((ws) => waitsForYou(state.runtime[ws.id]));
+  if (!waiting.length) return null;
+  const needsInput = waiting.some(
+    (ws) => boardColumn(state.runtime[ws.id]!) === 'needs-you',
+  );
+  const label = `${waiting.length} waiting for you`;
+  return (
+    <span
+      aria-label={label}
+      title={label}
+      className={cn(
+        'size-1.5 flex-none rounded-full',
+        needsInput ? 'bg-warning' : 'bg-accent',
+      )}
+    />
+  );
+}
+
+function WaitingForYou({
+  state,
+  selectedId,
+}: {
+  state: AppState;
+  selectedId: string | null;
+}) {
+  const waiting = workspacesWaitingForYou(state);
+  if (!waiting.length) return null;
+  const repoName = (workspace: Workspace) =>
+    state.repos.find((repo) => repo.id === workspace.repoId)?.name ?? '';
+  return (
+    <section
+      aria-label="Waiting for you"
+      className="mb-2 flex flex-col gap-0.5 border-b border-border-1 pb-2"
+    >
+      <div className="flex h-7 items-center gap-1.5 px-2 type-overline text-fg-4">
+        Waiting for you
+        <Badge count>{waiting.length}</Badge>
+      </div>
+      {waiting.map((workspace) => {
+        const runtime = state.runtime[workspace.id]!;
+        const label = workspaceLabel(workspace);
+        const repo = repoName(workspace);
+        const selected = workspace.id === selectedId;
+        return (
+          <button
+            key={workspace.id}
+            type="button"
+            aria-label={`Open ${label} in ${repo}`}
+            aria-current={selected ? 'page' : undefined}
+            className={cn(
+              ROW,
+              'h-8',
+              selected && 'bg-active text-fg-1 hover:bg-active',
+            )}
+            onClick={() => selectWorkspace(workspace.id)}
+          >
+            <span className="flex w-4 flex-none justify-center">
+              <StatusIcon workspace={workspace} runtime={runtime} />
+            </span>
+            <span className="truncate font-semibold text-fg-1">{label}</span>
+            <span className="flex-1 truncate text-xs text-fg-3">{repo}</span>
+            {runtime.unread ? <UnreadDot /> : null}
+          </button>
+        );
+      })}
+    </section>
+  );
+}
+
 interface GroupMember {
   repo: string;
   waitsOn: string | null;
@@ -314,12 +402,7 @@ function WorkspaceRow({
               ⌘{index + 1}
             </span>
           ) : null}
-          {runtime?.unread ? (
-            <span
-              aria-label="Unread"
-              className="size-1.5 rounded-full bg-accent"
-            />
-          ) : null}
+          {runtime?.unread ? <UnreadDot /> : null}
         </span>
         <span className="absolute top-1 right-1 hidden group-hover:flex has-[[role=menu]]:flex">
           <Menu
@@ -545,10 +628,12 @@ function moveToFolderItems(
 function WorkspaceFolderSection({
   state,
   folder,
+  workspaces,
   children,
 }: {
   state: AppState;
   folder: WorkspaceFolder;
+  workspaces: Workspace[];
   children: ReactNode;
 }) {
   const [collapsed, toggle] = useCollapsed('collapsedFolders', folder.id);
@@ -590,6 +675,9 @@ function WorkspaceFolderSection({
               collapsed && '-rotate-90',
             )}
           />
+          {collapsed ? (
+            <HiddenWaitingDot state={state} workspaces={workspaces} />
+          ) : null}
         </button>
         <span className="hidden group-hover:flex has-[[role=menu]]:flex">
           <Menu
@@ -765,6 +853,9 @@ function RepoGroup({
               collapsed && '-rotate-90',
             )}
           />
+          {collapsed ? (
+            <HiddenWaitingDot state={state} workspaces={workspaces} />
+          ) : null}
         </button>
         <span className="hidden gap-0.5 group-hover:flex has-[[role=menu]]:flex">
           <IconButton
@@ -829,6 +920,7 @@ function RepoGroup({
                 key={folder.id}
                 state={state}
                 folder={folder}
+                workspaces={run.workspaces}
               >
                 {entries}
               </WorkspaceFolderSection>
@@ -853,10 +945,14 @@ function RepoGroup({
 }
 
 function FolderSection({
+  state,
   folder,
+  workspaces,
   children,
 }: {
+  state: AppState;
   folder: RepoFolder;
+  workspaces: Workspace[];
   children: ReactNode;
 }) {
   const [collapsed, toggle] = useCollapsed('collapsedFolders', folder.id);
@@ -890,6 +986,9 @@ function FolderSection({
             size={12}
             className={cn('transition-transform', collapsed && '-rotate-90')}
           />
+          {collapsed ? (
+            <HiddenWaitingDot state={state} workspaces={workspaces} />
+          ) : null}
         </button>
         <span className="hidden group-hover:flex has-[[role=menu]]:flex">
           <Menu
@@ -1460,23 +1559,29 @@ export function Sidebar({ state }: { state: AppState }) {
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <Pages state={state} />
         <div className="flex-1 px-2 pt-1">
+          <WaitingForYou state={state} selectedId={selectedId} />
           {repoSections(state).map(({ folder, repos }) => {
+            const workspacesOf = (repo: Repo) =>
+              active.filter((ws) => sidebarRepoId(leads, ws) === repo.id);
             const groups = repos.map((repo) => (
               <RepoGroup
                 key={repo.id}
                 state={state}
                 repo={repo}
                 folderId={folder?.id ?? null}
-                workspaces={active.filter(
-                  (ws) => sidebarRepoId(leads, ws) === repo.id,
-                )}
+                workspaces={workspacesOf(repo)}
                 leads={leads}
                 selectedId={selectedId}
                 indexOf={indexOf}
               />
             ));
             return folder ? (
-              <FolderSection key={folder.id} folder={folder}>
+              <FolderSection
+                key={folder.id}
+                state={state}
+                folder={folder}
+                workspaces={repos.flatMap(workspacesOf)}
+              >
                 {groups}
               </FolderSection>
             ) : (

@@ -7,6 +7,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 ### New
 
 - **Customize the sidebar.** The new Customize sidebar icon hides the pages you do not use and can show the rest as one row of icons, so your workspaces start higher up. Your Ask chats now sit under Ask, at the end of the pages.
+- **Waiting for you.** Workspaces that ask you something, failed, or finished while you were elsewhere now also show at the top of the sidebar, so you no longer scroll down to a repository to find them. A collapsed repository or folder shows a dot when a workspace in it waits for you.
 
 ## [0.25.0] - 2026-11-04
 

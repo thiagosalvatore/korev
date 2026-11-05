@@ -363,3 +363,22 @@ export function boardColumn(runtime: WorkspaceRuntime): BoardColumn {
   if (runtime.setupError) return 'needs-you';
   return runtime.unread ? 'done' : 'idle';
 }
+
+const WAITING_FOR_YOU_COLUMNS: BoardColumn[] = ['needs-you', 'done'];
+
+export function waitsForYou(runtime: WorkspaceRuntime | undefined): boolean {
+  return (
+    runtime !== undefined &&
+    WAITING_FOR_YOU_COLUMNS.includes(boardColumn(runtime))
+  );
+}
+
+export function workspacesWaitingForYou(state: AppState): Workspace[] {
+  const active = activeWorkspaces(state);
+  return WAITING_FOR_YOU_COLUMNS.flatMap((column) =>
+    active.filter((workspace) => {
+      const runtime = state.runtime[workspace.id];
+      return runtime !== undefined && boardColumn(runtime) === column;
+    }),
+  );
+}
