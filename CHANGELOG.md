@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### Fixed
+
+- Opening the Customize sidebar menu no longer freezes the window. Before, no click worked until you pressed Escape.
+
 ## [0.26.0] - 2026-11-05
 
 Review pull requests in one click from the new Pull requests page, and shape the sidebar the way you work.

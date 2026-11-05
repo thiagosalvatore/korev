@@ -7,6 +7,7 @@ import {
   type RefObject,
 } from 'react';
 import { cn, Icon, Kbd, type IconName } from '../../design-system';
+import { NO_DRAG } from '../layout';
 
 export interface MenuItem {
   id: string;
@@ -98,6 +99,7 @@ export function Menu({
           className={cn(
             PANEL,
             'fixed inset-auto m-0 my-1 border-0 [position-try-fallbacks:flip-block]',
+            NO_DRAG,
             POSITION_AREAS[side][align],
           )}
           style={width ? { width } : undefined}
