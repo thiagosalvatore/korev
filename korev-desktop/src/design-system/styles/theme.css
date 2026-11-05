@@ -162,6 +162,10 @@
   --animate-rise: kv-rise var(--dur-slow) var(--ease-out);
   --animate-spin: kv-spin 0.8s linear infinite;
   --animate-slide-in: kv-slide-in var(--dur-slow) var(--ease-out);
+  --animate-arc: kv-arc 1.4s var(--ease-in-out) infinite;
+  --animate-shimmer: kv-shimmer 1.6s var(--ease-in-out) infinite;
+  --animate-appear: kv-fade var(--dur-slow) var(--ease-out) 150ms backwards;
+  --animate-breathe: kv-breathe 1.8s var(--ease-in-out) infinite;
 
   @keyframes kv-spin {
     to {
@@ -177,6 +181,34 @@
     from {
       transform: translateX(16px);
       opacity: 0;
+    }
+  }
+  @keyframes kv-arc {
+    0% {
+      stroke-dasharray: 1 150;
+      stroke-dashoffset: 0;
+    }
+    50% {
+      stroke-dasharray: 70 150;
+      stroke-dashoffset: -25;
+    }
+    100% {
+      stroke-dasharray: 70 150;
+      stroke-dashoffset: -99;
+    }
+  }
+  @keyframes kv-shimmer {
+    from {
+      background-position: 150% 0;
+    }
+    to {
+      background-position: -50% 0;
+    }
+  }
+  @keyframes kv-breathe {
+    50% {
+      opacity: 0.55;
+      transform: scale(0.96);
     }
   }
   @keyframes kv-rise {

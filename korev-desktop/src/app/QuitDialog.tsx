@@ -1,4 +1,4 @@
-import { Button, Dialog, Icon, Toast } from '../design-system';
+import { Button, Dialog, LoadingRing, Toast } from '../design-system';
 import type { QuitChoice } from '../shared/api';
 import type { AppState } from '../shared/model';
 import { workspaceLabel } from '../shared/workspaces';
@@ -45,11 +45,7 @@ const cancelQuit = () => choose('cancel');
 function AgentRow({ agent }: { agent: RunningAgent }) {
   return (
     <li className="flex items-center gap-3 rounded-md border border-border-1 px-3 py-2.5">
-      <Icon
-        name="loader-circle"
-        size={14}
-        className="animate-spin text-accent-text"
-      />
+      <LoadingRing size={14} className="text-accent-text" />
       <div className="min-w-0 flex-1">
         <div className="truncate type-ui font-medium text-fg-1">
           {agent.name}

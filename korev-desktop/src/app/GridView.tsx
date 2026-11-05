@@ -1,5 +1,12 @@
 import { useEffect, type ReactNode } from 'react';
-import { Button, cn, Icon, IconButton, type IconName } from '../design-system';
+import {
+  Button,
+  cn,
+  Icon,
+  IconButton,
+  LoadingRing,
+  type IconName,
+} from '../design-system';
 import { askRepoNames } from '../shared/format';
 import {
   hasWorktree,
@@ -193,11 +200,7 @@ function PaneHeader({
   return (
     <div className="flex h-9 flex-none items-center gap-2 border-b border-border-1 bg-surface pr-1 pl-3 text-sm">
       {running ? (
-        <Icon
-          name="loader-circle"
-          size={13}
-          className="animate-spin text-accent-text"
-        />
+        <LoadingRing size={13} className="text-accent-text" />
       ) : (
         <Icon name={icon} size={13} className="text-fg-3" />
       )}

@@ -14,6 +14,8 @@ import {
   IconButton,
   Input,
   Select,
+  Skeleton,
+  SkeletonStatus,
   Tabs,
 } from '../design-system';
 import { timeAgo } from '../shared/format';
@@ -296,6 +298,28 @@ function NoMatch() {
   );
 }
 
+const SKELETON_ROWS = 5;
+
+function InboxSkeleton() {
+  return (
+    <SkeletonStatus className="gap-1.5">
+      {Array.from({ length: SKELETON_ROWS }, (_, row) => (
+        <div
+          key={row}
+          className="flex items-center gap-3 rounded-md border border-border-1 bg-surface px-3 py-2.5"
+        >
+          <Skeleton className="size-3.5 rounded-full" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <Skeleton className={row % 2 ? 'w-1/2' : 'w-2/3'} />
+            <Skeleton className="h-2.5 w-1/3 opacity-60" />
+          </div>
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+      ))}
+    </SkeletonStatus>
+  );
+}
+
 function InboxGroups({
   state,
   inbox,
@@ -307,7 +331,7 @@ function InboxGroups({
 }) {
   const filter = useUi((ui) => ui.prFilter);
   const reason = useUi((ui) => ui.prReason);
-  if (!inbox) return <p className="m-0 text-sm text-fg-3">Loading…</p>;
+  if (!inbox) return <InboxSkeleton />;
   if (!inbox.ok)
     return <p className="m-0 text-sm text-danger-text">{inbox.message}</p>;
   const filtering = isFiltering(filter, reason);

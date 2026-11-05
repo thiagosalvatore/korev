@@ -15,6 +15,14 @@ How the Korev desktop app looks and behaves. The tokens live in
   needs attention, `success` = done or ready to merge.
 - **Themes.** Dark is the default token set; `[data-theme='light']` overrides it. The
   app follows the macOS appearance unless Settings → General → Theme overrides it.
+- **Loading.** Use `LoadingRing` for inline work: a button that is busy, a running agent
+  or a running check. The `loader-circle` icon name also renders it. Use `SkeletonRows`
+  (or `Skeleton` bars in the shape of the row) for lists. Use `Spinner` only for a full
+  pane whose content has an unknown shape. A running agent shows the ring next to
+  `ShimmerText` ("Working…"). Spinners and skeletons appear only after 150 ms, so fast
+  loads never flash. A refresh keeps the old content on screen and marks the refresh
+  button busy. With reduced motion on, the shimmer and the arc stop and the ring turns
+  slowly.
 
 ## Layout
 

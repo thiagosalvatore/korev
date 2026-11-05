@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -169,5 +170,29 @@ describe('PullRequestsPage', () => {
 
     expect(await rowOf(/#42 Add install steps/)).toBeTruthy();
     expect(screen.getByRole('listitem', { name: /#7 Fix login/ })).toBeTruthy();
+  });
+
+  it('shows a loading skeleton first and keeps the list on screen while it refreshes', async () => {
+    let finishRefresh = () => {};
+    render(<PullRequestsPage state={state} />);
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeTruthy();
+    await rowOf(/#42 Add install steps/);
+
+    call.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRefresh = () => resolve({ ok: true, value: inbox });
+        }),
+    );
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    fireEvent.click(refresh);
+
+    expect(refresh.getAttribute('aria-busy')).toBe('true');
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(
+      screen.getByRole('listitem', { name: /#42 Add install steps/ }),
+    ).toBeTruthy();
+    await act(async () => finishRefresh());
+    expect(refresh.getAttribute('aria-busy')).toBeNull();
   });
 });

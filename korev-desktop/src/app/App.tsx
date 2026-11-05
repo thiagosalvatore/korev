@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { cn, Logo, Spinner } from '../design-system';
+import { cn, LoadingRing, Logo } from '../design-system';
 import type { AppState } from '../shared/model';
 import { activeWorkspaces } from '../shared/workspaces';
 import { openNewWorkspace, selectWorkspace } from './actions';
@@ -111,9 +111,16 @@ function Loading() {
     <div className="flex h-screen flex-col bg-app">
       <div className={cn('h-11 flex-none', DRAG_REGION)} />
       <div className="flex flex-1 flex-col items-center justify-center gap-6 pb-20">
-        <Logo size={36} />
-        <div className="flex h-6">
-          <Spinner />
+        <Logo
+          size={36}
+          className="animate-breathe motion-reduce:animate-none"
+        />
+        <div
+          role="status"
+          aria-label="Loading"
+          className="animate-appear text-fg-4"
+        >
+          <LoadingRing size={18} />
         </div>
       </div>
     </div>
