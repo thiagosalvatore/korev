@@ -51,7 +51,7 @@ const FEATURES: [LucideIcon, string, string][] = [
   [
     Smartphone,
     'From your phone',
-    'Check on running agents and send messages from the phone app, over Tailscale.',
+    'Check on running agents and send messages from the iPhone app on the App Store, over Tailscale.',
   ],
   [
     ScanEye,

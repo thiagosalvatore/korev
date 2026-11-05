@@ -6,6 +6,7 @@ export const CHANGELOG_URL = '/changelog';
 export const RELEASES_URL = `${GITHUB_URL}/releases`;
 export const SHORTCUTS_URL = `${DOCS_URL}/reference/keyboard-shortcuts`;
 export const ROADMAP_URL = `${GITHUB_URL}/blob/main/TODOS.md`;
+export const APP_STORE_URL = 'https://apps.apple.com/app/korev/id6820681128';
 export const LATEST_DOWNLOAD_URL = `${RELEASES_URL}/latest/download`;
 
 export type MacArch = 'arm64' | 'x64';
