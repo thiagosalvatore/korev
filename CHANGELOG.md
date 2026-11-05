@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-05
+
+See work that spans repositories in one place, and find your Ask chats in their repository, on your Mac and on your phone.
+
 ### New
 
 - **Across repos.** Workspaces linked across repositories, and Ask chats about two or more repositories, now show once in a new Across repos section at the top of the sidebar. Each entry shows a chip per repository with its state, and each row starts with its repository. Before, a linked group showed only under its first repository.
