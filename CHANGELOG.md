@@ -4,6 +4,15 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-05
+
+Find a pull request fast with search and filters, and loading screens that look calmer.
+
+### New
+
+- **Search pull requests.** The Pull requests page has a filter box. Type `#1234` to find one pull request, or words to match the title, author, branch or repository. ⌘F jumps to the box and Esc clears it. Tabs, a repository menu and status toggles narrow the list further.
+- **New loading indicators.** Spinners, list placeholders and the "Working…" line in the chat have a new look, and a fast load no longer flashes a spinner.
+
 ### Fixed
 
 - Opening the Customize sidebar menu no longer freezes the window. Before, no click worked until you pressed Escape.
