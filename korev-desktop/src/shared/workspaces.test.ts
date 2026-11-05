@@ -2,15 +2,21 @@ import { describe, expect, it } from 'vitest';
 import {
   EMPTY_SCRIPTS,
   type AppState,
+  type AskChat,
   type Repo,
   type Workspace,
   type WorkspaceRuntime,
 } from './model';
 import {
+  acrossReposIn,
   activeWorkspaces,
+  askSections,
+  asksWaitingForYou,
   boardColumn,
   crossRepoLead,
+  crossRepoLeads,
   folderRuns,
+  isAcrossRepos,
   laneRepos,
   pickerRepos,
   repoSections,
@@ -246,6 +252,98 @@ describe('a group across repositories', () => {
     expect(waitsForLane(group, { ...apiMember, awaitsLane: false })).toBe(
       false,
     );
+  });
+});
+
+describe('isAcrossRepos', () => {
+  const linked = {
+    ...state,
+    runtime: {},
+    workspaces: [
+      workspace('web-lead', 'web', '2026-01-01', 'billing'),
+      workspace('api-member', 'api', '2026-01-01', 'billing'),
+      workspace('lane-1', 'scratch', '2026-01-02', 'plan'),
+      workspace('lane-2', 'scratch', '2026-01-02', 'plan'),
+      workspace('alone', 'blog', '2026-01-03'),
+    ],
+  } as unknown as AppState;
+  const leads = crossRepoLeads(linked);
+  const acrossRepos = (id: string) =>
+    isAcrossRepos(leads, linked.workspaces.find((ws) => ws.id === id)!);
+
+  it('marks only the members of a group that spans repositories', () => {
+    expect(acrossRepos('web-lead')).toBe(true);
+    expect(acrossRepos('api-member')).toBe(true);
+    expect(acrossRepos('lane-1')).toBe(false);
+    expect(acrossRepos('alone')).toBe(false);
+  });
+
+  it('counts the linked groups and Asks across repositories a repository is part of', () => {
+    const withAsks = {
+      ...linked,
+      askChats: [
+        ask('both', ['web', 'api']),
+        ask('web-only', ['web']),
+        ask('elsewhere', ['blog', 'scratch']),
+      ],
+    } as AppState;
+    expect(acrossReposIn(withAsks, 'web')).toEqual({ linked: 1, asks: 1 });
+    expect(acrossReposIn(withAsks, 'scratch')).toEqual({ linked: 0, asks: 1 });
+    expect(acrossReposIn(withAsks, 'orphan')).toEqual({ linked: 0, asks: 0 });
+  });
+});
+
+function ask(
+  id: string,
+  repoIds: string[],
+  lastMessageAt = '2026-01-01',
+): AskChat {
+  return {
+    id,
+    repoIds,
+    lastMessageAt,
+    session: { id: `${id}-session` },
+  } as AskChat;
+}
+
+describe('askSections', () => {
+  it('puts each Ask with its one repository, across repositories or under no repository, newest first', () => {
+    const sections = askSections({
+      askChats: [
+        ask('old-web', ['web'], '2026-01-01'),
+        ask('both', ['web', 'api'], '2026-01-02'),
+        ask('general', [], '2026-01-03'),
+        ask('new-web', ['web'], '2026-01-04'),
+        ask('api', ['api'], '2026-01-05'),
+        {
+          ...ask('nightly', ['web']),
+          automationRun: { automationId: 'a1' },
+        } as AskChat,
+      ],
+    });
+    const ids = (asks: AskChat[] | undefined) => asks?.map((entry) => entry.id);
+
+    expect(ids(sections.acrossRepos)).toEqual(['both']);
+    expect(ids(sections.noRepo)).toEqual(['general']);
+    expect(ids(sections.byRepo.get('web'))).toEqual(['new-web', 'old-web']);
+    expect(ids(sections.byRepo.get('api'))).toEqual(['api']);
+  });
+});
+
+describe('asksWaitingForYou', () => {
+  it('lists the Asks waiting for your input, without automation runs', () => {
+    const waiting = asksWaitingForYou({
+      askChats: [
+        ask('waiting', ['web']),
+        ask('idle', ['web']),
+        {
+          ...ask('nightly', ['web']),
+          automationRun: { automationId: 'a1' },
+        } as AskChat,
+      ],
+      waitingSessions: ['waiting-session', 'nightly-session'],
+    });
+    expect(waiting.map((entry) => entry.id)).toEqual(['waiting']);
   });
 });
 
