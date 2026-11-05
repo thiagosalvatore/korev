@@ -18,6 +18,7 @@ export interface MenuItem {
   danger?: boolean;
   disabled?: boolean;
   section?: string;
+  keepOpen?: boolean;
   onSelect: () => void;
 }
 
@@ -116,7 +117,10 @@ export function Menu({
                 ) : null}
                 <button
                   type="button"
-                  role="menuitem"
+                  role={item.keepOpen ? 'menuitemcheckbox' : 'menuitem'}
+                  aria-checked={
+                    item.keepOpen ? Boolean(item.checked) : undefined
+                  }
                   aria-label={item.ariaLabel}
                   disabled={item.disabled}
                   className={cn(
@@ -124,7 +128,7 @@ export function Menu({
                     item.danger && 'text-danger-text',
                   )}
                   onClick={() => {
-                    setOpen(false);
+                    if (!item.keepOpen) setOpen(false);
                     item.onSelect();
                   }}
                 >

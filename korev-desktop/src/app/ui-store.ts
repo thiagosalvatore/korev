@@ -107,6 +107,8 @@ export interface UiState {
   collapsedFolders: string[];
   historyOpen: boolean;
   askOpen: boolean;
+  hiddenNavEntries: string[];
+  compactNav: boolean;
   workspaces: Record<string, WorkspaceUi>;
   explainers: Record<string, ExplainerUi>;
   prPicker: PrPickerPurpose | null;
@@ -132,6 +134,8 @@ const INITIAL: UiState = {
   collapsedFolders: [],
   historyOpen: false,
   askOpen: true,
+  hiddenNavEntries: [],
+  compactNav: false,
   workspaces: {},
   explainers: {},
   prPicker: null,

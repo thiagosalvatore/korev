@@ -14,11 +14,14 @@ import {
   openFile,
   openSearch,
   openAsk,
+  openAutomations,
+  openGrid,
   openNewWorkspace,
   openRuns,
   openSettings,
   restoreWorkspace,
   selectWorkspace,
+  toggleCompactNav,
   toggleHandsFree,
 } from './actions';
 import { fuzzyRank } from './fuzzy';
@@ -81,6 +84,21 @@ function paletteItems(
       run: () => openNewWorkspace(null),
     },
     {
+      id: 'ask',
+      label: 'Ask',
+      icon: 'message-circle-question',
+      section: 'Actions',
+      run: () => openAsk(null),
+    },
+    {
+      id: 'grid',
+      label: 'Grid view',
+      icon: 'layout-grid',
+      hint: '⌘G',
+      section: 'Actions',
+      run: openGrid,
+    },
+    {
       id: 'board',
       label: 'Agent board',
       icon: 'square-kanban',
@@ -123,6 +141,20 @@ function paletteItems(
       icon: 'network',
       section: 'Actions',
       run: openRuns,
+    },
+    {
+      id: 'automations',
+      label: 'Automations',
+      icon: 'calendar-clock',
+      section: 'Actions',
+      run: openAutomations,
+    },
+    {
+      id: 'compact-nav',
+      label: 'Compact sidebar navigation',
+      icon: 'rows-2',
+      section: 'Actions',
+      run: toggleCompactNav,
     },
     {
       id: 'hands-free',

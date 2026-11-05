@@ -417,6 +417,10 @@ export function toggleGrid() {
   setUi({ page: { kind: 'workspace' } });
 }
 
+export function toggleCompactNav() {
+  setUi((ui) => ({ compactNav: !ui.compactNav }));
+}
+
 export function focusPane(index: number) {
   setUi((ui) => ({ grid: { ...ui.grid, focused: index } }));
   const pane = getUi().grid.panes[index];
