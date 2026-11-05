@@ -1,7 +1,7 @@
 {
   "name": "korev-mobile",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "dependencies": {
     "expo": "~57.0.27",
     "expo-asset": "~57.0.19",
