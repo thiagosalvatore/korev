@@ -1,7 +1,9 @@
+import { Smartphone } from 'lucide-react';
 import { LinkButton } from '@/components/ds/Button';
 import { GithubMark } from '@/components/ds/GithubMark';
 import { Logo } from '@/components/ds/Logo';
 import {
+  APP_STORE_URL,
   CHANGELOG_URL,
   DOCS_URL,
   GITHUB_URL,
@@ -43,6 +45,14 @@ export function Download({ withNote = true }: { withNote?: boolean }) {
         <LinkButton href={GITHUB_URL} size="lg" variant="secondary">
           <GithubMark size={16} />
           View source
+        </LinkButton>
+        <LinkButton
+          href={APP_STORE_URL}
+          size="lg"
+          variant="secondary"
+          icon={Smartphone}
+        >
+          iPhone app
         </LinkButton>
       </div>
       <OtherMacDownload />
