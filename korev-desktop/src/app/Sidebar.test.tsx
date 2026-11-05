@@ -9,7 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState } from '../shared/model';
 import { Sidebar } from './Sidebar';
-import { resetUiForTests, setUi, type GridPane } from './ui-store';
+import { getUi, resetUiForTests, setUi, type GridPane } from './ui-store';
 
 afterEach(() => {
   cleanup();
@@ -132,6 +132,7 @@ describe('Sidebar workspace name', () => {
       within(row).getByRole('button', { name: 'Workspace actions' }),
     );
     fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    expect(screen.queryByRole('menu')).toBeNull();
     fireEvent.change(screen.getByLabelText('Name'), {
       target: { value: 'Billing spike' },
     });
@@ -354,5 +355,94 @@ describe('Sidebar Ask chats', () => {
       name: 'Ask How does login work?',
     });
     expect(within(row).getByTitle('Waiting for your input')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Ask' }).getAttribute('title'),
+    ).toBe('An Ask chat is waiting for you');
+  });
+});
+
+describe('Sidebar pages', () => {
+  const ALL_PAGES = [
+    'search',
+    'new-workspace',
+    'grid',
+    'board',
+    'pull-requests',
+    'runs',
+    'automations',
+    'ask',
+  ];
+  const pages = () => screen.queryByRole('group', { name: 'Pages' });
+  const askChat = () =>
+    screen.queryByRole('button', { name: 'Ask How does login work?' });
+
+  it('hides the pages the user unticked', () => {
+    setUi({ hiddenNavEntries: ['board'] });
+    render(<Sidebar state={state} />);
+
+    expect(
+      within(pages()!).queryByRole('button', { name: /^Board/ }),
+    ).toBeNull();
+    expect(
+      within(pages()!).getByRole('button', { name: /^Grid/ }),
+    ).toBeTruthy();
+  });
+
+  it('drops the pages block when every page is hidden', () => {
+    setUi({ hiddenNavEntries: ALL_PAGES });
+    render(<Sidebar state={state} />);
+
+    expect(pages()).toBeNull();
+  });
+
+  it('shows the pages as one row of icons in compact mode', () => {
+    setUi({ compactNav: true, page: { kind: 'board' } });
+    render(<Sidebar state={state} />);
+
+    expect(
+      within(pages()!)
+        .getByRole('button', { name: 'Board' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+    expect(askChat()).toBeNull();
+  });
+
+  it('opens the waiting Ask chat from the compact Ask icon', () => {
+    setUi({ compactNav: true });
+    render(<Sidebar state={{ ...state, waitingSessions: ['as1'] }} />);
+
+    fireEvent.click(within(pages()!).getByRole('button', { name: 'Ask' }));
+
+    expect(getUi().page).toMatchObject({ kind: 'ask', askChatId: 'a1' });
+  });
+
+  it('folds the Ask chats under the Ask page', () => {
+    render(<Sidebar state={state} />);
+    expect(askChat()).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ask chats' }));
+
+    expect(askChat()).toBeNull();
+  });
+
+  it('drops the Ask chats with the Ask page', () => {
+    setUi({ hiddenNavEntries: ['ask'] });
+    render(<Sidebar state={state} />);
+
+    expect(askChat()).toBeNull();
+  });
+
+  it('hides a page from the customize menu and keeps the menu open', () => {
+    render(<Sidebar state={state} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Customize sidebar' }));
+    const board = () => screen.getByRole('menuitemcheckbox', { name: 'Board' });
+    expect(board().getAttribute('aria-checked')).toBe('true');
+
+    fireEvent.click(board());
+
+    expect(board().getAttribute('aria-checked')).toBe('false');
+    expect(
+      within(pages()!).queryByRole('button', { name: /^Board/ }),
+    ).toBeNull();
   });
 });

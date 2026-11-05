@@ -14,6 +14,7 @@ import {
   PR_BADGE_LABELS,
   primaryPr,
   type AppState,
+  type AskChat,
   type PrBadge,
   type PrStatus,
   type Repo,
@@ -49,6 +50,7 @@ import {
   openSettings,
   restoreWorkspace,
   selectWorkspace,
+  toggleCompactNav,
 } from './actions';
 import { api } from './bridge';
 import { askRepoNames, timeAgo } from '../shared/format';
@@ -64,7 +66,7 @@ import { DRAG_REGION, NO_DRAG } from './layout';
 import { RemoteDevices } from './RemoteDevices';
 import { Menu, type MenuItem } from './ui/Menu';
 import { reportFailure } from './ui/toast';
-import { setUi, useUi } from './ui-store';
+import { setUi, useUi, type Page } from './ui-store';
 
 const ROW =
   'group flex w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2 text-left text-sm text-fg-2 hover:bg-hover hover:text-fg-1';
@@ -73,18 +75,23 @@ function NavRow({
   icon,
   label,
   hint,
+  title,
+  iconClassName = 'text-fg-3',
   active = false,
   onClick,
 }: {
   icon: IconName;
   label: string;
   hint?: string;
+  title?: string;
+  iconClassName?: string;
   active?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      title={title}
       aria-current={active ? 'page' : undefined}
       className={cn(
         ROW,
@@ -93,7 +100,7 @@ function NavRow({
       )}
       onClick={onClick}
     >
-      <Icon name={icon} size={15} className="text-fg-3" />
+      <Icon name={icon} size={15} className={iconClassName} />
       <span className="flex-1">{label}</span>
       {hint ? (
         <Kbd className="opacity-0 group-hover:opacity-100">{hint}</Kbd>
@@ -431,17 +438,18 @@ const FOLDER_DRAG_TYPE = 'application/x-korev-folder';
 const DROP_INDICATOR = 'shadow-[inset_0_2px_0_0_var(--color-accent)]';
 const MOVE_TO_FOLDER = 'Move to folder';
 
+function toggled(list: string[], id: string): string[] {
+  return list.includes(id)
+    ? list.filter((entry) => entry !== id)
+    : [...list, id];
+}
+
 function useCollapsed(
   key: 'collapsedRepos' | 'expandedRepos' | 'collapsedFolders',
   id: string,
 ) {
   const listed = useUi((ui) => ui[key].includes(id));
-  const toggle = () =>
-    setUi((ui) => ({
-      [key]: listed
-        ? ui[key].filter((entry) => entry !== id)
-        : [...ui[key], id],
-    }));
+  const toggle = () => setUi((ui) => ({ [key]: toggled(ui[key], id) }));
   return [key === 'expandedRepos' ? !listed : listed, toggle] as const;
 }
 
@@ -951,98 +959,320 @@ function RootEndDropZone() {
   );
 }
 
-function AskChats({ state }: { state: AppState }) {
+function AskChatList({ state, asks }: { state: AppState; asks: AskChat[] }) {
   const selectedId = useUi((ui) => {
     if (ui.page.kind === 'grid') return paneAskChatId(focusedGridPane(ui.grid));
     return ui.page.kind === 'ask' ? ui.page.askChatId : null;
   });
-  const open = useUi((ui) => ui.askOpen);
-  const newestFirst = asksNewestFirst(state);
-  if (!newestFirst.length) return null;
   return (
-    <section aria-label="Ask" className="border-b border-border-1 px-2 py-1.5">
-      <button
-        type="button"
-        className={cn(ROW, 'h-6 gap-1 text-fg-4 hover:text-fg-2')}
-        aria-expanded={open}
-        onClick={() => setUi({ askOpen: !open })}
-      >
-        <span className="type-overline">Ask chats</span>
-        <Icon
-          name="chevron-down"
-          size={12}
-          className={cn('transition-transform', !open && '-rotate-90')}
-        />
-        <span className="flex-1" />
-        <span className="font-mono text-2xs">{newestFirst.length}</span>
-      </button>
-      {open ? (
-        <div className="max-h-56 overflow-y-auto">
-          {newestFirst.map((ask) => {
-            const running = state.runningSessions.includes(ask.session.id);
-            const waiting = state.waitingSessions.includes(ask.session.id);
-            return (
-              <div
-                key={ask.id}
-                role="button"
-                tabIndex={0}
-                aria-current={ask.id === selectedId ? 'page' : undefined}
-                aria-label={`Ask ${ask.session.title}`}
-                {...draggable(ASK_DRAG_TYPE, ask.id)}
-                onClick={() => openAsk(ask.id)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') openAsk(ask.id);
-                }}
+    <div className="max-h-56 overflow-y-auto pl-3">
+      {asks.map((ask) => {
+        const running = state.runningSessions.includes(ask.session.id);
+        const waiting = state.waitingSessions.includes(ask.session.id);
+        return (
+          <div
+            key={ask.id}
+            role="button"
+            tabIndex={0}
+            aria-current={ask.id === selectedId ? 'page' : undefined}
+            aria-label={`Ask ${ask.session.title}`}
+            {...draggable(ASK_DRAG_TYPE, ask.id)}
+            onClick={() => openAsk(ask.id)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') openAsk(ask.id);
+            }}
+            className={cn(
+              'group flex min-h-9 cursor-pointer items-center gap-2 rounded-md py-1 pr-1.5 pl-2 text-fg-2 hover:bg-hover',
+              ask.id === selectedId && 'bg-active text-fg-1 hover:bg-active',
+            )}
+          >
+            {waiting ? (
+              <WaitingIcon />
+            ) : (
+              <Icon
+                name={running ? 'loader-circle' : 'message-circle-question'}
+                size={14}
                 className={cn(
-                  'group flex min-h-9 cursor-pointer items-center gap-2 rounded-md py-1 pr-1.5 pl-2 text-fg-2 hover:bg-hover',
-                  ask.id === selectedId &&
-                    'bg-active text-fg-1 hover:bg-active',
+                  running ? 'animate-spin text-accent-text' : 'text-fg-4',
+                )}
+              />
+            )}
+            <span className="min-w-0 flex-1">
+              <span
+                className={cn(
+                  'block truncate text-sm',
+                  waiting ? 'font-semibold text-fg-1' : 'font-medium',
                 )}
               >
-                {waiting ? (
-                  <WaitingIcon />
-                ) : (
-                  <Icon
-                    name={running ? 'loader-circle' : 'message-circle-question'}
-                    size={14}
-                    className={cn(
-                      running ? 'animate-spin text-accent-text' : 'text-fg-4',
-                    )}
-                  />
-                )}
-                <span className="min-w-0 flex-1">
-                  <span
-                    className={cn(
-                      'block truncate text-sm',
-                      waiting ? 'font-semibold text-fg-1' : 'font-medium',
-                    )}
-                  >
-                    {ask.session.title}
-                  </span>
-                  <span className="block truncate text-xs text-fg-3">
-                    {askRepoNames(state, ask)}
-                  </span>
-                </span>
-                <span className="text-2xs text-fg-4 group-hover:hidden">
-                  {timeAgo(ask.lastMessageAt)}
-                </span>
-                <span className="hidden group-hover:flex">
-                  <IconButton
-                    icon="trash-2"
-                    label={`Delete ${ask.session.title}`}
-                    size="sm"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void deleteAsk(ask);
-                    }}
-                  />
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
-    </section>
+                {ask.session.title}
+              </span>
+              <span className="block truncate text-xs text-fg-3">
+                {askRepoNames(state, ask)}
+              </span>
+            </span>
+            <span className="text-2xs text-fg-4 group-hover:hidden">
+              {timeAgo(ask.lastMessageAt)}
+            </span>
+            <span className="hidden group-hover:flex">
+              <IconButton
+                icon="trash-2"
+                label={`Delete ${ask.session.title}`}
+                size="sm"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void deleteAsk(ask);
+                }}
+              />
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+interface NavEntry {
+  id: string;
+  icon: IconName;
+  label: string;
+  hint?: string;
+  page: Page['kind'] | null;
+  shown?: (state: AppState) => boolean;
+  open: () => void;
+}
+
+const ASK_ENTRY_ID = 'ask';
+const WAITING_ASK_TITLE = 'An Ask chat is waiting for you';
+const SHOW_IN_SIDEBAR = 'Show in sidebar';
+
+const NAV_ENTRIES: NavEntry[] = [
+  {
+    id: 'search',
+    icon: 'search',
+    label: 'Search',
+    hint: '⌘K',
+    page: null,
+    open: () => setUi({ palette: 'all' }),
+  },
+  {
+    id: 'new-workspace',
+    icon: 'square-pen',
+    label: 'New workspace',
+    hint: '⌘N',
+    page: 'new-workspace',
+    open: () => openNewWorkspace(null),
+  },
+  {
+    id: 'grid',
+    icon: 'layout-grid',
+    label: 'Grid',
+    hint: '⌘G',
+    page: 'grid',
+    open: openGrid,
+  },
+  {
+    id: 'board',
+    icon: 'square-kanban',
+    label: 'Board',
+    hint: '⌘⇧B',
+    page: 'board',
+    open: openBoard,
+  },
+  {
+    id: 'pull-requests',
+    icon: 'git-pull-request',
+    label: 'Pull requests',
+    page: 'pull-requests',
+    open: openPullRequests,
+  },
+  {
+    id: 'runs',
+    icon: 'network',
+    label: 'Runs',
+    page: 'runs',
+    shown: (state) => state.runs.length > 0,
+    open: openRuns,
+  },
+  {
+    id: 'automations',
+    icon: 'calendar-clock',
+    label: 'Automations',
+    page: 'automations',
+    open: openAutomations,
+  },
+  {
+    id: ASK_ENTRY_ID,
+    icon: 'message-circle-question',
+    label: 'Ask',
+    page: 'ask',
+    open: () => openAsk(null),
+  },
+];
+
+function useActiveNavEntry(): (entry: NavEntry) => boolean {
+  const pageKind = useUi((ui) => ui.page.kind);
+  const paletteOpen = useUi((ui) => ui.palette !== false);
+  return (entry) =>
+    entry.page === null ? paletteOpen : entry.page === pageKind;
+}
+
+function AskEntry({
+  state,
+  asks,
+  waitingAsk,
+  active,
+}: {
+  state: AppState;
+  asks: AskChat[];
+  waitingAsk: AskChat | undefined;
+  active: boolean;
+}) {
+  const open = useUi((ui) => ui.askOpen);
+  return (
+    <>
+      <div className="flex items-center gap-0.5">
+        <NavRow
+          icon="message-circle-question"
+          label="Ask"
+          title={waitingAsk ? WAITING_ASK_TITLE : undefined}
+          iconClassName={waitingAsk ? 'text-warning-text' : undefined}
+          active={active}
+          onClick={() => openAsk(null)}
+        />
+        {asks.length ? (
+          <button
+            type="button"
+            aria-label="Ask chats"
+            aria-expanded={open}
+            className="flex h-7 flex-none cursor-pointer items-center gap-1 rounded-md border-0 bg-transparent px-1.5 text-fg-4 hover:bg-hover hover:text-fg-2"
+            onClick={() => setUi({ askOpen: !open })}
+          >
+            <span className="font-mono text-2xs">{asks.length}</span>
+            <Icon
+              name="chevron-down"
+              size={12}
+              className={cn('transition-transform', !open && '-rotate-90')}
+            />
+          </button>
+        ) : null}
+      </div>
+      {open && asks.length ? <AskChatList state={state} asks={asks} /> : null}
+    </>
+  );
+}
+
+function Pages({ state }: { state: AppState }) {
+  const hidden = useUi((ui) => ui.hiddenNavEntries);
+  const compact = useUi((ui) => ui.compactNav);
+  const isActive = useActiveNavEntry();
+  const entries = NAV_ENTRIES.filter(
+    (entry) => !hidden.includes(entry.id) && (entry.shown?.(state) ?? true),
+  );
+  if (!entries.length) return null;
+  const asks = asksNewestFirst(state);
+  const waitingAsk = asks.find((ask) =>
+    state.waitingSessions.includes(ask.session.id),
+  );
+  if (compact) {
+    return (
+      <div
+        role="group"
+        aria-label="Pages"
+        className="flex justify-between border-b border-border-1 px-2 pb-2"
+      >
+        {entries.map((entry) => {
+          const isAsk = entry.id === ASK_ENTRY_ID;
+          const waiting = isAsk && waitingAsk !== undefined;
+          return (
+            <IconButton
+              key={entry.id}
+              icon={entry.icon}
+              label={entry.label}
+              title={waiting ? WAITING_ASK_TITLE : entry.label}
+              size="sm"
+              aria-current={isActive(entry) ? 'page' : undefined}
+              className={cn(
+                isActive(entry) && 'bg-active text-fg-1',
+                waiting && 'text-warning-text',
+              )}
+              onClick={() =>
+                isAsk && waitingAsk ? openAsk(waitingAsk.id) : entry.open()
+              }
+            />
+          );
+        })}
+      </div>
+    );
+  }
+  return (
+    <div
+      role="group"
+      aria-label="Pages"
+      className="flex flex-col gap-0.5 border-b border-border-1 px-2 pb-2"
+    >
+      {entries.map((entry) =>
+        entry.id === ASK_ENTRY_ID ? (
+          <AskEntry
+            key={entry.id}
+            state={state}
+            asks={asks}
+            waitingAsk={waitingAsk}
+            active={isActive(entry)}
+          />
+        ) : (
+          <NavRow
+            key={entry.id}
+            icon={entry.icon}
+            label={entry.label}
+            hint={entry.hint}
+            active={isActive(entry)}
+            onClick={entry.open}
+          />
+        ),
+      )}
+    </div>
+  );
+}
+
+function CustomizeSidebarMenu() {
+  const hidden = useUi((ui) => ui.hiddenNavEntries);
+  const compact = useUi((ui) => ui.compactNav);
+  return (
+    <Menu
+      label="Customize sidebar"
+      align="right"
+      items={[
+        {
+          id: 'compact',
+          label: 'Compact navigation',
+          icon: 'rows-2',
+          checked: compact,
+          keepOpen: true,
+          onSelect: toggleCompactNav,
+        },
+        ...NAV_ENTRIES.map((entry) => ({
+          id: entry.id,
+          label: entry.label,
+          icon: entry.icon,
+          checked: !hidden.includes(entry.id),
+          keepOpen: true,
+          section: SHOW_IN_SIDEBAR,
+          onSelect: () =>
+            setUi((ui) => ({
+              hiddenNavEntries: toggled(ui.hiddenNavEntries, entry.id),
+            })),
+        })),
+      ]}
+      trigger={({ toggle }) => (
+        <IconButton
+          icon="sliders-horizontal"
+          label="Customize sidebar"
+          size="sm"
+          className={NO_DRAG}
+          onClick={toggle}
+        />
+      )}
+    />
   );
 }
 
@@ -1203,8 +1433,6 @@ export function Sidebar({ state }: { state: AppState }) {
       return paneWorkspaceId(focusedGridPane(ui.grid));
     return ui.page.kind === 'workspace' ? ui.workspaceId : null;
   });
-  const pageKind = useUi((ui) => ui.page.kind);
-  const paletteOpen = useUi((ui) => ui.palette !== false);
   const active = activeWorkspaces(state);
   const leads = crossRepoLeads(state);
   const indexOf = (workspace: Workspace) => active.indexOf(workspace);
@@ -1219,6 +1447,7 @@ export function Sidebar({ state }: { state: AppState }) {
           DRAG_REGION,
         )}
       >
+        <CustomizeSidebarMenu />
         <HandsFreeButton />
         <IconButton
           icon="panel-left"
@@ -1229,63 +1458,7 @@ export function Sidebar({ state }: { state: AppState }) {
         />
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <div className="flex flex-col gap-0.5 px-2 pb-2">
-          <NavRow
-            icon="search"
-            label="Search"
-            hint="⌘K"
-            active={paletteOpen}
-            onClick={() => setUi({ palette: 'all' })}
-          />
-          <NavRow
-            icon="square-pen"
-            label="New workspace"
-            hint="⌘N"
-            active={pageKind === 'new-workspace'}
-            onClick={() => openNewWorkspace(null)}
-          />
-          <NavRow
-            icon="message-circle-question"
-            label="Ask"
-            active={pageKind === 'ask'}
-            onClick={() => openAsk(null)}
-          />
-          <NavRow
-            icon="layout-grid"
-            label="Grid"
-            hint="⌘G"
-            active={pageKind === 'grid'}
-            onClick={openGrid}
-          />
-          {state.runs.length ? (
-            <NavRow
-              icon="network"
-              label="Runs"
-              active={pageKind === 'runs'}
-              onClick={openRuns}
-            />
-          ) : null}
-          <NavRow
-            icon="square-kanban"
-            label="Board"
-            hint="⌘⇧B"
-            active={pageKind === 'board'}
-            onClick={openBoard}
-          />
-          <NavRow
-            icon="git-pull-request"
-            label="Pull requests"
-            active={pageKind === 'pull-requests'}
-            onClick={openPullRequests}
-          />
-          <NavRow
-            icon="calendar-clock"
-            label="Automations"
-            active={pageKind === 'automations'}
-            onClick={openAutomations}
-          />
-        </div>
-        <AskChats state={state} />
+        <Pages state={state} />
         <div className="flex-1 px-2 pt-1">
           {repoSections(state).map(({ folder, repos }) => {
             const groups = repos.map((repo) => (

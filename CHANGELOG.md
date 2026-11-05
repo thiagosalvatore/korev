@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Customize the sidebar.** The new Customize sidebar icon hides the pages you do not use and can show the rest as one row of icons, so your workspaces start higher up. Your Ask chats now sit under Ask, at the end of the pages.
+
 ## [0.25.0] - 2026-11-04
 
 Copy a plan before you approve it, and Korev no longer stalls git on a slow repository.

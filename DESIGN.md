@@ -20,11 +20,17 @@ How the Korev desktop app looks and behaves. The tokens live in
 
 Three columns:
 
-- **Left sidebar** (`--sidebar-w`): Search (⌘K), New workspace (⌘N), Ask, Grid, Runs (only
-  once an agent has started an orchestration run), Board (⌘⇧B), Automations, then the Ask
-  chats (without automation runs), then one group per repository with its workspaces, then History (archived
-  workspaces), then Add repository and Settings. A workspace linked across repositories
-  shows once, under the repository of its lead workspace (see Linked group).
+- **Left sidebar** (`--sidebar-w`): Search (⌘K), New workspace (⌘N), Grid (⌘G), Board (⌘⇧B),
+  Pull requests, Runs (only once an agent has started an orchestration run), Automations, then
+  Ask with its chats (without automation runs) nested under it, then one group per repository
+  with its workspaces, then History (archived workspaces), then Add repository and Settings. Ask
+  comes last so that opening its chats never moves the rows above it. A workspace linked across
+  repositories shows once, under the repository of its lead workspace (see Linked group).
+  - The **Customize sidebar** icon in the top bar hides any of these entries and turns on
+    **compact navigation**: one row of `sm` icon buttons in the same order, with no Ask chats.
+    The current page has `bg-active` in both layouts.
+  - While an Ask chat waits for you, the Ask icon turns `warning`. In compact mode, clicking it
+    opens the newest waiting chat.
 - **Centre**: the workspace header (workspace name, branch, target branch, Open in, PR number,
   the next git action), a tab strip (chats, Changes, open files) and the active tab.
 - **Right panel** (`--panel-w`): the git panel (Files / Changes / PR / Artifacts) on top and
