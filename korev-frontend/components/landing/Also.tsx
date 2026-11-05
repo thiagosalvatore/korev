@@ -8,7 +8,6 @@ import {
   ListChecks,
   Plug,
   ScanEye,
-  Smartphone,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -47,11 +46,6 @@ const FEATURES: [LucideIcon, string, string][] = [
     AudioLines,
     'Hands-free mode',
     'Say "Korev, create a workspace to plan the login page" and it happens. Korev reads out questions and plans, and you answer by voice.',
-  ],
-  [
-    Smartphone,
-    'From your phone',
-    'Check on running agents and send messages from the iPhone app on the App Store, over Tailscale.',
   ],
   [
     ScanEye,

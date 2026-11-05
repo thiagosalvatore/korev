@@ -3,8 +3,10 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Archive,
+  BatteryFull,
   BookOpenText,
   Check,
+  CircleHelp,
   ChevronRight,
   Eye,
   Layers,
@@ -15,12 +17,16 @@ import {
   GitPullRequestArrow,
   MessageCircleQuestion,
   Send,
+  Signal,
+  Wifi,
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { Button, type ButtonVariant } from '@/components/ds/Button';
 import { DiffHunk } from '@/components/ds/DiffHunk';
+import { LogoMark } from '@/components/ds/Logo';
 import {
+  DiffStat,
   RepoHeading,
   StateIcon,
   WorkspaceRow,
@@ -330,6 +336,85 @@ export function Linked() {
         <Button size="sm" variant="primary" icon={GitBranchPlus} tabIndex={-1}>
           Start workspaces
         </Button>
+      </div>
+    </div>
+  );
+}
+
+type PhoneRowState = WorkspaceState | 'asks';
+
+interface PhoneRow {
+  branch: string;
+  state: PhoneRowState;
+  add: number;
+  del: number;
+}
+
+const PHONE_QUESTION = 'Send Retry-After in seconds, or as an HTTP date?';
+
+function PhoneRowIcon({ state }: { state: PhoneRowState }) {
+  if (state === 'asks') return <CircleHelp size={16} color="var(--warning)" />;
+  return <StateIcon state={state} />;
+}
+
+function PhoneRows({ rows }: { rows: PhoneRow[] }) {
+  return rows.map((row) => (
+    <div
+      key={row.branch}
+      className={`b-prow${row.state === 'asks' ? ' unread' : ''}`}
+    >
+      <PhoneRowIcon state={row.state} />
+      <span className="b">{row.branch}</span>
+      <DiffStat add={row.add} del={row.del} />
+    </div>
+  ));
+}
+
+const API_ROWS: PhoneRow[] = [
+  { branch: 'webhook-retries', state: 'merged', add: 61, del: 18 },
+  { branch: 'billing-portal', state: 'run', add: 23, del: 4 },
+];
+
+export function Phone() {
+  const tick = useTick(2600, 3);
+  const asking = tick >= 1;
+  const webRows: PhoneRow[] = [
+    {
+      branch: 'rate-limit-headers',
+      state: asking ? 'asks' : 'run',
+      add: 42,
+      del: 7,
+    },
+    { branch: 'fix-flaky-checkout', state: 'checks', add: 12, del: 3 },
+    { branch: 'dark-mode-settings', state: 'open', add: 84, del: 12 },
+  ];
+  return (
+    <div className="b-card b-stage" aria-hidden="true">
+      <div className="b-phone">
+        <div className="sb">
+          <span>9:41</span>
+          <span className="isl" />
+          <span className="ic">
+            <Signal size={13} />
+            <Wifi size={13} />
+            <BatteryFull size={16} />
+          </span>
+        </div>
+        <div className={`nt${tick === 1 ? ' on' : ''}`}>
+          <span className="ap">
+            <LogoMark size={18} />
+          </span>
+          <div>
+            <b>rate-limit-headers needs you</b>
+            <span>{PHONE_QUESTION}</span>
+          </div>
+          <span className="t">now</span>
+        </div>
+        <h4>Workspaces</h4>
+        <RepoHeading name="acme/web" />
+        <PhoneRows rows={webRows} />
+        <RepoHeading name="acme/api" />
+        <PhoneRows rows={API_ROWS} />
       </div>
     </div>
   );

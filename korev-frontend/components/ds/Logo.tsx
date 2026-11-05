@@ -2,7 +2,7 @@ const WORDMARK_GAP_RATIO = 0.32;
 const WORDMARK_FONT_RATIO = 0.98;
 const WORDMARK_LIFT_RATIO = 0.04;
 
-function LogoMark({ size }: { size: number }) {
+export function LogoMark({ size }: { size: number }) {
   return (
     <svg
       width={size}

@@ -5,6 +5,7 @@ import {
   GitBranch,
   GitPullRequestArrow,
   Link,
+  Smartphone,
   type LucideIcon,
 } from 'lucide-react';
 import { KorevDemo } from '@/components/demo/KorevDemo';
@@ -15,11 +16,13 @@ import {
   Explain,
   Linked,
   MainCommit,
+  Phone,
   Review,
   Ship,
   Worktrees,
 } from '@/components/landing/Graph';
 import { Install } from '@/components/landing/Install';
+import { APP_STORE_URL } from '@/components/landing/links';
 
 function BranchSection({
   name,
@@ -29,6 +32,7 @@ function BranchSection({
   body,
   points,
   card,
+  action,
 }: {
   name: string;
   icon: LucideIcon;
@@ -37,6 +41,7 @@ function BranchSection({
   body: ReactNode;
   points: ReactNode[];
   card: ReactNode;
+  action?: ReactNode;
 }) {
   return (
     <Branch name={name}>
@@ -55,10 +60,24 @@ function BranchSection({
               </li>
             ))}
           </ul>
+          {action}
         </div>
         {card}
       </div>
     </Branch>
+  );
+}
+
+function AppStoreBadge() {
+  return (
+    <a href={APP_STORE_URL} className="lp-appstore">
+      <img
+        src="/app-store-badge.svg"
+        alt="Download on the App Store"
+        width={120}
+        height={40}
+      />
+    </a>
   );
 }
 
@@ -178,6 +197,24 @@ function FeatureGraph() {
         sha="c2f8e61"
         message="Merge #483 Billing portal"
         extra={<span className="h">· acme/web, acme/api</span>}
+      />
+      <BranchSection
+        name="Phone"
+        icon={Smartphone}
+        shortcut="iPhone · over Tailscale"
+        title="Your agents keep working when you leave the desk."
+        body="The iPhone app shows the same workspaces as your Mac. When an agent asks a question, your phone gets a notification. Answer it, and the agent goes on."
+        points={[
+          'Chat with any agent, or start a workspace by voice',
+          'See checks and merge the pull request',
+          'Pairs with your Mac when you scan a code',
+        ]}
+        card={<Phone />}
+        action={<AppStoreBadge />}
+      />
+      <MainCommit
+        sha="9d41b7e"
+        message="Merge #484 Send Retry-After in seconds"
       />
     </div>
   );
