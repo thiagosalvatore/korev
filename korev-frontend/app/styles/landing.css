@@ -88,6 +88,15 @@
 .lp-dl a {
   display: inline-flex;
 }
+.lp-appstore {
+  border-radius: 7px;
+}
+.lp-appstore img {
+  display: block;
+}
+.lp-appstore:focus-visible {
+  box-shadow: var(--focus-ring);
+}
 .lp-dl .note {
   font-size: 12.5px;
   color: var(--fg-3);

@@ -1,4 +1,3 @@
-import { Smartphone } from 'lucide-react';
 import { LinkButton } from '@/components/ds/Button';
 import { GithubMark } from '@/components/ds/GithubMark';
 import { Logo } from '@/components/ds/Logo';
@@ -40,20 +39,27 @@ export function Nav() {
 export function Download({ withNote = true }: { withNote?: boolean }) {
   return (
     <div className="lp-dl">
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          flexWrap: 'wrap',
+          alignItems: 'center',
+        }}
+      >
         <MacDownloadButton size="lg">Download for Mac</MacDownloadButton>
         <LinkButton href={GITHUB_URL} size="lg" variant="secondary">
           <GithubMark size={16} />
           View source
         </LinkButton>
-        <LinkButton
-          href={APP_STORE_URL}
-          size="lg"
-          variant="secondary"
-          icon={Smartphone}
-        >
-          iPhone app
-        </LinkButton>
+        <a href={APP_STORE_URL} className="lp-appstore">
+          <img
+            src="/app-store-badge.svg"
+            alt="Download on the App Store"
+            width={120}
+            height={40}
+          />
+        </a>
       </div>
       <OtherMacDownload />
       {withNote && (
