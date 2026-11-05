@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Wide chat.** On a large screen, click the new Wide chat icon at the right of the tab bar to let the chat fill the window. In the normal width, a wide table or code block now grows into the empty space on both sides instead of squeezing into the column.
+
 ## [0.28.0] - 2026-11-05
 
 See work that spans repositories in one place, and find your Ask chats in their repository, on your Mac and on your phone.

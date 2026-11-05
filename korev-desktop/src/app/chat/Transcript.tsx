@@ -461,7 +461,11 @@ function AssistantMessage({
   return (
     <div className="group flex flex-col gap-1">
       {shown ? (
-        <Markdown text={shown} className="px-1.5" {...markdownProps} />
+        <Markdown
+          text={shown}
+          className="kv-md-breakout px-1.5"
+          {...markdownProps}
+        />
       ) : null}
       {explains && onOpenExplainer ? (
         <ExplainerChip onOpen={onOpenExplainer} />
@@ -615,6 +619,7 @@ export interface TranscriptProps {
   onOpenFile?: (file: string, line: number | null) => void;
   onOpenExplainer?: () => void;
   repoUrl?: string | null;
+  wide?: boolean;
 }
 
 const STICK_THRESHOLD_PX = 80;
@@ -634,6 +639,7 @@ export function Transcript({
   onOpenFile,
   onOpenExplainer,
   repoUrl,
+  wide = false,
 }: TranscriptProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -661,7 +667,7 @@ export function Transcript({
   return (
     <div
       ref={scroller}
-      className="min-h-0 flex-1 overflow-y-auto"
+      className={cn('min-h-0 flex-1 overflow-y-auto', !wide && 'kv-chat')}
       onScroll={(event) => {
         const element = event.currentTarget;
         stuck.current =
@@ -669,7 +675,12 @@ export function Transcript({
           STICK_THRESHOLD_PX;
       }}
     >
-      <div className="mx-auto flex max-w-[820px] flex-col gap-3 px-6 pt-6 pb-10">
+      <div
+        className={cn(
+          'mx-auto flex flex-col gap-3 px-6 pt-6 pb-10',
+          !wide && 'max-w-[820px]',
+        )}
+      >
         {toBlocks(items).map((block) => {
           if (block.kind === 'tools') {
             return (

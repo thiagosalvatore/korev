@@ -12,6 +12,7 @@ import {
 import { ChatView } from './chat/ChatView';
 import { Composer } from './chat/Composer';
 import { ShareChatButton } from './chat/exportConversation';
+import { WideChatButton } from './chat/WideChatButton';
 import { askRepoNames, loadoutChoices, modelChoices } from '../shared/format';
 import { useModelChoice } from './hooks';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
@@ -193,6 +194,7 @@ function AskChatView({ state, ask }: { state: AppState; ask: AskChat }) {
             {ask.repoIds.length > 1 ? 'Start workspaces' : 'Start workspace'}
           </Button>
         ) : null}
+        <WideChatButton className={NO_DRAG} />
         <ShareChatButton
           session={ask.session}
           context={{ repo: repoNames, branch: null }}

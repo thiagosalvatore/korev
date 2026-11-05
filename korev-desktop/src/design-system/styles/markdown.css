@@ -131,6 +131,20 @@
     display: block;
     overflow-x: auto;
   }
+  /* In the narrow chat column, a wide table or code block grows into the empty space on both sides, centred on the column. */
+  .kv-chat {
+    container-type: inline-size;
+  }
+  .kv-chat .kv-md-breakout > table,
+  .kv-chat .kv-md-breakout > .kv-md-code {
+    position: relative;
+    left: 50%;
+    translate: -50%;
+    width: max-content;
+    min-width: 100%;
+    /* 3rem matches the column's side padding. */
+    max-width: calc(100cqw - 3rem);
+  }
   .kv-md th,
   .kv-md td {
     border: 1px solid var(--border-2);
