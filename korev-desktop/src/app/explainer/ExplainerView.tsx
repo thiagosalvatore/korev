@@ -5,6 +5,7 @@ import {
   DiffStat,
   Icon,
   IconButton,
+  LoadingRing,
   Spinner,
   type IconName,
 } from '../../design-system';
@@ -141,10 +142,7 @@ function StatusBanner({
   const { ref, latestRevision } = explainer;
   if (ref.status === 'writing')
     return (
-      <Banner
-        tone="neutral"
-        icon={<Icon name="loader-circle" size={14} className="animate-spin" />}
-      >
+      <Banner tone="neutral" icon={<LoadingRing size={14} />}>
         Updating the explanation…
       </Banner>
     );

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Icon, IconButton } from '../../design-system';
+import { IconButton, LoadingRing } from '../../design-system';
 import type { DictationPhase } from './dictation';
 import { isDictationShortcut } from './DictationButton';
 
@@ -93,7 +93,7 @@ export function RecordingBar(props: RecordingBarProps) {
       />
       {transcribing ? (
         <span className="flex items-center gap-1.5 text-xs text-fg-3">
-          <Icon name="loader-circle" size={14} className="animate-spin" />
+          <LoadingRing size={14} />
           Transcribing…
         </span>
       ) : (

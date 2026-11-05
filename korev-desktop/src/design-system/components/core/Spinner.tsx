@@ -1,13 +1,13 @@
-import { Icon } from './Icon';
+import { LoadingRing } from './LoadingRing';
 
 export function Spinner() {
   return (
     <div
       role="status"
       aria-label="Loading"
-      className="flex min-h-0 flex-1 items-center justify-center text-fg-4"
+      className="flex min-h-0 flex-1 animate-appear items-center justify-center text-fg-4"
     >
-      <Icon name="loader-circle" size={18} className="animate-spin" />
+      <LoadingRing size={20} />
     </div>
   );
 }

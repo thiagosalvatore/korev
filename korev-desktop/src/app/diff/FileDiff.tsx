@@ -4,6 +4,7 @@ import {
   DiffStat,
   highlightCode,
   Icon,
+  SkeletonRows,
   type DiffLang,
 } from '../../design-system';
 import {
@@ -315,7 +316,7 @@ export function FileDiff({
   const rows = patch ? parseUnifiedDiff(patch).slice(0, MAX_ROWS_PER_FILE) : [];
   let body: ReactNode;
   if (patch === null)
-    body = <p className="m-0 px-4 py-3 text-sm text-fg-3">Loading…</p>;
+    body = <SkeletonRows rows={6} className="gap-2 px-4 py-3" />;
   else if (isBinaryDiff(patch))
     body = <p className="m-0 px-4 py-3 text-sm text-fg-3">Binary file</p>;
   else if (!rows.length)

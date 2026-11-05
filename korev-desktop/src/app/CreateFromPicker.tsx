@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { cn, Icon, Tabs, type IconName } from '../design-system';
+import { cn, Icon, SkeletonRows, Tabs, type IconName } from '../design-system';
 import type { IssueSummary, PullRequestSummary } from '../shared/model';
 import { api } from './bridge';
 import { fuzzyRank } from './fuzzy';
@@ -172,7 +172,7 @@ export function CreateFromPicker({
         className="max-h-64 overflow-y-auto p-1"
       >
         {options === null ? (
-          <p className="m-0 px-3 py-4 text-sm text-fg-3">Loading…</p>
+          <SkeletonRows rows={4} lines={2} className="px-3 py-3" />
         ) : null}
         {options && !results.length ? (
           <p className="m-0 px-3 py-4 text-sm text-fg-3">Nothing found</p>

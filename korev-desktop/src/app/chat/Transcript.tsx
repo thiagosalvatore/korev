@@ -12,6 +12,8 @@ import {
   Dialog,
   Icon,
   IconButton,
+  LoadingRing,
+  ShimmerText,
   type IconName,
 } from '../../design-system';
 import {
@@ -130,11 +132,7 @@ function ToolRow({
         onClick={() => setOpen((value) => !value)}
       >
         {pending ? (
-          <Icon
-            name="loader-circle"
-            size={13}
-            className="animate-spin text-fg-3"
-          />
+          <LoadingRing size={13} className="text-fg-3" />
         ) : (
           <Icon
             name={
@@ -593,12 +591,8 @@ function WorkingIndicator({ since }: { since: number }) {
   }, []);
   return (
     <div className="flex items-center gap-2 px-1.5 text-sm text-fg-3">
-      <Icon
-        name="loader-circle"
-        size={14}
-        className="animate-spin text-accent-text"
-      />
-      Working…{' '}
+      <LoadingRing size={14} className="text-accent-text" />
+      <ShimmerText>Working…</ShimmerText>{' '}
       <span className="font-mono text-xs text-fg-4">
         {duration(now - since)}
       </span>

@@ -8,6 +8,7 @@ import {
   IconButton,
   Input,
   Kbd,
+  LoadingRing,
   type IconName,
 } from '../design-system';
 import {
@@ -162,13 +163,7 @@ function StatusIcon({
 }) {
   const column = boardColumn(runtime);
   if (column === 'working') {
-    return (
-      <Icon
-        name="loader-circle"
-        size={14}
-        className="animate-spin text-accent-text"
-      />
-    );
+    return <LoadingRing size={14} className="text-accent-text" />;
   }
   if (runtime.status === 'waiting') return <WaitingIcon />;
   if (column === 'needs-you') {
@@ -1091,9 +1086,7 @@ function AskChatList({ state, asks }: { state: AppState; asks: AskChat[] }) {
               <Icon
                 name={running ? 'loader-circle' : 'message-circle-question'}
                 size={14}
-                className={cn(
-                  running ? 'animate-spin text-accent-text' : 'text-fg-4',
-                )}
+                className={cn(running ? 'text-accent-text' : 'text-fg-4')}
               />
             )}
             <span className="min-w-0 flex-1">
