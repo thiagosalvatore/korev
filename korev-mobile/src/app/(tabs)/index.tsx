@@ -41,9 +41,9 @@ import {
 import {
   activeWorkspaces,
   crossRepoLeads,
+  isAcrossRepos,
   repoSections,
   sidebarEntries,
-  sidebarRepoId,
   waitsForLane,
   workspaceLabel,
 } from '../../../../korev-desktop/src/shared/workspaces';
@@ -61,6 +61,7 @@ import { MONO_FONT, useTheme, type Theme } from '../../theme';
 import { CHROME_FONT_SCALE, touchSlop } from '../../ui';
 
 const REPO_ADD_ICON_SIZE = ROW_ICON_SIZE + 2;
+const ACROSS_REPOS = 'across-repos';
 
 const BUSY_STATUSES: ReadonlySet<WorkspaceStatus> = new Set([
   'creating',
@@ -258,8 +259,9 @@ function LinkedGroup({
   styles: Styles;
 }) {
   const theme = useTheme();
-  const repoName = (workspace: Workspace) =>
-    state.repos.find((repo) => repo.id === workspace.repoId)?.name ?? '';
+  const repoOf = (workspace: Workspace) =>
+    state.repos.find((repo) => repo.id === workspace.repoId);
+  const repoName = (workspace: Workspace) => repoOf(workspace)?.name ?? '';
   return (
     <View accessibilityLabel={`Linked workspace ${workspaceLabel(lead)}`}>
       <View style={styles.linkedLabel}>
@@ -271,6 +273,10 @@ function LinkedGroup({
         >
           {workspaceLabel(lead)}
         </Text>
+        {members.map((workspace) => {
+          const repo = repoOf(workspace);
+          return repo ? <RepoAvatar key={workspace.id} repo={repo} /> : null;
+        })}
       </View>
       <View style={styles.linkedMembers}>
         {members.map((workspace) => (
@@ -296,11 +302,57 @@ function Chevron({ collapsed }: { collapsed: boolean }) {
   return <Icon size={ROW_ICON_SIZE - 3} color={theme.fg4} />;
 }
 
+function AcrossRepos({
+  state,
+  groups,
+  leads,
+  collapsed,
+  onToggle,
+  styles,
+}: {
+  state: AppState;
+  groups: Workspace[][];
+  leads: Map<string, Workspace>;
+  collapsed: boolean;
+  onToggle: () => void;
+  styles: Styles;
+}) {
+  if (!groups.length) return null;
+  return (
+    <View style={styles.group}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: !collapsed }}
+        style={styles.folderHeader}
+        onPress={onToggle}
+      >
+        <Text
+          maxFontSizeMultiplier={CHROME_FONT_SCALE}
+          style={styles.folderName}
+        >
+          Across repos
+        </Text>
+        <Chevron collapsed={collapsed} />
+      </Pressable>
+      {collapsed
+        ? null
+        : groups.map((members) => (
+            <LinkedGroup
+              key={members[0].groupId}
+              state={state}
+              lead={leads.get(members[0].groupId!)!}
+              members={members}
+              styles={styles}
+            />
+          ))}
+    </View>
+  );
+}
+
 function RepoGroup({
   state,
   repo,
   workspaces,
-  leads,
   collapsed,
   onToggle,
   onReorder,
@@ -309,7 +361,6 @@ function RepoGroup({
   state: AppState;
   repo: Repo;
   workspaces: Workspace[];
-  leads: Map<string, Workspace>;
   collapsed: boolean;
   onToggle: () => void;
   onReorder: () => void;
@@ -347,25 +398,14 @@ function RepoGroup({
       </View>
       {collapsed
         ? null
-        : sidebarEntries(workspaces, leads).map(([first, ...rest]) => {
-            const lead = first.groupId ? leads.get(first.groupId) : undefined;
-            return lead ? (
-              <LinkedGroup
-                key={first.id}
-                state={state}
-                lead={lead}
-                members={[first, ...rest]}
-                styles={styles}
-              />
-            ) : (
-              <WorkspaceRow
-                key={first.id}
-                workspace={first}
-                runtime={state.runtime[first.id]}
-                styles={styles}
-              />
-            );
-          })}
+        : workspaces.map((workspace) => (
+            <WorkspaceRow
+              key={workspace.id}
+              workspace={workspace}
+              runtime={state.runtime[workspace.id]}
+              styles={styles}
+            />
+          ))}
     </View>
   );
 }
@@ -432,9 +472,8 @@ export default function WorkspacesScreen() {
       state={state}
       repo={repo}
       workspaces={workspaces.filter(
-        (ws) => sidebarRepoId(leads, ws) === repo.id,
+        (ws) => ws.repoId === repo.id && !isAcrossRepos(leads, ws),
       )}
-      leads={leads}
       collapsed={collapsed.has(repo.id)}
       onToggle={() => toggle(repo.id)}
       onReorder={startReordering}
@@ -457,22 +496,35 @@ export default function WorkspacesScreen() {
           onDraggingChange={setDragging}
         />
       ) : (
-        sections.map(({ folder, repos }) =>
-          folder ? (
-            <FolderGroup
-              key={folder.id}
-              folder={folder}
-              collapsed={collapsed.has(folder.id)}
-              onToggle={() => toggle(folder.id)}
-              onReorder={startReordering}
-              styles={styles}
-            >
-              {repos.map(repoGroup)}
-            </FolderGroup>
-          ) : (
-            repos.map(repoGroup)
-          ),
-        )
+        <>
+          <AcrossRepos
+            state={state}
+            groups={sidebarEntries(
+              workspaces.filter((ws) => isAcrossRepos(leads, ws)),
+              leads,
+            )}
+            leads={leads}
+            collapsed={collapsed.has(ACROSS_REPOS)}
+            onToggle={() => toggle(ACROSS_REPOS)}
+            styles={styles}
+          />
+          {sections.map(({ folder, repos }) =>
+            folder ? (
+              <FolderGroup
+                key={folder.id}
+                folder={folder}
+                collapsed={collapsed.has(folder.id)}
+                onToggle={() => toggle(folder.id)}
+                onReorder={startReordering}
+                styles={styles}
+              >
+                {repos.map(repoGroup)}
+              </FolderGroup>
+            ) : (
+              repos.map(repoGroup)
+            ),
+          )}
+        </>
       )}
       {sections.length === 0 && (
         <Text style={styles.empty}>

@@ -293,14 +293,6 @@ export function acrossReposIn(
   };
 }
 
-export function sidebarRepoId(
-  leads: Map<string, Workspace>,
-  workspace: Workspace,
-): string {
-  const lead = workspace.groupId ? leads.get(workspace.groupId) : undefined;
-  return lead?.repoId ?? workspace.repoId;
-}
-
 export interface FolderRun {
   folderId: string | null;
   workspaces: Workspace[];

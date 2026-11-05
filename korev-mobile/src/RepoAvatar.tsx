@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import type { KorevApi } from '../../korev-desktop/src/shared/api';
+import { repoInitials } from '../../korev-desktop/src/shared/format';
 import type { Repo } from '../../korev-desktop/src/shared/model';
 import { useConnection } from './korev';
 import { MONO_FONT, useTheme } from './theme';
@@ -24,7 +25,7 @@ function Initial({ repo }: { repo: Repo }) {
   return (
     <View style={[styles.avatar, { backgroundColor: theme.accentSubtle }]}>
       <Text style={[styles.initial, { color: theme.accentText }]}>
-        {repo.name.charAt(0).toUpperCase()}
+        {repoInitials(repo.name).toUpperCase()}
       </Text>
     </View>
   );

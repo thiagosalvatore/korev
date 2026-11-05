@@ -131,3 +131,15 @@ export function askRepoNames(state: AppState, ask: AskChat): string {
     .map((repoId) => state.repos.find((repo) => repo.id === repoId)?.name)
     .join(', ');
 }
+
+const REPO_NAME_PARTS = /[-_./]/;
+const AVATAR_INITIALS = 2;
+
+export function repoInitials(name: string): string {
+  return name
+    .split(REPO_NAME_PARTS)
+    .filter(Boolean)
+    .slice(0, AVATAR_INITIALS)
+    .map((part) => part.charAt(0))
+    .join('');
+}

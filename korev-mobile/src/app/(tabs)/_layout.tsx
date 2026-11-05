@@ -9,6 +9,7 @@ import {
 } from 'lucide-react-native';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { RemotePairing } from '../../../../korev-desktop/src/shared/model';
+import { asksWaitingForYou } from '../../../../korev-desktop/src/shared/workspaces';
 import { useAppState } from '../../hooks';
 import { useKorev } from '../../korev';
 import {
@@ -124,6 +125,11 @@ export default function TabsLayout() {
     ? Object.values(state.runtime).filter((entry) => entry.status === 'waiting')
         .length
     : 0;
+  const waitingAsks = state ? asksWaitingForYou(state).length : 0;
+  const waitingBadgeStyle = {
+    backgroundColor: theme.warning,
+    color: theme.fgOnWarning,
+  };
 
   return (
     <Tabs
@@ -161,10 +167,7 @@ export default function TabsLayout() {
             <FolderGit2 size={size} color={color} />
           ),
           tabBarBadge: waiting || undefined,
-          tabBarBadgeStyle: {
-            backgroundColor: theme.warning,
-            color: theme.fgOnWarning,
-          },
+          tabBarBadgeStyle: waitingBadgeStyle,
         }}
       />
       <Tabs.Screen
@@ -199,6 +202,8 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <MessageCircleQuestion size={size} color={color} />
           ),
+          tabBarBadge: waitingAsks || undefined,
+          tabBarBadgeStyle: waitingBadgeStyle,
         }}
       />
     </Tabs>

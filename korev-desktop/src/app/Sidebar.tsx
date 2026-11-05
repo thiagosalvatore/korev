@@ -60,7 +60,7 @@ import {
   toggleCompactNav,
 } from './actions';
 import { api } from './bridge';
-import { askRepoNames, timeAgo } from '../shared/format';
+import { askRepoNames, repoInitials, timeAgo } from '../shared/format';
 import {
   ASK_DRAG_TYPE,
   draggable,
@@ -554,18 +554,6 @@ function repoIcon(repoId: string): Promise<string | null> {
 }
 
 const AVATAR_SIZES = { md: 'size-5 text-2xs', sm: 'size-4 text-[9px]' };
-
-const REPO_NAME_PARTS = /[-_./]/;
-const AVATAR_INITIALS = 2;
-
-function repoInitials(name: string): string {
-  return name
-    .split(REPO_NAME_PARTS)
-    .filter(Boolean)
-    .slice(0, AVATAR_INITIALS)
-    .map((part) => part.charAt(0))
-    .join('');
-}
 
 function RepoAvatar({
   repo,
