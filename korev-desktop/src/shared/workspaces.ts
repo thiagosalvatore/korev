@@ -144,6 +144,39 @@ export function asksNewestFirst(state: Pick<AppState, 'askChats'>): AskChat[] {
   return newestFirst(state.askChats.filter((ask) => !ask.automationRun));
 }
 
+export interface AskSections {
+  acrossRepos: AskChat[];
+  byRepo: Map<string, AskChat[]>;
+  noRepo: AskChat[];
+}
+
+export function askSections(state: Pick<AppState, 'askChats'>): AskSections {
+  const sections: AskSections = {
+    acrossRepos: [],
+    byRepo: new Map(),
+    noRepo: [],
+  };
+  for (const ask of asksNewestFirst(state)) {
+    const [repoId, ...others] = ask.repoIds;
+    if (!repoId) sections.noRepo.push(ask);
+    else if (others.length) sections.acrossRepos.push(ask);
+    else
+      sections.byRepo.set(repoId, [
+        ...(sections.byRepo.get(repoId) ?? []),
+        ask,
+      ]);
+  }
+  return sections;
+}
+
+export function asksWaitingForYou(
+  state: Pick<AppState, 'askChats' | 'waitingSessions'>,
+): AskChat[] {
+  return asksNewestFirst(state).filter((ask) =>
+    state.waitingSessions.includes(ask.session.id),
+  );
+}
+
 export function reviewChatOf(
   state: Pick<AppState, 'askChats'>,
   prUrl: string,
@@ -220,6 +253,39 @@ export function crossRepoLeads(state: AppState): Map<string, Workspace> {
     leads.set(groupId, created ?? members[0]);
   }
   return leads;
+}
+
+export function isAcrossRepos(
+  leads: Map<string, Workspace>,
+  workspace: Workspace,
+): boolean {
+  return workspace.groupId !== null && leads.has(workspace.groupId);
+}
+
+export interface AcrossReposCounts {
+  linked: number;
+  asks: number;
+}
+
+export function acrossReposIn(
+  state: AppState,
+  repoId: string,
+): AcrossReposCounts {
+  const leads = crossRepoLeads(state);
+  const linkedGroups = new Set(
+    state.workspaces
+      .filter(
+        (ws) =>
+          !ws.archivedAt && ws.repoId === repoId && isAcrossRepos(leads, ws),
+      )
+      .map((ws) => ws.groupId),
+  );
+  return {
+    linked: linkedGroups.size,
+    asks: askSections(state).acrossRepos.filter((ask) =>
+      ask.repoIds.includes(repoId),
+    ).length,
+  };
 }
 
 export function sidebarRepoId(
