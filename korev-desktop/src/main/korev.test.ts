@@ -2053,6 +2053,47 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).not.toContain('--resume');
   });
 
+  it('removes the Ask once its conversation is in the new workspace', async () => {
+    const repo = await addRepo();
+    const ask = await askAndWait([repo.id], 'Where is the README?');
+
+    const started = await korev.api.startFromAsk(ask.id);
+
+    if (!started.ok) throw new Error(started.message);
+    const [workspace] = started.value;
+    await waitFor(
+      async () => (await userMessages(workspace.sessions[0].id)).length === 2,
+    );
+    expect((await korev.api.getState()).askChats).toEqual([]);
+    expect((await userMessages(workspace.sessions[0].id))[0]).toBe(
+      'Where is the README?',
+    );
+  });
+
+  it('keeps the Ask when the worktree cannot be created', async () => {
+    const repo = await addRepo();
+    const ask = await askAndWait([repo.id], 'Where is the README?');
+    const settings = (await korev.api.getState()).settings;
+    await mkdir(
+      path.join(
+        settings.workspacesRoot,
+        'acme',
+        'implement-your-part-of-the',
+        'x',
+      ),
+      { recursive: true },
+    );
+
+    const started = await korev.api.startFromAsk(ask.id);
+
+    if (!started.ok) throw new Error(started.message);
+    const { runtime } = await waitUntilCreated(started.value[0].id);
+    expect(runtime.status).toBe('failed');
+    expect(
+      (await korev.api.getState()).askChats.map((entry) => entry.id),
+    ).toEqual([ask.id]);
+  });
+
   it('archives a workspace and restores its uncommitted work', async () => {
     const workspace = await createWorkspace();
     await writeFile(path.join(workspace.path, 'draft.txt'), 'wip\n');

@@ -1019,7 +1019,9 @@ function sceneAsk(t: number): SceneState {
     selected: null,
     askSelected: true,
     askChats:
-      t > 800 ? [{ title: 'Billing portal in web and api', ago: 'now' }] : [],
+      t > 800 && !started
+        ? [{ title: 'Billing portal in web and api', ago: 'now' }]
+        : [],
     panel: null,
     keys: null,
     center: (
