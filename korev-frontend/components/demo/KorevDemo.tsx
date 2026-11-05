@@ -73,6 +73,7 @@ export function KorevWindow({
         repos={s.repos}
         selected={s.selected}
         askSelected={s.askSelected}
+        across={s.across}
         askChats={s.askChats}
       />
       <main className="km-main">

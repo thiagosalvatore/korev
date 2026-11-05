@@ -27,6 +27,21 @@ describe('KorevWindow', () => {
     expect(headerActionAt('ship', t)).toBe(label);
   });
 
+  it('ask scene shows the started workspaces once, under Across repos', () => {
+    const { container, unmount } = render(
+      <KorevWindow sceneIndex={sceneIndex('ask')} t={8000} />,
+    );
+    const rows = [...container.querySelectorAll('.km-side .km-row')].filter(
+      (row) => row.textContent?.includes('billing-portal'),
+    );
+    expect(rows.map((row) => row.querySelector('.n')?.textContent)).toEqual([
+      'acme/web',
+      'acme/api',
+    ]);
+    expect(screen.getByText('Across repos')).toBeTruthy();
+    unmount();
+  });
+
   it('start scene shows the new workspace form until the workspace is created', () => {
     const { rerender } = render(
       <KorevWindow sceneIndex={sceneIndex('start')} t={2000} />,

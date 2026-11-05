@@ -43,6 +43,7 @@ export interface SceneState {
   repos: Repo[];
   selected: string | null;
   askSelected?: boolean;
+  across?: Workspace[];
   askChats?: { title: string; ago: string }[];
   keys: string[] | null;
   panel: PanelProps | null;
@@ -997,7 +998,6 @@ function sceneAsk(t: number): SceneState {
   return {
     repos: [
       webRepo(
-        ...(started ? [billingPortal('web')] : []),
         workspace(
           'rl',
           'rate-limit-headers',
@@ -1008,8 +1008,14 @@ function sceneAsk(t: number): SceneState {
         ),
         darkModeSettings(),
       ),
-      apiRepo(...(started ? [billingPortal('api')] : [])),
+      apiRepo(),
     ],
+    across: started
+      ? [
+          { ...billingPortal('web'), name: 'acme/web' },
+          { ...billingPortal('api'), name: 'acme/api' },
+        ]
+      : [],
     selected: null,
     askSelected: true,
     askChats:

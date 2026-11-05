@@ -136,7 +136,7 @@ describe('activeWorkspaces', () => {
       'between',
     ]);
     expect(
-      folderRuns(sorted, new Map()).map((run) => [
+      folderRuns(sorted).map((run) => [
         run.folderId,
         run.workspaces.map((ws) => ws.id),
       ]),
@@ -207,41 +207,41 @@ describe('a group across repositories', () => {
     ],
   } as AppState;
 
-  it('sorts all its members under the lead repository', () => {
+  it('sorts all its members together, before every repository', () => {
     expect(activeWorkspaces(group).map((ws) => ws.id)).toEqual([
-      'api-1',
       'web-lead',
       'api-member',
       'scratch-member',
+      'api-1',
     ]);
   });
 
   it('hands the lead to the next member when the lead is archived', () => {
     expect(crossRepoLead(withoutLead, apiMember)?.id).toBe('api-member');
     expect(activeWorkspaces(withoutLead).map((ws) => ws.id)).toEqual([
-      'api-1',
       'api-member',
       'scratch-member',
+      'api-1',
     ]);
   });
 
-  it('puts all its members in the folder of the lead', () => {
+  it('keeps its members out of the folder of the lead', () => {
     const foldered = {
       ...group,
-      workspaces: group.workspaces.map((ws) =>
-        ws === lead ? { ...ws, folderId: 'wave' } : ws,
-      ),
+      workspaces: [
+        ...group.workspaces.map((ws) =>
+          ws === lead ? { ...ws, folderId: 'wave' } : ws,
+        ),
+        { ...workspace('api-2', 'api', '2026-01-03'), folderId: 'wave' },
+      ],
     } as AppState;
-    const leads = new Map([['billing', foldered.workspaces[0]]]);
 
-    expect(
-      folderRuns(activeWorkspaces(foldered), leads).map((run) => [
-        run.folderId,
-        run.workspaces.map((ws) => ws.id),
-      ]),
-    ).toEqual([
-      [null, ['api-1']],
-      ['wave', ['web-lead', 'api-member', 'scratch-member']],
+    expect(activeWorkspaces(foldered).map((ws) => ws.id)).toEqual([
+      'web-lead',
+      'api-member',
+      'scratch-member',
+      'api-1',
+      'api-2',
     ]);
   });
 

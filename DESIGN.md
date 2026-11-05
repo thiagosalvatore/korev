@@ -29,22 +29,36 @@ How the Korev desktop app looks and behaves. The tokens live in
 Three columns:
 
 - **Left sidebar** (`--sidebar-w`): Search (⌘K), New workspace (⌘N), Grid (⌘G), Board (⌘⇧B),
-  Pull requests, Runs (only once an agent has started an orchestration run), Automations, then
-  Ask with its chats (without automation runs) nested under it, then one group per repository
-  with its workspaces, then History (archived workspaces), then Add repository and Settings. Ask
-  comes last so that opening its chats never moves the rows above it. A workspace linked across
-  repositories shows once, under the repository of its lead workspace (see Linked group).
-  - The **Customize sidebar** icon in the top bar hides any of these entries and turns on
-    **compact navigation**: one row of `sm` icon buttons in the same order, with no Ask chats.
-    The current page has `bg-active` in both layouts.
-  - While an Ask chat waits for you, the Ask icon turns `warning`. In compact mode, clicking it
-    opens the newest waiting chat.
-  - **Waiting for you** sits between the pages and the repositories while a workspace is in the
-    Board's Needs you or Done column. The header is an overline with a count badge. Each row is one
-    line: status icon, workspace name (semibold), repository (`fg-3`) and the unread dot. Needs you
-    rows come first. The workspace keeps its row in its repository too.
-  - A collapsed repository, folder or workspace folder shows a `size-1.5` dot after its chevron
-    when a workspace under it waits for you: `warning` for Needs you, `accent` for Done only.
+  Pull requests, Runs (only once an agent has started an orchestration run), Automations and New
+  Ask. Then Waiting for you, Across repos, one group per repository, No repository, History
+  (archived workspaces), and Add repository and Settings.
+  - The **Customize sidebar** icon in the top bar hides any of these pages and turns on
+    **compact navigation**: one row of `sm` icon buttons in the same order. The current page has
+    `bg-active` in both layouts. New Ask is current only on a blank Ask page, not while an Ask chat
+    is open.
+  - **Waiting for you** sits between the pages and Across repos while a workspace is in the
+    Board's Needs you or Done column, or an Ask chat waits for your input. The header is an
+    overline with a count badge. Each row is one line: status icon, name (semibold), repository
+    (`fg-3`, "Ask · repository" for an Ask chat) and the unread dot. Needs you workspaces come
+    first, then Ask chats, then Done workspaces. Each keeps its own row further down too.
+  - **Across repos** holds every workspace linked across repositories (see Linked group) and every
+    Ask chat about two or more repositories. The header is an overline with a count badge. It is
+    hidden while it is empty. Cross-repo groups come first in ⌘1–9 order, so the numbers follow
+    the rows on screen.
+  - **A repository group** has its workspaces, then its Ask chats under a foldable **Asks** row
+    (`messages-square`, count, `max-h-56` scroll), then "Also in N linked, M Ask above" in
+    `text-xs fg-4` when the repository is part of Across repos. A repository with any of these
+    starts open.
+  - **No repository** follows the repositories while an Ask chat has no repository. Its avatar is
+    a dashed box.
+  - **Ask chat rows**: `message-square` (`fg-4`) when idle, the loading ring while the agent
+    works, `message-circle-question` (`warning`) only while it waits for you. Line 2 shows the
+    repositories, with their avatars, only in Across repos.
+  - **Repository avatars** show the repository icon, or the first letters of up to two parts of
+    the name (`acme-web` → AW), so repositories with the same first letter stay apart.
+  - A collapsed repository, folder, workspace folder or Asks row shows a `size-1.5` dot after its
+    chevron when something under it waits for you: `warning` for Needs you or a waiting Ask chat,
+    `accent` for Done only.
 - **Centre**: the workspace header (workspace name, branch, target branch, Open in, PR number,
   the next git action), a tab strip (chats, Changes, open files) and the active tab.
 - **Right panel** (`--panel-w`): the git panel (Files / Changes / PR / Artifacts) on top and
@@ -96,12 +110,16 @@ and schedule filled in.
 ## Linked group
 
 Workspaces linked across repositories share one name and one branch, so the sidebar shows them
-as one entry under the lead's repository:
+as one entry in Across repos:
 
-- A label line that you cannot click: a link icon and the shared name, in `text-xs fg-3`.
-- One indented row per member. Line 1 is the repository name, not the branch. Line 2 is the
-  branch, or "Waits for the plan in <lead repository>" while the member waits for its lane.
-- Each row keeps its own status icon, unread dot and ⌘N.
+- A header button: a link icon, the shared name (semibold `fg-1`), and on line 2 one chip per
+  member (`bg-active`): the `sm` repository avatar and the member's status icon. Clicking it folds
+  the entry. Entries start open.
+- One row per member, behind a `border-2` rule. Line 1 is the `sm` repository avatar and the
+  repository name, not the branch. Line 2 is the branch, or "Waits for the plan in <lead
+  repository>" while the member waits for its lane.
+- Each row keeps its own status icon, unread dot and ⌘N. Its menu has no Move to folder, and
+  dropping it on a folder does nothing: a group across repositories is never in a folder.
 - A waiting member's empty chat says its agent starts when the plan is approved, with
   **Open <lead repository>**.
 - The workspace header and the Grid pane header put the repository name before the workspace

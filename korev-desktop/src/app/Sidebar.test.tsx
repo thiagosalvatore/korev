@@ -165,11 +165,11 @@ describe('Sidebar group across repositories', () => {
     workspaces: [member('lead', 'busy', false), member('api', 'idle', true)],
   } as unknown as AppState;
 
-  it('shows the group once, under the lead repository', () => {
+  it('shows the group once, under Across repos, and points each repository to it', () => {
     render(<Sidebar state={grouped} />);
 
-    const busy = screen.getByRole('region', { name: 'busy-repo' });
-    const group = within(busy).getByRole('group', {
+    const acrossRepos = screen.getByRole('region', { name: 'Across repos' });
+    const group = within(acrossRepos).getByRole('group', {
       name: 'Linked workspace add-billing',
     });
     expect(
@@ -180,12 +180,15 @@ describe('Sidebar group across repositories', () => {
       'Workspace add-billing in busy-repo',
       'Workspace add-billing in idle-repo',
     ]);
-    expect(
-      within(screen.getByRole('region', { name: 'idle-repo' })).queryAllByRole(
-        'button',
-        { name: /^Workspace add-billing/ },
-      ),
-    ).toEqual([]);
+    for (const name of ['busy-repo', 'idle-repo']) {
+      const repo = screen.getByRole('region', { name });
+      expect(
+        within(repo).queryAllByRole('button', {
+          name: /^Workspace add-billing/,
+        }),
+      ).toEqual([]);
+      expect(repo.textContent).toContain('Also in 1 linked above');
+    }
   });
 
   it('says which repository a member waits on', () => {
@@ -298,7 +301,9 @@ describe('Sidebar on the grid page', () => {
         .getAttribute('aria-current'),
     ).toBe('page');
     expect(
-      screen.getByRole('button', { name: 'Ask' }).getAttribute('aria-current'),
+      screen
+        .getByRole('button', { name: 'New Ask' })
+        .getAttribute('aria-current'),
     ).toBeNull();
   });
 
@@ -324,6 +329,49 @@ describe('Sidebar on the grid page', () => {
 });
 
 describe('Sidebar Ask chats', () => {
+  const withAsk = (repoIds: string[]) =>
+    ({
+      ...state,
+      askChats: [{ ...state.askChats[0], repoIds }],
+    }) as unknown as AppState;
+  const askRow = () =>
+    screen.getByRole('button', { name: 'Ask How does login work?' });
+
+  it('shows an Ask under its repository', () => {
+    render(<Sidebar state={state} />);
+
+    expect(
+      within(screen.getByRole('region', { name: 'busy-repo' })).getByRole(
+        'button',
+        { name: 'Ask How does login work?' },
+      ),
+    ).toBe(askRow());
+  });
+
+  it('shows an Ask about two repositories once, under Across repos', () => {
+    render(<Sidebar state={withAsk(['busy', 'idle'])} />);
+
+    const acrossRepos = screen.getByRole('region', { name: 'Across repos' });
+    expect(within(acrossRepos).getByRole('button', { name: /^Ask / })).toBe(
+      askRow(),
+    );
+    expect(askRow().textContent).toContain('busy-repo, idle-repo');
+    expect(
+      screen.getByRole('region', { name: 'busy-repo' }).textContent,
+    ).toContain('Also in 1 Ask above');
+  });
+
+  it('shows an Ask without a repository in its own group', () => {
+    render(<Sidebar state={withAsk([])} />);
+
+    expect(
+      within(screen.getByRole('region', { name: 'No repository' })).getByRole(
+        'button',
+        { name: 'Ask How does login work?' },
+      ),
+    ).toBe(askRow());
+  });
+
   it('leaves automation runs out of the Ask chats', () => {
     const run = {
       ...state.askChats[0],
@@ -341,23 +389,18 @@ describe('Sidebar Ask chats', () => {
     ).toBeNull();
   });
 
-  it('marks an Ask chat that waits for your input', () => {
-    render(
-      <Sidebar
-        state={{
-          ...state,
-          runningSessions: ['as1'],
-          waitingSessions: ['as1'],
-        }}
-      />,
+  it('folds the Asks of a repository', () => {
+    render(<Sidebar state={state} />);
+
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Asks' })).getByRole('button', {
+        expanded: true,
+      }),
     );
-    const row = screen.getByRole('button', {
-      name: 'Ask How does login work?',
-    });
-    expect(within(row).getByTitle('Waiting for your input')).toBeTruthy();
+
     expect(
-      screen.getByRole('button', { name: 'Ask' }).getAttribute('title'),
-    ).toBe('An Ask chat is waiting for you');
+      screen.queryByRole('button', { name: 'Ask How does login work?' }),
+    ).toBeNull();
   });
 });
 
@@ -399,6 +442,27 @@ describe('Sidebar waiting for you', () => {
       workspaceId: 'w3',
       page: { kind: 'workspace' },
     });
+  });
+
+  it('lists a waiting Ask after the workspaces that need input', () => {
+    setUi({ collapsedRepos: ['busy'] });
+    render(<Sidebar state={{ ...waiting, waitingSessions: ['as1'] }} />);
+
+    const rows = within(section()!).getAllByRole('button');
+    expect(rows.map((row) => row.getAttribute('aria-label'))).toEqual([
+      'Open fix-billing in idle-repo',
+      'Open Ask How does login work?',
+      'Open login-page in busy-repo',
+    ]);
+    expect(
+      within(screen.getByRole('region', { name: 'busy-repo' })).getByLabelText(
+        '2 waiting for you',
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(rows[1]);
+
+    expect(getUi().page).toMatchObject({ kind: 'ask', askChatId: 'a1' });
   });
 
   it('hides the section when nothing waits for you', () => {
@@ -464,32 +528,30 @@ describe('Sidebar pages', () => {
         .getByRole('button', { name: 'Board' })
         .getAttribute('aria-current'),
     ).toBe('page');
-    expect(askChat()).toBeNull();
   });
 
-  it('opens the waiting Ask chat from the compact Ask icon', () => {
-    setUi({ compactNav: true });
-    render(<Sidebar state={{ ...state, waitingSessions: ['as1'] }} />);
+  it('marks New Ask only while the Ask page is blank', () => {
+    const newAsk = () =>
+      within(pages()!)
+        .getByRole('button', { name: /^New Ask/ })
+        .getAttribute('aria-current');
+    setUi({ page: { kind: 'ask', askChatId: 'a1', repoIds: [] } });
+    const { rerender } = render(<Sidebar state={state} />);
+    expect(newAsk()).toBeNull();
 
-    fireEvent.click(within(pages()!).getByRole('button', { name: 'Ask' }));
-
-    expect(getUi().page).toMatchObject({ kind: 'ask', askChatId: 'a1' });
+    setUi({ page: { kind: 'ask', askChatId: null, repoIds: [] } });
+    rerender(<Sidebar state={{ ...state }} />);
+    expect(newAsk()).toBe('page');
   });
 
-  it('folds the Ask chats under the Ask page', () => {
-    render(<Sidebar state={state} />);
-    expect(askChat()).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Ask chats' }));
-
-    expect(askChat()).toBeNull();
-  });
-
-  it('drops the Ask chats with the Ask page', () => {
+  it('keeps the Ask chats in their repositories when New Ask is hidden', () => {
     setUi({ hiddenNavEntries: ['ask'] });
     render(<Sidebar state={state} />);
 
-    expect(askChat()).toBeNull();
+    expect(
+      within(pages()!).queryByRole('button', { name: /^New Ask/ }),
+    ).toBeNull();
+    expect(askChat()).toBeTruthy();
   });
 
   it('hides a page from the customize menu and keeps the menu open', () => {

@@ -113,7 +113,8 @@ export interface UiState {
   expandedRepos: string[];
   collapsedFolders: string[];
   historyOpen: boolean;
-  askOpen: boolean;
+  collapsedLinked: string[];
+  collapsedAsks: string[];
   hiddenNavEntries: string[];
   compactNav: boolean;
   workspaces: Record<string, WorkspaceUi>;
@@ -142,7 +143,8 @@ const INITIAL: UiState = {
   expandedRepos: [],
   collapsedFolders: [],
   historyOpen: false,
-  askOpen: true,
+  collapsedLinked: [],
+  collapsedAsks: [],
   hiddenNavEntries: [],
   compactNav: false,
   workspaces: {},

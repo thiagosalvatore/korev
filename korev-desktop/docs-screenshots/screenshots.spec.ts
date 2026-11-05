@@ -197,7 +197,7 @@ async function captureAll(window: Page) {
   await window.getByRole('button', { name: 'Add comment' }).click();
   await capture(window, 'diff-comment');
 
-  await sidebar.getByRole('button', { name: 'Ask', exact: true }).click();
+  await sidebar.getByRole('button', { name: 'New Ask', exact: true }).click();
   await window
     .getByRole('textbox', { name: 'Message' })
     .fill('Where are rate limits set?');
