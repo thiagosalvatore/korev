@@ -31,6 +31,12 @@ Three columns:
     The current page has `bg-active` in both layouts.
   - While an Ask chat waits for you, the Ask icon turns `warning`. In compact mode, clicking it
     opens the newest waiting chat.
+  - **Waiting for you** sits between the pages and the repositories while a workspace is in the
+    Board's Needs you or Done column. The header is an overline with a count badge. Each row is one
+    line: status icon, workspace name (semibold), repository (`fg-3`) and the unread dot. Needs you
+    rows come first. The workspace keeps its row in its repository too.
+  - A collapsed repository, folder or workspace folder shows a `size-1.5` dot after its chevron
+    when a workspace under it waits for you: `warning` for Needs you, `accent` for Done only.
 - **Centre**: the workspace header (workspace name, branch, target branch, Open in, PR number,
   the next git action), a tab strip (chats, Changes, open files) and the active tab.
 - **Right panel** (`--panel-w`): the git panel (Files / Changes / PR / Artifacts) on top and

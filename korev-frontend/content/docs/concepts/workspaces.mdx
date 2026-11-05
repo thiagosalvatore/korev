@@ -55,6 +55,12 @@ Each active workspace gets ten ports. `KOREV_PORT` is the first one: 55000 for t
 - **The icon** is a spinner while an agent or the setup script runs. Otherwise it shows the pull request state: open, draft, checks running, checks failing, conflicts, merged or closed.
 - **On the right** are `+N −M` against the target branch and the unread dot.
 
+## Waiting for you
+
+When a workspace waits for you, it also shows in **Waiting for you** at the top of the sidebar, so you do not have to scroll to its repository. The list shows workspaces whose agent asks you something or failed first, then workspaces whose agent finished while you were elsewhere. Click a row to open the workspace. A finished workspace leaves the list when you open it. The list is hidden while nothing waits.
+
+When you collapse a repository or a folder, its header shows a dot if a workspace in it waits for you. The dot is yellow when an agent asks you something or failed, and blue when an agent only finished.
+
 ## Customize the sidebar
 
 With many workspaces, the pages at the top of the sidebar (Search, New workspace, Grid, Board, Pull requests, Runs, Automations and Ask) can push your workspaces down. Click the **Customize sidebar** icon at the top of the sidebar to change them:

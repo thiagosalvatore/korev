@@ -361,6 +361,66 @@ describe('Sidebar Ask chats', () => {
   });
 });
 
+describe('Sidebar waiting for you', () => {
+  const waiting = {
+    ...state,
+    workspaces: [
+      ...state.workspaces,
+      {
+        id: 'w3',
+        repoId: 'idle',
+        name: 'fix-billing',
+        branch: 'fix-billing',
+        createdAt: '2026-01-03T00:00:00Z',
+        sessions: [],
+      },
+    ],
+    runtime: {
+      w1: { status: 'idle', unread: true, prs: [] },
+      w3: { status: 'waiting', unread: false, prs: [] },
+    },
+  } as unknown as AppState;
+  const section = () =>
+    screen.queryByRole('region', { name: 'Waiting for you' });
+
+  it('lists the workspaces that wait for you, the ones that need input first', () => {
+    setUi({ collapsedRepos: ['idle'] });
+    render(<Sidebar state={waiting} />);
+
+    const rows = within(section()!).getAllByRole('button');
+    expect(rows.map((row) => row.getAttribute('aria-label'))).toEqual([
+      'Open fix-billing in idle-repo',
+      'Open login-page in busy-repo',
+    ]);
+
+    fireEvent.click(rows[0]);
+
+    expect(getUi()).toMatchObject({
+      workspaceId: 'w3',
+      page: { kind: 'workspace' },
+    });
+  });
+
+  it('hides the section when nothing waits for you', () => {
+    render(<Sidebar state={state} />);
+
+    expect(section()).toBeNull();
+  });
+
+  it('marks a collapsed repo that hides a waiting workspace', () => {
+    setUi({ collapsedRepos: ['idle'] });
+    render(<Sidebar state={waiting} />);
+
+    const repo = (name: string) => screen.getByRole('region', { name });
+    expect(
+      within(repo('idle-repo')).getByLabelText('1 waiting for you'),
+    ).toBeTruthy();
+    expect(
+      within(repo('busy-repo')).queryByLabelText(/waiting for you/),
+    ).toBeNull();
+  });
+});
+
 describe('Sidebar pages', () => {
   const ALL_PAGES = [
     'search',
