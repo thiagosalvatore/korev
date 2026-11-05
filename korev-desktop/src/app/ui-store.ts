@@ -1,5 +1,12 @@
 import { useSyncExternalStore } from 'react';
-import type { TerminalKind, TerminalPreset, TurnRange } from '../shared/model';
+import {
+  EMPTY_INBOX_FILTER,
+  type InboxFilter,
+  type InboxReason,
+  type TerminalKind,
+  type TerminalPreset,
+  type TurnRange,
+} from '../shared/model';
 
 export type MainTab =
   | { kind: 'chat'; sessionId: string }
@@ -118,6 +125,8 @@ export interface UiState {
   updateOpen: boolean;
   quit: QuitPrompt;
   handsFree: boolean;
+  prFilter: InboxFilter;
+  prReason: InboxReason | null;
 }
 
 const STORAGE_KEY = 'korev:ui';
@@ -149,6 +158,8 @@ const INITIAL: UiState = {
   updateOpen: false,
   quit: 'closed',
   handsFree: false,
+  prFilter: EMPTY_INBOX_FILTER,
+  prReason: null,
 };
 
 export const EMPTY_WORKSPACE_UI: WorkspaceUi = {
@@ -182,6 +193,8 @@ function load(): UiState {
       updateOpen: false,
       quit: 'closed',
       handsFree: false,
+      prFilter: EMPTY_INBOX_FILTER,
+      prReason: null,
     };
   } catch {
     return INITIAL;

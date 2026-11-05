@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode } from 'react';
+import type { InputHTMLAttributes, ReactNode, Ref } from 'react';
 import { cn } from '../../cn';
 import { Icon, type IconName } from '../core/Icon';
 import {
@@ -19,6 +19,7 @@ export interface InputProps extends Omit<
   suffix?: ReactNode;
   size?: FieldSize;
   mono?: boolean;
+  ref?: Ref<HTMLInputElement>;
 }
 
 export function Input({
