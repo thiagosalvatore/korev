@@ -391,6 +391,23 @@ export function demoWorld(now: number): DemoWorld {
     ),
     checkoutPr,
   );
+  const sessionRefresh = (repo: Repo, awaitsLane: boolean): Workspace => ({
+    ...demoWorkspace(
+      `demo-ws-session-refresh-${repo.id}`,
+      repo,
+      'session-refresh',
+      'Session refresh',
+      demoSession(
+        `demo-session-refresh-${repo.id}`,
+        'Session refresh',
+        ago(60),
+      ),
+    ),
+    groupId: 'demo-group-session-refresh',
+    awaitsLane,
+  });
+  const sessionRefreshWeb = sessionRefresh(WEB, false);
+  const sessionRefreshApi = sessionRefresh(API, true);
   const darkMode = demoWorkspace(
     'demo-ws-dark',
     WEB,
@@ -422,6 +439,8 @@ export function demoWorld(now: number): DemoWorld {
       webhooks,
       search,
       checkout,
+      sessionRefreshWeb,
+      sessionRefreshApi,
       darkMode,
     ],
     askChats: [ask],
@@ -447,6 +466,10 @@ export function demoWorld(now: number): DemoWorld {
         stats: { additions: 23, deletions: 9 },
         prs: [checkoutPr],
       }),
+      [sessionRefreshWeb.id]: demoRuntime({
+        stats: { additions: 42, deletions: 7 },
+      }),
+      [sessionRefreshApi.id]: demoRuntime(),
       [darkMode.id]: demoRuntime({ stats: { additions: 210, deletions: 38 } }),
     },
     runningSessions: [login.sessions[0].id],

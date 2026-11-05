@@ -8,6 +8,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 - **Across repos.** Workspaces linked across repositories, and Ask chats about two or more repositories, now show once in a new Across repos section at the top of the sidebar. Each entry shows a chip per repository with its state, and each row starts with its repository. Before, a linked group showed only under its first repository.
 - **Ask chats in their repository.** An Ask chat about one repository now sits in that repository, under a list you can fold. Ask chats without a repository sit in No repository. An Ask chat that asks you something also shows in Waiting for you. The Ask page in the sidebar is now New Ask.
+- **The same on your phone.** The Workspaces tab shows linked workspaces across repositories once, in Across repos. The Ask tab groups your Ask chats the same way, marks the ones that ask you something, and counts them on its tab.
 
 ## [0.27.0] - 2026-11-05
 

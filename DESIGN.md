@@ -220,14 +220,19 @@ Notes** opens the same page.
   pickers, the composer, the PR bar) stop growing at 1.4× (`CHROME_FONT_SCALE`), so they never
   push the chat off the screen. Chat text and list rows scale fully.
 - **On amber.** Text on a `warning` fill, like the tab badge, uses `fgOnWarning`.
+- **Ask tab.** The list has an overline per group: Across repos, then each repository, then No
+  repository. An idle Ask chat shows `MessageSquare` (`fg4`), a waiting one
+  `MessageCircleQuestion` (`warningText`) with a highlighted title. The tab badge counts waiting
+  Ask chats, like the Workspaces badge counts waiting workspaces.
 - **Explainer.** A chat with an explainer opens on Explanation, with an Explanation | Chat switch
   under the header. The sections follow the desktop in one column. Walkthrough steps are cards
   that open one at a time. Glossary terms have a dotted underline; tapping one shows its meaning.
   Diff rows use `diffAddBg`, `diffDelBg` and `diffHunkBg`, and risks use `riskHigh`, `riskMedium`
   and `riskLow` with their `Subtle` backgrounds. The pull request bar has **Explain** next to the
   next step, and the Ask tab header has a book button that opens "Explain a pull request".
-- **Linked group.** The workspace list follows the desktop's Linked group: one entry under the
-  lead's repository, a link-icon label with the shared name, and indented rows that lead with
-  the repository name. The workspace title is "<repository> · <name>", and a waiting workspace's
+- **Linked group.** The workspace list follows the desktop's Linked group: a foldable **Across
+  repos** overline above the repositories, then one entry per group with a link-icon label, the
+  shared name and one avatar per repository, and indented rows that lead with the repository
+  name. A repository group leaves those workspaces out. The workspace title is "<repository> · <name>", and a waiting workspace's
   empty chat says its agent starts when you approve the plan. The lanes card has a repository
   picker per lane.
