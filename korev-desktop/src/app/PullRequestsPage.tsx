@@ -1,19 +1,34 @@
-import { useCallback, useEffect, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import {
   Badge,
   Button,
   cn,
   Icon,
   IconButton,
+  Input,
+  Select,
   Skeleton,
   SkeletonStatus,
+  Tabs,
 } from '../design-system';
 import { timeAgo } from '../shared/format';
 import {
+  EMPTY_INBOX_FILTER,
+  filterInbox,
   INBOX_GROUPS,
+  INBOX_STATUS_LABELS,
   inboxStatuses,
   type AppState,
+  type InboxFilter,
   type InboxPullRequest,
+  type InboxReason,
   type Result,
 } from '../shared/model';
 import { reviewChatOf, workspaceOfPr } from '../shared/workspaces';
@@ -26,9 +41,12 @@ import {
 } from './actions';
 import { api } from './bridge';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
-import { useUi } from './ui-store';
+import { setUi, useUi } from './ui-store';
 
 const REFRESH_MS = 120_000;
+const ALL_GROUPS = 'all';
+const ALL_REPOS = '';
+const NO_MATCH = 'No pull requests match these filters.';
 
 function useInbox() {
   const [inbox, setInbox] = useState<Result<InboxPullRequest[]> | null>(null);
@@ -119,6 +137,167 @@ function PullRequestRow({
   );
 }
 
+function updateFilter(change: Partial<InboxFilter>) {
+  setUi((ui) => ({ prFilter: { ...ui.prFilter, ...change } }));
+}
+
+function toggleStatus(label: string) {
+  setUi(({ prFilter }) => ({
+    prFilter: {
+      ...prFilter,
+      statuses: prFilter.statuses.includes(label)
+        ? prFilter.statuses.filter((status) => status !== label)
+        : [...prFilter.statuses, label],
+    },
+  }));
+}
+
+function clearFilters() {
+  setUi({ prFilter: EMPTY_INBOX_FILTER, prReason: null });
+}
+
+function isFiltering(filter: InboxFilter, reason: InboxReason | null) {
+  return Boolean(
+    filter.query.trim() || filter.repoId || filter.statuses.length || reason,
+  );
+}
+
+function useMatchingInbox(
+  state: AppState,
+  inbox: Result<InboxPullRequest[]> | null,
+): InboxPullRequest[] {
+  const filter = useUi((ui) => ui.prFilter);
+  const repoNames = useMemo(
+    () => new Map(state.repos.map((repo) => [repo.id, repo.name])),
+    [state.repos],
+  );
+  return useMemo(
+    () => (inbox?.ok ? filterInbox(inbox.value, filter, repoNames) : []),
+    [inbox, filter, repoNames],
+  );
+}
+
+function useFocusOnFind(input: RefObject<HTMLInputElement | null>) {
+  useEffect(() => {
+    function focus(event: KeyboardEvent) {
+      if (!event.metaKey || event.key !== 'f') return;
+      event.preventDefault();
+      input.current?.focus();
+    }
+    window.addEventListener('keydown', focus);
+    return () => window.removeEventListener('keydown', focus);
+  }, [input]);
+}
+
+function RepoSelect({
+  state,
+  prs,
+}: {
+  state: AppState;
+  prs: InboxPullRequest[];
+}) {
+  const repoId = useUi((ui) => ui.prFilter.repoId);
+  const repos = state.repos.filter((repo) =>
+    prs.some((pr) => pr.repoId === repo.id),
+  );
+  if (repos.length < 2) return null;
+  return (
+    <Select
+      ariaLabel="Repository"
+      icon="folder-git-2"
+      value={repoId ?? ALL_REPOS}
+      onChange={(value) => updateFilter({ repoId: value || null })}
+      options={[
+        { value: ALL_REPOS, label: 'All repositories' },
+        ...repos.map((repo) => ({ value: repo.id, label: repo.name })),
+      ]}
+    />
+  );
+}
+
+function FilterBar({
+  state,
+  prs,
+  matching,
+}: {
+  state: AppState;
+  prs: InboxPullRequest[];
+  matching: InboxPullRequest[];
+}) {
+  const filter = useUi((ui) => ui.prFilter);
+  const reason = useUi((ui) => ui.prReason);
+  const search = useRef<HTMLInputElement>(null);
+  useFocusOnFind(search);
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <Input
+          ref={search}
+          aria-label="Filter"
+          icon="search"
+          autoFocus
+          className="flex-1"
+          placeholder="Filter by number, title, author or branch"
+          value={filter.query}
+          onChange={(event) => updateFilter({ query: event.target.value })}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') updateFilter({ query: '' });
+          }}
+        />
+        <RepoSelect state={state} prs={prs} />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs
+          variant="pill"
+          value={reason ?? ALL_GROUPS}
+          onChange={(id) =>
+            setUi({
+              prReason:
+                INBOX_GROUPS.find((group) => group.reason === id)?.reason ??
+                null,
+            })
+          }
+          tabs={[
+            { id: ALL_GROUPS, label: 'All', count: matching.length },
+            ...INBOX_GROUPS.map((group) => ({
+              id: group.reason,
+              label: group.title,
+              count: matching.filter((pr) => pr.reason === group.reason).length,
+            })),
+          ]}
+        />
+        <div className="flex flex-wrap items-center gap-1">
+          {INBOX_STATUS_LABELS.map((label) => {
+            const on = filter.statuses.includes(label);
+            return (
+              <Button
+                key={label}
+                size="sm"
+                variant={on ? 'secondary' : 'ghost'}
+                aria-pressed={on}
+                onClick={() => toggleStatus(label)}
+              >
+                {label}
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NoMatch() {
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <p className="m-0 text-sm text-fg-3">{NO_MATCH}</p>
+      <Button size="sm" variant="secondary" onClick={clearFilters}>
+        Clear filters
+      </Button>
+    </div>
+  );
+}
+
 const SKELETON_ROWS = 5;
 
 function InboxSkeleton() {
@@ -144,22 +323,35 @@ function InboxSkeleton() {
 function InboxGroups({
   state,
   inbox,
+  matching,
 }: {
   state: AppState;
   inbox: Result<InboxPullRequest[]> | null;
+  matching: InboxPullRequest[];
 }) {
+  const filter = useUi((ui) => ui.prFilter);
+  const reason = useUi((ui) => ui.prReason);
   if (!inbox) return <InboxSkeleton />;
   if (!inbox.ok)
     return <p className="m-0 text-sm text-danger-text">{inbox.message}</p>;
-  return INBOX_GROUPS.map((group) => {
-    const prs = inbox.value.filter((pr) => pr.reason === group.reason);
+  const filtering = isFiltering(filter, reason);
+  const groups = INBOX_GROUPS.filter(
+    (group) => !reason || group.reason === reason,
+  );
+  const shown = matching.filter((pr) => !reason || pr.reason === reason);
+  if (filtering && inbox.value.length && !shown.length) return <NoMatch />;
+  return groups.map((group) => {
+    const prs = shown.filter((pr) => pr.reason === group.reason);
     return (
       <section
         key={group.reason}
         aria-label={group.title}
         className="flex flex-col gap-2"
       >
-        <h2 className="m-0 type-overline text-fg-4">{group.title}</h2>
+        <h2 className="m-0 flex items-center gap-2 type-overline text-fg-4">
+          {group.title}
+          {prs.length ? <Badge count>{prs.length}</Badge> : null}
+        </h2>
         {prs.length ? (
           <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
             {prs.map((pr) => (
@@ -167,7 +359,9 @@ function InboxGroups({
             ))}
           </ul>
         ) : (
-          <p className="m-0 text-sm text-fg-3">{group.empty}</p>
+          <p className="m-0 text-sm text-fg-3">
+            {filtering ? NO_MATCH : group.empty}
+          </p>
         )}
       </section>
     );
@@ -177,6 +371,7 @@ function InboxGroups({
 export function PullRequestsPage({ state }: { state: AppState }) {
   const sidebar = useUi((ui) => ui.sidebar);
   const { inbox, refresh } = useInbox();
+  const matching = useMatchingInbox(state, inbox);
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <div
@@ -195,9 +390,16 @@ export function PullRequestsPage({ state }: { state: AppState }) {
           onClick={refresh}
         />
       </div>
-      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-6">
+      {inbox?.ok ? (
+        <div className="flex flex-none justify-center border-b border-border-1 px-6 py-3">
+          <div className="w-full max-w-[960px]">
+            <FilterBar state={state} prs={inbox.value} matching={matching} />
+          </div>
+        </div>
+      ) : null}
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-6 [scrollbar-gutter:stable_both-edges]">
         <div className="flex w-full max-w-[960px] flex-col gap-6">
-          <InboxGroups state={state} inbox={inbox} />
+          <InboxGroups state={state} inbox={inbox} matching={matching} />
         </div>
       </div>
     </div>

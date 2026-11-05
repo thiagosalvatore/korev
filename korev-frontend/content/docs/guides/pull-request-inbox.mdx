@@ -12,6 +12,17 @@ Pull requests in repositories that are not in Korev do not show. To see them, ad
 
 Korev reads the list with `gh`, so `gh` must be installed and signed in. The list updates when you open the page, every two minutes while it is open, and when you press the refresh button. You can also open it from the command palette (⌘K) with **Pull requests**.
 
+## Find a pull request
+
+The bar on top of the list narrows it. The filters stay set when you leave the page and come back. They reset when you restart Korev.
+
+- **Filter** box: type a number (`#1234`), or words from the title, the author, the branch or the repository name. A pull request shows only when every word matches. ⌘F puts the cursor in the box, and Esc clears it.
+- **All**, **Waiting for your review**, **Opened by you**: show both groups or only one. Each one shows how many pull requests match.
+- **Repository**: show the pull requests of one repository. It shows when the list has pull requests from more than one repository.
+- **Draft**, **Checks failing**, **Checks running**, **Approved**, **Changes requested**, **Conflicts**: show only the pull requests with one of the labels you turn on.
+
+When nothing matches, **Clear filters** resets the bar.
+
 ## What each row shows
 
 Each row shows the repository, the author, the branch and when the pull request last changed. Labels show what needs attention:

@@ -255,6 +255,56 @@ export function inboxStatuses(pr: InboxPullRequest): InboxStatus[] {
   );
 }
 
+export const INBOX_STATUS_LABELS = INBOX_STATUSES.map(({ label }) => label);
+
+export interface InboxFilter {
+  query: string;
+  repoId: string | null;
+  statuses: string[];
+}
+
+export const EMPTY_INBOX_FILTER: InboxFilter = {
+  query: '',
+  repoId: null,
+  statuses: [],
+};
+
+const PR_NUMBER_TOKEN = /^#(\d+)$/;
+
+function matchesToken(
+  pr: InboxPullRequest,
+  token: string,
+  repoName: string,
+): boolean {
+  const numbered = PR_NUMBER_TOKEN.exec(token);
+  if (numbered) return pr.number === Number(numbered[1]);
+  if (String(pr.number) === token) return true;
+  return [pr.title, pr.author, pr.headRefName, repoName].some((field) =>
+    field.toLowerCase().includes(token),
+  );
+}
+
+function hasAnyStatus(pr: InboxPullRequest, statuses: string[]): boolean {
+  if (!statuses.length) return true;
+  return inboxStatuses(pr).some((status) => statuses.includes(status.label));
+}
+
+export function filterInbox(
+  prs: InboxPullRequest[],
+  filter: InboxFilter,
+  repoNames: ReadonlyMap<string, string>,
+): InboxPullRequest[] {
+  const tokens = filter.query.toLowerCase().split(/\s+/).filter(Boolean);
+  return prs.filter(
+    (pr) =>
+      (!filter.repoId || pr.repoId === filter.repoId) &&
+      hasAnyStatus(pr, filter.statuses) &&
+      tokens.every((token) =>
+        matchesToken(pr, token, repoNames.get(pr.repoId) ?? ''),
+      ),
+  );
+}
+
 export interface IssueSummary {
   number: number;
   title: string;

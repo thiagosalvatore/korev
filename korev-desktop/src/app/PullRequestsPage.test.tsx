@@ -128,6 +128,50 @@ describe('PullRequestsPage', () => {
     expect(call).not.toHaveBeenCalledWith('reviewPullRequest', ['r1', 42]);
   });
 
+  it('finds a pull request by its number', async () => {
+    render(<PullRequestsPage state={state} />);
+    await rowOf(/#42 Add install steps/);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Filter' }), {
+      target: { value: '#7' },
+    });
+
+    expect(screen.getByRole('listitem', { name: /#7 Fix login/ })).toBeTruthy();
+    expect(screen.queryByRole('listitem', { name: /#42/ })).toBeNull();
+  });
+
+  it('narrows the list to the chosen status and group', async () => {
+    render(<PullRequestsPage state={state} />);
+    await rowOf(/#42 Add install steps/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Checks failing' }));
+
+    expect(screen.queryByRole('listitem', { name: /#42/ })).toBeNull();
+    expect(screen.getByRole('listitem', { name: /#7 Fix login/ })).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole('tab', { name: /Waiting for your review/ }),
+    );
+
+    expect(screen.queryByRole('region', { name: 'Opened by you' })).toBeNull();
+  });
+
+  it('clears filters that hide every pull request', async () => {
+    render(<PullRequestsPage state={state} />);
+    await rowOf(/#42 Add install steps/);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Filter' }), {
+      target: { value: 'nothing like this' },
+    });
+    expect(
+      screen.getByText('No pull requests match these filters.'),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+    expect(await rowOf(/#42 Add install steps/)).toBeTruthy();
+    expect(screen.getByRole('listitem', { name: /#7 Fix login/ })).toBeTruthy();
+  });
+
   it('shows a loading skeleton first and keeps the list on screen while it refreshes', async () => {
     let finishRefresh = () => {};
     render(<PullRequestsPage state={state} />);

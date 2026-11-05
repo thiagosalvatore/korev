@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   answerQuestions,
   conversationText,
+  EMPTY_INBOX_FILTER,
+  filterInbox,
   finishedCodexPlan,
   planLanes,
   presetLaneRepo,
@@ -12,6 +14,8 @@ import {
   type AgentQuestion,
   type ChatItem,
   type ChatSession,
+  type InboxFilter,
+  type InboxPullRequest,
   type PrStatus,
 } from './model';
 
@@ -243,5 +247,68 @@ describe('planOf and conversationText', () => {
   it('cuts each message to the given length', () => {
     const items = [user('hello there'), assistant('hi')];
     expect(conversationText(items, 5)).toBe('User: hello\n\nAssistant: hi');
+  });
+});
+
+describe('filterInbox', () => {
+  function inboxPr(overrides: Partial<InboxPullRequest>): InboxPullRequest {
+    return {
+      repoId: 'web',
+      reason: 'review-requested',
+      number: 42,
+      title: 'Add install steps',
+      url: 'https://github.com/acme/web/pull/42',
+      author: 'octo',
+      isDraft: false,
+      headRefName: 'octo/install',
+      baseRefName: 'main',
+      updatedAt: '2026-11-04T10:00:00Z',
+      reviewDecision: null,
+      mergeable: 'MERGEABLE',
+      checks: 'success',
+      ...overrides,
+    };
+  }
+
+  const install = inboxPr({});
+  const login = inboxPr({
+    repoId: 'api',
+    number: 7,
+    title: 'Fix login redirect',
+    author: 'me',
+    headRefName: 'me/login-42',
+    checks: 'failure',
+  });
+  const draft = inboxPr({ number: 420, title: 'Draft docs', isDraft: true });
+  const prs = [install, login, draft];
+  const repoNames = new Map([
+    ['web', 'acme-web'],
+    ['api', 'acme-api'],
+  ]);
+
+  function matching(filter: Partial<InboxFilter>) {
+    return filterInbox(prs, { ...EMPTY_INBOX_FILTER, ...filter }, repoNames);
+  }
+
+  it('finds a pull request by its number', () => {
+    expect(matching({ query: '#42' })).toEqual([install]);
+    expect(matching({ query: '42' })).toEqual([install, login]);
+  });
+
+  it('needs every word to match the title, author, branch or repository', () => {
+    expect(matching({ query: 'LOGIN me' })).toEqual([login]);
+    expect(matching({ query: 'acme-api redirect' })).toEqual([login]);
+    expect(matching({ query: 'login octo' })).toEqual([]);
+  });
+
+  it('keeps pull requests that show any of the chosen statuses', () => {
+    expect(matching({ statuses: ['Draft', 'Checks failing'] })).toEqual([
+      login,
+      draft,
+    ]);
+  });
+
+  it('keeps only the chosen repository', () => {
+    expect(matching({ repoId: 'web' })).toEqual([install, draft]);
   });
 });

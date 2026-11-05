@@ -64,6 +64,14 @@ state badge, the tasks it waits for, its worker's workspace, and the worker's re
 Decision cards use the permission card style (warning border). They also show at the end of the
 coordinator's chat.
 
+The **Pull requests** page replaces the centre and the right panel with the pull request inbox. A
+filter bar sits between the header and the list and does not scroll. Its top line is the filter
+box (focused on open, ⌘F, Esc clears) and the repository select (only with 2 or more
+repositories). Its second line has the group tabs (`pill` Tabs: All, Waiting for your review,
+Opened by you, each with the matching count) and one `sm` toggle button per status label: `ghost`
+when off, `secondary` when on. Each group overline has a count badge. When the filters hide every
+pull request, the list shows "No pull requests match these filters." and **Clear filters**.
+
 The **Automations** page replaces the centre and the right panel with one card per automation.
 A card has the name, a **Running** badge while a run is going, the on/off switch, **Run now**,
 **Edit** and **Delete**. Under them: the schedule, the repositories, the time of the last run and
