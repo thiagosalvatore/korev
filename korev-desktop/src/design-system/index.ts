@@ -13,6 +13,7 @@ export * from './components/forms/Input';
 export * from './components/forms/Select';
 export * from './components/forms/Switch';
 export * from './components/display/Badge';
+export * from './components/display/ErrorState';
 export * from './components/navigation/Tabs';
 export * from './components/overlay/Dialog';
 export * from './components/overlay/Toast';

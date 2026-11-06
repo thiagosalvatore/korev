@@ -195,4 +195,16 @@ describe('PullRequestsPage', () => {
     await act(async () => finishRefresh());
     expect(refresh.getAttribute('aria-busy')).toBeNull();
   });
+
+  it('shows why the inbox failed and loads it again on Try again', async () => {
+    call.mockResolvedValueOnce({ ok: false, message: 'gh: HTTP 502' });
+    render(<PullRequestsPage state={state} />);
+
+    expect(await screen.findByText("Couldn't load pull requests")).toBeTruthy();
+    expect(screen.getByText('gh: HTTP 502')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await rowOf(/#42 Add install steps/)).toBeTruthy();
+    expect(screen.queryByText('gh: HTTP 502')).toBeNull();
+  });
 });
