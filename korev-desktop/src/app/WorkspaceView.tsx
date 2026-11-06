@@ -20,6 +20,7 @@ import {
 } from './actions';
 import { ChatView } from './chat/ChatView';
 import { ShareChatButton } from './chat/exportConversation';
+import { WideChatButton } from './chat/WideChatButton';
 import { DiffView } from './diff/DiffView';
 import { FileView } from './FileView';
 import { PrComments } from './comments/PrComments';
@@ -230,6 +231,7 @@ function TabStrip({
       </div>
       {activeSession ? (
         <div className="ml-auto flex items-center px-1">
+          <WideChatButton />
           <ShareChatButton
             session={activeSession}
             context={{ repo: repo?.name ?? '', branch: workspace.branch }}
