@@ -12,6 +12,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   dateTime,
   fileName,
@@ -143,15 +144,22 @@ function MessageActions({
     if (action === 'select') setSelecting(true);
   };
 
+  const longPress = Gesture.LongPress()
+    .runOnJS(true)
+    .enabled(Boolean(text))
+    .onStart(() => void showActions());
+
   return (
     <>
-      <Pressable
-        style={style}
-        accessibilityHint="Long press to copy or select the text"
-        onLongPress={text ? () => void showActions() : undefined}
-      >
-        {children}
-      </Pressable>
+      <GestureDetector gesture={longPress}>
+        <View
+          style={style}
+          accessible
+          accessibilityHint="Long press to copy or select the text"
+        >
+          {children}
+        </View>
+      </GestureDetector>
       <ReaderSheet
         title={MESSAGE_ACTION_LABELS.select}
         visible={selecting}
