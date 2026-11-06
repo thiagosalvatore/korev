@@ -10,6 +10,7 @@ import {
   Badge,
   Button,
   cn,
+  ErrorState,
   Icon,
   IconButton,
   Input,
@@ -47,6 +48,7 @@ const REFRESH_MS = 120_000;
 const ALL_GROUPS = 'all';
 const ALL_REPOS = '';
 const NO_MATCH = 'No pull requests match these filters.';
+const INBOX_FAILED = "Couldn't load pull requests";
 
 function useInbox() {
   const [inbox, setInbox] = useState<Result<InboxPullRequest[]> | null>(null);
@@ -324,16 +326,25 @@ function InboxGroups({
   state,
   inbox,
   matching,
+  onRetry,
 }: {
   state: AppState;
   inbox: Result<InboxPullRequest[]> | null;
   matching: InboxPullRequest[];
+  onRetry: () => Promise<void>;
 }) {
   const filter = useUi((ui) => ui.prFilter);
   const reason = useUi((ui) => ui.prReason);
   if (!inbox) return <InboxSkeleton />;
   if (!inbox.ok)
-    return <p className="m-0 text-sm text-danger-text">{inbox.message}</p>;
+    return (
+      <ErrorState
+        title={INBOX_FAILED}
+        detail={inbox.message}
+        onRetry={onRetry}
+        className="pt-[12vh]"
+      />
+    );
   const filtering = isFiltering(filter, reason);
   const groups = INBOX_GROUPS.filter(
     (group) => !reason || group.reason === reason,
@@ -399,7 +410,12 @@ export function PullRequestsPage({ state }: { state: AppState }) {
       ) : null}
       <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-6 [scrollbar-gutter:stable_both-edges]">
         <div className="flex w-full max-w-[960px] flex-col gap-6">
-          <InboxGroups state={state} inbox={inbox} matching={matching} />
+          <InboxGroups
+            state={state}
+            inbox={inbox}
+            matching={matching}
+            onRetry={refresh}
+          />
         </div>
       </div>
     </div>

@@ -1,4 +1,11 @@
-import { Button, cn, Icon, IconButton, LoadingRing } from '../design-system';
+import {
+  Button,
+  cn,
+  ErrorState,
+  Icon,
+  IconButton,
+  LoadingRing,
+} from '../design-system';
 import {
   hasWorktree,
   type AppState,
@@ -259,44 +266,28 @@ function failureDetail(message: string | null) {
   return (message ?? '').replace(`${WORKTREE_FAILED}: `, '');
 }
 
+function PendingPrompt({ prompt }: { prompt: string | null | undefined }) {
+  if (!prompt) return null;
+  return (
+    <p className="m-0 max-w-xl rounded-md bg-raised px-3 py-2 text-left text-sm whitespace-pre-wrap text-fg-1">
+      {prompt}
+    </p>
+  );
+}
+
 export function WorktreePending({
   state,
   workspace,
   runtime,
 }: WorktreeStatusProps) {
-  const failed = runtime.status === 'failed';
-  const progress = worktreeProgress(workspace, runtime);
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-      {failed ? (
-        <Icon name="triangle-alert" size={22} className="text-danger-text" />
-      ) : (
-        <LoadingRing size={22} className="text-accent-text" />
-      )}
-      <p className="m-0 text-lg font-semibold text-fg-1">
-        {failed ? WORKTREE_FAILED : progress.title}
-      </p>
-      {failed ? (
-        <pre className="m-0 max-h-64 w-full max-w-xl overflow-auto rounded-md bg-inset px-3 py-2 text-left font-mono text-xs break-words whitespace-pre-wrap text-danger-text select-text">
-          {failureDetail(runtime.message)}
-        </pre>
-      ) : (
-        <p className="m-0 text-sm text-fg-3">{progress.detail}</p>
-      )}
-      {runtime.pendingPrompt ? (
-        <p className="m-0 max-w-xl rounded-md bg-raised px-3 py-2 text-left text-sm whitespace-pre-wrap text-fg-1">
-          {runtime.pendingPrompt}
-        </p>
-      ) : null}
-      {failed ? (
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            icon="rotate-ccw"
-            onClick={() => retryWorkspace(workspace)}
-          >
-            Try again
-          </Button>
+  if (runtime.status === 'failed')
+    return (
+      <ErrorState
+        title={WORKTREE_FAILED}
+        detail={failureDetail(runtime.message)}
+        onRetry={() => retryWorkspace(workspace)}
+        className="flex-1 justify-center"
+        actions={
           <Button
             size="sm"
             variant="ghost"
@@ -305,8 +296,18 @@ export function WorktreePending({
           >
             Archive workspace
           </Button>
-        </div>
-      ) : null}
+        }
+      >
+        <PendingPrompt prompt={runtime.pendingPrompt} />
+      </ErrorState>
+    );
+  const progress = worktreeProgress(workspace, runtime);
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+      <LoadingRing size={22} className="text-accent-text" />
+      <p className="m-0 text-lg font-semibold text-fg-1">{progress.title}</p>
+      <p className="m-0 text-sm text-fg-3">{progress.detail}</p>
+      <PendingPrompt prompt={runtime.pendingPrompt} />
     </div>
   );
 }

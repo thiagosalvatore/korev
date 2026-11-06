@@ -3,6 +3,7 @@ import {
   Button,
   cn,
   DiffStat,
+  ErrorState,
   Icon,
   IconButton,
   LoadingRing,
@@ -685,21 +686,12 @@ function Failed({
   onShowChat: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 pt-[12vh] text-center">
-      <Icon name="circle-alert" size={22} className="text-danger-text" />
-      <p className="m-0 type-h3 text-fg-1">
-        Korev could not build the explanation
-      </p>
-      <p className="m-0 max-w-md text-sm text-fg-3">{error}</p>
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          variant="primary"
-          icon="refresh-cw"
-          onClick={() => updateExplainer(sessionId)}
-        >
-          Try again
-        </Button>
+    <ErrorState
+      title="Korev could not build the explanation"
+      detail={error}
+      onRetry={() => updateExplainer(sessionId)}
+      className="pt-[12vh]"
+      actions={
         <Button
           size="sm"
           variant="ghost"
@@ -708,8 +700,8 @@ function Failed({
         >
           Open chat
         </Button>
-      </div>
-    </div>
+      }
+    />
   );
 }
 
