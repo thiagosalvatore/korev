@@ -14,6 +14,7 @@ import {
   Icon,
   IconButton,
   Input,
+  LOADING_ICON,
   Select,
   Skeleton,
   SkeletonStatus,
@@ -49,18 +50,44 @@ const ALL_GROUPS = 'all';
 const ALL_REPOS = '';
 const NO_MATCH = 'No pull requests match these filters.';
 const INBOX_FAILED = "Couldn't load pull requests";
+const REFRESH_FAILED = "Couldn't refresh";
+const INBOX_CACHE_KEY = 'korev:pr-inbox';
+
+function readCachedInbox(): Result<InboxPullRequest[]> | null {
+  try {
+    const cached: unknown = JSON.parse(
+      localStorage.getItem(INBOX_CACHE_KEY) ?? 'null',
+    );
+    return Array.isArray(cached)
+      ? { ok: true, value: cached as InboxPullRequest[] }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheInbox(prs: InboxPullRequest[]) {
+  localStorage.setItem(INBOX_CACHE_KEY, JSON.stringify(prs));
+}
 
 function useInbox() {
-  const [inbox, setInbox] = useState<Result<InboxPullRequest[]> | null>(null);
+  const [inbox, setInbox] = useState(readCachedInbox);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const refresh = useCallback(async () => {
-    setInbox(await api.pullRequestInbox());
+    setRefreshing(true);
+    const loaded = await api.pullRequestInbox();
+    setRefreshing(false);
+    if (loaded.ok) cacheInbox(loaded.value);
+    setRefreshError(loaded.ok ? null : loaded.message);
+    setInbox((shown) => (!loaded.ok && shown?.ok ? shown : loaded));
   }, []);
   useEffect(() => {
     void refresh();
     const timer = setInterval(() => void refresh(), REFRESH_MS);
     return () => clearInterval(timer);
   }, [refresh]);
-  return { inbox, refresh };
+  return { inbox, refresh, refreshing, refreshError };
 }
 
 function PullRequestRow({
@@ -381,8 +408,9 @@ function InboxGroups({
 
 export function PullRequestsPage({ state }: { state: AppState }) {
   const sidebar = useUi((ui) => ui.sidebar);
-  const { inbox, refresh } = useInbox();
+  const { inbox, refresh, refreshing, refreshError } = useInbox();
   const matching = useMatchingInbox(state, inbox);
+  const staleAfterError = Boolean(refreshError && inbox?.ok);
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <div
@@ -392,12 +420,24 @@ export function PullRequestsPage({ state }: { state: AppState }) {
           sidebar ? 'pl-4' : TRAFFIC_LIGHT_GUTTER,
         )}
       >
-        <h1 className="m-0 text-sm font-semibold text-fg-1">Pull requests</h1>
+        <div className="flex items-baseline gap-2">
+          <h1 className="m-0 text-sm font-semibold text-fg-1">Pull requests</h1>
+          {staleAfterError ? (
+            <span
+              className="text-xs text-fg-4"
+              title={refreshError ?? undefined}
+            >
+              {REFRESH_FAILED}
+            </span>
+          ) : null}
+        </div>
         <IconButton
-          icon="refresh-cw"
+          icon={refreshing ? LOADING_ICON : 'refresh-cw'}
           label="Refresh"
           size="sm"
           className={NO_DRAG}
+          disabled={refreshing}
+          aria-busy={refreshing || undefined}
           onClick={refresh}
         />
       </div>
