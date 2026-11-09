@@ -385,6 +385,13 @@ function WorkspaceRow({
   const label = workspaceLabel(workspace);
   const [renaming, setRenaming] = useState(false);
   const [naming, setNaming] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const repoFolders = state.workspaceFolders.filter(
+    (folder) => folder.repoId === workspace.repoId,
+  );
+  const currentFolder = workspace.folderId ?? null;
+  const moveToFolder = (target: string | null) =>
+    void api.moveWorkspace(workspace.id, target);
   async function createFolderWithWorkspace(name: string) {
     const folder = await api.createWorkspaceFolder(workspace.repoId, name);
     await api.moveWorkspace(workspace.id, folder.id);
@@ -499,12 +506,11 @@ function WorkspaceRow({
               ...(member
                 ? []
                 : moveToFolderItems(
-                    state.workspaceFolders.filter(
-                      (folder) => folder.repoId === workspace.repoId,
-                    ),
-                    workspace.folderId ?? null,
-                    (target) => void api.moveWorkspace(workspace.id, target),
+                    repoFolders,
+                    currentFolder,
+                    moveToFolder,
                     () => setNaming(true),
+                    () => setPicking(true),
                   )),
             ]}
             trigger={({ toggle }) => (
@@ -537,6 +543,14 @@ function WorkspaceRow({
           submitLabel="Create"
           onSubmit={createFolderWithWorkspace}
           onClose={() => setNaming(false)}
+        />
+      ) : null}
+      {picking ? (
+        <FolderPickerDialog
+          folders={repoFolders}
+          current={currentFolder}
+          onPick={moveToFolder}
+          onClose={() => setPicking(false)}
         />
       ) : null}
     </>
@@ -595,6 +609,7 @@ const REPO_DRAG_TYPE = 'application/x-korev-repo';
 const FOLDER_DRAG_TYPE = 'application/x-korev-folder';
 const DROP_INDICATOR = 'shadow-[inset_0_2px_0_0_var(--color-accent)]';
 const MOVE_TO_FOLDER = 'Move to folder';
+const INLINE_FOLDER_LIMIT = 2;
 
 function toggled(list: string[], id: string): string[] {
   return list.includes(id)
@@ -671,14 +686,95 @@ function NameDialog({
   );
 }
 
+interface FolderChoice {
+  id: string;
+  name: string;
+}
+
+function FolderPickerDialog({
+  folders,
+  current,
+  onPick,
+  onClose,
+}: {
+  folders: FolderChoice[];
+  current: string | null;
+  onPick: (folderId: string) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const needle = query.trim().toLowerCase();
+  const visible = folders.filter((folder) =>
+    folder.name.toLowerCase().includes(needle),
+  );
+  return (
+    <Dialog open onClose={onClose} title={MOVE_TO_FOLDER}>
+      <Input
+        icon="search"
+        aria-label="Search folders"
+        placeholder="Search folders"
+        autoFocus
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      <div className="mt-2 max-h-80 overflow-y-auto">
+        {visible.map((folder) => (
+          <button
+            key={folder.id}
+            type="button"
+            className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-sm border-0 bg-transparent px-2 text-left text-sm text-fg-1 hover:bg-hover"
+            onClick={() => {
+              onPick(folder.id);
+              onClose();
+            }}
+          >
+            <Icon name="folder" size={14} className="text-fg-3" />
+            <span className="min-w-0 flex-1 truncate">{folder.name}</span>
+            {folder.id === current ? (
+              <Icon name="check" size={14} className="text-accent-text" />
+            ) : null}
+          </button>
+        ))}
+        {visible.length ? null : (
+          <div className="px-2 py-1.5 text-sm text-fg-4">No folders match</div>
+        )}
+      </div>
+    </Dialog>
+  );
+}
+
+function inlineFolders(
+  folders: FolderChoice[],
+  current: string | null,
+): FolderChoice[] {
+  const currentFirst = [
+    ...folders.filter((folder) => folder.id === current),
+    ...folders.filter((folder) => folder.id !== current),
+  ];
+  return currentFirst.slice(0, INLINE_FOLDER_LIMIT);
+}
+
 function moveToFolderItems(
-  folders: { id: string; name: string }[],
+  folders: FolderChoice[],
   current: string | null,
   moveTo: (folderId: string | null) => void,
   onNewFolder: () => void,
+  onMoreFolders: () => void,
 ): MenuItem[] {
+  const moreFolders: MenuItem[] =
+    folders.length > INLINE_FOLDER_LIMIT
+      ? [
+          {
+            id: 'more-folders',
+            label: 'More folders…',
+            icon: 'folder-search',
+            section: MOVE_TO_FOLDER,
+            onSelect: onMoreFolders,
+          },
+        ]
+      : [];
   return [
-    ...folders.map((folder) => ({
+    ...inlineFolders(folders, current).map((folder) => ({
       id: folder.id,
       label: folder.name,
       icon: 'folder' as const,
@@ -686,6 +782,7 @@ function moveToFolderItems(
       section: MOVE_TO_FOLDER,
       onSelect: () => moveTo(folder.id),
     })),
+    ...moreFolders,
     {
       id: 'no-folder',
       label: 'No folder',
@@ -1164,6 +1261,9 @@ function RepoGroup({
     repo.id,
   );
   const [naming, setNaming] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const moveToFolder = (target: string | null) =>
+    void api.moveRepo(repo.id, { folderId: target, beforeId: null });
   const drop = useDropTarget({
     [REPO_DRAG_TYPE]: (draggedId) =>
       void api.moveRepo(draggedId, { folderId, beforeId: repo.id }),
@@ -1247,12 +1347,9 @@ function RepoGroup({
             items={moveToFolderItems(
               state.folders,
               folderId,
-              (target) =>
-                void api.moveRepo(repo.id, {
-                  folderId: target,
-                  beforeId: null,
-                }),
+              moveToFolder,
               () => setNaming(true),
+              () => setPicking(true),
             )}
             trigger={({ toggle: toggleMenu }) => (
               <IconButton
@@ -1271,6 +1368,14 @@ function RepoGroup({
           submitLabel="Create"
           onSubmit={createFolderWithRepo}
           onClose={() => setNaming(false)}
+        />
+      ) : null}
+      {picking ? (
+        <FolderPickerDialog
+          folders={state.folders}
+          current={folderId}
+          onPick={moveToFolder}
+          onClose={() => setPicking(false)}
         />
       ) : null}
       {collapsed ? null : (

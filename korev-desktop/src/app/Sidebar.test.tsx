@@ -265,6 +265,40 @@ describe('Sidebar workspace folders', () => {
     ]);
   });
 
+  it('keeps extra folders out of the menu behind More folders', () => {
+    const crowded = {
+      ...foldered,
+      workspaceFolders: [
+        { id: 'wave', repoId: 'busy', name: 'Wave 1' },
+        { id: 'wave-2', repoId: 'busy', name: 'Wave 2' },
+        { id: 'wave-3', repoId: 'busy', name: 'Wave 3' },
+        { id: 'backlog', repoId: 'busy', name: 'Backlog' },
+      ],
+    } as unknown as AppState;
+    render(<Sidebar state={crowded} />);
+    const row = screen.getByRole('button', { name: 'Workspace login-page' });
+
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Workspace actions' }),
+    );
+    expect(screen.getByRole('menuitem', { name: 'Wave 2' })).toBeTruthy();
+    expect(screen.queryByRole('menuitem', { name: 'Backlog' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'More folders…' }));
+    const picker = screen.getByRole('dialog', { name: 'Move to folder' });
+    fireEvent.change(within(picker).getByRole('textbox'), {
+      target: { value: 'back' },
+    });
+    expect(within(picker).queryByRole('button', { name: 'Wave 1' })).toBeNull();
+    fireEvent.click(within(picker).getByRole('button', { name: 'Backlog' }));
+
+    expect(window.korev.call).toHaveBeenCalledWith('moveWorkspace', [
+      'w1',
+      'backlog',
+    ]);
+    expect(screen.queryByRole('dialog', { name: 'Move to folder' })).toBeNull();
+  });
+
   it('renames a folder', () => {
     render(<Sidebar state={foldered} />);
 
