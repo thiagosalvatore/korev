@@ -62,6 +62,7 @@ beforeEach(() => {
     return null;
   });
   window.korev = { call, on: () => () => {} } as unknown as Window['korev'];
+  localStorage.clear();
 });
 
 afterEach(() => {
@@ -194,6 +195,48 @@ describe('PullRequestsPage', () => {
     ).toBeTruthy();
     await act(async () => finishRefresh());
     expect(refresh.getAttribute('aria-busy')).toBeNull();
+  });
+
+  it('shows the last loaded list right away on the next visit and refreshes it', async () => {
+    const { unmount } = render(<PullRequestsPage state={state} />);
+    await rowOf(/#42 Add install steps/);
+    unmount();
+
+    let finishRefresh = () => {};
+    call.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRefresh = () => resolve({ ok: true, value: [inbox[1]] });
+        }),
+    );
+    render(<PullRequestsPage state={state} />);
+
+    expect(
+      screen.getByRole('listitem', { name: /#42 Add install steps/ }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull();
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    expect(refresh.getAttribute('aria-busy')).toBe('true');
+
+    await act(async () => finishRefresh());
+    expect(screen.queryByRole('listitem', { name: /#42/ })).toBeNull();
+    expect(screen.getByRole('listitem', { name: /#7 Fix login/ })).toBeTruthy();
+    expect(refresh.getAttribute('aria-busy')).toBeNull();
+  });
+
+  it('keeps the last loaded list when a refresh fails', async () => {
+    const { unmount } = render(<PullRequestsPage state={state} />);
+    await rowOf(/#42 Add install steps/);
+    unmount();
+
+    call.mockResolvedValueOnce({ ok: false, message: 'gh: HTTP 502' });
+    render(<PullRequestsPage state={state} />);
+
+    expect(await screen.findByText("Couldn't refresh")).toBeTruthy();
+    expect(
+      screen.getByRole('listitem', { name: /#42 Add install steps/ }),
+    ).toBeTruthy();
+    expect(screen.queryByText("Couldn't load pull requests")).toBeNull();
   });
 
   it('shows why the inbox failed and loads it again on Try again', async () => {
