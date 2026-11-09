@@ -4,13 +4,21 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-09
+
+Let the chat fill a large screen, and open the Pull requests page without a wait.
+
 ### New
 
 - **Wide chat.** On a large screen, click the new Wide chat icon at the right of the tab bar to let the chat fill the window. In the normal width, a wide table or code block now grows into the empty space on both sides instead of squeezing into the column.
+- **Pull requests open at once.** The Pull requests page shows the last list it loaded right away, also after a restart, and refreshes it in the background. If the refresh fails, the list stays and "Couldn't refresh" shows next to the title.
+- **Shorter Move to folder menu.** The Move to folder menu shows at most two folders, with the current folder first. When you have more, **More folders…** opens a dialog with every folder and a search field.
 
 ### Fixed
 
 - Tables in the chat no longer split short words like "Workspace" across lines. Each column is now at least as wide as its longest word, and the long column wraps instead.
+- When a page fails to load, for example Pull requests after a GitHub error, it now shows a clear error with a Try again button. Before, it showed one line of raw red error text.
+- On your phone, you can now scroll a wide table sideways in a chat reply. Before, its last columns stayed hidden.
 
 ## [0.28.0] - 2026-11-05
 
