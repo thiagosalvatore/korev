@@ -85,4 +85,36 @@ describe('Transcript', () => {
       screen.getByText(`Completed in 2m 30s · $0.42 · ${dateTime(finishedAt)}`),
     ).toBeTruthy();
   });
+
+  function renderAnswer(wide: boolean) {
+    render(
+      <Transcript
+        sessionId="session-1"
+        items={[{ id: 'assistant-1', kind: 'assistant', text: 'Hello' }]}
+        running={false}
+        empty={null}
+        onRevert={vi.fn()}
+        onRespond={vi.fn()}
+        onRetry={vi.fn()}
+        onOpenTurnFile={vi.fn()}
+        wide={wide}
+      />,
+    );
+    return screen.getByText('Hello');
+  }
+
+  it('keeps answers at reading width and lets their tables grow past it', () => {
+    const answer = renderAnswer(false);
+
+    expect(answer.closest('.max-w-\\[820px\\]')).toBeTruthy();
+    expect(answer.closest('.kv-chat')).toBeTruthy();
+    expect(answer.closest('.kv-md-breakout')).toBeTruthy();
+  });
+
+  it('fills the pane when the chat is wide', () => {
+    const answer = renderAnswer(true);
+
+    expect(answer.closest('.max-w-\\[820px\\]')).toBeNull();
+    expect(answer.closest('.kv-chat')).toBeNull();
+  });
 });

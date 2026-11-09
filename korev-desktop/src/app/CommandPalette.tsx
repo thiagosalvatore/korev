@@ -22,6 +22,7 @@ import {
   restoreWorkspace,
   selectWorkspace,
   toggleCompactNav,
+  toggleWideChat,
   toggleHandsFree,
 } from './actions';
 import { fuzzyRank } from './fuzzy';
@@ -155,6 +156,13 @@ function paletteItems(
       icon: 'rows-2',
       section: 'Actions',
       run: toggleCompactNav,
+    },
+    {
+      id: 'wide-chat',
+      label: 'Wide chat',
+      icon: 'unfold-horizontal',
+      section: 'Actions',
+      run: toggleWideChat,
     },
     {
       id: 'hands-free',

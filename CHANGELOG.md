@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Wide chat.** On a large screen, click the new Wide chat icon at the right of the tab bar to let the chat fill the window. In the normal width, a wide table or code block now grows into the empty space on both sides instead of squeezing into the column.
+
 ### Fixed
 
 - Tables in the chat no longer split short words like "Workspace" across lines. Each column is now at least as wide as its longest word, and the long column wraps instead.

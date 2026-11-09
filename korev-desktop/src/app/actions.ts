@@ -421,6 +421,10 @@ export function toggleCompactNav() {
   setUi((ui) => ({ compactNav: !ui.compactNav }));
 }
 
+export function toggleWideChat() {
+  setUi((ui) => ({ wideChat: !ui.wideChat }));
+}
+
 export function focusPane(index: number) {
   setUi((ui) => ({ grid: { ...ui.grid, focused: index } }));
   const pane = getUi().grid.panes[index];

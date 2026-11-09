@@ -123,6 +123,7 @@ export interface UiState {
   grid: GridUi;
   palette: PaletteMode;
   diffLayout: DiffLayout;
+  wideChat: boolean;
   updateOpen: boolean;
   quit: QuitPrompt;
   handsFree: boolean;
@@ -157,6 +158,7 @@ const INITIAL: UiState = {
   },
   palette: false,
   diffLayout: 'unified',
+  wideChat: false,
   updateOpen: false,
   quit: 'closed',
   handsFree: false,
