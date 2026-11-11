@@ -35,6 +35,7 @@ import {
   type RepoScripts,
   type Settings,
   type Skill,
+  type ReviewReplies,
   type ThemePreference,
 } from '../shared/model';
 import { api } from './bridge';
@@ -66,6 +67,13 @@ const THEMES: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: 'System' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
+];
+
+const REVIEW_REPLY_OPTIONS: { value: ReviewReplies; label: string }[] = [
+  { value: 'reply', label: 'Reply on each thread' },
+  { value: 'reply-and-resolve', label: 'Reply and resolve' },
+  { value: 'none', label: "Don't post anything" },
+  { value: 'custom', label: 'Custom' },
 ];
 
 const DICTATION_LANGUAGES: { value: DictationLanguage; label: string }[] = [
@@ -723,6 +731,47 @@ function Git({ settings }: { settings: Settings }) {
           onChange={(archiveOnMerge) => update({ archiveOnMerge })}
         />
       </Row>
+      <Row
+        title="Keep PRs ready"
+        description="When a workspace's pull request has merge conflicts, a failing required check or a review comment nobody has answered, Korev asks the workspace's agent to fix it and push. Each problem is sent once. Turn it off for one workspace from its menu."
+      >
+        <Switch
+          checked={settings.keepPrsReady}
+          onChange={(keepPrsReady) => update({ keepPrsReady })}
+        />
+      </Row>
+      {settings.keepPrsReady ? (
+        <Row
+          nested
+          title="Answering reviewers"
+          description="What the agent does on GitHub after it handles a review comment. It posts as you."
+        >
+          <Select
+            ariaLabel="Answering reviewers"
+            className="w-56"
+            options={REVIEW_REPLY_OPTIONS}
+            value={settings.reviewReplies}
+            onChange={(reviewReplies) =>
+              update({ reviewReplies: reviewReplies as ReviewReplies })
+            }
+          />
+        </Row>
+      ) : null}
+      {settings.keepPrsReady && settings.reviewReplies === 'custom' ? (
+        <Row
+          nested
+          title="Custom instruction"
+          description="Tells the agent how to answer reviewers."
+        >
+          <TextSetting
+            value={settings.reviewReplyInstructions}
+            placeholder="Reply only when it needs an explanation, otherwise resolve"
+            onSave={(reviewReplyInstructions) =>
+              update({ reviewReplyInstructions })
+            }
+          />
+        </Row>
+      ) : null}
       <Row
         title="Delete branch on archive"
         description="Remove the local branch when a workspace is archived."

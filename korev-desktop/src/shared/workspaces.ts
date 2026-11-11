@@ -1,11 +1,13 @@
-import type {
-  AppState,
-  AskChat,
-  Repo,
-  RepoFolder,
-  Workspace,
-  WorkspaceRuntime,
-  WorkspaceStatus,
+import {
+  keepsPrReady,
+  prProblems,
+  type AppState,
+  type AskChat,
+  type Repo,
+  type RepoFolder,
+  type Workspace,
+  type WorkspaceRuntime,
+  type WorkspaceStatus,
 } from './model';
 
 export interface RepoSection {
@@ -418,19 +420,42 @@ export function boardColumn(runtime: WorkspaceRuntime): BoardColumn {
 
 const WAITING_FOR_YOU_COLUMNS: BoardColumn[] = ['needs-you', 'done'];
 
-export function waitsForYou(runtime: WorkspaceRuntime | undefined): boolean {
+export function prNeedsYou(
+  state: Pick<AppState, 'runtime' | 'settings'>,
+  workspace: Workspace,
+): boolean {
+  const runtime = state.runtime[workspace.id];
+  if (!runtime || boardColumn(runtime) !== 'idle') return false;
+  const problems = runtime.prs.flatMap(prProblems);
+  if (!problems.length) return false;
+  if (!keepsPrReady(workspace, state.settings)) return true;
+  return problems.every((found) =>
+    workspace.prReadyHandled.includes(found.key),
+  );
+}
+
+export function waitsForYou(
+  state: Pick<AppState, 'runtime' | 'settings'>,
+  workspace: Workspace,
+): boolean {
+  const runtime = state.runtime[workspace.id];
   return (
     runtime !== undefined &&
-    WAITING_FOR_YOU_COLUMNS.includes(boardColumn(runtime))
+    (WAITING_FOR_YOU_COLUMNS.includes(boardColumn(runtime)) ||
+      prNeedsYou(state, workspace))
   );
 }
 
 export function workspacesWaitingForYou(state: AppState): Workspace[] {
   const active = activeWorkspaces(state);
-  return WAITING_FOR_YOU_COLUMNS.flatMap((column) =>
+  const inColumn = WAITING_FOR_YOU_COLUMNS.flatMap((column) =>
     active.filter((workspace) => {
       const runtime = state.runtime[workspace.id];
       return runtime !== undefined && boardColumn(runtime) === column;
     }),
   );
+  const prsNeedingYou = active.filter((workspace) =>
+    prNeedsYou(state, workspace),
+  );
+  return [...inColumn, ...prsNeedingYou];
 }

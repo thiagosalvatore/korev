@@ -85,6 +85,9 @@ const SETTINGS: Settings = {
   autoRenameBranches: true,
   deleteBranchOnArchive: false,
   archiveOnMerge: false,
+  keepPrsReady: false,
+  reviewReplies: 'reply',
+  reviewReplyInstructions: '',
   toolApprovals: false,
   askFollowsToolApprovals: false,
   orchestration: true,
@@ -146,6 +149,8 @@ export function demoWorkspace(
     archiveSnapshot: null,
     label: null,
     keepAfterMerge: false,
+    pausePrReady: false,
+    prReadyHandled: [],
     awaitsLane: false,
     sessions: [session],
     prs: [],
@@ -191,6 +196,7 @@ export function demoPullRequest(
     reviewDecision: 'APPROVED',
     mergedAt: null,
     headRefName: branch,
+    headRefOid: `${number}`.padStart(7, '0'),
     baseRefName: DEMO_BASE_BRANCH,
     createdAt,
     checks: demoChecks({
@@ -199,6 +205,7 @@ export function demoPullRequest(
       typecheck: 'success',
     }),
     stack: null,
+    unansweredThreads: [],
     ...patch,
   };
 }

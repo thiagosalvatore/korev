@@ -3,6 +3,7 @@ import {
   EMPTY_SCRIPTS,
   type AppState,
   type AskChat,
+  type PrStatus,
   type Repo,
   type Workspace,
   type WorkspaceRuntime,
@@ -21,6 +22,7 @@ import {
   pickerRepos,
   repoSections,
   waitsForLane,
+  workspacesWaitingForYou,
 } from './workspaces';
 
 function repo(id: string, folderId: string | null = null): Repo {
@@ -372,6 +374,53 @@ describe('boardColumn', () => {
       ({ status, setupError: 'Setup script failed' }) as WorkspaceRuntime;
     expect(boardColumn(failedSetup('idle'))).toBe('needs-you');
     expect(boardColumn(failedSetup('working'))).toBe('working');
+  });
+});
+
+describe('workspacesWaitingForYou', () => {
+  const pr = (unansweredThreads: string[]) =>
+    ({
+      number: 7,
+      state: 'OPEN',
+      mergeable: 'MERGEABLE',
+      checks: [],
+      unansweredThreads,
+    }) as unknown as PrStatus;
+  const runtime = (
+    status: WorkspaceRuntime['status'],
+    prs: PrStatus[],
+  ): WorkspaceRuntime => ({ status, unread: false, prs }) as WorkspaceRuntime;
+
+  it('lists an idle workspace whose PR has unanswered comments', () => {
+    const waiting = workspacesWaitingForYou({
+      ...state,
+      settings: { ...state.settings, keepPrsReady: false },
+      runtime: {
+        'blog-1': runtime('idle', [pr(['c1'])]),
+        'web-1': runtime('idle', [pr([])]),
+        'api-1': runtime('working', [pr(['c2'])]),
+      },
+    });
+    expect(waiting.map((entry) => entry.id)).toEqual(['blog-1']);
+  });
+
+  it('lists a kept-ready workspace only once Korev has already sent its problems to the agent', () => {
+    const handled = (id: string, prReadyHandled: string[]) =>
+      ({
+        ...workspace(id, 'blog', '2026-01-01'),
+        pausePrReady: false,
+        prReadyHandled,
+      }) as Workspace;
+    const waiting = workspacesWaitingForYou({
+      ...state,
+      settings: { keepPrsReady: true },
+      workspaces: [handled('sent', ['thread:c1@7']), handled('new', [])],
+      runtime: {
+        sent: runtime('idle', [pr(['c1'])]),
+        new: runtime('idle', [pr(['c1'])]),
+      },
+    } as unknown as AppState);
+    expect(waiting.map((entry) => entry.id)).toEqual(['sent']);
   });
 });
 

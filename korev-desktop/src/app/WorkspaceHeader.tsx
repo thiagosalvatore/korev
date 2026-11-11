@@ -240,6 +240,20 @@ export function WorkspaceHeader({
         >
           Keep after merge
         </Button>
+        {state.settings.keepPrsReady ? (
+          <Button
+            size="sm"
+            variant={workspace.pausePrReady ? 'ghost' : 'secondary'}
+            icon="shield-check"
+            aria-pressed={!workspace.pausePrReady}
+            title="Let the agent fix failing checks, conflicts and review comments on this workspace's pull requests"
+            onClick={() =>
+              void api.setPausePrReady(workspace.id, !workspace.pausePrReady)
+            }
+          >
+            Keep PR ready
+          </Button>
+        ) : null}
       </div>
       <div className="flex-1" />
       <div className={cn('flex items-center gap-1.5', NO_DRAG)}>

@@ -91,7 +91,8 @@ export type PromptKind =
   | 'create_pr'
   | 'fix_errors'
   | 'resolve_merge_conflicts'
-  | 'rename_branch';
+  | 'rename_branch'
+  | 'address_review';
 
 export type RepoPrompts = Partial<Record<PromptKind, string>>;
 
@@ -480,6 +481,8 @@ export interface Workspace {
   restoredAt: string | null;
   archiveSnapshot: Checkpoint | null;
   keepAfterMerge: boolean;
+  pausePrReady: boolean;
+  prReadyHandled: string[];
   awaitsLane: boolean;
   folderId?: string | null;
   sessions: ChatSession[];
@@ -637,6 +640,9 @@ export interface Settings {
   autoRenameBranches: boolean;
   deleteBranchOnArchive: boolean;
   archiveOnMerge: boolean;
+  keepPrsReady: boolean;
+  reviewReplies: ReviewReplies;
+  reviewReplyInstructions: string;
   toolApprovals: boolean;
   askFollowsToolApprovals: boolean;
   orchestration: boolean;
@@ -654,6 +660,15 @@ export interface Settings {
   dictationLanguage: DictationLanguage;
   windowBounds: WindowBounds | null;
   lastSeenVersion: string | null;
+}
+
+export type ReviewReplies = 'none' | 'reply' | 'reply-and-resolve' | 'custom';
+
+export function keepsPrReady(
+  workspace: Workspace,
+  settings: Pick<Settings, 'keepPrsReady'>,
+): boolean {
+  return settings.keepPrsReady && !workspace.pausePrReady;
 }
 
 export interface ModelSetting {
@@ -720,10 +735,12 @@ export interface PrStatus {
   reviewDecision: ReviewDecision | null;
   mergedAt: string | null;
   headRefName: string;
+  headRefOid: string;
   baseRefName: string;
   createdAt: string;
   checks: PrCheck[];
   stack: PrStack | null;
+  unansweredThreads: string[];
 }
 
 export interface PrStack {
@@ -815,6 +832,7 @@ export function nextPrStep(pr: PrStatus | null): PrStep {
   if (pr.mergeable === 'CONFLICTING') return 'resolve-conflicts';
   if (hasRequiredCheck(pr, 'failure')) return 'fix-errors';
   if (hasRequiredCheck(pr, 'pending')) return 'checks-running';
+  if (pr.unansweredThreads.length) return 'changes-requested';
   if (pr.isDraft) return 'draft';
   if (pr.reviewDecision === 'CHANGES_REQUESTED') return 'changes-requested';
   if (pr.reviewDecision === 'REVIEW_REQUIRED') return 'waiting-for-review';
@@ -827,6 +845,7 @@ export type PrBadge =
   | 'closed'
   | 'conflicts'
   | 'checks-failing'
+  | 'review'
   | 'checks-running'
   | 'draft'
   | 'open';
@@ -836,6 +855,7 @@ export const PR_BADGE_LABELS: Record<PrBadge, string> = {
   closed: 'Closed',
   conflicts: 'Conflicts',
   'checks-failing': 'Checks failing',
+  review: 'Unanswered comments',
   'checks-running': 'Checks running',
   draft: 'Draft',
   open: 'Open',
@@ -846,9 +866,45 @@ export function prBadge(pr: PrStatus): PrBadge {
   if (pr.state === 'CLOSED') return 'closed';
   if (pr.mergeable === 'CONFLICTING') return 'conflicts';
   if (hasRequiredCheck(pr, 'failure')) return 'checks-failing';
+  if (pr.unansweredThreads.length) return 'review';
   if (hasRequiredCheck(pr, 'pending')) return 'checks-running';
   if (pr.isDraft) return 'draft';
   return 'open';
+}
+
+export function failingRequiredChecks(pr: PrStatus): PrCheck[] {
+  return pr.checks.filter(
+    (check) => check.required && check.state === 'failure',
+  );
+}
+
+export interface PrProblem {
+  kind: 'conflict' | 'check' | 'thread';
+  subject: string;
+  key: string;
+}
+
+function problem(
+  kind: PrProblem['kind'],
+  subject: string,
+  version: string,
+): PrProblem {
+  return { kind, subject, key: `${kind}:${subject}@${version}` };
+}
+
+export function prProblems(pr: PrStatus): PrProblem[] {
+  if (pr.state !== 'OPEN') return [];
+  const conflict =
+    pr.mergeable === 'CONFLICTING'
+      ? [problem('conflict', pr.baseRefName, pr.headRefOid)]
+      : [];
+  const failingChecks = failingRequiredChecks(pr).map((check) =>
+    problem('check', check.name, pr.headRefOid),
+  );
+  const threads = pr.unansweredThreads.map((id) =>
+    problem('thread', id, pr.number.toString()),
+  );
+  return [...conflict, ...failingChecks, ...threads];
 }
 
 export function primaryPr(

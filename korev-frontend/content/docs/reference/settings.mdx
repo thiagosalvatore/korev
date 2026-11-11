@@ -38,12 +38,14 @@ Has one tab per agent. Each tab shows whether the CLI is **Connected**, **Not si
 
 ## Git
 
-| Setting                       | Default           | What it does                                       |
-| ----------------------------- | ----------------- | -------------------------------------------------- |
-| Branch prefix                 | Your GitHub login | The part before `/` in new branch names.           |
-| Name workspaces from the task | On                | Claude Haiku names new workspaces from the task.   |
-| Archive on merge              | Off               | Archives a workspace when its pull request merges. |
-| Delete branch on archive      | Off               | Deletes the branch when you archive a workspace.   |
+| Setting                       | Default              | What it does                                                                                                                                                                 |
+| ----------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Branch prefix                 | Your GitHub login    | The part before `/` in new branch names.                                                                                                                                     |
+| Name workspaces from the task | On                   | Claude Haiku names new workspaces from the task.                                                                                                                             |
+| Archive on merge              | Off                  | Archives a workspace when its pull request merges.                                                                                                                           |
+| Keep PRs ready                | Off                  | Sends merge conflicts, failing required checks and unanswered review comments to the workspace's agent. See [Keep PRs ready](../guides/review-and-merge.mdx#keep-prs-ready). |
+| Answering reviewers           | Reply on each thread | Shows when **Keep PRs ready** is on. What the agent does on GitHub after it handles a review comment. **Custom** adds a field for your own instruction.                      |
+| Delete branch on archive      | Off                  | Deletes the branch when you archive a workspace.                                                                                                                             |
 
 A repository's `[git]` table overrides these. See [Repository config](./repository-config.mdx#git).
 
