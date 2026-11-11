@@ -213,6 +213,7 @@ export interface KorevApi {
   unregisterPushToken(token: string): Promise<void>;
   prepareDictation(): Promise<void>;
   transcribe(audioBase64: string): Promise<string>;
+  cancelDictation(): Promise<void>;
   runVoiceCommand(
     spoken: string,
     options?: { awake?: boolean },

@@ -16,17 +16,26 @@ export function useDictation(onText: (text: string) => void) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const discard = useRef(false);
+  const transcription = useRef(0);
 
   async function transcribe(recording: Blob) {
+    const id = ++transcription.current;
+    const current = () => id === transcription.current;
     setPhase('transcribing');
     try {
       const text = await api.transcribe(await readAsBase64(recording));
-      if (text) onText(text);
+      if (text && current()) onText(text);
     } catch (error) {
-      failed(error);
+      if (current()) failed(error);
     } finally {
-      setPhase('idle');
+      if (current()) setPhase('idle');
     }
+  }
+
+  function dropTranscription() {
+    transcription.current += 1;
+    void api.cancelDictation();
+    setPhase('idle');
   }
 
   function finish(microphone: MediaStream, chunks: Blob[]) {
@@ -67,6 +76,7 @@ export function useDictation(onText: (text: string) => void) {
     stream,
     toggle,
     done: () => stop({ keep: true }),
-    cancel: () => stop({ keep: false }),
+    cancel: () =>
+      phase === 'transcribing' ? dropTranscription() : stop({ keep: false }),
   };
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { IconButton, LoadingRing } from '../../design-system';
+import { LoadingRing } from '../../design-system';
 import type { DictationPhase } from './dictation';
 import { isDictationShortcut } from './DictationButton';
 
@@ -63,13 +63,12 @@ export function RecordingBar(props: RecordingBarProps) {
   const bar = useRef<HTMLDivElement>(null);
   const transcribing = props.phase === 'transcribing';
 
-  useEffect(() => bar.current?.focus(), []);
+  useEffect(() => bar.current?.focus(), [props.phase]);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (transcribing) return;
+    const finishing = event.key === 'Enter' || isDictationShortcut(event);
     if (event.key === 'Escape') props.onCancel();
-    else if (event.key === 'Enter' || isDictationShortcut(event))
-      props.onDone();
+    else if (finishing && !transcribing) props.onDone();
     else return;
     event.preventDefault();
     event.stopPropagation();
@@ -84,13 +83,6 @@ export function RecordingBar(props: RecordingBarProps) {
       className="flex min-h-14 items-center gap-3 px-2 pt-3 pb-1 outline-none focus-visible:shadow-none"
       onKeyDown={onKeyDown}
     >
-      <IconButton
-        icon="trash-2"
-        label="Discard recording (Esc)"
-        size="sm"
-        disabled={transcribing}
-        onClick={props.onCancel}
-      />
       {transcribing ? (
         <span className="flex items-center gap-1.5 text-xs text-fg-3">
           <LoadingRing size={14} />

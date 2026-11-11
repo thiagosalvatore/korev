@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### Fixed
+
+- You can now discard a voice recording while Korev turns it into text, not only while you record. The discard button sits next to the stop button, and Esc works in both steps. Before, a slow transcription had no way out, and a discarded recording held up the next one.
+
 ## [0.29.0] - 2026-11-09
 
 Let the chat fill a large screen, and open the Pull requests page without a wait.
