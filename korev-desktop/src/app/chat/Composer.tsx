@@ -542,6 +542,7 @@ export function Composer(props: ComposerProps) {
               status={voice.status}
               phase={dictation.phase}
               onToggle={voice.toggle}
+              onCancel={dictation.cancel}
             />
           }
           contextPicker={

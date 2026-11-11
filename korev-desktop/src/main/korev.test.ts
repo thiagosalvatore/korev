@@ -248,6 +248,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
         status: () => ({ status: 'missing' }),
         prepare: () => undefined,
         transcribe: async () => '',
+        cancel: () => undefined,
       },
       appVersion: APP_VERSION,
       fetchRelease,

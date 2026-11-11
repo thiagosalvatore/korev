@@ -12,6 +12,12 @@ export interface TranscribeRequest {
   language: DictationLanguage;
 }
 
+export interface StopRequest {
+  stop: true;
+}
+
+export type WorkerRequest = TranscribeRequest | StopRequest;
+
 export type TranscribeReply =
   | { id: number; text: string }
   | { id: number; error: string };
@@ -52,6 +58,10 @@ export async function loadWhisper(
       return new Promise((resolve, reject) =>
         pending.set(id, { resolve, reject }),
       );
+    },
+    stop() {
+      const request: StopRequest = { stop: true };
+      worker.postMessage(request);
     },
     release: async () => {
       worker.kill();

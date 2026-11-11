@@ -250,7 +250,7 @@ export interface KorevDeps extends CoreDeps {
     | 'registerPushToken'
     | 'unregisterPushToken'
   >;
-  dictation: Pick<Dictation, 'status' | 'prepare' | 'transcribe'>;
+  dictation: Pick<Dictation, 'status' | 'prepare' | 'transcribe' | 'cancel'>;
   appVersion: string;
   fetchRelease(which: 'latest' | string): Promise<Release | null>;
   installUpdate(release: Release): Promise<Result>;
@@ -1602,6 +1602,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         audioBase64,
         store.state.settings.dictationLanguage,
       ),
+    cancelDictation: async () => deps.dictation.cancel(),
     runVoiceCommand: (spoken, options) => voice.run(spoken, options),
     checkForUpdates,
     installUpdate: async () =>

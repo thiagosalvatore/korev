@@ -46,6 +46,7 @@ export const WHISPER_MODELS: SpeechModels<ModelFile> = {
 
 export interface SpeechModel {
   transcribe(wavPath: string, language: DictationLanguage): Promise<string>;
+  stop(): void;
   release(): Promise<void>;
 }
 
@@ -61,6 +62,7 @@ export interface Dictation {
   status(): DictationStatus;
   prepare(): void;
   transcribe(audioBase64: string, language: DictationLanguage): Promise<string>;
+  cancel(): void;
   close(): Promise<void>;
 }
 
@@ -92,6 +94,7 @@ export function createDictation(options: DictationOptions): Dictation {
   let loaded: Promise<SpeechModel> | null = null;
   let queue: Promise<unknown> = Promise.resolve();
   let idleTimer: NodeJS.Timeout | null = null;
+  let cancellations = 0;
 
   function setStatus(next: DictationStatus) {
     status = next;
@@ -184,6 +187,7 @@ export function createDictation(options: DictationOptions): Dictation {
   async function transcribeNow(
     audioBase64: string,
     language: DictationLanguage,
+    cancelled: () => boolean,
   ) {
     if (status.status !== 'ready')
       throw new Error('The voice model is not downloaded yet.');
@@ -193,22 +197,34 @@ export function createDictation(options: DictationOptions): Dictation {
       const wav = path.join(workDir, 'speech.wav');
       await writeFile(recording, Buffer.from(audioBase64, 'base64'));
       await toSpeechWav(recording, wav);
-      return await transcribeWav(wav, language);
+      if (cancelled()) return '';
+      const text = await transcribeWav(wav, language);
+      return cancelled() ? '' : text;
     } finally {
       await rm(workDir, { recursive: true, force: true });
     }
   }
 
   function transcribe(audioBase64: string, language: DictationLanguage) {
-    const next = queue.then(() => transcribeNow(audioBase64, language));
+    const cancellationsBefore = cancellations;
+    const cancelled = () => cancellations !== cancellationsBefore;
+    const next = queue.then(() =>
+      transcribeNow(audioBase64, language, cancelled),
+    );
     queue = next.catch(() => undefined);
     return next;
+  }
+
+  function cancel() {
+    cancellations += 1;
+    void loaded?.then((model) => model.stop()).catch(() => undefined);
   }
 
   return {
     status: () => status,
     prepare,
     transcribe,
+    cancel,
     async close() {
       if (idleTimer) clearTimeout(idleTimer);
       await release();

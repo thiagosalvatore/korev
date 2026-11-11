@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createDictation,
   type ModelFile,
+  type SpeechModel,
   type SpeechModels,
 } from './dictation';
 
@@ -41,11 +42,33 @@ function serving(bytes: Buffer) {
   return vi.fn(async () => new Response(new Uint8Array(bytes)));
 }
 
-function dictationWith(download: typeof fetch) {
+function silentWav(samples = 1600) {
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + samples * 2, 4);
+  header.write('WAVEfmt ', 8);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(16000, 24);
+  header.writeUInt32LE(32000, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(samples * 2, 40);
+  return Buffer.concat([header, Buffer.alloc(samples * 2)]).toString('base64');
+}
+
+function dictationWith(
+  download: typeof fetch,
+  model: Partial<SpeechModel> = {},
+) {
   const onChange = vi.fn();
   const loadModel = vi.fn(async () => ({
     transcribe: async () => '',
     release: async () => undefined,
+    stop: () => undefined,
+    ...model,
   }));
   const dictation = createDictation({
     modelsDir,
@@ -125,6 +148,29 @@ describe('dictation model', () => {
     dictation.prepare();
 
     expect(loadModel).toHaveBeenCalledOnce();
+    await dictation.close();
+  });
+
+  it('stops the running transcription and skips the waiting one when cancelled', async () => {
+    let finish: (text: string) => void = () => undefined;
+    const transcribe = vi.fn(
+      () => new Promise<string>((resolve) => (finish = resolve)),
+    );
+    const { dictation } = dictationWith(serving(MODEL_BYTES), {
+      transcribe,
+      stop: () => finish('partial'),
+    });
+    dictation.prepare();
+    await settled(dictation);
+    const running = dictation.transcribe(silentWav(), 'en');
+    const waiting = dictation.transcribe(silentWav(), 'en');
+    await vi.waitFor(() => expect(transcribe).toHaveBeenCalled());
+
+    dictation.cancel();
+
+    await expect(running).resolves.toBe('');
+    await expect(waiting).resolves.toBe('');
+    expect(transcribe).toHaveBeenCalledOnce();
     await dictation.close();
   });
 });
