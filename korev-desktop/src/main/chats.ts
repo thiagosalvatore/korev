@@ -81,6 +81,7 @@ const SAVE_EVERY_ITEMS = 20;
 const STDERR_TAIL_CHARS = 2_000;
 const REPLAY_ITEM_CHARS = 2_000;
 const REPLAY_TOTAL_CHARS = 24_000;
+const SLASH_COMMAND_PREFIX = '/';
 const DENIED_MESSAGE = 'The user denied this request.';
 const NOT_WAITING_MESSAGE = 'This request is no longer waiting for an answer';
 const NO_PLAN_WAITING_MESSAGE = 'No plan is waiting for an answer';
@@ -114,7 +115,11 @@ export function replayPrompt(history: ChatItem[], text: string): string {
   const conversation = conversationText(history, REPLAY_ITEM_CHARS);
   if (!conversation) return text;
   const transcript = conversation.slice(-REPLAY_TOTAL_CHARS);
-  return `<previous-conversation>\nHere is the conversation so far, for context:\n\n${transcript}\n</previous-conversation>\n\n${text}`;
+  const context = `<previous-conversation>\nHere is the conversation so far, for context:\n\n${transcript}\n</previous-conversation>`;
+  // The agent only runs a slash command that opens the message.
+  return text.startsWith(SLASH_COMMAND_PREFIX)
+    ? `${text}\n\n${context}`
+    : `${context}\n\n${text}`;
 }
 
 export interface LinkedWorkspace {

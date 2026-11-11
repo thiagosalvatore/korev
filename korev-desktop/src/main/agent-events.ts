@@ -17,6 +17,8 @@ const DETAIL_MAX_CHARS = 20_000;
 const OUTPUT_MAX_CHARS = 20_000;
 const MS_PER_SECOND = 1_000;
 const PERCENT = 100;
+const COMPACT_BOUNDARY = 'compact_boundary';
+const COMPACTED = 'Compacted the conversation';
 
 export interface TurnParser {
   feed(event: JsonRecord): ChatItem[];
@@ -295,22 +297,33 @@ export function createClaudeParser(cwd: string): TurnParser {
     );
   }
 
+  function onCompacted(event: JsonRecord): ChatItem[] {
+    // A /compact turn makes no model call, so the context fill comes from here.
+    usedTokens = num(record(event.compact_metadata).post_tokens) || usedTokens;
+    return [
+      { id: `compact:${str(event.uuid)}`, kind: 'notice', text: COMPACTED },
+    ];
+  }
+
   function onResult(event: JsonRecord): ChatItem[] {
     const ok = event.subtype === 'success' && event.is_error !== true;
     windowTokens = largestContextWindow(event.modelUsage) || windowTokens;
+    const result: ChatItem = {
+      id: `result:${str(event.session_id) || messageId}`,
+      kind: 'result',
+      ok,
+      text: ok ? '' : str(event.result) || str(event.subtype),
+      durationMs:
+        typeof event.duration_ms === 'number' ? event.duration_ms : null,
+      costUsd:
+        typeof event.total_cost_usd === 'number' ? event.total_cost_usd : null,
+    };
+    // A local command such as /compact answers in the result, not in a message.
+    const reply = ok && event.local_command ? str(event.result) : '';
+    if (!reply) return [result];
     return [
-      {
-        id: `result:${str(event.session_id) || messageId}`,
-        kind: 'result',
-        ok,
-        text: ok ? '' : str(event.result) || str(event.subtype),
-        durationMs:
-          typeof event.duration_ms === 'number' ? event.duration_ms : null,
-        costUsd:
-          typeof event.total_cost_usd === 'number'
-            ? event.total_cost_usd
-            : null,
-      },
+      { id: `reply:${str(event.uuid)}`, kind: 'notice', text: reply },
+      result,
     ];
   }
 
@@ -332,6 +345,8 @@ export function createClaudeParser(cwd: string): TurnParser {
           return onResult(event);
         case 'rate_limit_event':
           return onRateLimit(event);
+        case 'system':
+          return event.subtype === COMPACT_BOUNDARY ? onCompacted(event) : [];
         default:
           return [];
       }
