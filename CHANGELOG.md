@@ -4,6 +4,16 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-11
+
+See which pull requests need you, let Korev keep them ready to merge, and scan every pull request in one table.
+
+### New
+
+- **Waiting for you shows PRs that need you.** A workspace now shows under Waiting for you when its pull request has merge conflicts, a failed required check, or a review comment that waits for your answer. The row shows a comment icon with the number of unanswered threads, on your Mac and on your phone. The workspace leaves the list when the pull request has no more problems.
+- **Keep PRs ready.** Turn on Settings → Git → Keep PRs ready, and Korev asks the workspace's agent to fix conflicts, failed checks and new review comments on its pull request, then commit and push. Answering reviewers sets what the agent posts on GitHub after it handles a comment. It is off by default, and each workspace has its own Keep PR ready toggle.
+- **Pull requests in one table.** The Pull requests page is now one table with a status label for each pull request, such as Conflicts, Checks failing or Ready. Views at the top show All, Needs review, Needs attention, Ready to merge and Mine, and a Filters menu filters by status. A pull request whose base branch is another pull request in the list shows under it as a stack.
+
 ## [0.30.0] - 2026-11-11
 
 Pick Fable 5.2 for Claude Code, and discard a voice recording while Korev turns it into text.
