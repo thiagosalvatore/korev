@@ -11,6 +11,7 @@ import { rollupCheckState } from './pull-requests';
 const GH_TIMEOUT_MS = 30_000;
 const LIST_LIMIT = '50';
 const INBOX_LIMIT = 100;
+const THREADS_LIMIT = 100;
 const INBOX_FAILED =
   'Korev could not reach GitHub. Check that `gh` is installed and signed in.';
 const OPEN_PRS = 'is:pr is:open archived:false';
@@ -23,8 +24,9 @@ const INBOX_QUERY = `query {
   mine: search(query: "${OPEN_PRS} author:@me", type: ISSUE, first: ${INBOX_LIMIT}) { nodes { ...inboxPr } }
 }
 fragment inboxPr on PullRequest {
-  number title url isDraft updatedAt headRefName baseRefName reviewDecision mergeable
+  number title url isDraft createdAt updatedAt headRefName baseRefName reviewDecision mergeable
   author { login }
+  reviewThreads(first: ${THREADS_LIMIT}) { nodes { isResolved } }
   repository { url }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 }`;
@@ -129,6 +131,7 @@ interface SearchedPr {
   title?: string;
   url?: string;
   isDraft?: boolean;
+  createdAt?: string;
   updatedAt?: string;
   headRefName?: string;
   baseRefName?: string;
@@ -136,6 +139,7 @@ interface SearchedPr {
   mergeable?: InboxPullRequest['mergeable'];
   author?: { login?: string } | null;
   repository?: { url?: string };
+  reviewThreads?: { nodes?: { isResolved?: boolean }[] };
   commits?: {
     nodes?: { commit?: { statusCheckRollup?: { state?: string } | null } }[];
   };
@@ -160,12 +164,16 @@ function toInboxPr(
     isDraft: pr.isDraft === true,
     headRefName: str(pr.headRefName),
     baseRefName: str(pr.baseRefName),
+    createdAt: str(pr.createdAt),
     updatedAt: str(pr.updatedAt),
     reviewDecision: pr.reviewDecision ?? null,
     mergeable: pr.mergeable ?? 'UNKNOWN',
     checks: rollupCheckState(
       pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state,
     ),
+    unresolvedThreads: (pr.reviewThreads?.nodes ?? []).filter(
+      (thread) => thread.isResolved === false,
+    ).length,
   };
 }
 

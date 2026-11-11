@@ -191,10 +191,12 @@ export interface InboxPullRequest {
   isDraft: boolean;
   headRefName: string;
   baseRefName: string;
+  createdAt: string;
   updatedAt: string;
   reviewDecision: PrStatus['reviewDecision'];
   mergeable: PrStatus['mergeable'];
   checks: Exclude<CheckState, 'skipped'> | null;
+  unresolvedThreads: number;
 }
 
 export const INBOX_GROUPS: {
@@ -222,21 +224,15 @@ export interface InboxStatus {
 const INBOX_STATUSES: (InboxStatus & {
   shows(pr: InboxPullRequest): boolean;
 })[] = [
-  { label: 'Draft', tone: 'neutral', shows: (pr) => pr.isDraft },
+  {
+    label: 'Conflicts',
+    tone: 'danger',
+    shows: (pr) => pr.mergeable === 'CONFLICTING',
+  },
   {
     label: 'Checks failing',
     tone: 'danger',
     shows: (pr) => pr.checks === 'failure',
-  },
-  {
-    label: 'Checks running',
-    tone: 'warning',
-    shows: (pr) => pr.checks === 'pending',
-  },
-  {
-    label: 'Approved',
-    tone: 'success',
-    shows: (pr) => pr.reviewDecision === 'APPROVED',
   },
   {
     label: 'Changes requested',
@@ -244,9 +240,15 @@ const INBOX_STATUSES: (InboxStatus & {
     shows: (pr) => pr.reviewDecision === 'CHANGES_REQUESTED',
   },
   {
-    label: 'Conflicts',
-    tone: 'danger',
-    shows: (pr) => pr.mergeable === 'CONFLICTING',
+    label: 'Checks running',
+    tone: 'warning',
+    shows: (pr) => pr.checks === 'pending',
+  },
+  { label: 'Draft', tone: 'neutral', shows: (pr) => pr.isDraft },
+  {
+    label: 'Approved',
+    tone: 'success',
+    shows: (pr) => pr.reviewDecision === 'APPROVED',
   },
 ];
 
@@ -257,6 +259,136 @@ export function inboxStatuses(pr: InboxPullRequest): InboxStatus[] {
 }
 
 export const INBOX_STATUS_LABELS = INBOX_STATUSES.map(({ label }) => label);
+
+const READY_STATUS: InboxStatus = { label: 'Ready', tone: 'success' };
+
+export function primaryStatus(pr: InboxPullRequest): InboxStatus {
+  return (
+    inboxStatuses(pr).find((status) => status.tone !== 'success') ??
+    READY_STATUS
+  );
+}
+
+function needsAttention(pr: InboxPullRequest): boolean {
+  return (
+    pr.checks === 'failure' ||
+    pr.mergeable === 'CONFLICTING' ||
+    pr.reviewDecision === 'CHANGES_REQUESTED' ||
+    pr.unresolvedThreads > 0
+  );
+}
+
+function readyToMerge(pr: InboxPullRequest): boolean {
+  return (
+    !pr.isDraft &&
+    pr.mergeable !== 'CONFLICTING' &&
+    pr.checks !== 'failure' &&
+    pr.checks !== 'pending' &&
+    pr.reviewDecision !== 'CHANGES_REQUESTED' &&
+    pr.reviewDecision !== 'REVIEW_REQUIRED'
+  );
+}
+
+const isMine = (pr: InboxPullRequest) => pr.reason === 'authored';
+
+export type InboxViewId = 'all' | 'review' | 'attention' | 'ready' | 'mine';
+
+export const INBOX_VIEWS: {
+  id: InboxViewId;
+  label: string;
+  empty: string;
+  matches(pr: InboxPullRequest): boolean;
+}[] = [
+  {
+    id: 'all',
+    label: 'All',
+    empty: 'No open pull requests.',
+    matches: () => true,
+  },
+  {
+    id: 'review',
+    label: 'Needs review',
+    empty: 'Nobody is waiting for your review.',
+    matches: (pr) => pr.reason === 'review-requested',
+  },
+  {
+    id: 'attention',
+    label: 'Needs attention',
+    empty: 'None of your pull requests need you right now.',
+    matches: (pr) => isMine(pr) && needsAttention(pr),
+  },
+  {
+    id: 'ready',
+    label: 'Ready to merge',
+    empty: 'None of your pull requests are ready to merge.',
+    matches: (pr) => isMine(pr) && readyToMerge(pr),
+  },
+  {
+    id: 'mine',
+    label: 'Mine',
+    empty: 'You have no open pull requests.',
+    matches: isMine,
+  },
+];
+
+export interface InboxRow {
+  pr: InboxPullRequest;
+  depth: number;
+  stackSize: number | null;
+}
+
+function branchKey(repoId: string, branch: string): string {
+  return `${repoId}:${branch}`;
+}
+
+function stackParents(prs: InboxPullRequest[]) {
+  const byHead = new Map(
+    prs.map((pr) => [branchKey(pr.repoId, pr.headRefName), pr]),
+  );
+  return (pr: InboxPullRequest) =>
+    byHead.get(branchKey(pr.repoId, pr.baseRefName));
+}
+
+function stackRoot(
+  pr: InboxPullRequest,
+  parentOf: (pr: InboxPullRequest) => InboxPullRequest | undefined,
+): InboxPullRequest {
+  const seen = new Set([pr]);
+  let root = pr;
+  for (
+    let parent = parentOf(root);
+    parent && !seen.has(parent);
+    parent = parentOf(root)
+  ) {
+    seen.add(parent);
+    root = parent;
+  }
+  return root;
+}
+
+export function stackRows(prs: InboxPullRequest[]): InboxRow[] {
+  const parentOf = stackParents(prs);
+  const children = new Map<InboxPullRequest, InboxPullRequest[]>();
+  for (const pr of prs) {
+    const parent = parentOf(pr);
+    if (parent) children.set(parent, [...(children.get(parent) ?? []), pr]);
+  }
+  const shown = new Set<InboxPullRequest>();
+  const rows: InboxRow[] = [];
+  const addTree = (pr: InboxPullRequest, depth: number) => {
+    if (shown.has(pr)) return;
+    shown.add(pr);
+    rows.push({ pr, depth, stackSize: null });
+    for (const child of children.get(pr) ?? []) addTree(child, depth + 1);
+  };
+  for (const pr of prs) {
+    const first = rows.length;
+    addTree(stackRoot(pr, parentOf), 0);
+    const size = rows.length - first;
+    if (size > 1) rows[first].stackSize = size;
+  }
+  return rows;
+}
 
 export interface InboxFilter {
   query: string;

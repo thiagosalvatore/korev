@@ -78,13 +78,27 @@ state badge, the tasks it waits for, its worker's workspace, and the worker's re
 Decision cards use the permission card style (warning border). They also show at the end of the
 coordinator's chat.
 
-The **Pull requests** page replaces the centre and the right panel with the pull request inbox. A
-filter bar sits between the header and the list and does not scroll. Its top line is the filter
-box (focused on open, ⌘F, Esc clears) and the repository select (only with 2 or more
-repositories). Its second line has the group tabs (`pill` Tabs: All, Waiting for your review,
-Opened by you, each with the matching count) and one `sm` toggle button per status label: `ghost`
-when off, `secondary` when on. Each group overline has a count badge. When the filters hide every
-pull request, the list shows "No pull requests match these filters." and **Clear filters**.
+The **Pull requests** page replaces the centre and the right panel with the pull request inbox: one
+full-width table. A toolbar sits between the header and the table and does not scroll. On the
+left: the view tabs (`pill` Tabs: All, Needs review, Needs attention, Ready to merge, Mine, each
+with the matching count) and **Filters**, a menu with one check item per status label (the button
+turns `secondary` and shows a count while any are on). On the right: the repository select (only
+with 2 or more repositories) and the search box (focused on open, ⌘F, Esc clears).
+
+- The column headers (Title, Status, Updated) are overlines and stay on top while the table
+  scrolls. Rows are separated by `border-1` hairlines and turn `bg-hover` under the pointer.
+- Title cell: the title (`text-sm` medium `fg-1`, a draft icon first for drafts), then
+  `repository#number · @author · opened <time>` in `text-xs fg-4`.
+- A pull request whose base branch is the head branch of another one in the list sits under it,
+  indented one step per level. The first one of the stack shows an `accent` **Stack of N** badge.
+- Status cell: the review icon (green check approved, amber alert changes requested, `fg-4` eye
+  review required), one status badge with a dot (the most severe of Conflicts, Checks failing,
+  Changes requested, Checks running, Draft, otherwise **Ready**), and an outline badge with the
+  number of unresolved review threads.
+- Actions are `sm` icon buttons: Review (Open review), Explain, Check out (Open workspace), Open on
+  GitHub.
+- When the filters hide every pull request, the table shows "No pull requests match these
+  filters." and **Clear filters**. An empty view shows one line in `fg-3`.
 
 The **Automations** page replaces the centre and the right panel with one card per automation.
 A card has the name, a **Running** badge while a run is going, the on/off switch, **Run now**,

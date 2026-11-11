@@ -3,10 +3,7 @@ title: Pull request inbox
 description: 'See every pull request that waits for your review, and every pull request you opened, and start a review in one click.'
 ---
 
-**Pull requests** in the sidebar lists two groups of open pull requests, across every repository you added to Korev:
-
-- **Waiting for your review**: pull requests that ask for your review.
-- **Opened by you**: your own pull requests.
+**Pull requests** in the sidebar shows one table of open pull requests across every repository you added to Korev: the pull requests that ask for your review and the ones you opened.
 
 Pull requests in repositories that are not in Korev do not show. To see them, add the repository with **Add repository**.
 
@@ -14,29 +11,44 @@ Korev reads the list with `gh`, so `gh` must be installed and signed in. The lis
 
 ## Find a pull request
 
-The bar on top of the list narrows it. The filters stay set when you leave the page and come back. They reset when you restart Korev.
+The bar on top of the table narrows it. The filters stay set when you leave the page and come back. They reset when you restart Korev.
 
-- **Filter** box: type a number (`#1234`), or words from the title, the author, the branch or the repository name. A pull request shows only when every word matches. ⌘F puts the cursor in the box, and Esc clears it.
-- **All**, **Waiting for your review**, **Opened by you**: show both groups or only one. Each one shows how many pull requests match.
+- **Views** show part of the list. Each one shows how many pull requests match.
+  - **All**: every pull request.
+  - **Needs review**: pull requests that ask for your review.
+  - **Needs attention**: your pull requests with failing checks, conflicts, requested changes or unresolved review threads.
+  - **Ready to merge**: your pull requests with no conflicts, no failing or running checks, no requested changes and no missing review.
+  - **Mine**: your pull requests.
+- **Filters**: show only the pull requests with one of the labels you check: **Conflicts**, **Checks failing**, **Changes requested**, **Checks running**, **Draft** or **Approved**.
 - **Repository**: show the pull requests of one repository. It shows when the list has pull requests from more than one repository.
-- **Draft**, **Checks failing**, **Checks running**, **Approved**, **Changes requested**, **Conflicts**: show only the pull requests with one of the labels you turn on.
+- **Search** box: type a number (`#1234`), or words from the title, the author, the branch or the repository name. A pull request shows only when every word matches. ⌘F puts the cursor in the box, and Esc clears it.
 
 When nothing matches, **Clear filters** resets the bar.
 
 ## What each row shows
 
-Each row shows the repository, the author, the branch and when the pull request last changed. Labels show what needs attention:
+- **Title**: the title, then the repository and number, the author and when the pull request was opened.
+- **Status**: an icon for the review (approved, changes requested or review required), one label for the most important problem, and a comment icon with the number of unresolved review threads.
+- **Updated**: when the pull request last changed.
+
+The status label is the first one of these that applies:
 
 | Label                 | Meaning                                       |
 | --------------------- | --------------------------------------------- |
-| **Draft**             | The pull request is a draft                   |
-| **Checks failing**    | At least one check failed                     |
-| **Checks running**    | Checks have not finished                      |
-| **Approved**          | The pull request has the reviews it needs     |
-| **Changes requested** | A reviewer asked for changes                  |
 | **Conflicts**         | The branch has conflicts with its base branch |
+| **Checks failing**    | At least one check failed                     |
+| **Changes requested** | A reviewer asked for changes                  |
+| **Checks running**    | Checks have not finished                      |
+| **Draft**             | The pull request is a draft                   |
+| **Ready**             | Nothing above applies                         |
+
+### Stacked pull requests
+
+When a pull request is based on the branch of another pull request in the list, it shows under that pull request, indented one step. The first pull request of the stack shows **Stack of N**.
 
 ## Act on a pull request
+
+Each row has four buttons. Hold the pointer over a button to see its name.
 
 - **Review** opens a read-only [Ask](../concepts/ask.mdx) chat named **Review #N title** and starts the review at once. You do not type anything. The agent reads the pull request with `gh pr view` and `gh pr diff`. Nothing is checked out. The review uses your [review model](../concepts/agents-and-modes.mdx#review-model) and the repository's code review prompt, if you set one in [the repository settings](./configure-your-repository.mdx).
 - **Open review** shows instead of **Review** when a review chat for the pull request already exists. It opens that chat and does not start a new review.
@@ -46,4 +58,4 @@ Each row shows the repository, the author, the branch and when the pull request 
 
 ## On your phone
 
-In the [phone app](./use-korev-from-your-phone.mdx), tap the pull request icon on the **Ask** tab. It shows the same two groups and labels. Pull down to update the list. Tap a pull request to choose **Review**, **Explain**, **Check out** or **Open on GitHub**.
+In the [phone app](./use-korev-from-your-phone.mdx), tap the pull request icon on the **Ask** tab. It shows two groups, **Waiting for your review** and **Opened by you**, with the same labels. Pull down to update the list. Tap a pull request to choose **Review**, **Explain**, **Check out** or **Open on GitHub**.

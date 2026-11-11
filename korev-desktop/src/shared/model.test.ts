@@ -5,12 +5,15 @@ import {
   EMPTY_INBOX_FILTER,
   filterInbox,
   finishedCodexPlan,
+  INBOX_VIEWS,
   planLanes,
   presetLaneRepo,
   planOf,
   PLAN_TOOL,
   prBadge,
+  primaryStatus,
   replyToQuestions,
+  stackRows,
   type AgentQuestion,
   type ChatItem,
   type ChatSession,
@@ -250,26 +253,28 @@ describe('planOf and conversationText', () => {
   });
 });
 
-describe('filterInbox', () => {
-  function inboxPr(overrides: Partial<InboxPullRequest>): InboxPullRequest {
-    return {
-      repoId: 'web',
-      reason: 'review-requested',
-      number: 42,
-      title: 'Add install steps',
-      url: 'https://github.com/acme/web/pull/42',
-      author: 'octo',
-      isDraft: false,
-      headRefName: 'octo/install',
-      baseRefName: 'main',
-      updatedAt: '2026-11-04T10:00:00Z',
-      reviewDecision: null,
-      mergeable: 'MERGEABLE',
-      checks: 'success',
-      ...overrides,
-    };
-  }
+function inboxPr(overrides: Partial<InboxPullRequest>): InboxPullRequest {
+  return {
+    repoId: 'web',
+    reason: 'review-requested',
+    number: 42,
+    title: 'Add install steps',
+    url: 'https://github.com/acme/web/pull/42',
+    author: 'octo',
+    isDraft: false,
+    headRefName: 'octo/install',
+    baseRefName: 'main',
+    createdAt: '2026-11-01T10:00:00Z',
+    updatedAt: '2026-11-04T10:00:00Z',
+    reviewDecision: null,
+    mergeable: 'MERGEABLE',
+    checks: 'success',
+    unresolvedThreads: 0,
+    ...overrides,
+  };
+}
 
+describe('filterInbox', () => {
   const install = inboxPr({});
   const login = inboxPr({
     repoId: 'api',
@@ -310,5 +315,108 @@ describe('filterInbox', () => {
 
   it('keeps only the chosen repository', () => {
     expect(matching({ repoId: 'web' })).toEqual([install, draft]);
+  });
+});
+
+describe('primaryStatus', () => {
+  it('shows the most severe problem', () => {
+    expect(
+      primaryStatus(inboxPr({ checks: 'failure', mergeable: 'CONFLICTING' })),
+    ).toEqual({ label: 'Conflicts', tone: 'danger' });
+  });
+
+  it('is Ready when nothing blocks the pull request', () => {
+    expect(primaryStatus(inboxPr({ reviewDecision: 'APPROVED' }))).toEqual({
+      label: 'Ready',
+      tone: 'success',
+    });
+  });
+});
+
+describe('INBOX_VIEWS', () => {
+  function shownIn(viewId: string, prs: InboxPullRequest[]) {
+    const view = INBOX_VIEWS.find((entry) => entry.id === viewId);
+    return prs.filter((pr) => view?.matches(pr)).map((pr) => pr.number);
+  }
+
+  const reviewing = inboxPr({ number: 1, checks: 'failure' });
+  const approved = inboxPr({
+    number: 2,
+    reason: 'authored',
+    reviewDecision: 'APPROVED',
+  });
+  const commented = inboxPr({
+    number: 3,
+    reason: 'authored',
+    reviewDecision: 'APPROVED',
+    unresolvedThreads: 1,
+  });
+  const running = inboxPr({
+    number: 4,
+    reason: 'authored',
+    reviewDecision: 'APPROVED',
+    checks: 'pending',
+  });
+  const prs = [reviewing, approved, commented, running];
+
+  it('needs attention for your own pull requests that someone must act on', () => {
+    expect(shownIn('attention', prs)).toEqual([3]);
+  });
+
+  it('is ready to merge only when approved, green and without conflicts', () => {
+    expect(shownIn('ready', prs)).toEqual([2, 3]);
+  });
+});
+
+describe('stackRows', () => {
+  const bottom = inboxPr({
+    number: 1,
+    headRefName: 'stack/1',
+    baseRefName: 'main',
+    updatedAt: '2026-11-01T10:00:00Z',
+  });
+  const middle = inboxPr({
+    number: 2,
+    headRefName: 'stack/2',
+    baseRefName: 'stack/1',
+    updatedAt: '2026-11-03T10:00:00Z',
+  });
+  const top = inboxPr({
+    number: 3,
+    headRefName: 'stack/3',
+    baseRefName: 'stack/2',
+    updatedAt: '2026-11-02T10:00:00Z',
+  });
+  const alone = inboxPr({ number: 4, headRefName: 'solo' });
+
+  function rows(prs: InboxPullRequest[]) {
+    return stackRows(prs).map(({ pr, depth, stackSize }) => [
+      pr.number,
+      depth,
+      stackSize,
+    ]);
+  }
+
+  it('puts each pull request under the one its branch is based on', () => {
+    expect(rows([middle, top, alone, bottom])).toEqual([
+      [1, 0, 3],
+      [2, 1, null],
+      [3, 2, null],
+      [4, 0, null],
+    ]);
+  });
+
+  it('starts a new stack when the base pull request is not in the list', () => {
+    expect(rows([top, bottom])).toEqual([
+      [3, 0, null],
+      [1, 0, null],
+    ]);
+  });
+
+  it('does not stack pull requests from different repositories', () => {
+    expect(rows([bottom, { ...middle, repoId: 'api' }])).toEqual([
+      [1, 0, null],
+      [2, 0, null],
+    ]);
   });
 });

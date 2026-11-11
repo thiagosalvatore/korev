@@ -14,6 +14,7 @@ import {
   Icon,
   IconButton,
   Input,
+  type IconName,
   LOADING_ICON,
   Select,
   Skeleton,
@@ -24,13 +25,15 @@ import { timeAgo } from '../shared/format';
 import {
   EMPTY_INBOX_FILTER,
   filterInbox,
-  INBOX_GROUPS,
   INBOX_STATUS_LABELS,
-  inboxStatuses,
+  INBOX_VIEWS,
+  primaryStatus,
+  stackRows,
   type AppState,
   type InboxFilter,
   type InboxPullRequest,
-  type InboxReason,
+  type InboxRow,
+  type InboxViewId,
   type Result,
 } from '../shared/model';
 import { reviewChatOf, workspaceOfPr } from '../shared/workspaces';
@@ -43,10 +46,11 @@ import {
 } from './actions';
 import { api } from './bridge';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
+import { Menu } from './ui/Menu';
 import { setUi, useUi } from './ui-store';
 
 const REFRESH_MS = 120_000;
-const ALL_GROUPS = 'all';
+const ALL_VIEW = INBOX_VIEWS[0];
 const ALL_REPOS = '';
 const NO_MATCH = 'No pull requests match these filters.';
 const INBOX_FAILED = "Couldn't load pull requests";
@@ -90,78 +94,159 @@ function useInbox() {
   return { inbox, refresh, refreshing, refreshError };
 }
 
-function PullRequestRow({
-  state,
-  pr,
-}: {
-  state: AppState;
-  pr: InboxPullRequest;
-}) {
-  const label = `#${pr.number} ${pr.title}`;
+const ROW_GRID =
+  'grid grid-cols-[minmax(0,1fr)_220px_72px_112px] items-center gap-4 px-4';
+const STACK_INDENT_PX = 18;
+
+const REVIEW_ICONS: Partial<
+  Record<
+    NonNullable<InboxPullRequest['reviewDecision']>,
+    { icon: IconName; label: string; className: string }
+  >
+> = {
+  APPROVED: {
+    icon: 'circle-check',
+    label: 'Approved',
+    className: 'text-success-text',
+  },
+  CHANGES_REQUESTED: {
+    icon: 'circle-alert',
+    label: 'Changes requested',
+    className: 'text-warning-text',
+  },
+  REVIEW_REQUIRED: {
+    icon: 'eye',
+    label: 'Review required',
+    className: 'text-fg-4',
+  },
+};
+
+function ReviewIcon({ pr }: { pr: InboxPullRequest }) {
+  const review = pr.reviewDecision ? REVIEW_ICONS[pr.reviewDecision] : null;
+  return (
+    <span className="flex size-4 flex-none items-center justify-center">
+      {review ? (
+        <span role="img" aria-label={review.label} title={review.label}>
+          <Icon name={review.icon} size={14} className={review.className} />
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function UnresolvedThreads({ count }: { count: number }) {
+  if (!(count > 0)) return null;
+  const label = `${count} unresolved ${count === 1 ? 'thread' : 'threads'}`;
+  return (
+    <span role="img" aria-label={label} title={label}>
+      <Badge outline>
+        <Icon name="message-square" size={11} />
+        {count}
+      </Badge>
+    </span>
+  );
+}
+
+function StatusCell({ pr }: { pr: InboxPullRequest }) {
+  const status = primaryStatus(pr);
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <ReviewIcon pr={pr} />
+      <Badge tone={status.tone} dot>
+        {status.label}
+      </Badge>
+      <UnresolvedThreads count={pr.unresolvedThreads} />
+    </div>
+  );
+}
+
+function rowDetails(pr: InboxPullRequest, repoName: string | undefined) {
+  return [
+    `${repoName ?? ''}#${pr.number}`,
+    `@${pr.author}`,
+    pr.createdAt ? `opened ${timeAgo(pr.createdAt)}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function RowActions({ state, pr }: { state: AppState; pr: InboxPullRequest }) {
   const review = reviewChatOf(state, pr.url);
   const workspace = workspaceOfPr(state, pr.url);
+  return (
+    <div className="flex items-center justify-end gap-0.5">
+      <IconButton
+        size="sm"
+        icon={review ? 'message-square-text' : 'sparkles'}
+        label={review ? 'Open review' : 'Review'}
+        onClick={() =>
+          review ? openAsk(review.id) : reviewInboxPullRequest(pr)
+        }
+      />
+      <IconButton
+        size="sm"
+        icon="book-open"
+        label="Explain"
+        onClick={() => explainPullRequest(pr.repoId, pr.number)}
+      />
+      <IconButton
+        size="sm"
+        icon={workspace ? 'folder-open' : 'git-branch'}
+        label={workspace ? 'Open workspace' : 'Check out'}
+        onClick={() =>
+          workspace ? selectWorkspace(workspace.id) : checkOutPullRequest(pr)
+        }
+      />
+      <IconButton
+        size="sm"
+        icon="external-link"
+        label="Open on GitHub"
+        onClick={() => api.openExternal(pr.url)}
+      />
+    </div>
+  );
+}
+
+function PullRequestRow({
+  state,
+  row: { pr, depth, stackSize },
+}: {
+  state: AppState;
+  row: InboxRow;
+}) {
   const repo = state.repos.find((entry) => entry.id === pr.repoId);
   return (
     <li
-      aria-label={label}
-      className="flex items-center gap-3 rounded-md border border-border-1 bg-surface px-3 py-2.5"
+      aria-label={`#${pr.number} ${pr.title}`}
+      className={cn(ROW_GRID, 'border-b border-border-1 py-2 hover:bg-hover')}
     >
-      <Icon
-        name={pr.isDraft ? 'git-pull-request-draft' : 'git-pull-request'}
-        size={15}
-        className="flex-none text-fg-3"
-      />
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="truncate text-sm text-fg-1">{label}</span>
-        <span className="truncate text-xs text-fg-4">
-          {[
-            repo?.name,
-            `@${pr.author}`,
-            pr.headRefName,
-            timeAgo(pr.updatedAt),
-          ].join(' · ')}
+      <div
+        className="flex min-w-0 flex-col gap-1"
+        style={{ paddingLeft: depth * STACK_INDENT_PX }}
+      >
+        <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-fg-1">
+          {pr.isDraft ? (
+            <Icon
+              name="git-pull-request-draft"
+              size={13}
+              className="flex-none text-fg-4"
+            />
+          ) : null}
+          <span className="truncate">{pr.title}</span>
+        </span>
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-fg-4">
+          {stackSize ? (
+            <Badge tone="accent">
+              <Icon name="layers" size={11} />
+              Stack of {stackSize}
+            </Badge>
+          ) : null}
+          <span className="truncate">{rowDetails(pr, repo?.name)}</span>
         </span>
       </div>
-      <div className="flex flex-none items-center gap-1">
-        {inboxStatuses(pr).map((status) => (
-          <Badge key={status.label} tone={status.tone}>
-            {status.label}
-          </Badge>
-        ))}
-      </div>
-      <div className="flex flex-none items-center gap-1">
-        <Button
-          size="sm"
-          variant={pr.reason === 'review-requested' ? 'primary' : 'secondary'}
-          onClick={() =>
-            review ? openAsk(review.id) : reviewInboxPullRequest(pr)
-          }
-        >
-          {review ? 'Open review' : 'Review'}
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => explainPullRequest(pr.repoId, pr.number)}
-        >
-          Explain
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() =>
-            workspace ? selectWorkspace(workspace.id) : checkOutPullRequest(pr)
-          }
-        >
-          {workspace ? 'Open workspace' : 'Check out'}
-        </Button>
-        <IconButton
-          icon="external-link"
-          label="Open on GitHub"
-          size="sm"
-          onClick={() => api.openExternal(pr.url)}
-        />
-      </div>
+      <StatusCell pr={pr} />
+      <span className="text-xs text-fg-3">{timeAgo(pr.updatedAt)}</span>
+      <RowActions state={state} pr={pr} />
     </li>
   );
 }
@@ -182,13 +267,17 @@ function toggleStatus(label: string) {
 }
 
 function clearFilters() {
-  setUi({ prFilter: EMPTY_INBOX_FILTER, prReason: null });
+  setUi({ prFilter: EMPTY_INBOX_FILTER, prView: ALL_VIEW.id });
 }
 
-function isFiltering(filter: InboxFilter, reason: InboxReason | null) {
+function isFiltering(filter: InboxFilter) {
   return Boolean(
-    filter.query.trim() || filter.repoId || filter.statuses.length || reason,
+    filter.query.trim() || filter.repoId || filter.statuses.length,
   );
+}
+
+function viewOf(id: InboxViewId) {
+  return INBOX_VIEWS.find((view) => view.id === id) ?? ALL_VIEW;
 }
 
 function useMatchingInbox(
@@ -244,7 +333,35 @@ function RepoSelect({
   );
 }
 
-function FilterBar({
+function FiltersMenu() {
+  const statuses = useUi((ui) => ui.prFilter.statuses);
+  return (
+    <Menu
+      label="Filters"
+      items={INBOX_STATUS_LABELS.map((label) => ({
+        id: label,
+        label,
+        checked: statuses.includes(label),
+        keepOpen: true,
+        onSelect: () => toggleStatus(label),
+      }))}
+      trigger={({ open, toggle }) => (
+        <Button
+          size="sm"
+          variant={statuses.length ? 'secondary' : 'ghost'}
+          icon="list-filter"
+          aria-expanded={open}
+          onClick={toggle}
+        >
+          Filters
+          {statuses.length ? <Badge count>{statuses.length}</Badge> : null}
+        </Button>
+      )}
+    />
+  );
+}
+
+function Toolbar({
   state,
   prs,
   matching,
@@ -253,72 +370,45 @@ function FilterBar({
   prs: InboxPullRequest[];
   matching: InboxPullRequest[];
 }) {
-  const filter = useUi((ui) => ui.prFilter);
-  const reason = useUi((ui) => ui.prReason);
+  const query = useUi((ui) => ui.prFilter.query);
+  const view = useUi((ui) => ui.prView);
   const search = useRef<HTMLInputElement>(null);
   useFocusOnFind(search);
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <Input
-          ref={search}
-          aria-label="Filter"
-          icon="search"
-          autoFocus
-          className="flex-1"
-          placeholder="Filter by number, title, author or branch"
-          value={filter.query}
-          onChange={(event) => updateFilter({ query: event.target.value })}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') updateFilter({ query: '' });
-          }}
-        />
-        <RepoSelect state={state} prs={prs} />
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Tabs
-          variant="pill"
-          value={reason ?? ALL_GROUPS}
-          onChange={(id) =>
-            setUi({
-              prReason:
-                INBOX_GROUPS.find((group) => group.reason === id)?.reason ??
-                null,
-            })
-          }
-          tabs={[
-            { id: ALL_GROUPS, label: 'All', count: matching.length },
-            ...INBOX_GROUPS.map((group) => ({
-              id: group.reason,
-              label: group.title,
-              count: matching.filter((pr) => pr.reason === group.reason).length,
-            })),
-          ]}
-        />
-        <div className="flex flex-wrap items-center gap-1">
-          {INBOX_STATUS_LABELS.map((label) => {
-            const on = filter.statuses.includes(label);
-            return (
-              <Button
-                key={label}
-                size="sm"
-                variant={on ? 'secondary' : 'ghost'}
-                aria-pressed={on}
-                onClick={() => toggleStatus(label)}
-              >
-                {label}
-              </Button>
-            );
-          })}
-        </div>
-      </div>
+    <div className="flex flex-none flex-wrap items-center gap-2 border-b border-border-1 px-4 py-2">
+      <Tabs
+        variant="pill"
+        value={view}
+        onChange={(id) => setUi({ prView: viewOf(id as InboxViewId).id })}
+        tabs={INBOX_VIEWS.map((entry) => ({
+          id: entry.id,
+          label: entry.label,
+          count: matching.filter(entry.matches).length,
+        }))}
+      />
+      <FiltersMenu />
+      <div className="flex-1" />
+      <RepoSelect state={state} prs={prs} />
+      <Input
+        ref={search}
+        aria-label="Filter"
+        icon="search"
+        autoFocus
+        className="w-64"
+        placeholder="Search title, repo or #number"
+        value={query}
+        onChange={(event) => updateFilter({ query: event.target.value })}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') updateFilter({ query: '' });
+        }}
+      />
     </div>
   );
 }
 
 function NoMatch() {
   return (
-    <div className="flex flex-col items-start gap-2">
+    <div className="flex flex-col items-start gap-2 px-4 py-6">
       <p className="m-0 text-sm text-fg-3">{NO_MATCH}</p>
       <Button size="sm" variant="secondary" onClick={clearFilters}>
         Clear filters
@@ -327,29 +417,47 @@ function NoMatch() {
   );
 }
 
-const SKELETON_ROWS = 5;
+function ColumnHeaders() {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        ROW_GRID,
+        'sticky top-0 z-10 h-8 border-b border-border-1 bg-app type-overline text-fg-4',
+      )}
+    >
+      <span>Title</span>
+      <span>Status</span>
+      <span>Updated</span>
+      <span />
+    </div>
+  );
+}
+
+const SKELETON_ROWS = 6;
 
 function InboxSkeleton() {
   return (
-    <SkeletonStatus className="gap-1.5">
+    <SkeletonStatus className="gap-0">
       {Array.from({ length: SKELETON_ROWS }, (_, row) => (
         <div
           key={row}
-          className="flex items-center gap-3 rounded-md border border-border-1 bg-surface px-3 py-2.5"
+          className={cn(ROW_GRID, 'border-b border-border-1 py-3')}
         >
-          <Skeleton className="size-3.5 rounded-full" />
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <Skeleton className={row % 2 ? 'w-1/2' : 'w-2/3'} />
             <Skeleton className="h-2.5 w-1/3 opacity-60" />
           </div>
-          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-5 w-20 rounded-xs" />
+          <Skeleton className="h-2.5 w-10 opacity-60" />
+          <span />
         </div>
       ))}
     </SkeletonStatus>
   );
 }
 
-function InboxGroups({
+function InboxTable({
   state,
   inbox,
   matching,
@@ -361,7 +469,11 @@ function InboxGroups({
   onRetry: () => Promise<void>;
 }) {
   const filter = useUi((ui) => ui.prFilter);
-  const reason = useUi((ui) => ui.prReason);
+  const view = viewOf(useUi((ui) => ui.prView));
+  const rows = useMemo(
+    () => stackRows(matching.filter(view.matches)),
+    [matching, view],
+  );
   if (!inbox) return <InboxSkeleton />;
   if (!inbox.ok)
     return (
@@ -372,38 +484,19 @@ function InboxGroups({
         className="pt-[12vh]"
       />
     );
-  const filtering = isFiltering(filter, reason);
-  const groups = INBOX_GROUPS.filter(
-    (group) => !reason || group.reason === reason,
-  );
-  const shown = matching.filter((pr) => !reason || pr.reason === reason);
-  if (filtering && inbox.value.length && !shown.length) return <NoMatch />;
-  return groups.map((group) => {
-    const prs = shown.filter((pr) => pr.reason === group.reason);
-    return (
-      <section
-        key={group.reason}
-        aria-label={group.title}
-        className="flex flex-col gap-2"
-      >
-        <h2 className="m-0 flex items-center gap-2 type-overline text-fg-4">
-          {group.title}
-          {prs.length ? <Badge count>{prs.length}</Badge> : null}
-        </h2>
-        {prs.length ? (
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-            {prs.map((pr) => (
-              <PullRequestRow key={pr.url} state={state} pr={pr} />
-            ))}
-          </ul>
-        ) : (
-          <p className="m-0 text-sm text-fg-3">
-            {filtering ? NO_MATCH : group.empty}
-          </p>
-        )}
-      </section>
+  if (!rows.length)
+    return isFiltering(filter) ? (
+      <NoMatch />
+    ) : (
+      <p className="m-0 px-4 py-6 text-sm text-fg-3">{view.empty}</p>
     );
-  });
+  return (
+    <ul className="m-0 flex list-none flex-col p-0">
+      {rows.map((row) => (
+        <PullRequestRow key={row.pr.url} state={state} row={row} />
+      ))}
+    </ul>
+  );
 }
 
 export function PullRequestsPage({ state }: { state: AppState }) {
@@ -442,21 +535,16 @@ export function PullRequestsPage({ state }: { state: AppState }) {
         />
       </div>
       {inbox?.ok ? (
-        <div className="flex flex-none justify-center border-b border-border-1 px-6 py-3">
-          <div className="w-full max-w-[960px]">
-            <FilterBar state={state} prs={inbox.value} matching={matching} />
-          </div>
-        </div>
+        <Toolbar state={state} prs={inbox.value} matching={matching} />
       ) : null}
-      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-6 [scrollbar-gutter:stable_both-edges]">
-        <div className="flex w-full max-w-[960px] flex-col gap-6">
-          <InboxGroups
-            state={state}
-            inbox={inbox}
-            matching={matching}
-            onRetry={refresh}
-          />
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {inbox?.ok ? <ColumnHeaders /> : null}
+        <InboxTable
+          state={state}
+          inbox={inbox}
+          matching={matching}
+          onRetry={refresh}
+        />
       </div>
     </div>
   );

@@ -282,10 +282,12 @@ function inboxEntry(
     isDraft: pr.isDraft,
     headRefName: pr.headRefName,
     baseRefName: pr.baseRefName,
+    createdAt: pr.createdAt,
     updatedAt: pr.createdAt,
     reviewDecision: pr.reviewDecision,
     mergeable: pr.mergeable,
     checks,
+    unresolvedThreads: 0,
   };
 }
 

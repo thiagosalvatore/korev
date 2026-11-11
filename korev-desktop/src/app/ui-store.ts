@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import {
   EMPTY_INBOX_FILTER,
   type InboxFilter,
-  type InboxReason,
+  type InboxViewId,
   type TerminalKind,
   type TerminalPreset,
   type TurnRange,
@@ -128,7 +128,7 @@ export interface UiState {
   quit: QuitPrompt;
   handsFree: boolean;
   prFilter: InboxFilter;
-  prReason: InboxReason | null;
+  prView: InboxViewId;
 }
 
 const STORAGE_KEY = 'korev:ui';
@@ -163,7 +163,7 @@ const INITIAL: UiState = {
   quit: 'closed',
   handsFree: false,
   prFilter: EMPTY_INBOX_FILTER,
-  prReason: null,
+  prView: 'all',
 };
 
 export const EMPTY_WORKSPACE_UI: WorkspaceUi = {
@@ -198,7 +198,7 @@ function load(): UiState {
       quit: 'closed',
       handsFree: false,
       prFilter: EMPTY_INBOX_FILTER,
-      prReason: null,
+      prView: 'all',
     };
   } catch {
     return INITIAL;
