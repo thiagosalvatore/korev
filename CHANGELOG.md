@@ -4,6 +4,16 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-11-11
+
+Archive review chats once you approve, and let Korev re-check a review when the author asks for it again.
+
+### New
+
+- **Archive reviews when done.** Turn on Settings → Git → Archive reviews when done, and Korev archives a review chat when your latest review approves the pull request, or when the pull request is merged or closed. Archived review chats move to History at the bottom of the sidebar, where you can restore or delete them. If you review the same pull request again from the inbox, Korev restores its chat. It is off by default.
+- **Re-check reviews.** When the author of a pull request you reviewed clicks Re-request review, Korev can ask the review chat to check the new commits. Choose in Settings → Git → Re-check reviews. **Re-check and tell me** sends one message to the review chat: the agent reads only the commits after your last review and says, for each earlier finding, whether it is fixed. It posts nothing to GitHub. **Re-check and approve** does the same, and approves the pull request on GitHub when every finding is fixed. The default is Off.
+- **Roomier Pull requests page.** The Pull requests page has more space at the sides and top, and fewer lines above the first row. The Review, Explain, Check out and Open on GitHub buttons on a row now change color when the pointer is on them.
+
 ## [0.31.0] - 2026-11-11
 
 See which pull requests need you, let Korev keep them ready to merge, and scan every pull request in one table.
