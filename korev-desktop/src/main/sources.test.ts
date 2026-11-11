@@ -84,6 +84,33 @@ describe('the pull request inbox', () => {
     ]);
   });
 
+  it('reads when a pull request was opened and counts only its unresolved threads', () => {
+    const json = JSON.stringify({
+      data: {
+        mine: {
+          nodes: [
+            searchedPr(1, 'acme/web', {
+              createdAt: '2026-10-30T09:00:00Z',
+              reviewThreads: {
+                nodes: [
+                  { isResolved: false },
+                  { isResolved: true },
+                  { isResolved: false },
+                ],
+              },
+            }),
+          ],
+        },
+      },
+    });
+
+    const [pr] = parseInbox(json, repoIds);
+    expect([pr.createdAt, pr.unresolvedThreads]).toEqual([
+      '2026-10-30T09:00:00Z',
+      2,
+    ]);
+  });
+
   it('is empty when GitHub does not answer with JSON', () => {
     expect(parseInbox('gh: not logged in', repoIds)).toEqual([]);
   });

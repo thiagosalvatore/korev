@@ -26,10 +26,12 @@ function inboxPr(overrides: Partial<InboxPullRequest>): InboxPullRequest {
     isDraft: false,
     headRefName: 'octo/install',
     baseRefName: 'main',
+    createdAt: '2026-11-01T10:00:00Z',
     updatedAt: '2026-11-04T10:00:00Z',
     reviewDecision: null,
     mergeable: 'MERGEABLE',
     checks: 'success',
+    unresolvedThreads: 0,
     ...overrides,
   };
 }
@@ -78,16 +80,9 @@ describe('PullRequestsPage', () => {
   it('starts a review of a pull request waiting for you in one click', async () => {
     render(<PullRequestsPage state={state} />);
 
-    const waiting = await screen.findByRole('region', {
-      name: 'Waiting for your review',
-    });
-    const row = await within(waiting).findByRole('listitem', {
-      name: /#42 Add install steps/,
-    });
+    const row = await rowOf(/#42 Add install steps/);
     expect(
-      within(screen.getByRole('region', { name: 'Opened by you' })).getByText(
-        'Checks failing',
-      ),
+      within(await rowOf(/#7 Fix login/)).getByText('Checks failing'),
     ).toBeTruthy();
     fireEvent.click(within(row).getByRole('button', { name: 'Review' }));
 
@@ -141,20 +136,59 @@ describe('PullRequestsPage', () => {
     expect(screen.queryByRole('listitem', { name: /#42/ })).toBeNull();
   });
 
-  it('narrows the list to the chosen status and group', async () => {
+  it('narrows the list to the chosen view', async () => {
     render(<PullRequestsPage state={state} />);
     await rowOf(/#42 Add install steps/);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Checks failing' }));
+    fireEvent.click(screen.getByRole('tab', { name: /Needs review/ }));
+
+    expect(screen.getByRole('listitem', { name: /#42/ })).toBeTruthy();
+    expect(screen.queryByRole('listitem', { name: /#7 Fix login/ })).toBeNull();
+  });
+
+  it('narrows the list to the statuses chosen in Filters', async () => {
+    render(<PullRequestsPage state={state} />);
+    await rowOf(/#42 Add install steps/);
+
+    fireEvent.click(screen.getByRole('button', { name: /Filters/ }));
+    fireEvent.click(
+      screen.getByRole('menuitemcheckbox', { name: 'Checks failing' }),
+    );
 
     expect(screen.queryByRole('listitem', { name: /#42/ })).toBeNull();
     expect(screen.getByRole('listitem', { name: /#7 Fix login/ })).toBeTruthy();
+  });
 
-    fireEvent.click(
-      screen.getByRole('tab', { name: /Waiting for your review/ }),
-    );
+  it('shows a stacked pull request under the one it is based on', async () => {
+    call.mockResolvedValueOnce({
+      ok: true,
+      value: [
+        inboxPr({
+          reason: 'authored',
+          number: 8,
+          title: 'Use the new login',
+          url: 'https://github.com/acme/web/pull/8',
+          headRefName: 'me/login-2',
+          baseRefName: 'me/login',
+        }),
+        inboxPr({
+          reason: 'authored',
+          number: 7,
+          title: 'Fix login',
+          url: MINE_URL,
+          headRefName: 'me/login',
+        }),
+      ],
+    });
+    render(<PullRequestsPage state={state} />);
 
-    expect(screen.queryByRole('region', { name: 'Opened by you' })).toBeNull();
+    const root = await rowOf(/#7 Fix login/);
+    expect(within(root).getByText('Stack of 2')).toBeTruthy();
+    expect(
+      screen
+        .getAllByRole('listitem')
+        .map((row) => row.getAttribute('aria-label')),
+    ).toEqual(['#7 Fix login', '#8 Use the new login']);
   });
 
   it('clears filters that hide every pull request', async () => {

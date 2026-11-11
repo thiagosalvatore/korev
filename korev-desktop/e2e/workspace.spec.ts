@@ -1006,9 +1006,10 @@ test('reviews a pull request from the inbox in one click', async () => {
     const sidebar = window.getByRole('navigation', { name: 'Workspaces' });
     await sidebar.getByRole('button', { name: 'Pull requests' }).click();
 
-    const row = window
-      .getByRole('region', { name: 'Waiting for your review' })
-      .getByRole('listitem', { name: /#42 Add install steps/ });
+    await window.getByRole('tab', { name: /Needs review/ }).click();
+    const row = window.getByRole('listitem', {
+      name: /#42 Add install steps/,
+    });
     await expect(row.getByText('Checks failing')).toBeVisible();
     await snap(window, '18-pull-request-inbox');
     await row.getByRole('button', { name: 'Review' }).click();
