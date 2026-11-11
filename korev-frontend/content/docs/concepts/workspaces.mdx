@@ -57,9 +57,11 @@ Each active workspace gets ten ports. `KOREV_PORT` is the first one: 55000 for t
 
 ## Waiting for you
 
-When a workspace waits for you, it also shows in **Waiting for you** at the top of the sidebar, so you do not have to scroll to its repository. The list shows workspaces whose agent asks you something or failed first, then [Ask chats](./ask.mdx) that ask you something, then workspaces whose agent finished while you were elsewhere. Click a row to open it. A finished workspace leaves the list when you open it. The list is hidden while nothing waits.
+When a workspace waits for you, it also shows in **Waiting for you** at the top of the sidebar, so you do not have to scroll to its repository. The list shows workspaces whose agent asks you something or failed first, then workspaces whose pull request needs you, then [Ask chats](./ask.mdx) that ask you something, then workspaces whose agent finished while you were elsewhere. Click a row to open it. A finished workspace leaves the list when you open it. The list is hidden while nothing waits.
 
-When you collapse a repository, a folder or a list of Ask chats, its header shows a dot if something in it waits for you. The dot is yellow when an agent asks you something or failed, and blue when an agent only finished.
+A pull request needs you when it has merge conflicts, a required check failed, or a review comment waits for your answer. A review comment waits for your answer when its thread is not resolved, the last comment in the thread is not yours, and a bot or a member or collaborator of the repository started the thread. The workspace's row shows a comment icon and the number of these threads. The workspace stays in the list until the pull request is fixed, also after you open it.
+
+When you collapse a repository, a folder or a list of Ask chats, its header shows a dot if something in it waits for you. The dot is yellow when an agent asks you something or failed, or a pull request needs you. It is blue when an agent only finished.
 
 ## Customize the sidebar
 
