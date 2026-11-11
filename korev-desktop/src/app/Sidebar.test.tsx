@@ -55,6 +55,7 @@ const state = {
   runs: [],
   runningSessions: [],
   waitingSessions: [],
+  settings: { keepPrsReady: false },
   runtime: {},
   remote: {},
 } as unknown as AppState;

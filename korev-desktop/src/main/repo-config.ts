@@ -26,6 +26,7 @@ const PROMPT_KINDS: readonly PromptKind[] = [
   'fix_errors',
   'resolve_merge_conflicts',
   'rename_branch',
+  'address_review',
 ];
 const PORT_OFFSET = /\$\(\(\s*KOREV_PORT\s*\+\s*(\d)\s*\)\)/g;
 const PORT_VARIABLE = /\$\{?KOREV_PORT\}?/g;

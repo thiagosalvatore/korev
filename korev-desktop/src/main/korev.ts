@@ -20,7 +20,10 @@ import {
   latestPlan,
   type PlanLane,
   planLanes,
+  keepsPrReady,
+  prProblems,
   type PromptKind,
+  type PrProblem,
   type PrStatus,
   type Repo,
   type ReleaseInfo,
@@ -79,9 +82,11 @@ import {
   fetchPrThreads,
   fixChecksPrompt,
   inboxReviewPrompt,
+  keepReadyPrompt,
   mergePr,
   resolveConflictsPrompt,
   reviewPrompt,
+  reviewReplyInstruction,
 } from './pull-requests';
 import {
   expandPort,
@@ -587,6 +592,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     if (prsChanged || straysChanged) ctx.emitState();
     if (readyToArchive(workspace, prs))
       await archiveIfConfigured(workspaceId, prs);
+    await keepPrReadyIfConfigured(workspaceId, prs);
     return prs;
   }
 
@@ -611,17 +617,71 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     if (workspace.keepAfterMerge) return;
     const config = await workspaceConfig(ctx, workspace);
     if (!(config.archiveOnMerge ?? store.state.settings.archiveOnMerge)) return;
-    if (
-      ctx.runningSessions.size &&
-      workspace.sessions.some((session) => ctx.runningSessions.has(session.id))
-    )
-      return;
+    if (hasRunningSession(workspace)) return;
     const archived = await archive(workspaceId);
     if (!archived.ok) return;
     deps.emit('toast', {
       title: `${mergedNumbers(prs)} merged. Archived ${workspaceLabel(workspace)}`,
       tone: 'success',
     });
+  }
+
+  function hasRunningSession(workspace: Workspace) {
+    return workspace.sessions.some((session) =>
+      ctx.runningSessions.has(session.id),
+    );
+  }
+
+  function firstUnhandledPrProblems(workspace: Workspace, prs: PrStatus[]) {
+    for (const pr of prs) {
+      const problems = prProblems(pr).filter(
+        (found) => !workspace.prReadyHandled.includes(found.key),
+      );
+      if (problems.length) return { pr, problems };
+    }
+    return null;
+  }
+
+  function markPrProblemsHandled(
+    workspace: Workspace,
+    prs: PrStatus[],
+    problems: PrProblem[],
+  ) {
+    const open = new Set(prs.flatMap(prProblems).map((found) => found.key));
+    workspace.prReadyHandled = [
+      ...workspace.prReadyHandled.filter((key) => open.has(key)),
+      ...problems.map((found) => found.key),
+    ];
+    saveAndEmit();
+  }
+
+  async function keepPrReadyIfConfigured(workspaceId: string, prs: PrStatus[]) {
+    const workspace = ctx.workspace(workspaceId);
+    if (workspace.archivedAt) return;
+    if (!keepsPrReady(workspace, store.state.settings)) return;
+    if (hasRunningSession(workspace)) return;
+    const unhandled = firstUnhandledPrProblems(workspace, prs);
+    if (!unhandled) return;
+    const { pr, problems } = unhandled;
+    markPrProblemsHandled(workspace, prs, problems);
+    const threads = problems.some((found) => found.kind === 'thread')
+      ? await fetchPrThreads(deps.run, deps.env, workspace.path, pr.url)
+      : [];
+    const config = await workspaceConfig(ctx, workspace);
+    const prompt = keepReadyPrompt({
+      pr,
+      problems,
+      threads,
+      baseBranch: pr.baseRefName || workspace.baseBranch,
+      replyInstruction: reviewReplyInstruction(store.state.settings),
+      prompts: config.prompts,
+    });
+    const openedBy = workspace.prs.find((tracked) => tracked.url === pr.url);
+    await sendToActiveSession(
+      workspaceId,
+      openedBy?.sessionId ?? '',
+      onPrBranch(prompt, pr, workspace.branch),
+    );
   }
 
   async function actionPrompt(
@@ -1298,6 +1358,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     },
     async setKeepAfterMerge(workspaceId, keep) {
       ctx.workspace(workspaceId).keepAfterMerge = keep;
+      saveAndEmit();
+    },
+    async setPausePrReady(workspaceId, paused) {
+      ctx.workspace(workspaceId).pausePrReady = paused;
       saveAndEmit();
     },
     async renameWorkspace(workspaceId, label) {
