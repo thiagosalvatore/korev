@@ -68,6 +68,17 @@ Under the checks, the pull request tab shows the comments on the open pull reque
 - **Diff** opens the file in the diff view, where the thread also shows under its line.
 - **Open as tab** opens the same view as a tab next to your chats, with more room to read.
 
+## Keep PRs ready
+
+Turn on **Settings → Git → Keep PRs ready**, and Korev sends a workspace's open pull request to the workspace's agent when it needs work. That is when it has merge conflicts, a failing required check, or a review comment that waits for your answer. The agent fixes the problem, commits and pushes.
+
+- Korev sends each problem once. If the agent cannot fix it, the workspace shows under [Waiting for you](../concepts/workspaces.mdx#waiting-for-you) and Korev does not try again. A new failure after a push, or a new reply from a reviewer, is a new problem.
+- Korev never interrupts the agent. If a chat in the workspace is running, Korev waits until its turn ends.
+- **Answering reviewers** sets what the agent does on GitHub after it handles a review comment: **Reply on each thread** (the default), **Reply and resolve**, **Don't post anything**, or **Custom**, which follows your own instruction. The agent posts as you.
+- To turn it off for one workspace, untick **Keep PR ready** in the workspace's **…** menu in the sidebar, or press **Keep PR ready** in the workspace header.
+
+The prompt uses your [`[prompts]`](./configure-your-repository.mdx#prompts) instructions for `resolve_merge_conflicts` and `fix_errors`. Add instructions for the review comments with `address_review`.
+
 ## Archive on merge
 
 Turn on **Settings → Git → Archive on merge**, or set `[git] archive_on_merge = true`, and Korev archives each workspace when its pull request merges.

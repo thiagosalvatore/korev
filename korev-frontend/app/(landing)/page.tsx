@@ -170,6 +170,7 @@ function FeatureGraph() {
           'Failing checks go to the agent with their links',
           'GitHub review comments come in with Add to chat',
           'Archive on merge cleans up the worktree',
+          'Keep PRs ready sends new review comments and failing checks to the agent by itself',
         ]}
         card={<Ship />}
       />
