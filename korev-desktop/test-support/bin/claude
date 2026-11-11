@@ -113,6 +113,9 @@ case "$message" in
   *korev-explainer*)
     cat "$(dirname "$0")/../explainer-reply.jsonl"
     ;;
+  *korev-review*)
+    cat "$(dirname "$0")/../review-reply.jsonl"
+    ;;
   *sweep-tickets*)
     cat "$(dirname "$0")/../automation-reply.jsonl"
     ;;

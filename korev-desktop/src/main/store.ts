@@ -92,6 +92,7 @@ export function defaultSettings(home: string): Settings {
     deleteBranchOnArchive: false,
     archiveOnMerge: false,
     archiveReviews: false,
+    reReviews: 'off',
     keepPrsReady: false,
     reviewReplies: 'reply',
     reviewReplyInstructions: '',

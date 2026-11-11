@@ -136,6 +136,7 @@ function FeatureGraph() {
           '“N files changed” after each turn shows only that turn',
           'Open a review chat with its own model',
           'Pull requests lists what waits for your review; Review starts it in one click',
+          'When the author asks again, Korev re-checks your findings and can approve',
         ]}
         card={<Review />}
       />

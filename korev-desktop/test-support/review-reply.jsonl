@@ -1,0 +1,2 @@
+{"type":"stream_event","event":{"type":"message_start","message":{"id":"review-1"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Both findings are fixed.\n\n```korev-review\n{\"addressed\": true}\n```"}}}

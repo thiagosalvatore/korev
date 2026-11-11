@@ -75,6 +75,7 @@ let prsByUrl: Record<string, Record<string, unknown>> = {};
 let stacksByUrl: Record<string, Record<string, unknown>> = {};
 let reviewsByUrl: Record<string, Record<string, unknown>> = {};
 let ghMerges: string[][] = [];
+let ghReviews: string[][] = [];
 let gitAddGate: Promise<void> | null = null;
 let mergeBaseGate: Promise<void> | null = null;
 let mergeBasesStarted = 0;
@@ -157,6 +158,10 @@ const runWithFakeSqlite: CommandRunner = async (file, args, options) => {
   }
   if (file === 'gh' && args[0] === 'api' && args[1] === 'graphql')
     return fakePrStack(args);
+  if (file === 'gh' && args[0] === 'pr' && args[1] === 'review') {
+    ghReviews.push([...args]);
+    return { exitCode: 0, stdout: '', stderr: '' };
+  }
   if (file === 'gh' && isGhMerge(args)) {
     ghMerges.push([...args]);
     return { exitCode: 0, stdout: '', stderr: '' };
@@ -295,6 +300,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     stacksByUrl = {};
     reviewsByUrl = {};
     ghMerges = [];
+    ghReviews = [];
     gitAddGate = null;
     mergeBaseGate = null;
     mergeBasesStarted = 0;
@@ -1631,6 +1637,75 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
     expect(sections.byRepo.get(repo.id) ?? []).toEqual([]);
     expect((await askOf())?.archivedAt).toBeUndefined();
+  });
+
+  describe('when the author re-requests your review', () => {
+    const url = 'https://github.com/acme/web/pull/42';
+
+    async function reviewedChat() {
+      await korev.shutdown();
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      korev = await openKorev();
+      const repo = await addRepo();
+      openPr = { number: 42, url, title: 'Add install steps', state: 'OPEN' };
+      const started = await korev.api.reviewPullRequest(repo.id, 42);
+      if (!started.ok) throw new Error(started.message);
+      const ask = (await korev.api.getState()).askChats.find(
+        (entry) => entry.id === started.value.askChatId,
+      )!;
+      await waitForTurn(ask.session.id);
+      reviewsByUrl[url] = {
+        state: 'OPEN',
+        headRefOid: 'head2',
+        viewerLatestReview: {
+          id: 'r1',
+          state: 'CHANGES_REQUESTED',
+          commit: { oid: 'head1' },
+        },
+        reviewRequests: { nodes: [{ requestedReviewer: { login: 'me' } }] },
+      };
+      return ask.session.id;
+    }
+
+    async function prompts(sessionId: string) {
+      return (await korev.api.transcript(sessionId)).filter(
+        (item) => item.kind === 'user',
+      );
+    }
+
+    async function pollUntilReChecked(sessionId: string) {
+      await waitFor(async () => {
+        vi.advanceTimersByTime(PR_POLL_MS);
+        return (await prompts(sessionId)).length === 2;
+      });
+      await waitForTurn(sessionId);
+    }
+
+    it('re-checks the changes once and approves when every finding is addressed', async () => {
+      const sessionId = await reviewedChat();
+      await korev.api.updateSettings({ reReviews: 'approve' });
+
+      await pollUntilReChecked(sessionId);
+      await waitFor(async () => ghReviews.length > 0);
+      vi.advanceTimersByTime(PR_POLL_MS);
+      vi.advanceTimersByTime(PR_POLL_MS);
+
+      const sent = await prompts(sessionId);
+      expect(sent).toHaveLength(2);
+      expect(sent[1].kind === 'user' && sent[1].text).toEqual(
+        expect.stringContaining('compare/head1...head2'),
+      );
+      expect(ghReviews).toEqual([['pr', 'review', url, '--approve']]);
+    });
+
+    it('does not approve when only asked to re-check', async () => {
+      const sessionId = await reviewedChat();
+      await korev.api.updateSettings({ reReviews: 'check' });
+
+      await pollUntilReChecked(sessionId);
+
+      expect(ghReviews).toEqual([]);
+    });
   });
 
   it('explains a pull request together with the open ones it builds on', async () => {
