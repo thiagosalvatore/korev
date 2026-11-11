@@ -12,6 +12,7 @@ import {
   type IconName,
 } from '../design-system';
 import {
+  failingRequiredChecks,
   prBadge,
   PR_BADGE_LABELS,
   primaryPr,
@@ -35,6 +36,7 @@ import {
   crossRepoLeads,
   folderRuns,
   isAcrossRepos,
+  prNeedsYou,
   repoSections,
   sidebarEntries,
   waitsForLane,
@@ -119,6 +121,7 @@ const PR_BADGE_ICONS: Record<PrBadge, { icon: IconName; className: string }> = {
     icon: 'git-pull-request',
     className: 'text-danger-text',
   },
+  review: { icon: 'message-square-warning', className: 'text-warning-text' },
   'checks-running': {
     icon: 'git-pull-request',
     className: 'text-warning-text animate-pulse',
@@ -136,8 +139,46 @@ export function prIcon(pr: PrStatus): {
   return { ...PR_BADGE_ICONS[badge], label: PR_BADGE_LABELS[badge] };
 }
 
+function unansweredLabel(count: number): string {
+  return `${count} unanswered ${count === 1 ? 'comment' : 'comments'}`;
+}
+
+function prProblemLabels(pr: PrStatus): string[] {
+  if (pr.state !== 'OPEN') return [];
+  const failing = failingRequiredChecks(pr).map(
+    (check) => `${check.name} failing`,
+  );
+  return [
+    ...(pr.mergeable === 'CONFLICTING' ? ['Conflicts'] : []),
+    ...failing,
+    ...(pr.unansweredThreads.length
+      ? [unansweredLabel(pr.unansweredThreads.length)]
+      : []),
+  ];
+}
+
 function prSummary(pr: PrStatus): string {
-  return `PR #${pr.number} · ${prIcon(pr).label}`;
+  const problems = prProblemLabels(pr);
+  const details = problems.length ? problems : [prIcon(pr).label];
+  return [`PR #${pr.number}`, ...details].join(' · ');
+}
+
+function unansweredCount(runtime: WorkspaceRuntime | undefined): number {
+  return (runtime?.prs ?? [])
+    .filter((pr) => pr.state === 'OPEN')
+    .reduce((total, pr) => total + pr.unansweredThreads.length, 0);
+}
+
+function UnansweredCount({ count }: { count: number }) {
+  if (!count) return null;
+  const label = unansweredLabel(count);
+  return (
+    <span aria-label={label} title={label}>
+      <Badge tone="warning" count>
+        {count}
+      </Badge>
+    </span>
+  );
 }
 
 function WaitingIcon() {
@@ -221,6 +262,10 @@ function UnreadDot() {
   );
 }
 
+function needsYourInput(runtime: WorkspaceRuntime): boolean {
+  return boardColumn(runtime) === 'needs-you' || prNeedsYou(runtime);
+}
+
 function isWaitingAsk(state: AppState, ask: AskChat): boolean {
   return state.waitingSessions.includes(ask.session.id);
 }
@@ -240,7 +285,7 @@ function HiddenWaitingDot({
   if (!count) return null;
   const needsInput =
     waitingAsks.length > 0 ||
-    waiting.some((ws) => boardColumn(state.runtime[ws.id]!) === 'needs-you');
+    waiting.some((ws) => needsYourInput(state.runtime[ws.id]!));
   const label = `${count} waiting for you`;
   return (
     <span
@@ -265,8 +310,8 @@ function WaitingForYou({
   const waiting = workspacesWaitingForYou(state);
   const asks = asksWaitingForYou(state);
   if (!waiting.length && !asks.length) return null;
-  const needsYou = waiting.filter(
-    (ws) => boardColumn(state.runtime[ws.id]!) === 'needs-you',
+  const needsYou = waiting.filter((ws) =>
+    needsYourInput(state.runtime[ws.id]!),
   );
   const done = waiting.filter((ws) => !needsYou.includes(ws));
   const repoName = (workspace: Workspace) =>
@@ -284,6 +329,7 @@ function WaitingForYou({
         detail={repo}
         selected={workspace.id === selectedId}
         unread={runtime.unread}
+        unanswered={unansweredCount(runtime)}
         onClick={() => selectWorkspace(workspace.id)}
       />
     );
@@ -307,6 +353,7 @@ function WaitingForYou({
           detail={`Ask · ${askRepoNames(state, ask)}`}
           selected={ask.id === selectedAskId}
           unread={false}
+          unanswered={0}
           onClick={() => openAsk(ask.id)}
         />
       ))}
@@ -322,6 +369,7 @@ function WaitingRow({
   detail,
   selected,
   unread,
+  unanswered,
   onClick,
 }: {
   label: string;
@@ -330,6 +378,7 @@ function WaitingRow({
   detail: string;
   selected: boolean;
   unread: boolean;
+  unanswered: number;
   onClick: () => void;
 }) {
   return (
@@ -347,6 +396,7 @@ function WaitingRow({
       <span className="flex w-4 flex-none justify-center">{icon}</span>
       <span className="truncate font-semibold text-fg-1">{title}</span>
       <span className="flex-1 truncate text-xs text-fg-3">{detail}</span>
+      <UnansweredCount count={unanswered} />
       {unread ? <UnreadDot /> : null}
     </button>
   );
@@ -466,6 +516,7 @@ function WorkspaceRow({
               ⌘{index + 1}
             </span>
           ) : null}
+          <UnansweredCount count={unansweredCount(runtime)} />
           {runtime?.unread ? <UnreadDot /> : null}
         </span>
         <span className="absolute top-1 right-1 hidden group-hover:flex has-[[role=menu]]:flex">

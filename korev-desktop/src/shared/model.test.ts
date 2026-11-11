@@ -10,6 +10,7 @@ import {
   planOf,
   PLAN_TOOL,
   prBadge,
+  prProblems,
   replyToQuestions,
   type AgentQuestion,
   type ChatItem,
@@ -110,10 +111,12 @@ describe('prBadge', () => {
     reviewDecision: null,
     mergedAt: null,
     headRefName: 'dev/login',
+    headRefOid: 'abc123',
     baseRefName: 'main',
     createdAt: '2026-01-01T00:00:00Z',
     checks: [{ name: 'lint', state: 'failure', url: null, required: true }],
     stack: null,
+    unansweredThreads: [],
   };
 
   it('shows conflicts before failing checks', () => {
@@ -122,6 +125,40 @@ describe('prBadge', () => {
 
   it('shows a merged PR as merged whatever its checks say', () => {
     expect(prBadge({ ...pr, state: 'MERGED' })).toBe('merged');
+  });
+
+  it('shows unanswered review comments even while checks run', () => {
+    const running = {
+      ...pr,
+      checks: [{ ...pr.checks[0]!, state: 'pending' as const }],
+      unansweredThreads: ['c1'],
+    };
+    expect(prBadge(running)).toBe('review');
+  });
+
+  describe('prProblems', () => {
+    it('names conflicts, failing required checks and unanswered threads', () => {
+      const broken: PrStatus = {
+        ...pr,
+        mergeable: 'CONFLICTING',
+        checks: [
+          ...pr.checks,
+          { name: 'preview', state: 'failure', url: null, required: false },
+          { name: 'test', state: 'pending', url: null, required: true },
+        ],
+        unansweredThreads: ['c1', 'c2'],
+      };
+      expect(prProblems(broken).map((found) => found.key)).toEqual([
+        'conflict:main@abc123',
+        'check:lint@abc123',
+        'thread:c1@7',
+        'thread:c2@7',
+      ]);
+    });
+
+    it('finds nothing on a PR that is not open', () => {
+      expect(prProblems({ ...pr, state: 'MERGED' })).toEqual([]);
+    });
   });
 });
 
