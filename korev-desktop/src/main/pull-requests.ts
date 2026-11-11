@@ -14,6 +14,7 @@ import {
 } from '../shared/model';
 import type { CommandRunner } from './command-runner';
 import { withPrompt } from './repo-config';
+import { lastFencedBlock } from '../shared/explainer';
 
 const GH_TIMEOUT_MS = 60_000;
 const PR_FIELDS =
@@ -447,6 +448,13 @@ export function reviewFinished(status: ReviewStatus): boolean {
   return status.state !== 'OPEN' || status.latestReview?.state === 'APPROVED';
 }
 
+export function reReviewKey(status: ReviewStatus): string | null {
+  const review = status.latestReview;
+  if (status.state !== 'OPEN' || !status.reRequested) return null;
+  if (!review || review.state === 'APPROVED') return null;
+  return `${review.id}@${status.headRefOid}`;
+}
+
 export async function fetchReviewStatus(
   run: CommandRunner,
   env: NodeJS.ProcessEnv,
@@ -477,6 +485,22 @@ function mergeArgs(pr: PrStatus): string[] {
   return mergeScope(pr) === 'pr'
     ? ['pr', 'merge', number, '--squash']
     : ['stack', 'merge', number, '--yes', '--squash'];
+}
+
+export async function approvePr(
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  url: string,
+): Promise<string | null> {
+  const result = await run('gh', ['pr', 'review', url, '--approve'], {
+    cwd,
+    env,
+    timeoutMs: GH_TIMEOUT_MS,
+  });
+  return result.exitCode === 0
+    ? null
+    : result.stderr.trim() || 'Approve failed';
 }
 
 export async function mergePr(
@@ -665,6 +689,44 @@ export function inboxReviewPrompt(pr: PrStatus): string {
     'Read it with `gh pr view` and `gh pr diff`. Nothing is checked out.',
     REVIEW_FINDINGS,
   ].join('\n');
+}
+
+const REVIEW_FENCE = 'korev-review';
+const GITHUB_PR_URL = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/\d+$/;
+
+function changesSince(url: string, status: ReviewStatus): string {
+  const fullDiff = `\`gh pr diff ${url}\``;
+  const reviewed = status.latestReview?.commitOid;
+  const repo = GITHUB_PR_URL.exec(url)?.[1];
+  if (!reviewed || !repo) return `Read the changes with ${fullDiff}.`;
+  return `Your last review was on commit ${reviewed}. Read only what changed since then with \`gh api repos/${repo}/compare/${reviewed}...${status.headRefOid} --jq '.files[] | .filename, .patch'\`. If that fails, for example after a force push, read ${fullDiff}.`;
+}
+
+export function reReviewPrompt(
+  url: string,
+  status: ReviewStatus,
+  approve: boolean,
+): string {
+  return [
+    `The author changed pull request ${url} and asked for your review again.`,
+    changesSince(url, status),
+    'For each finding you listed earlier in this chat, say whether the new commits address it. Do not edit files and do not post a review.',
+    approve
+      ? `End your reply with exactly one fenced block that starts with \`\`\`${REVIEW_FENCE} and holds {"addressed": true} when every finding is addressed and nothing new needs a fix, or {"addressed": false} otherwise.`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function findingsAddressed(reply: string): boolean {
+  const block = lastFencedBlock(reply, REVIEW_FENCE);
+  if (block === null) return false;
+  try {
+    return (JSON.parse(block) as { addressed?: unknown }).addressed === true;
+  } catch {
+    return false;
+  }
 }
 
 function nodes(connection: unknown): JsonRecord[] {

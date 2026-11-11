@@ -11,6 +11,7 @@ import {
   type AgentKind,
   type AppState,
   type AskChat,
+  type ReReview,
   type ChatItem,
   type ChatSession,
   type EditorApp,
@@ -50,7 +51,12 @@ import type { Dictation } from './dictation';
 import type { RemoteAccess } from './remote-access';
 import { askScratchPath, askWorktreePath } from './ask-worktrees';
 import { AUTOMATION_TICK_MS, createAutomations } from './automations';
-import { createChats, lanesElsewhereNote, type TurnPrLinks } from './chats';
+import {
+  createChats,
+  lanesElsewhereNote,
+  type TurnOutcome,
+  type TurnPrLinks,
+} from './chats';
 import { enableCommitSigning, signingKey } from './commit-signing';
 import { createExplainers } from './explainers';
 import { readConductorRepos, readConductorSettings } from './conductor-import';
@@ -79,6 +85,11 @@ import {
   createPrPrompt,
   fetchPrStatus,
   fetchReviewStatus,
+  findingsAddressed,
+  approvePr,
+  reReviewKey,
+  reReviewPrompt,
+  type ReviewStatus,
   onPrBranch,
   fetchPrThreads,
   fixChecksPrompt,
@@ -435,6 +446,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     (session, outcome) => {
       explainers.turnFinished(session, outcome);
       automations.turnFinished(session, outcome);
+      reviewTurnFinished(session, outcome);
     },
     (workspace, attention) => voice.announce(workspace, attention),
   );
@@ -625,19 +637,89 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   }
 
   async function refreshReview(ask: AskChat) {
-    if (!store.state.settings.archiveReviews || !ask.reviewOf) return;
+    const { archiveReviews, reReviews } = store.state.settings;
+    if (!ask.reviewOf || (!archiveReviews && reReviews === 'off')) return;
     const status = await fetchReviewStatus(
       deps.run,
       deps.env,
-      ctx.repo(ask.repoIds[0]).path,
+      reviewCwd(ask),
       ask.reviewOf,
     );
-    if (!status || !reviewFinished(status)) return;
-    if (ctx.runningSessions.has(ask.session.id)) return;
+    if (!status || ctx.runningSessions.has(ask.session.id)) return;
+    if (archiveReviews && reviewFinished(status)) return archiveReview(ask);
+    if (reReviews !== 'off') await reReviewIfRequested(ask, status);
+  }
+
+  function reviewCwd(ask: AskChat) {
+    return ctx.repo(ask.repoIds[0]).path;
+  }
+
+  function archiveReview(ask: AskChat) {
     archiveAskChat(ask);
     deps.emit('toast', {
       title: `Archived ${ask.session.title}`,
       tone: 'success',
+    });
+  }
+
+  async function reReviewIfRequested(ask: AskChat, status: ReviewStatus) {
+    const key = reReviewKey(status);
+    if (!key || key === ask.reReview?.key || !ask.reviewOf) return;
+    const reReview = { key, headRefOid: status.headRefOid, pending: true };
+    ask.reReview = reReview;
+    saveAndEmit();
+    const approve = store.state.settings.reReviews === 'approve';
+    const repo = ctx.repo(ask.repoIds[0]);
+    const { prompts } = await loadRepoConfig(repo, repo.path);
+    const sent = await sendPrompt(
+      ask.session,
+      withPrompt(
+        reReviewPrompt(ask.reviewOf, status, approve),
+        prompts.code_review,
+      ),
+    );
+    if (sent.ok) return;
+    reReview.pending = false;
+    saveAndEmit();
+  }
+
+  function reviewTurnFinished(session: ChatSession, outcome: TurnOutcome) {
+    const ask = store.state.askChats.find(
+      (entry) => entry.session.id === session.id,
+    );
+    const reReview = ask?.reReview;
+    if (!ask || !reReview?.pending) return;
+    reReview.pending = false;
+    saveAndEmit();
+    if (outcome.stopped || !findingsAddressed(outcome.reply)) return;
+    if (store.state.settings.reReviews !== 'approve') return;
+    ctx.background(approveReviewed(ask, reReview));
+  }
+
+  async function approveReviewed(ask: AskChat, reReview: ReReview) {
+    if (!ask.reviewOf) return;
+    const status = await fetchReviewStatus(
+      deps.run,
+      deps.env,
+      reviewCwd(ask),
+      ask.reviewOf,
+    );
+    if (status?.headRefOid !== reReview.headRefOid) {
+      deps.emit('toast', {
+        title: `New commits landed while Korev re-checked ${ask.session.title}. It did not approve.`,
+        tone: 'neutral',
+      });
+      return;
+    }
+    const failed = await approvePr(
+      deps.run,
+      deps.env,
+      reviewCwd(ask),
+      ask.reviewOf,
+    );
+    deps.emit('toast', {
+      title: failed ?? `Approved ${ask.session.title}`,
+      tone: failed ? 'danger' : 'success',
     });
   }
 

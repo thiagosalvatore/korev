@@ -8,6 +8,7 @@ import {
   parsePrThreads,
   parseReviewStatus,
   parseUnansweredThreads,
+  reReviewKey,
   reviewFinished,
   reviewPrompt,
   reviewReplyInstruction,
@@ -565,6 +566,26 @@ describe('review status', () => {
     expect(approved && reviewFinished(approved)).toBe(true);
     expect(commented && reviewFinished(commented)).toBe(false);
     expect(closed && reviewFinished(closed)).toBe(true);
+  });
+
+  it('asks for a re-check once per re-request round', () => {
+    const changesRequested = {
+      review: { id: 'r1', state: 'CHANGES_REQUESTED', oid: 'old1' },
+    };
+    const reRequested = parseReviewStatus(
+      reviewResponse({ ...changesRequested, requested: ['me'] }),
+    );
+    const notRequested = parseReviewStatus(reviewResponse(changesRequested));
+    const approved = parseReviewStatus(
+      reviewResponse({
+        review: { id: 'r1', state: 'APPROVED', oid: 'old1' },
+        requested: ['me'],
+      }),
+    );
+
+    expect(reRequested && reReviewKey(reRequested)).toBe('r1@head1');
+    expect(notRequested && reReviewKey(notRequested)).toBeNull();
+    expect(approved && reReviewKey(approved)).toBeNull();
   });
 
   it('returns null for a response without a pull request', () => {

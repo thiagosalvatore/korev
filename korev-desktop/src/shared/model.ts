@@ -589,6 +589,13 @@ export interface AskChat {
   automationRun?: AutomationRun;
   reviewOf?: string;
   archivedAt?: string;
+  reReview?: ReReview;
+}
+
+export interface ReReview {
+  key: string;
+  headRefOid: string;
+  pending: boolean;
 }
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -642,6 +649,7 @@ export interface Settings {
   deleteBranchOnArchive: boolean;
   archiveOnMerge: boolean;
   archiveReviews: boolean;
+  reReviews: ReReviews;
   keepPrsReady: boolean;
   reviewReplies: ReviewReplies;
   reviewReplyInstructions: string;
@@ -663,6 +671,8 @@ export interface Settings {
   windowBounds: WindowBounds | null;
   lastSeenVersion: string | null;
 }
+
+export type ReReviews = 'off' | 'check' | 'approve';
 
 export type ReviewReplies = 'none' | 'reply' | 'reply-and-resolve' | 'custom';
 

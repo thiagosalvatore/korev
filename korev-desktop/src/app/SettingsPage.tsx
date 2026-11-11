@@ -35,6 +35,7 @@ import {
   type RepoScripts,
   type Settings,
   type Skill,
+  type ReReviews,
   type ReviewReplies,
   type ThemePreference,
 } from '../shared/model';
@@ -74,6 +75,12 @@ const REVIEW_REPLY_OPTIONS: { value: ReviewReplies; label: string }[] = [
   { value: 'reply-and-resolve', label: 'Reply and resolve' },
   { value: 'none', label: "Don't post anything" },
   { value: 'custom', label: 'Custom' },
+];
+
+const RE_REVIEW_OPTIONS: { value: ReReviews; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'check', label: 'Re-check and tell me' },
+  { value: 'approve', label: 'Re-check and approve' },
 ];
 
 const DICTATION_LANGUAGES: { value: DictationLanguage; label: string }[] = [
@@ -738,6 +745,20 @@ function Git({ settings }: { settings: Settings }) {
         <Switch
           checked={settings.archiveReviews}
           onChange={(archiveReviews) => update({ archiveReviews })}
+        />
+      </Row>
+      <Row
+        title="Re-check reviews"
+        description="When the author of a pull request you reviewed asks for your review again, Korev sends the new changes to the review chat. The agent checks whether each of its findings was fixed. With Re-check and approve, Korev approves the pull request when every finding is fixed."
+      >
+        <Select
+          ariaLabel="Re-check reviews"
+          className="w-56"
+          options={RE_REVIEW_OPTIONS}
+          value={settings.reReviews}
+          onChange={(reReviews) =>
+            update({ reReviews: reReviews as ReReviews })
+          }
         />
       </Row>
       <Row

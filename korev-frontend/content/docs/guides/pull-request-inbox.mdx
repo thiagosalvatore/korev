@@ -60,6 +60,15 @@ Each row has four buttons. Hold the pointer over a button to see its name.
 
 Turn on **Archive reviews when done** in **Settings → Git** to tidy up review chats. Korev checks every review chat's pull request every 30 seconds. It archives the chat when your latest review approves the pull request, or when the pull request is merged or closed. Archived review chats move to **History** at the bottom of the sidebar, where you can restore or delete them. When you review the same pull request again, Korev restores its chat.
 
+### Re-check reviews
+
+Set **Re-check reviews** in **Settings → Git** so you do not have to ask for a second review by hand. When the author of a pull request you reviewed clicks **Re-request review**, Korev sends one follow-up message to the review chat. The agent reads only the commits after your last review and says whether each of its earlier findings is fixed. It does not post anything.
+
+- **Re-check and tell me**: the chat shows as waiting for you. You decide what to post.
+- **Re-check and approve**: when the agent says every finding is fixed, Korev runs `gh pr review --approve`. If new commits land while the agent reads, Korev does not approve. With **Archive reviews when done** on, the approval then archives the chat.
+
+Korev re-checks only while the author's request for your review is open, and once for each set of new commits. It never re-checks a pull request whose author did not ask, so a review costs agent time only when the author is ready.
+
 ## On your phone
 
 In the [phone app](./use-korev-from-your-phone.mdx), tap the pull request icon on the **Ask** tab. It shows two groups, **Waiting for your review** and **Opened by you**, with the same labels. Pull down to update the list. Tap a pull request to choose **Review**, **Explain**, **Check out** or **Open on GitHub**.
