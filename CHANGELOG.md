@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-11
+
+Pick Fable 5.2 for Claude Code, and discard a voice recording while Korev turns it into text.
+
 ### New
 
 - **Fable 5.2.** You can now pick Fable 5.2 in the model menu for Claude Code. It needs a `claude` CLI that offers it.
