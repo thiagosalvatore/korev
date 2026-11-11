@@ -927,11 +927,23 @@ case "$1 $2" in
 esac
 `;
 
-async function launchWithFakeGh(home: string) {
+const FAKE_GH_WITH_REVIEW = `#!/bin/sh
+case "$1 $2" in
+  "pr view") echo '{"number":7,"url":"https://github.com/acme/web/pull/7","title":"Add a note","state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefName":"dev-person/add-agent-note","headRefOid":"abc123","baseRefName":"main","createdAt":"2026-01-01T00:00:00Z","statusCheckRollup":[]}' ;;
+  "api graphql")
+    case "$*" in
+      *isRequired*) exit 1 ;;
+      *) echo '{"data":{"viewer":{"login":"me"},"resource":{"reviewThreads":{"nodes":[{"isResolved":false,"first":{"nodes":[{"authorAssociation":"MEMBER","author":{"__typename":"User"}}]},"last":{"nodes":[{"id":"c1","author":{"login":"reviewer"}}]}}]}}}}' ;;
+    esac ;;
+  *) exit 1 ;;
+esac
+`;
+
+async function launchWithFakeGh(home: string, fakeGh = FAKE_GH) {
   const repo = await createRepo(home);
   const fakeBin = path.join(home, 'fake-gh');
   await mkdir(fakeBin);
-  await writeFile(path.join(fakeBin, 'gh'), FAKE_GH);
+  await writeFile(path.join(fakeBin, 'gh'), fakeGh);
   await chmod(path.join(fakeBin, 'gh'), 0o755);
   await writeFile(path.join(home, '.shrc'), `export PATH=${fakeBin}:$PATH\n`);
   return {
@@ -1051,6 +1063,28 @@ test("starts an Ask to review a teammate's pull request", async () => {
       'Review pull request #42 Add install steps. Check the wording.',
     );
     await snap(window, '17-review-pr');
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('keeps a workspace under Waiting for you while its PR has unanswered review comments', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const { app, window } = await launchWithFakeGh(home, FAKE_GH_WITH_REVIEW);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window.getByRole('textbox', { name: 'Message' }).fill('Add a note');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+    await expect(window.getByText('I added agent-note.txt.')).toBeVisible();
+    await waitForAgentsToFinish(window);
+
+    const waiting = window.getByRole('region', { name: 'Waiting for you' });
+    await expect(waiting.getByLabel('1 unanswered comment')).toBeVisible();
+    await expect(
+      waiting.getByRole('button', { name: /^Open .* in acme-web$/ }),
+    ).toBeVisible();
+    await snap(window, '19-unanswered-review');
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });

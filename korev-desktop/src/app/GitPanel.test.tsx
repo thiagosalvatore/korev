@@ -23,10 +23,12 @@ const pr: PrStatus = {
   reviewDecision: null,
   mergedAt: null,
   headRefName: 'login-page',
+  headRefOid: 'abc123',
   baseRefName: 'main',
   createdAt: '2026-01-01T00:00:00Z',
   checks: [{ name: 'lint', state: 'success', url: null, required: true }],
   stack: null,
+  unansweredThreads: [],
 };
 
 const thread: PrThread = {

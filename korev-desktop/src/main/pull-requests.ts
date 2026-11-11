@@ -12,7 +12,7 @@ import type { CommandRunner } from './command-runner';
 
 const GH_TIMEOUT_MS = 60_000;
 const PR_FIELDS =
-  'number,url,title,state,isDraft,mergeable,mergedAt,reviewDecision,statusCheckRollup,headRefName,baseRefName,createdAt';
+  'number,url,title,state,isDraft,mergeable,mergedAt,reviewDecision,statusCheckRollup,headRefName,headRefOid,baseRefName,createdAt';
 const PR_URL = /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/g;
 const COMPLETED = 'COMPLETED';
 const PASSING = new Set(['SUCCESS', 'NEUTRAL']);
@@ -24,9 +24,19 @@ const BLOCKING_REVIEW_DECISIONS = new Set([
   'REVIEW_REQUIRED',
 ]);
 const MAX_STACK_SIZE = 100;
-const STACK_QUERY = `query($url: URI!) {
+const MAX_REVIEW_THREADS = 100;
+const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+const PR_DETAILS_QUERY = `query($url: URI!) {
+  viewer { login }
   resource(url: $url) {
     ... on PullRequest {
+      reviewThreads(first: ${MAX_REVIEW_THREADS}) {
+        nodes {
+          isResolved
+          first: comments(first: 1) { nodes { authorAssociation author { __typename } } }
+          last: comments(last: 1) { nodes { id author { login } } }
+        }
+      }
       stackEntry { position }
       stack {
         entries(first: ${MAX_STACK_SIZE}) {
@@ -166,11 +176,56 @@ export function parsePrStatus(json: string): PrStatus | null {
       null) as PrStatus['reviewDecision'],
     mergedAt: str(raw.mergedAt) || null,
     headRefName: str(raw.headRefName),
+    headRefOid: str(raw.headRefOid),
     baseRefName: str(raw.baseRefName),
     createdAt: str(raw.createdAt),
     checks: rollup.map(toCheck),
     stack: null,
+    unansweredThreads: [],
   };
+}
+
+interface ReviewThreadSummary {
+  isResolved?: boolean;
+  first?: {
+    nodes: {
+      authorAssociation?: string;
+      author?: { __typename?: string } | null;
+    }[];
+  };
+  last?: { nodes: { id: string; author?: { login?: string } | null }[] };
+}
+
+interface DetailsResponse {
+  data?: {
+    viewer?: { login?: string };
+    resource?: { reviewThreads?: { nodes: ReviewThreadSummary[] } } | null;
+  };
+}
+
+function startedByTrustedAuthor(thread: ReviewThreadSummary): boolean {
+  const opening = thread.first?.nodes[0];
+  return (
+    opening?.author?.__typename === 'Bot' ||
+    TRUSTED_ASSOCIATIONS.has(opening?.authorAssociation ?? '')
+  );
+}
+
+export function parseUnansweredThreads(json: string): string[] {
+  let response: DetailsResponse;
+  try {
+    response = JSON.parse(json) as DetailsResponse;
+  } catch {
+    return [];
+  }
+  const viewer = response.data?.viewer?.login;
+  const threads = response.data?.resource?.reviewThreads?.nodes ?? [];
+  return threads.flatMap((thread) => {
+    const last = thread.last?.nodes[0];
+    if (!last || thread.isResolved || !startedByTrustedAuthor(thread))
+      return [];
+    return last.author?.login === viewer ? [] : [last.id];
+  });
 }
 
 export function parsePrStack(json: string): PrStack | null {
@@ -216,21 +271,29 @@ function readyToMerge(pr: StackPullRequest): boolean {
   );
 }
 
-async function fetchPrStack(
+type PrDetails = Pick<PrStatus, 'stack' | 'unansweredThreads'>;
+
+const NO_DETAILS: PrDetails = { stack: null, unansweredThreads: [] };
+
+async function fetchPrDetails(
   run: CommandRunner,
   env: NodeJS.ProcessEnv,
   cwd: string,
   url: string,
-): Promise<PrStack | null> {
+): Promise<PrDetails> {
   try {
     const result = await run(
       'gh',
-      ['api', 'graphql', '-f', `query=${STACK_QUERY}`, '-f', `url=${url}`],
+      ['api', 'graphql', '-f', `query=${PR_DETAILS_QUERY}`, '-f', `url=${url}`],
       { cwd, env, timeoutMs: GH_TIMEOUT_MS },
     );
-    return result.exitCode === 0 ? parsePrStack(result.stdout) : null;
+    if (result.exitCode !== 0) return NO_DETAILS;
+    return {
+      stack: parsePrStack(result.stdout),
+      unansweredThreads: parseUnansweredThreads(result.stdout),
+    };
   } catch {
-    return null;
+    return NO_DETAILS;
   }
 }
 
@@ -296,14 +359,14 @@ export async function fetchPrStatus(
     if (result.exitCode !== 0) return null;
     const status = parsePrStatus(result.stdout);
     if (status?.state !== 'OPEN') return status;
-    const [stack, required] = await Promise.all([
-      fetchPrStack(run, env, cwd, status.url),
+    const [details, required] = await Promise.all([
+      fetchPrDetails(run, env, cwd, status.url),
       fetchRequiredChecks(run, env, cwd, status),
     ]);
     return {
       ...status,
+      ...details,
       checks: withRequiredChecks(status.checks, required),
-      stack,
     };
   } catch {
     return null;

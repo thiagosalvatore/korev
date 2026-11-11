@@ -18,10 +18,12 @@ const READY_PR: PrStatus = {
   reviewDecision: 'APPROVED',
   mergedAt: null,
   headRefName: 'dev/login',
+  headRefOid: 'abc123',
   baseRefName: 'main',
   createdAt: '2026-01-01T00:00:00Z',
   checks: [{ name: 'lint', state: 'success', url: null, required: true }],
   stack: null,
+  unansweredThreads: [],
 };
 
 function actionLabel(pr: PrStatus): string {

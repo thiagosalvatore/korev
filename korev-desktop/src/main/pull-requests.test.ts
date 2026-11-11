@@ -5,6 +5,7 @@ import {
   fetchPrStatus,
   parsePrStatus,
   parsePrThreads,
+  parseUnansweredThreads,
   reviewPrompt,
 } from './pull-requests';
 import type { CommandResult, CommandRunner } from './command-runner';
@@ -142,6 +143,57 @@ describe('PR stack', () => {
 
   it('returns null for a PR outside any stack', () => {
     expect(parsePrStack(stackResponse(null, []))).toBeNull();
+  });
+});
+
+describe('unanswered review threads', () => {
+  function thread(
+    lastId: string,
+    {
+      isResolved = false,
+      startedBy = { association: 'MEMBER', type: 'User' },
+      lastBy = 'reviewer',
+    } = {},
+  ) {
+    return {
+      isResolved,
+      first: {
+        nodes: [
+          {
+            authorAssociation: startedBy.association,
+            author: { __typename: startedBy.type },
+          },
+        ],
+      },
+      last: { nodes: [{ id: lastId, author: { login: lastBy } }] },
+    };
+  }
+
+  function detailsResponse(threads: ReturnType<typeof thread>[]) {
+    return JSON.stringify({
+      data: {
+        viewer: { login: 'me' },
+        resource: { reviewThreads: { nodes: threads } },
+      },
+    });
+  }
+
+  it('lists the last comment of each thread waiting on the author', () => {
+    const json = detailsResponse([
+      thread('c1'),
+      thread('c2', { isResolved: true }),
+      thread('c3', { lastBy: 'me' }),
+      thread('c4', { startedBy: { association: 'NONE', type: 'User' } }),
+      thread('c5', { startedBy: { association: 'NONE', type: 'Bot' } }),
+      thread('c6', {
+        startedBy: { association: 'COLLABORATOR', type: 'User' },
+      }),
+    ]);
+    expect(parseUnansweredThreads(json)).toEqual(['c1', 'c5', 'c6']);
+  });
+
+  it('returns no threads for a malformed response', () => {
+    expect(parseUnansweredThreads('nope')).toEqual([]);
   });
 });
 
@@ -334,10 +386,12 @@ describe('review prompt', () => {
       reviewDecision: null,
       mergedAt: null,
       headRefName: `dev/${number}`,
+      headRefOid: 'abc123',
       baseRefName: 'main',
       createdAt: '2026-01-01T00:00:00Z',
       checks: [],
       stack: null,
+      unansweredThreads: [],
       ...overrides,
     };
   }

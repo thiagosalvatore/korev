@@ -191,6 +191,7 @@ export function demoPullRequest(
     reviewDecision: 'APPROVED',
     mergedAt: null,
     headRefName: branch,
+    headRefOid: `${number}`.padStart(7, '0'),
     baseRefName: DEMO_BASE_BRANCH,
     createdAt,
     checks: demoChecks({
@@ -199,6 +200,7 @@ export function demoPullRequest(
       typecheck: 'success',
     }),
     stack: null,
+    unansweredThreads: [],
     ...patch,
   };
 }
