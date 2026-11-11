@@ -34,6 +34,7 @@ export const DEFAULT_EFFORT: Record<AgentKind, string> = {
 export const CLAUDE_MODELS: AgentModel[] = [
   { id: 'claude-opus-5-5', label: 'Opus 5.5' },
   { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5' },
+  { id: 'claude-fable-5-2', label: 'Fable 5.2' },
   { id: 'claude-fable-5-1', label: 'Fable 5.1' },
   { id: 'claude-haiku-4-5', label: 'Haiku 4.5' },
 ];
