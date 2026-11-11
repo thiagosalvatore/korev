@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Fable 5.2.** You can now pick Fable 5.2 in the model menu for Claude Code. It needs a `claude` CLI that offers it.
+
 ### Fixed
 
 - You can now discard a voice recording while Korev turns it into text, not only while you record. The discard button sits next to the stop button, and Esc works in both steps. Before, a slow transcription had no way out, and a discarded recording held up the next one.
