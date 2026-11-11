@@ -143,7 +143,9 @@ function newestFirst(asks: AskChat[]): AskChat[] {
 }
 
 export function asksNewestFirst(state: Pick<AppState, 'askChats'>): AskChat[] {
-  return newestFirst(state.askChats.filter((ask) => !ask.automationRun));
+  return newestFirst(
+    state.askChats.filter((ask) => !ask.automationRun && !ask.archivedAt),
+  );
 }
 
 export interface AskSections {

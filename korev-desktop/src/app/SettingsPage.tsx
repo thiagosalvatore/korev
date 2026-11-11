@@ -732,6 +732,15 @@ function Git({ settings }: { settings: Settings }) {
         />
       </Row>
       <Row
+        title="Archive reviews when done"
+        description="Archive a review chat from the pull request inbox once you approve the pull request, or when it is merged or closed. You can restore it from History."
+      >
+        <Switch
+          checked={settings.archiveReviews}
+          onChange={(archiveReviews) => update({ archiveReviews })}
+        />
+      </Row>
+      <Row
         title="Keep PRs ready"
         description="When a workspace's pull request has merge conflicts, a failing required check or a review comment nobody has answered, Korev asks the workspace's agent to fix it and push. Each problem is sent once. Turn it off for one workspace from its menu."
       >

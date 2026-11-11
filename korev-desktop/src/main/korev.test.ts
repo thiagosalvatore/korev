@@ -26,6 +26,7 @@ import {
 } from '../shared/model';
 import { AUTOMATION_TICK_MS } from './automations';
 import { createKorev, PR_POLL_MS, type Korev } from './korev';
+import { askSections } from '../shared/workspaces';
 import type { RemoteSettings } from './remote-access';
 import type { Release } from './updates';
 
@@ -72,6 +73,7 @@ let conductorRepos: Record<string, string | null>[] = [];
 let openPr: Record<string, unknown> | null = null;
 let prsByUrl: Record<string, Record<string, unknown>> = {};
 let stacksByUrl: Record<string, Record<string, unknown>> = {};
+let reviewsByUrl: Record<string, Record<string, unknown>> = {};
 let ghMerges: string[][] = [];
 let gitAddGate: Promise<void> | null = null;
 let mergeBaseGate: Promise<void> | null = null;
@@ -102,8 +104,19 @@ function fakePrView(ref: string) {
   return pr ? { exitCode: 0, stdout: JSON.stringify(pr), stderr: '' } : NO_PR;
 }
 
+function fakeReviewStatus(url: string | undefined) {
+  const resource = (url && reviewsByUrl[url]) ?? null;
+  return {
+    exitCode: 0,
+    stdout: JSON.stringify({ data: { viewer: { login: 'me' }, resource } }),
+    stderr: '',
+  };
+}
+
 function fakePrStack(args: readonly string[]) {
   const url = args.find((arg) => arg.startsWith('url='))?.slice('url='.length);
+  if (args.some((arg) => arg.includes('viewerLatestReview')))
+    return fakeReviewStatus(url);
   const resource = (url && stacksByUrl[url]) ?? {
     stackEntry: null,
     stack: null,
@@ -280,6 +293,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     openPr = null;
     prsByUrl = {};
     stacksByUrl = {};
+    reviewsByUrl = {};
     ghMerges = [];
     gitAddGate = null;
     mergeBaseGate = null;
@@ -1580,6 +1594,43 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       expect.stringContaining('Use the house review skill.'),
     );
     expect(again).toEqual(started);
+  });
+
+  it('archives a review chat once you approve the pull request, and brings it back on the next review', async () => {
+    await korev.shutdown();
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    korev = await openKorev();
+    await korev.api.updateSettings({ archiveReviews: true });
+    const repo = await addRepo();
+    const url = 'https://github.com/acme/web/pull/42';
+    openPr = { number: 42, url, title: 'Add install steps', state: 'OPEN' };
+    const started = await korev.api.reviewPullRequest(repo.id, 42);
+    if (!started.ok) throw new Error(started.message);
+    const askOf = async () =>
+      (await korev.api.getState()).askChats.find(
+        (entry) => entry.id === started.value.askChatId,
+      );
+    await waitForTurn((await askOf())!.session.id);
+    reviewsByUrl[url] = {
+      state: 'OPEN',
+      headRefOid: 'head1',
+      viewerLatestReview: {
+        id: 'r1',
+        state: 'APPROVED',
+        commit: { oid: 'head1' },
+      },
+      reviewRequests: { nodes: [] },
+    };
+
+    await waitFor(async () => {
+      vi.advanceTimersByTime(PR_POLL_MS);
+      return !!(await askOf())?.archivedAt;
+    });
+    const sections = askSections(await korev.api.getState());
+    await korev.api.reviewPullRequest(repo.id, 42);
+
+    expect(sections.byRepo.get(repo.id) ?? []).toEqual([]);
+    expect((await askOf())?.archivedAt).toBeUndefined();
   });
 
   it('explains a pull request together with the open ones it builds on', async () => {
