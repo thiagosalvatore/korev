@@ -1090,3 +1090,31 @@ test('keeps a workspace under Waiting for you while its PR has unanswered review
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test('sends unanswered review comments to the agent when PRs are kept ready', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const { app, window } = await launchWithFakeGh(home, FAKE_GH_WITH_REVIEW);
+  try {
+    await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'updateSettings',
+        [{ keepPrsReady: true }],
+      ),
+    );
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window.getByRole('textbox', { name: 'Message' }).fill('Add a note');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+
+    await expect(
+      window.getByText(/Reviewers left comments on pull request #7/),
+    ).toBeVisible();
+    await waitForAgentsToFinish(window);
+    await expect(
+      window.getByRole('button', { name: 'Keep PR ready' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await snap(window, '20-keep-pr-ready');
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});

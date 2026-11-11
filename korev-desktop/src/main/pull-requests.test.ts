@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   findPrUrls,
+  keepReadyPrompt,
   parsePrStack,
   fetchPrStatus,
   parsePrStatus,
   parsePrThreads,
   parseUnansweredThreads,
   reviewPrompt,
+  reviewReplyInstruction,
 } from './pull-requests';
 import type { CommandResult, CommandRunner } from './command-runner';
-import type { PrStatus } from '../shared/model';
+import { prProblems, type PrStatus, type PrThread } from '../shared/model';
 
 describe('PR status', () => {
   it('maps check runs and status contexts to check states', () => {
@@ -417,5 +419,91 @@ describe('review prompt', () => {
     expect(reviewPrompt([])).toContain(
       'Review the changes on this branch compared to its target branch',
     );
+  });
+});
+
+describe('keep-ready prompt', () => {
+  const pr = {
+    ...parsePrStatus(
+      JSON.stringify({
+        number: 7,
+        url: 'https://github.com/acme/web/pull/7',
+        state: 'OPEN',
+        mergeable: 'CONFLICTING',
+        headRefOid: 'abc123',
+        baseRefName: 'main',
+      }),
+    )!,
+    unansweredThreads: ['c1', 'c2'],
+  };
+  const threads: PrThread[] = ['c1', 'c2'].map((id, index) => ({
+    id: `t${index + 1}`,
+    path: 'README.md',
+    line: index + 1,
+    diffHunk: '',
+    isResolved: false,
+    isOutdated: false,
+    comments: [
+      {
+        id,
+        author: 'octo',
+        isBot: false,
+        body: `Please fix ${id}`,
+        url: '',
+        createdAt: '',
+      },
+    ],
+  }));
+
+  function promptFor(problemKeys: string[], replyInstruction = 'Reply.') {
+    return keepReadyPrompt({
+      pr,
+      problems: prProblems(pr).filter((found) =>
+        problemKeys.includes(found.key),
+      ),
+      threads,
+      baseBranch: 'main',
+      replyInstruction,
+      prompts: { address_review: 'Run make lint first.' },
+    });
+  }
+
+  it('asks only about the new problems', () => {
+    const prompt = promptFor(['thread:c2@7']);
+    expect(prompt).toContain('t2 on README.md:2');
+    expect(prompt).toContain('> octo: Please fix c2');
+    expect(prompt).toContain('Run make lint first.');
+    expect(prompt).not.toContain('c1');
+    expect(prompt).not.toContain('merge conflicts');
+  });
+
+  it('asks to resolve conflicts and answer reviewers in one prompt', () => {
+    const prompt = promptFor(
+      ['conflict:main@abc123', 'thread:c1@7'],
+      'Stay quiet.',
+    );
+    expect(prompt).toContain('merge conflicts');
+    expect(prompt).toContain('Please fix c1');
+    expect(prompt).toContain('Stay quiet.');
+  });
+});
+
+describe('review reply instruction', () => {
+  it('uses the custom instruction when one is set', () => {
+    expect(
+      reviewReplyInstruction({
+        reviewReplies: 'custom',
+        reviewReplyInstructions: 'Reply only when it needs an explanation.',
+      }),
+    ).toBe('Reply only when it needs an explanation.');
+  });
+
+  it('never posts on GitHub when replies are off', () => {
+    expect(
+      reviewReplyInstruction({
+        reviewReplies: 'none',
+        reviewReplyInstructions: 'Reply to everything.',
+      }),
+    ).toMatch(/do not post/i);
   });
 });

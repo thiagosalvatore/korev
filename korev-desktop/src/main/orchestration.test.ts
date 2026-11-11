@@ -28,6 +28,8 @@ function workspace(name: string, groupId: string | null): Workspace {
     restoredAt: null,
     archiveSnapshot: null,
     keepAfterMerge: false,
+    pausePrReady: false,
+    prReadyHandled: [],
     awaitsLane: false,
     prs: [],
     sessions: [

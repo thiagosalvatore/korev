@@ -560,6 +560,116 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toBeNull();
   });
 
+  function reviewedPr(lastCommentId: string) {
+    openPr = {
+      number: 7,
+      url: BRANCH_PR_URL,
+      state: 'OPEN',
+      headRefOid: 'abc123',
+    };
+    const thread = {
+      id: 'PRRT_1',
+      path: 'README.md',
+      line: 1,
+      isResolved: false,
+      first: {
+        nodes: [
+          { authorAssociation: 'MEMBER', author: { __typename: 'User' } },
+        ],
+      },
+      last: { nodes: [{ id: lastCommentId, author: { login: 'octo' } }] },
+      comments: {
+        nodes: [
+          {
+            id: lastCommentId,
+            body: `Please rename (${lastCommentId})`,
+            author: { login: 'octo', __typename: 'User' },
+          },
+        ],
+      },
+    };
+    stacksByUrl[BRANCH_PR_URL] = {
+      stackEntry: null,
+      stack: null,
+      reviewThreads: { nodes: [thread] },
+    };
+  }
+
+  async function waitUntilIdle(sessionId: string) {
+    await waitForTurn(sessionId);
+    await waitFor(
+      async () =>
+        !(await korev.api.getState()).runningSessions.includes(sessionId),
+    );
+  }
+
+  async function userPrompts(sessionId: string) {
+    return (await korev.api.transcript(sessionId)).flatMap((item) =>
+      item.kind === 'user' ? [item.text] : [],
+    );
+  }
+
+  it('asks the agent once about each new review comment when PRs are kept ready', async () => {
+    await korev.api.updateSettings({ keepPrsReady: true });
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    reviewedPr('c1');
+
+    await korev.api.prStatuses(workspace.id);
+    await waitUntilIdle(session.id);
+    await korev.api.prStatuses(workspace.id);
+    expect(await userPrompts(session.id)).toEqual([
+      expect.stringContaining('Please rename (c1)'),
+    ]);
+
+    reviewedPr('c2');
+    await korev.api.prStatuses(workspace.id);
+    await waitUntilIdle(session.id);
+    const prompts = await userPrompts(session.id);
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain('Please rename (c2)');
+    expect(prompts[1]).not.toContain('(c1)');
+  });
+
+  it.each([
+    ['the setting is off', false, false],
+    ['the workspace is paused', true, true],
+  ])(
+    'leaves review comments to you when %s',
+    async (_case, keepPrsReady, paused) => {
+      await korev.api.updateSettings({ keepPrsReady });
+      const workspace = await createWorkspace();
+      if (paused) await korev.api.setPausePrReady(workspace.id, true);
+      reviewedPr('c1');
+
+      await korev.api.prStatuses(workspace.id);
+
+      expect(await userPrompts(workspace.sessions[0].id)).toEqual([]);
+    },
+  );
+
+  it('waits for a running turn to end before it asks about review comments', async () => {
+    await korev.api.updateSettings({ keepPrsReady: true });
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await korev.api.send(session.id, task('hold-turn'));
+    await waitFor(async () =>
+      (await korev.api.getState()).runningSessions.includes(session.id),
+    );
+    reviewedPr('c1');
+
+    await korev.api.prStatuses(workspace.id);
+    expect(await userPrompts(session.id)).toHaveLength(1);
+
+    await korev.api.stop(session.id);
+    await waitFor(async () =>
+      (await userPrompts(session.id)).some((prompt) =>
+        prompt.includes('Please rename (c1)'),
+      ),
+    );
+    await korev.api.stop(session.id);
+  });
+
   function fakePr(number: number, state: string, createdAt: string) {
     const url = `https://github.com/acme/web/pull/${number}`;
     prsByUrl[url] = { number, url, state, createdAt, mergedAt: null };

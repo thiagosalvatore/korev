@@ -394,6 +394,7 @@ describe('workspacesWaitingForYou', () => {
   it('lists an idle workspace whose PR has unanswered comments', () => {
     const waiting = workspacesWaitingForYou({
       ...state,
+      settings: { ...state.settings, keepPrsReady: false },
       runtime: {
         'blog-1': runtime('idle', [pr(['c1'])]),
         'web-1': runtime('idle', [pr([])]),
@@ -401,6 +402,25 @@ describe('workspacesWaitingForYou', () => {
       },
     });
     expect(waiting.map((entry) => entry.id)).toEqual(['blog-1']);
+  });
+
+  it('lists a kept-ready workspace only once Korev has already sent its problems to the agent', () => {
+    const handled = (id: string, prReadyHandled: string[]) =>
+      ({
+        ...workspace(id, 'blog', '2026-01-01'),
+        pausePrReady: false,
+        prReadyHandled,
+      }) as Workspace;
+    const waiting = workspacesWaitingForYou({
+      ...state,
+      settings: { keepPrsReady: true },
+      workspaces: [handled('sent', ['thread:c1@7']), handled('new', [])],
+      runtime: {
+        sent: runtime('idle', [pr(['c1'])]),
+        new: runtime('idle', [pr(['c1'])]),
+      },
+    } as unknown as AppState);
+    expect(waiting.map((entry) => entry.id)).toEqual(['sent']);
   });
 });
 

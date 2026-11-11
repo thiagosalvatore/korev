@@ -91,7 +91,8 @@ export type PromptKind =
   | 'create_pr'
   | 'fix_errors'
   | 'resolve_merge_conflicts'
-  | 'rename_branch';
+  | 'rename_branch'
+  | 'address_review';
 
 export type RepoPrompts = Partial<Record<PromptKind, string>>;
 
@@ -348,6 +349,8 @@ export interface Workspace {
   restoredAt: string | null;
   archiveSnapshot: Checkpoint | null;
   keepAfterMerge: boolean;
+  pausePrReady: boolean;
+  prReadyHandled: string[];
   awaitsLane: boolean;
   folderId?: string | null;
   sessions: ChatSession[];
@@ -505,6 +508,9 @@ export interface Settings {
   autoRenameBranches: boolean;
   deleteBranchOnArchive: boolean;
   archiveOnMerge: boolean;
+  keepPrsReady: boolean;
+  reviewReplies: ReviewReplies;
+  reviewReplyInstructions: string;
   toolApprovals: boolean;
   askFollowsToolApprovals: boolean;
   orchestration: boolean;
@@ -522,6 +528,15 @@ export interface Settings {
   dictationLanguage: DictationLanguage;
   windowBounds: WindowBounds | null;
   lastSeenVersion: string | null;
+}
+
+export type ReviewReplies = 'none' | 'reply' | 'reply-and-resolve' | 'custom';
+
+export function keepsPrReady(
+  workspace: Workspace,
+  settings: Pick<Settings, 'keepPrsReady'>,
+): boolean {
+  return settings.keepPrsReady && !workspace.pausePrReady;
 }
 
 export interface ModelSetting {

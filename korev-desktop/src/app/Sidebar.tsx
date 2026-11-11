@@ -262,8 +262,11 @@ function UnreadDot() {
   );
 }
 
-function needsYourInput(runtime: WorkspaceRuntime): boolean {
-  return boardColumn(runtime) === 'needs-you' || prNeedsYou(runtime);
+function needsYourInput(state: AppState, workspace: Workspace): boolean {
+  return (
+    boardColumn(state.runtime[workspace.id]!) === 'needs-you' ||
+    prNeedsYou(state, workspace)
+  );
 }
 
 function isWaitingAsk(state: AppState, ask: AskChat): boolean {
@@ -279,13 +282,12 @@ function HiddenWaitingDot({
   workspaces: Workspace[];
   asks?: AskChat[];
 }) {
-  const waiting = workspaces.filter((ws) => waitsForYou(state.runtime[ws.id]));
+  const waiting = workspaces.filter((ws) => waitsForYou(state, ws));
   const waitingAsks = asks.filter((ask) => isWaitingAsk(state, ask));
   const count = waiting.length + waitingAsks.length;
   if (!count) return null;
   const needsInput =
-    waitingAsks.length > 0 ||
-    waiting.some((ws) => needsYourInput(state.runtime[ws.id]!));
+    waitingAsks.length > 0 || waiting.some((ws) => needsYourInput(state, ws));
   const label = `${count} waiting for you`;
   return (
     <span
@@ -310,9 +312,7 @@ function WaitingForYou({
   const waiting = workspacesWaitingForYou(state);
   const asks = asksWaitingForYou(state);
   if (!waiting.length && !asks.length) return null;
-  const needsYou = waiting.filter((ws) =>
-    needsYourInput(state.runtime[ws.id]!),
-  );
+  const needsYou = waiting.filter((ws) => needsYourInput(state, ws));
   const done = waiting.filter((ws) => !needsYou.includes(ws));
   const repoName = (workspace: Workspace) =>
     state.repos.find((repo) => repo.id === workspace.repoId)?.name ?? '';
@@ -547,6 +547,21 @@ function WorkspaceRow({
                     !workspace.keepAfterMerge,
                   ),
               },
+              ...(state.settings.keepPrsReady
+                ? [
+                    {
+                      id: 'keep-pr-ready',
+                      label: 'Keep PR ready',
+                      icon: 'shield-check' as const,
+                      checked: !workspace.pausePrReady,
+                      onSelect: () =>
+                        void api.setPausePrReady(
+                          workspace.id,
+                          !workspace.pausePrReady,
+                        ),
+                    },
+                  ]
+                : []),
               {
                 id: 'archive',
                 label: 'Archive',
