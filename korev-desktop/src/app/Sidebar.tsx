@@ -49,6 +49,7 @@ import {
   archiveWorkspace,
   deleteAsk,
   openAsk,
+  restoreAsk,
   openAutomations,
   openBoard,
   openPullRequests,
@@ -1784,11 +1785,44 @@ function CustomizeSidebarMenu() {
   );
 }
 
+interface ArchivedEntry {
+  id: string;
+  label: string;
+  title: string;
+  archivedAt: string;
+  restore: () => void;
+  remove: () => void;
+}
+
+function archivedEntries(state: AppState): ArchivedEntry[] {
+  const workspaces = state.workspaces
+    .filter((ws) => ws.archivedAt)
+    .map((workspace) => ({
+      id: workspace.id,
+      label: workspaceLabel(workspace),
+      title: workspace.branch,
+      archivedAt: workspace.archivedAt ?? workspace.createdAt,
+      restore: () => void restoreWorkspace(workspace),
+      remove: () => void api.deleteWorkspace(workspace.id),
+    }));
+  const asks = state.askChats
+    .filter((ask) => ask.archivedAt)
+    .map((ask) => ({
+      id: ask.id,
+      label: ask.session.title,
+      title: ask.session.title,
+      archivedAt: ask.archivedAt ?? ask.createdAt,
+      restore: () => void restoreAsk(ask),
+      remove: () => void deleteAsk(ask),
+    }));
+  return [...workspaces, ...asks].sort((a, b) =>
+    b.archivedAt.localeCompare(a.archivedAt),
+  );
+}
+
 function History({ state }: { state: AppState }) {
   const open = useUi((ui) => ui.historyOpen);
-  const archived = state.workspaces
-    .filter((ws) => ws.archivedAt)
-    .sort((a, b) => (b.archivedAt ?? '').localeCompare(a.archivedAt ?? ''));
+  const archived = archivedEntries(state);
   if (!archived.length) return null;
   return (
     <section
@@ -1807,33 +1841,30 @@ function History({ state }: { state: AppState }) {
       </button>
       {open ? (
         <div className="max-h-56 overflow-y-auto">
-          {archived.map((workspace) => (
+          {archived.map((entry) => (
             <div
-              key={workspace.id}
+              key={entry.id}
               className="group flex h-8 items-center gap-2 rounded-md px-2 text-sm text-fg-3 hover:bg-hover"
             >
               <Icon name="archive" size={13} />
-              <span
-                className="min-w-0 flex-1 truncate"
-                title={workspace.branch}
-              >
-                {workspaceLabel(workspace)}
+              <span className="min-w-0 flex-1 truncate" title={entry.title}>
+                {entry.label}
                 <span className="ml-1.5 text-xs text-fg-4">
-                  {timeAgo(workspace.archivedAt ?? workspace.createdAt)}
+                  {timeAgo(entry.archivedAt)}
                 </span>
               </span>
               <span className="hidden gap-0.5 group-hover:flex">
                 <IconButton
                   icon="archive-restore"
-                  label={`Unarchive ${workspaceLabel(workspace)}`}
+                  label={`Unarchive ${entry.label}`}
                   size="sm"
-                  onClick={() => restoreWorkspace(workspace)}
+                  onClick={entry.restore}
                 />
                 <IconButton
                   icon="trash-2"
-                  label={`Delete ${workspaceLabel(workspace)}`}
+                  label={`Delete ${entry.label}`}
                   size="sm"
-                  onClick={() => api.deleteWorkspace(workspace.id)}
+                  onClick={entry.remove}
                 />
               </span>
             </div>

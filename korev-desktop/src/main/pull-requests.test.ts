@@ -6,7 +6,9 @@ import {
   fetchPrStatus,
   parsePrStatus,
   parsePrThreads,
+  parseReviewStatus,
   parseUnansweredThreads,
+  reviewFinished,
   reviewPrompt,
   reviewReplyInstruction,
 } from './pull-requests';
@@ -505,5 +507,67 @@ describe('review reply instruction', () => {
         reviewReplyInstructions: 'Reply to everything.',
       }),
     ).toMatch(/do not post/i);
+  });
+});
+
+describe('review status', () => {
+  function reviewResponse({
+    state = 'OPEN',
+    review = null as { id: string; state: string; oid: string } | null,
+    requested = [] as string[],
+  } = {}) {
+    return JSON.stringify({
+      data: {
+        viewer: { login: 'me' },
+        resource: {
+          state,
+          headRefOid: 'head1',
+          viewerLatestReview: review && {
+            id: review.id,
+            state: review.state,
+            commit: { oid: review.oid },
+          },
+          reviewRequests: {
+            nodes: requested.map((login) => ({
+              requestedReviewer: { login },
+            })),
+          },
+        },
+      },
+    });
+  }
+
+  it('reads your latest review and whether you are requested again', () => {
+    const status = parseReviewStatus(
+      reviewResponse({
+        review: { id: 'r1', state: 'CHANGES_REQUESTED', oid: 'old1' },
+        requested: ['someone', 'me'],
+      }),
+    );
+
+    expect(status).toEqual({
+      state: 'OPEN',
+      headRefOid: 'head1',
+      latestReview: { id: 'r1', state: 'CHANGES_REQUESTED', commitOid: 'old1' },
+      reRequested: true,
+    });
+  });
+
+  it('is finished once you approve, or the PR merges or closes', () => {
+    const approved = parseReviewStatus(
+      reviewResponse({ review: { id: 'r1', state: 'APPROVED', oid: 'h' } }),
+    );
+    const commented = parseReviewStatus(
+      reviewResponse({ review: { id: 'r1', state: 'COMMENTED', oid: 'h' } }),
+    );
+    const closed = parseReviewStatus(reviewResponse({ state: 'CLOSED' }));
+
+    expect(approved && reviewFinished(approved)).toBe(true);
+    expect(commented && reviewFinished(commented)).toBe(false);
+    expect(closed && reviewFinished(closed)).toBe(true);
+  });
+
+  it('returns null for a response without a pull request', () => {
+    expect(parseReviewStatus('{"data":{"resource":null}}')).toBeNull();
   });
 });

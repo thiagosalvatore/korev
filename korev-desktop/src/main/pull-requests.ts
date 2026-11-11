@@ -101,6 +101,19 @@ const PR_THREADS_QUERY = `query($url: URI!) {
   }
 }`;
 const GHOST_AUTHOR = 'ghost';
+const MAX_REVIEW_REQUESTS = 100;
+const REVIEW_STATUS_QUERY = `query($url: URI!) {
+  viewer { login }
+  resource(url: $url) {
+    ... on PullRequest {
+      state headRefOid
+      viewerLatestReview { id state commit { oid } }
+      reviewRequests(first: ${MAX_REVIEW_REQUESTS}) {
+        nodes { requestedReviewer { ... on User { login } } }
+      }
+    }
+  }
+}`;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -373,6 +386,87 @@ export async function fetchPrStatus(
       ...details,
       checks: withRequiredChecks(status.checks, required),
     };
+  } catch {
+    return null;
+  }
+}
+
+export interface ReviewStatus {
+  state: PrStatus['state'];
+  headRefOid: string;
+  latestReview: { id: string; state: string; commitOid: string } | null;
+  reRequested: boolean;
+}
+
+interface ReviewStatusResponse {
+  data?: {
+    viewer?: { login?: string };
+    resource?: {
+      state?: string;
+      headRefOid?: string;
+      viewerLatestReview?: {
+        id: string;
+        state: string;
+        commit?: { oid?: string } | null;
+      } | null;
+      reviewRequests?: {
+        nodes: { requestedReviewer?: { login?: string } | null }[];
+      };
+    } | null;
+  };
+}
+
+export function parseReviewStatus(json: string): ReviewStatus | null {
+  let response: ReviewStatusResponse;
+  try {
+    response = JSON.parse(json) as ReviewStatusResponse;
+  } catch {
+    return null;
+  }
+  const pr = response.data?.resource;
+  if (!pr?.state) return null;
+  const viewer = response.data?.viewer?.login;
+  const review = pr.viewerLatestReview;
+  return {
+    state: pr.state as PrStatus['state'],
+    headRefOid: str(pr.headRefOid),
+    latestReview: review
+      ? {
+          id: review.id,
+          state: review.state,
+          commitOid: str(review.commit?.oid),
+        }
+      : null,
+    reRequested: (pr.reviewRequests?.nodes ?? []).some(
+      (request) => !!viewer && request.requestedReviewer?.login === viewer,
+    ),
+  };
+}
+
+export function reviewFinished(status: ReviewStatus): boolean {
+  return status.state !== 'OPEN' || status.latestReview?.state === 'APPROVED';
+}
+
+export async function fetchReviewStatus(
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  url: string,
+): Promise<ReviewStatus | null> {
+  try {
+    const result = await run(
+      'gh',
+      [
+        'api',
+        'graphql',
+        '-f',
+        `query=${REVIEW_STATUS_QUERY}`,
+        '-f',
+        `url=${url}`,
+      ],
+      { cwd, env, timeoutMs: GH_TIMEOUT_MS },
+    );
+    return result.exitCode === 0 ? parseReviewStatus(result.stdout) : null;
   } catch {
     return null;
   }

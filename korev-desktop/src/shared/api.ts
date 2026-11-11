@@ -126,6 +126,7 @@ export interface KorevApi {
   focusWorkspaces(workspaceIds: string[]): Promise<void>;
   createAskChat(repoIds: string[]): Promise<AskChat>;
   deleteAskChat(askChatId: string): Promise<void>;
+  restoreAskChat(askChatId: string): Promise<void>;
   createAutomation(draft: AutomationDraft): Promise<Automation>;
   updateAutomation(
     automationId: string,

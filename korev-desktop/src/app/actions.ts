@@ -87,6 +87,11 @@ export async function deleteAsk(ask: AskChat) {
     openAsk(null, ask.repoIds);
 }
 
+export async function restoreAsk(ask: AskChat) {
+  await api.restoreAskChat(ask.id);
+  openAsk(ask.id);
+}
+
 export function openSettings(section = 'general') {
   setUi({ page: { kind: 'settings', section } });
 }

@@ -588,6 +588,7 @@ export interface AskChat {
   lastMessageAt: string;
   automationRun?: AutomationRun;
   reviewOf?: string;
+  archivedAt?: string;
 }
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -640,6 +641,7 @@ export interface Settings {
   autoRenameBranches: boolean;
   deleteBranchOnArchive: boolean;
   archiveOnMerge: boolean;
+  archiveReviews: boolean;
   keepPrsReady: boolean;
   reviewReplies: ReviewReplies;
   reviewReplyInstructions: string;

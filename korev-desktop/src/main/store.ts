@@ -91,6 +91,7 @@ export function defaultSettings(home: string): Settings {
     autoRenameBranches: true,
     deleteBranchOnArchive: false,
     archiveOnMerge: false,
+    archiveReviews: false,
     keepPrsReady: false,
     reviewReplies: 'reply',
     reviewReplyInstructions: '',

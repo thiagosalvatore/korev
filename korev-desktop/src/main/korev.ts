@@ -78,10 +78,12 @@ import {
 import {
   createPrPrompt,
   fetchPrStatus,
+  fetchReviewStatus,
   onPrBranch,
   fetchPrThreads,
   fixChecksPrompt,
   inboxReviewPrompt,
+  reviewFinished,
   keepReadyPrompt,
   mergePr,
   resolveConflictsPrompt,
@@ -607,9 +609,36 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         if (shuttingDown) return;
         await refreshPrs(workspace.id).catch(() => null);
       }
+      for (const ask of openReviewChats()) {
+        if (shuttingDown) return;
+        await refreshReview(ask).catch(() => null);
+      }
     } finally {
       checkingPrs = false;
     }
+  }
+
+  function openReviewChats() {
+    return store.state.askChats.filter(
+      (ask) => ask.reviewOf && !ask.archivedAt && ask.repoIds.length,
+    );
+  }
+
+  async function refreshReview(ask: AskChat) {
+    if (!store.state.settings.archiveReviews || !ask.reviewOf) return;
+    const status = await fetchReviewStatus(
+      deps.run,
+      deps.env,
+      ctx.repo(ask.repoIds[0]).path,
+      ask.reviewOf,
+    );
+    if (!status || !reviewFinished(status)) return;
+    if (ctx.runningSessions.has(ask.session.id)) return;
+    archiveAskChat(ask);
+    deps.emit('toast', {
+      title: `Archived ${ask.session.title}`,
+      tone: 'success',
+    });
   }
 
   async function archiveIfConfigured(workspaceId: string, prs: PrStatus[]) {
@@ -1015,7 +1044,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     const reviewing = store.state.askChats.find(
       (ask) => ask.reviewOf === pr.url,
     );
-    if (reviewing) return ok({ askChatId: reviewing.id });
+    if (reviewing) {
+      restoreAskChat(reviewing.id);
+      return ok({ askChatId: reviewing.id });
+    }
     const session: ChatSession = {
       ...chatSessionOn(ctx, store.state.settings.reviewModel),
       title: `Review #${pr.number} ${pr.title}`,
@@ -1043,6 +1075,18 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       (entry) => entry.session.id === sessionId,
     );
     return ask ? { session: ask.session, askChatId: ask.id } : null;
+  }
+
+  function archiveAskChat(ask: AskChat) {
+    ask.archivedAt = deps.now().toISOString();
+    saveAndEmit();
+  }
+
+  function restoreAskChat(askChatId: string) {
+    const ask = store.state.askChats.find((entry) => entry.id === askChatId);
+    if (!ask?.archivedAt) return;
+    delete ask.archivedAt;
+    saveAndEmit();
   }
 
   async function deleteAskChat(askChatId: string) {
@@ -1448,6 +1492,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     explainer: (sessionId) => explainers.get(sessionId),
     updateExplainer: (sessionId) => explainers.update(sessionId),
     deleteAskChat,
+    restoreAskChat: async (askChatId) => restoreAskChat(askChatId),
     createAutomation: async (draft) => automations.create(draft),
     updateAutomation: async (automationId, patch) =>
       automations.update(automationId, patch),
