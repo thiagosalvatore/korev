@@ -79,14 +79,16 @@ Decision cards use the permission card style (warning border). They also show at
 coordinator's chat.
 
 The **Pull requests** page replaces the centre and the right panel with the pull request inbox: one
-full-width table. A toolbar sits between the header and the table and does not scroll. On the
+full-width table with a `px-6` gutter, lined up with the header title. A toolbar sits between the
+header and the table, with space above it and no rule under it, and does not scroll. On the
 left: the view tabs (`pill` Tabs: All, Needs review, Needs attention, Ready to merge, Mine, each
 with the matching count) and **Filters**, a menu with one check item per status label (the button
 turns `secondary` and shows a count while any are on). On the right: the repository select (only
 with 2 or more repositories) and the search box (focused on open, ⌘F, Esc clears).
 
 - The column headers (Title, Status, Updated) are overlines and stay on top while the table
-  scrolls. Rows are separated by `border-1` hairlines and turn `bg-hover` under the pointer.
+  scrolls. Rows are separated by `border-1` hairlines (none under the last row) and turn
+  `bg-hover` under the pointer.
 - Title cell: the title (`text-sm` medium `fg-1`, a draft icon first for drafts), then
   `repository#number · @author · opened <time>` in `text-xs fg-4`.
 - A pull request whose base branch is the head branch of another one in the list sits under it,
@@ -96,7 +98,8 @@ with 2 or more repositories) and the search box (focused on open, ⌘F, Esc clea
   Changes requested, Checks running, Draft, otherwise **Ready**), and an outline badge with the
   number of unresolved review threads.
 - Actions are `sm` icon buttons: Review (Open review), Explain, Check out (Open workspace), Open on
-  GitHub.
+  GitHub. The row is already `bg-hover`, so a hovered button turns `bg-raised` with a `border-2`
+  outline to stand out from it.
 - When the filters hide every pull request, the table shows "No pull requests match these
   filters." and **Clear filters**. An empty view shows one line in `fg-3`.
 

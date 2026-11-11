@@ -95,8 +95,10 @@ function useInbox() {
 }
 
 const ROW_GRID =
-  'grid grid-cols-[minmax(0,1fr)_220px_72px_112px] items-center gap-4 px-4';
+  'grid grid-cols-[minmax(0,1fr)_220px_72px_112px] items-center gap-4 px-6';
 const STACK_INDENT_PX = 18;
+const ROW_ACTION =
+  'enabled:hover:border-border-2 enabled:hover:bg-raised enabled:hover:shadow-1';
 
 const REVIEW_ICONS: Partial<
   Record<
@@ -177,6 +179,7 @@ function RowActions({ state, pr }: { state: AppState; pr: InboxPullRequest }) {
     <div className="flex items-center justify-end gap-0.5">
       <IconButton
         size="sm"
+        className={ROW_ACTION}
         icon={review ? 'message-square-text' : 'sparkles'}
         label={review ? 'Open review' : 'Review'}
         onClick={() =>
@@ -185,12 +188,14 @@ function RowActions({ state, pr }: { state: AppState; pr: InboxPullRequest }) {
       />
       <IconButton
         size="sm"
+        className={ROW_ACTION}
         icon="book-open"
         label="Explain"
         onClick={() => explainPullRequest(pr.repoId, pr.number)}
       />
       <IconButton
         size="sm"
+        className={ROW_ACTION}
         icon={workspace ? 'folder-open' : 'git-branch'}
         label={workspace ? 'Open workspace' : 'Check out'}
         onClick={() =>
@@ -199,6 +204,7 @@ function RowActions({ state, pr }: { state: AppState; pr: InboxPullRequest }) {
       />
       <IconButton
         size="sm"
+        className={ROW_ACTION}
         icon="external-link"
         label="Open on GitHub"
         onClick={() => api.openExternal(pr.url)}
@@ -218,7 +224,10 @@ function PullRequestRow({
   return (
     <li
       aria-label={`#${pr.number} ${pr.title}`}
-      className={cn(ROW_GRID, 'border-b border-border-1 py-2 hover:bg-hover')}
+      className={cn(
+        ROW_GRID,
+        'border-b border-border-1 py-2 last:border-b-0 hover:bg-hover',
+      )}
     >
       <div
         className="flex min-w-0 flex-col gap-1"
@@ -375,7 +384,7 @@ function Toolbar({
   const search = useRef<HTMLInputElement>(null);
   useFocusOnFind(search);
   return (
-    <div className="flex flex-none flex-wrap items-center gap-2 border-b border-border-1 px-4 py-2">
+    <div className="flex flex-none flex-wrap items-center gap-2 px-6 pt-5 pb-3">
       <Tabs
         variant="pill"
         value={view}
@@ -408,7 +417,7 @@ function Toolbar({
 
 function NoMatch() {
   return (
-    <div className="flex flex-col items-start gap-2 px-4 py-6">
+    <div className="flex flex-col items-start gap-2 px-6 py-6">
       <p className="m-0 text-sm text-fg-3">{NO_MATCH}</p>
       <Button size="sm" variant="secondary" onClick={clearFilters}>
         Clear filters
@@ -488,7 +497,7 @@ function InboxTable({
     return isFiltering(filter) ? (
       <NoMatch />
     ) : (
-      <p className="m-0 px-4 py-6 text-sm text-fg-3">{view.empty}</p>
+      <p className="m-0 px-6 py-6 text-sm text-fg-3">{view.empty}</p>
     );
   return (
     <ul className="m-0 flex list-none flex-col p-0">
@@ -510,7 +519,7 @@ export function PullRequestsPage({ state }: { state: AppState }) {
         className={cn(
           'flex h-11 flex-none items-center justify-between border-b border-border-1 pr-2',
           DRAG_REGION,
-          sidebar ? 'pl-4' : TRAFFIC_LIGHT_GUTTER,
+          sidebar ? 'pl-6' : TRAFFIC_LIGHT_GUTTER,
         )}
       >
         <div className="flex items-baseline gap-2">
