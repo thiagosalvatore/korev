@@ -152,6 +152,7 @@ export function demoWorkspace(
     label: null,
     keepAfterMerge: false,
     pausePrReady: false,
+    keepPrReady: false,
     prReadyHandled: [],
     awaitsLane: false,
     sessions: [session],

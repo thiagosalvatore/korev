@@ -28,6 +28,7 @@ function workspace(name: string): Workspace {
     archiveSnapshot: null,
     keepAfterMerge: false,
     pausePrReady: false,
+    keepPrReady: false,
     prReadyHandled: [],
     awaitsLane: false,
     prs: [],

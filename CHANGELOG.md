@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Keep one pull request ready.** Each row on the Pull requests page has a Keep ready button. It lets the agent fix that pull request's merge conflicts, failing checks and review comments, also when Settings → Git → Keep PRs ready is off. If no workspace has the pull request, Korev checks it out in a new one first. Click it again to stop.
+
 ### Fixed
 
 - The Pull requests page refreshes again when many pull requests wait for your review. GitHub took too long to answer the single request for both lists, so the page kept showing "Couldn't refresh". Korev now asks for each list on its own, at the same time.

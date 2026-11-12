@@ -197,6 +197,7 @@ function sanitize(raw: unknown, home: string): PersistedState {
         label: workspace.label ?? null,
         keepAfterMerge: workspace.keepAfterMerge ?? false,
         pausePrReady: workspace.pausePrReady ?? false,
+        keepPrReady: workspace.keepPrReady ?? false,
         prReadyHandled: workspace.prReadyHandled ?? [],
         awaitsLane: workspace.awaitsLane ?? false,
         groupId: workspace.groupId ?? null,

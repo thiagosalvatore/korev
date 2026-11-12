@@ -100,7 +100,7 @@ export interface KorevApi {
   ): Promise<Result<{ askChatId: string }>>;
   setBaseBranch(workspaceId: string, branch: string): Promise<void>;
   setKeepAfterMerge(workspaceId: string, keep: boolean): Promise<void>;
-  setPausePrReady(workspaceId: string, paused: boolean): Promise<void>;
+  setKeepPrReady(workspaceId: string, keep: boolean): Promise<void>;
   renameWorkspace(workspaceId: string, label: string): Promise<void>;
   workspaceConfig(workspaceId: string): Promise<RepoConfig>;
   repoConfig(repoId: string): Promise<RepoConfig>;

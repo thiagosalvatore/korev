@@ -27,6 +27,7 @@ import {
   filterInbox,
   INBOX_STATUS_LABELS,
   INBOX_VIEWS,
+  keepsPrReady,
   primaryStatus,
   stackRows,
   type AppState,
@@ -40,6 +41,7 @@ import { reviewChatOf, workspaceOfPr } from '../shared/workspaces';
 import {
   checkOutPullRequest,
   explainPullRequest,
+  keepPullRequestReady,
   openAsk,
   reviewInboxPullRequest,
   selectWorkspace,
@@ -95,7 +97,7 @@ function useInbox() {
 }
 
 const ROW_GRID =
-  'grid grid-cols-[minmax(0,1fr)_220px_72px_112px] items-center gap-4 px-6';
+  'grid grid-cols-[minmax(0,1fr)_220px_72px_140px] items-center gap-4 px-6';
 const STACK_INDENT_PX = 18;
 const ROW_ACTION =
   'enabled:hover:border-border-2 enabled:hover:bg-raised enabled:hover:shadow-1';
@@ -175,6 +177,9 @@ function rowDetails(pr: InboxPullRequest, repoName: string | undefined) {
 function RowActions({ state, pr }: { state: AppState; pr: InboxPullRequest }) {
   const review = reviewChatOf(state, pr.url);
   const workspace = workspaceOfPr(state, pr.url);
+  const keepsReady = workspace
+    ? keepsPrReady(workspace, state.settings)
+    : false;
   return (
     <div className="flex items-center justify-end gap-0.5">
       <IconButton
@@ -211,6 +216,25 @@ function RowActions({ state, pr }: { state: AppState; pr: InboxPullRequest }) {
         }
         onClick={() =>
           workspace ? selectWorkspace(workspace.id) : checkOutPullRequest(pr)
+        }
+      />
+      <IconButton
+        size="sm"
+        className={ROW_ACTION}
+        icon="shield-check"
+        label="Keep ready"
+        active={keepsReady}
+        title={
+          keepsReady
+            ? 'Stop the agent from fixing conflicts, failing checks and review comments on this pull request'
+            : workspace
+              ? "Let the workspace's agent fix conflicts, failing checks and review comments on this pull request"
+              : 'Check out this pull request in a workspace whose agent fixes its conflicts, failing checks and review comments'
+        }
+        onClick={() =>
+          workspace
+            ? api.setKeepPrReady(workspace.id, !keepsReady)
+            : keepPullRequestReady(pr)
         }
       />
       <IconButton

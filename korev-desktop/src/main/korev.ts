@@ -1488,8 +1488,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       ctx.workspace(workspaceId).keepAfterMerge = keep;
       saveAndEmit();
     },
-    async setPausePrReady(workspaceId, paused) {
-      ctx.workspace(workspaceId).pausePrReady = paused;
+    async setKeepPrReady(workspaceId, keep) {
+      const workspace = ctx.workspace(workspaceId);
+      if (store.state.settings.keepPrsReady) workspace.pausePrReady = !keep;
+      else workspace.keepPrReady = keep;
       saveAndEmit();
     },
     async renameWorkspace(workspaceId, label) {

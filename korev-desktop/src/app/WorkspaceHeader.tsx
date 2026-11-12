@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, cn, Icon, IconButton, type IconName } from '../design-system';
 import {
+  keepsPrReady,
   MERGE_STEPS,
   nextPrStep,
   PR_STEPS,
@@ -184,6 +185,7 @@ export function WorkspaceHeader({
   const repoName = groupRepoName(state, workspace);
   const pr = primaryPr(workspace, runtime, prUrl);
   const action = nextAction(state, workspace, pr);
+  const keepsReady = keepsPrReady(workspace, state.settings);
   const editor =
     state.editors.find((entry) => entry.id === state.settings.editor) ??
     state.editors[0];
@@ -240,16 +242,14 @@ export function WorkspaceHeader({
         >
           Keep after merge
         </Button>
-        {state.settings.keepPrsReady ? (
+        {state.settings.keepPrsReady || workspace.keepPrReady ? (
           <Button
             size="sm"
-            variant={workspace.pausePrReady ? 'ghost' : 'secondary'}
+            variant={keepsReady ? 'secondary' : 'ghost'}
             icon="shield-check"
-            aria-pressed={!workspace.pausePrReady}
+            aria-pressed={keepsReady}
             title="Let the agent fix failing checks, conflicts and review comments on this workspace's pull requests"
-            onClick={() =>
-              void api.setPausePrReady(workspace.id, !workspace.pausePrReady)
-            }
+            onClick={() => void api.setKeepPrReady(workspace.id, !keepsReady)}
           >
             Keep PR ready
           </Button>

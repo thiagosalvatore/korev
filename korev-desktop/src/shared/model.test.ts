@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  keepsPrReady,
   answerQuestions,
   conversationText,
   EMPTY_INBOX_FILTER,
@@ -455,5 +456,36 @@ describe('stackRows', () => {
       [1, 0, null],
       [2, 0, null],
     ]);
+  });
+});
+
+describe('keepsPrReady', () => {
+  it.each([
+    [
+      'the setting is on',
+      true,
+      { pausePrReady: false, keepPrReady: false },
+      true,
+    ],
+    [
+      'the workspace is paused',
+      true,
+      { pausePrReady: true, keepPrReady: true },
+      false,
+    ],
+    [
+      'the setting is off',
+      false,
+      { pausePrReady: false, keepPrReady: false },
+      false,
+    ],
+    [
+      'the workspace opted in',
+      false,
+      { pausePrReady: true, keepPrReady: true },
+      true,
+    ],
+  ])('when %s', (_case, keepPrsReady, flags, expected) => {
+    expect(keepsPrReady(flags, { keepPrsReady })).toBe(expected);
   });
 });

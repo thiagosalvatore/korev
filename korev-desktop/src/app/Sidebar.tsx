@@ -13,6 +13,7 @@ import {
 } from '../design-system';
 import {
   failingRequiredChecks,
+  keepsPrReady,
   prBadge,
   PR_BADGE_LABELS,
   primaryPr,
@@ -548,17 +549,17 @@ function WorkspaceRow({
                     !workspace.keepAfterMerge,
                   ),
               },
-              ...(state.settings.keepPrsReady
+              ...(state.settings.keepPrsReady || workspace.keepPrReady
                 ? [
                     {
                       id: 'keep-pr-ready',
                       label: 'Keep PR ready',
                       icon: 'shield-check' as const,
-                      checked: !workspace.pausePrReady,
+                      checked: keepsPrReady(workspace, state.settings),
                       onSelect: () =>
-                        void api.setPausePrReady(
+                        void api.setKeepPrReady(
                           workspace.id,
-                          !workspace.pausePrReady,
+                          !keepsPrReady(workspace, state.settings),
                         ),
                     },
                   ]

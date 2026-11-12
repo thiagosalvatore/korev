@@ -482,6 +482,7 @@ export interface Workspace {
   archiveSnapshot: Checkpoint | null;
   keepAfterMerge: boolean;
   pausePrReady: boolean;
+  keepPrReady: boolean;
   prReadyHandled: string[];
   awaitsLane: boolean;
   folderId?: string | null;
@@ -677,10 +678,12 @@ export type ReReviews = 'off' | 'check' | 'approve';
 export type ReviewReplies = 'none' | 'reply' | 'reply-and-resolve' | 'custom';
 
 export function keepsPrReady(
-  workspace: Workspace,
+  workspace: Pick<Workspace, 'pausePrReady' | 'keepPrReady'>,
   settings: Pick<Settings, 'keepPrsReady'>,
 ): boolean {
-  return settings.keepPrsReady && !workspace.pausePrReady;
+  return settings.keepPrsReady
+    ? !workspace.pausePrReady
+    : workspace.keepPrReady;
 }
 
 export interface ModelSetting {
