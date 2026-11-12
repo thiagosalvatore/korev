@@ -7,7 +7,7 @@ A workspace is a [git worktree](https://git-scm.com/docs/git-worktree) on its ow
 
 ## Where workspaces live
 
-Korev puts each worktree at `<workspaces location>/<repo>/<workspace name>`. The default location is `~/korev/workspaces`. Change it in **Settings → Storage → Workspaces location**.
+Korev puts each worktree at `<workspaces location>/<repo>/<workspace name>`. The default location is `~/korev/workspaces`. Change it in **Settings → Storage → Workspaces location**. A repository with a [worktree pool](../guides/configure-your-repository.mdx#reuse-worktrees) keeps its worktrees at `<workspaces location>/<repo>/.pool/<n>` instead.
 
 All worktrees share the main checkout's `.git` folder, so they share commits, branches and remotes.
 
@@ -38,11 +38,12 @@ The target branch decides the `+N −M` counts in the sidebar, the Changes tab, 
 
 Every workspace has a `.context/` folder. Korev adds it to the repository's `.git/info/exclude`, so git ignores it and nobody needs to change `.gitignore`.
 
-- Agents are told they can save files there to share notes with other agents.
+- Agents are told they can save files there to share notes with other agents, and to save the documents and screenshots they make for you there.
+- Each plan is saved to `.context/plans/`, in a file named from the plan's first heading. A revised plan with the same heading replaces the file.
 - Attachments you add to a chat are saved in `.context/attachments/`.
 - The Create PR prompt tells the agent not to commit it.
 
-The **Artifacts** tab in the right panel lists the files in `.context/`, except attachments. Click a file to open it: markdown is rendered and images are shown. Right-click a file to reveal it in Finder or open it in its default app. To point the agent at a file, drag it into the message box or type `@` and its name.
+The **Artifacts** tab in the right panel lists the files in `.context/`, except attachments. Click a file to open it: markdown is rendered and images are shown. Right-click a file to reveal it in Finder or open it in its default app. When Korev cannot show a file, such as a video or a file over 1 MB, the tab has **Open outside Korev**. To point the agent at a file, drag it into the message box or type `@` and its name.
 
 ## Ports
 
@@ -52,7 +53,7 @@ Each active workspace gets ten ports. `KOREV_PORT` is the first one: 55000 for t
 
 - **Line 1** is the branch name. It is bold when the workspace has agent output you have not read.
 - **Line 2** is the workspace name, a link icon for [linked workspaces](./linked-workspaces.mdx), and the error if setup failed.
-- **The icon** is a spinner while an agent or the setup script runs. Otherwise it shows the pull request state: open, draft, checks running, checks failing, conflicts, merged or closed.
+- **The icon** is a spinner while an agent or the setup script runs, a question mark while an agent waits for you, and a red warning sign when the setup or the agent failed. Otherwise it shows the pull request state: open, draft, checks running, checks failing, conflicts, merged or closed.
 - **On the right** are `+N −M` against the target branch and the unread dot.
 
 ## Waiting for you
@@ -80,7 +81,7 @@ To use the whole width, click **Wide chat**, the icon at the right of the tab ba
 
 Put workspaces of one repository in a folder to keep them together.
 
-- Open a workspace's **⋯** menu. Under **Move to folder**, pick a folder, **No folder**, or **New folder…**.
+- Open a workspace's **⋯** menu. Under **Move to folder**, pick a folder, **No folder**, or **New folder…**. The menu lists up to two folders, the current one first. With more folders, **More folders…** opens a dialog where you can search for one.
 - Or drag a workspace onto a folder.
 - Click a folder to collapse or expand it. Its **⋯** menu renames or deletes it. Deleting a folder keeps its workspaces.
 - A folder shows only while it has a workspace that is not archived.
@@ -97,7 +98,7 @@ The command palette also searches the chats of every workspace, archived ones to
 1. Stops the agents and terminals.
 2. Runs the archive script, for up to five minutes.
 3. Saves a snapshot of the files.
-4. Removes the worktree.
+4. Removes the worktree. A pooled worktree stays on disk, and the next new workspace reuses it.
 
 The branch stays unless **Settings → Git → Delete branch on archive** is on.
 

@@ -44,6 +44,7 @@ When the agent finishes a plan, the chat shows **Plan ready for review**. Claude
 
 - **Approve plan** turns plan mode off and lets the agent build it.
 - To keep planning, type your feedback in the message box and send it. Plan mode stays on. You can @mention files, attach images and use everything else the message box supports.
+- **Copy plan** copies the plan with its formatting, so it pastes well into Slack or a document.
 
 <Screenshot
   name="plan-review"
@@ -53,6 +54,13 @@ When the agent finishes a plan, the chat shows **Plan ready for review**. Claude
 Codex runs in its read-only sandbox in plan mode. When you approve a Codex plan, Korev sends "Implement the plan." with plan mode off.
 
 To start every chat in plan mode, turn on **Settings → Default models → Start chats in plan mode**.
+
+## Read the chat
+
+- Agent replies and your own messages show as formatted markdown.
+- Hover an agent reply and click **Copy message** under it. Korev copies the markdown as plain text and the formatted text as rich text, so Slack, Google Docs and Notes keep the formatting.
+- Each code block has a **Copy code** button in its corner.
+- When Claude Code starts a sub-agent, its tool calls fold under the Task row as "N tool calls". Click the row to see them.
 
 ## Steer, queue and stop
 

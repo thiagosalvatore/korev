@@ -17,6 +17,8 @@ They come after the repository's `[environment_variables]`, so a repository cann
 
 Agent processes also get `KOREV_SESSION_ID`.
 
+With [Sign agent commits with a Korev key](./settings.mdx#sign-agent-commits) on, agents and scripts also get `KOREV_SIGNING_KEY` and `GIT_CONFIG_*` variables. These make git sign each commit with the Korev key. Your own terminal does not get them.
+
 Ask chats do not run in a workspace, so they get none of these.
 
 ## Ports
@@ -24,6 +26,16 @@ Ask chats do not run in a workspace, so they get none of these.
 `KOREV_PORT` starts at 55000 and goes up in steps of ten, one block per active workspace. A workspace owns `$KOREV_PORT` to `$KOREV_PORT+9`. A restored workspace gets a new block.
 
 In scripts, the shell expands `$KOREV_PORT` and `$((KOREV_PORT + 1))`. In `preview_urls`, Korev expands them itself.
+
+## Variables from your login shell
+
+Korev reads these from your login shell when it starts, and passes them to everything it starts:
+
+- `PATH`
+- `SSH_AUTH_SOCK`, so git and agents can use your SSH agent, for example Secretive or 1Password
+- `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE` and `GIT_SSL_CAINFO`, so tools trust your company's certificates
+
+Korev does not copy any other variable from your shell, so a token you export in `~/.zshrc` does not reach the agents. Put the variables a workspace needs in the repository's [`[environment_variables]`](./repository-config.mdx). After you change your shell config, quit and open Korev again.
 
 ## Variables Korev removes
 

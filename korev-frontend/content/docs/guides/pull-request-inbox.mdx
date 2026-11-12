@@ -7,7 +7,7 @@ description: 'See every pull request that waits for your review, and every pull 
 
 Pull requests in repositories that are not in Korev do not show. To see them, add the repository with **Add repository**.
 
-Korev reads the list with `gh`, so `gh` must be installed and signed in. The list updates when you open the page, every two minutes while it is open, and when you press the refresh button. You can also open it from the command palette (⌘K) with **Pull requests**.
+Korev reads the list with `gh`, so `gh` must be installed and signed in. The page shows the last list it loaded at once, also after you restart Korev, and refreshes it in the background. The list updates when you open the page, every two minutes while it is open, and when you press the refresh button. If a refresh fails, the old list stays and **Couldn't refresh** shows next to the title. If there is no list yet and loading fails, the page shows **Couldn't load pull requests** with the error and a **Try again** button. You can also open it from the command palette (⌘K) with **Pull requests**.
 
 ## Find a pull request
 
