@@ -482,7 +482,6 @@ export interface Workspace {
   archiveSnapshot: Checkpoint | null;
   keepAfterMerge: boolean;
   pausePrReady: boolean;
-  // Keeps this workspace's PR ready while Settings → Git → Keep PRs ready is off.
   keepPrReady: boolean;
   prReadyHandled: string[];
   awaitsLane: boolean;
