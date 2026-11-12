@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CommandRunner } from './command-runner';
-import { listPullRequests, parseInbox } from './sources';
+import { listInbox, listPullRequests, parseInbox } from './sources';
 
 function recordingRunner(calls: (readonly string[])[]): CommandRunner {
   return async (_file, args) => {
@@ -72,7 +72,7 @@ describe('the pull request inbox', () => {
     });
 
     expect(
-      parseInbox(json, repoIds).map((pr) => [
+      parseInbox([json], repoIds).map((pr) => [
         pr.number,
         pr.repoId,
         pr.reason,
@@ -104,7 +104,7 @@ describe('the pull request inbox', () => {
       },
     });
 
-    const [pr] = parseInbox(json, repoIds);
+    const [pr] = parseInbox([json], repoIds);
     expect([pr.createdAt, pr.unresolvedThreads]).toEqual([
       '2026-10-30T09:00:00Z',
       2,
@@ -112,6 +112,61 @@ describe('the pull request inbox', () => {
   });
 
   it('is empty when GitHub does not answer with JSON', () => {
-    expect(parseInbox('gh: not logged in', repoIds)).toEqual([]);
+    expect(parseInbox(['gh: not logged in'], repoIds)).toEqual([]);
+  });
+
+  function inboxRunner(
+    queries: string[],
+    answer: (query: string) => {
+      exitCode: number;
+      stdout: string;
+      stderr: string;
+    },
+  ): CommandRunner {
+    return async (_file, args) => {
+      const query = args[args.length - 1];
+      queries.push(query);
+      return answer(query);
+    };
+  }
+
+  function searchResponse(alias: string, prs: unknown[]) {
+    return JSON.stringify({ data: { [alias]: { nodes: prs } } });
+  }
+
+  it('asks GitHub for each search in its own request and merges them, newest first', async () => {
+    const queries: string[] = [];
+    const runner = inboxRunner(queries, (query) => ({
+      exitCode: 0,
+      stdout: query.includes('review-requested:@me')
+        ? searchResponse('review', [searchedPr(1, 'acme/web')])
+        : searchResponse('mine', [searchedPr(2, 'acme/web')]),
+      stderr: '',
+    }));
+
+    const inbox = await listInbox(runner, {}, '/home', repoIds);
+
+    expect(queries.map((query) => query.match(/search\(/g)?.length)).toEqual([
+      1, 1,
+    ]);
+    expect(inbox.ok && inbox.value.map((pr) => [pr.number, pr.reason])).toEqual(
+      [
+        [2, 'authored'],
+        [1, 'review-requested'],
+      ],
+    );
+  });
+
+  it('fails with what GitHub said when one of the searches fails', async () => {
+    const runner = inboxRunner([], (query) =>
+      query.includes('author:@me')
+        ? { exitCode: 1, stdout: '', stderr: 'gh: HTTP 504\n' }
+        : { exitCode: 0, stdout: searchResponse('review', []), stderr: '' },
+    );
+
+    expect(await listInbox(runner, {}, '/home', repoIds)).toEqual({
+      ok: false,
+      message: 'gh: HTTP 504',
+    });
   });
 });

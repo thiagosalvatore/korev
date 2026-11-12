@@ -15,21 +15,25 @@ const THREADS_LIMIT = 100;
 const INBOX_FAILED =
   'Korev could not reach GitHub. Check that `gh` is installed and signed in.';
 const OPEN_PRS = 'is:pr is:open archived:false';
-const INBOX_SEARCHES: Record<string, InboxReason> = {
-  review: 'review-requested',
-  mine: 'authored',
-};
-const INBOX_QUERY = `query {
-  review: search(query: "${OPEN_PRS} review-requested:@me", type: ISSUE, first: ${INBOX_LIMIT}) { nodes { ...inboxPr } }
-  mine: search(query: "${OPEN_PRS} author:@me", type: ISSUE, first: ${INBOX_LIMIT}) { nodes { ...inboxPr } }
-}
-fragment inboxPr on PullRequest {
+const INBOX_SEARCHES: Record<string, { filter: string; reason: InboxReason }> =
+  {
+    review: { filter: 'review-requested:@me', reason: 'review-requested' },
+    mine: { filter: 'author:@me', reason: 'authored' },
+  };
+const INBOX_FRAGMENT = `fragment inboxPr on PullRequest {
   number title url isDraft createdAt updatedAt headRefName baseRefName reviewDecision mergeable
   author { login }
   reviewThreads(first: ${THREADS_LIMIT}) { nodes { isResolved } }
   repository { url }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 }`;
+
+function inboxQuery(alias: string, filter: string): string {
+  return `query {
+  ${alias}: search(query: "${OPEN_PRS} ${filter}", type: ISSUE, first: ${INBOX_LIMIT}) { nodes { ...inboxPr } }
+}
+${INBOX_FRAGMENT}`;
+}
 
 type JsonRecord = Record<string, unknown>;
 
@@ -177,19 +181,25 @@ function toInboxPr(
   };
 }
 
+function readInboxResponse(json: string): InboxResponse {
+  try {
+    return JSON.parse(json) as InboxResponse;
+  } catch {
+    return {};
+  }
+}
+
 export function parseInbox(
-  json: string,
+  responses: string[],
   repoIdsByUrl: Map<string, string>,
 ): InboxPullRequest[] {
-  let response: InboxResponse;
-  try {
-    response = JSON.parse(json) as InboxResponse;
-  } catch {
-    return [];
-  }
+  const data = Object.assign(
+    {},
+    ...responses.map((json) => readInboxResponse(json).data),
+  ) as NonNullable<InboxResponse['data']>;
   return Object.entries(INBOX_SEARCHES)
-    .flatMap(([alias, reason]) =>
-      (response.data?.[alias]?.nodes ?? []).flatMap((pr) => {
+    .flatMap(([alias, { reason }]) =>
+      (data[alias]?.nodes ?? []).flatMap((pr) => {
         const repoId = repoIdsByUrl.get(str(pr.repository?.url).toLowerCase());
         return repoId && typeof pr.number === 'number'
           ? [toInboxPr(pr, reason, repoId)]
@@ -206,14 +216,29 @@ export async function listInbox(
   repoIdsByUrl: Map<string, string>,
 ): Promise<Result<InboxPullRequest[]>> {
   try {
-    const result = await run(
-      'gh',
-      ['api', 'graphql', '-f', `query=${INBOX_QUERY}`],
-      { cwd, env, timeoutMs: GH_TIMEOUT_MS },
+    const results = await Promise.all(
+      Object.entries(INBOX_SEARCHES).map(([alias, { filter }]) =>
+        run(
+          'gh',
+          ['api', 'graphql', '-f', `query=${inboxQuery(alias, filter)}`],
+          {
+            cwd,
+            env,
+            timeoutMs: GH_TIMEOUT_MS,
+          },
+        ),
+      ),
     );
-    if (result.exitCode !== 0)
-      return { ok: false, message: result.stderr.trim() || INBOX_FAILED };
-    return { ok: true, value: parseInbox(result.stdout, repoIdsByUrl) };
+    const failed = results.find((result) => result.exitCode !== 0);
+    if (failed)
+      return { ok: false, message: failed.stderr.trim() || INBOX_FAILED };
+    return {
+      ok: true,
+      value: parseInbox(
+        results.map((result) => result.stdout),
+        repoIdsByUrl,
+      ),
+    };
   } catch {
     return { ok: false, message: INBOX_FAILED };
   }
