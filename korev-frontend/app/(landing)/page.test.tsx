@@ -45,5 +45,10 @@ describe('landing page', () => {
         name: 'Understand a pull request before you review it.',
       }),
     ).toBeTruthy();
+    expect(
+      screen.getByRole('heading', {
+        name: 'Every pull request that needs you, in one table.',
+      }),
+    ).toBeTruthy();
   });
 });
