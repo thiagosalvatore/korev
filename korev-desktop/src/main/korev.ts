@@ -436,9 +436,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   const chats = createChats(
     ctx,
     (workspaceId, links) => {
-      void trackOpenedPrs(workspaceId, links)
-        .then(() => refreshPrs(workspaceId))
-        .catch(() => null);
+      ctx.background(
+        trackOpenedPrs(workspaceId, links)
+          .then(() => refreshPrs(workspaceId))
+          .catch(() => null),
+      );
       ctx.background(
         orchestration.turnFinished(links.sessionId).catch(() => undefined),
       );
@@ -1464,7 +1466,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       ctx.runtime(workspace.id).prs = [pr];
       store.save();
       ctx.emitState();
-      void refreshPrs(origin.id).catch(() => null);
+      ctx.background(refreshPrs(origin.id).catch(() => null));
       return ok(workspace);
     },
     listBranches: (repoId) => listBranches(git, ctx.repo(repoId).path),
