@@ -41,7 +41,6 @@ const TOOLTIP =
   'pointer-events-none fixed inset-auto m-1 max-w-64 rounded-sm border-0 bg-raised px-2 py-1 text-left text-xs font-normal whitespace-normal text-fg-1 shadow-pop [position-area:top] [position-try-fallbacks:top_span-left,top_span-right,bottom,bottom_span-left,bottom_span-right]';
 const TOOLTIP_DELAY_MS = 500;
 
-// Chromium on macOS shows `title` tooltips unreliably, often only once.
 function useTooltip() {
   const [shown, setShown] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -84,7 +83,6 @@ export function IconButton({
       type="button"
       aria-label={label}
       aria-describedby={title ? tooltipId : undefined}
-      // Disabled buttons get no pointer events, so they keep the native tooltip.
       title={disabled ? (title ?? label) : undefined}
       aria-pressed={active}
       className={cn(BASE, VARIANTS[variant], SIZES[size], className)}
