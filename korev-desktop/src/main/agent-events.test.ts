@@ -300,6 +300,62 @@ describe('Claude stream parser', () => {
     });
   });
 
+  it('reports a /compact and the context it leaves', () => {
+    const parser = createClaudeParser(CWD);
+    const items = feedAll(parser, [
+      {
+        type: 'system',
+        subtype: 'compact_boundary',
+        uuid: 'boundary-1',
+        compact_metadata: {
+          trigger: 'manual',
+          pre_tokens: 33_535,
+          post_tokens: 9_332,
+        },
+      },
+      {
+        type: 'user',
+        isReplay: true,
+        message: {
+          role: 'user',
+          content: '<local-command-stdout>Compacted</local-command-stdout>',
+        },
+      },
+      {
+        type: 'result',
+        subtype: 'success',
+        local_command: 'compact',
+        modelUsage: { 'claude-haiku-5-5': { contextWindow: 1_000_000 } },
+      },
+    ]);
+
+    expect(items).toMatchObject([
+      { id: 'compact:boundary-1', kind: 'notice' },
+      { kind: 'result', ok: true },
+    ]);
+    expect(parser.usage()?.context).toEqual({
+      usedTokens: 9_332,
+      windowTokens: 1_000_000,
+    });
+  });
+
+  it('shows what a local command like /compact replies', () => {
+    const items = feedAll(createClaudeParser(CWD), [
+      {
+        type: 'result',
+        subtype: 'success',
+        local_command: 'compact',
+        result: 'Not enough messages to compact.',
+        uuid: 'result-1',
+      },
+    ]);
+
+    expect(items).toMatchObject([
+      { kind: 'notice', text: 'Not enough messages to compact.' },
+      { kind: 'result', ok: true },
+    ]);
+  });
+
   it('has no context fill when the stream carries no usage', () => {
     const parser = createClaudeParser(CWD);
     feedAll(parser, [{ type: 'result', subtype: 'success' }]);
