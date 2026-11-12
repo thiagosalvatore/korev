@@ -79,13 +79,11 @@ function luminance(rgb: Rgb): number {
   return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 }
 
-// Korev's own cobalt carries white text at about 4:1, so white stays until it drops under the 3:1 minimum for UI text.
 function textOn(rgb: Rgb): string {
   const whiteContrast = 1.05 / (luminance(rgb) + 0.05);
   return whiteContrast >= MIN_UI_CONTRAST ? toHex(WHITE) : toHex(DARK_TEXT);
 }
 
-// Hover, press and text steps are mixed toward white on dark and toward black on light, like the hand-picked cobalt steps.
 export function accentTokens(
   hex: string,
   light: boolean,

@@ -314,7 +314,6 @@ function AccentSwatch({
   );
 }
 
-// The color picker fires on every drag step, so it previews on the page right away and saves once the drag settles.
 function AccentPicker({ accent }: { accent: string }) {
   const [draft, setDraft] = useState(accent);
   const pending = useRef<{

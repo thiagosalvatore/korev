@@ -1,4 +1,3 @@
-/* data-theme='dark' also matches the theme previews in Settings, so a dark preview works inside the light app. */
 :root,
 [data-theme='dark'] {
   /* Graphite neutrals (cool, low-chroma) */
@@ -210,7 +209,6 @@
   --selection-bg: rgba(47, 91, 234, 0.22);
 }
 
-/* Theme presets (Settings → Appearance). Korev is the default above; each preset overrides surfaces, borders, text and, when it has its own, the accent. */
 [data-theme='dark'][data-palette='graphite'] {
   --bg-app: #181818;
   --bg-surface: #1e1e1e;
