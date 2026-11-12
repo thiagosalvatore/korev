@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import { fontVariables } from '@/app/fonts';
 import { THEME_STORAGE_KEY } from '@/components/landing/theme';
+import { SITE_METADATA } from '@/lib/site-metadata';
 import './globals.css';
 
 const APPLY_STORED_THEME = `(function(){try{var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});if(t)document.documentElement.dataset.theme=t}catch(e){}})()`;
 
 export const metadata: Metadata = {
+  ...SITE_METADATA,
   title: 'Korev · Every task on its own branch',
   description:
     'Korev runs Claude Code and Codex in parallel on your Mac. Each task gets a git worktree with its own chats, terminal, diff and pull request.',
