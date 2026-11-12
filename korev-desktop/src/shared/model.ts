@@ -1058,6 +1058,7 @@ export type ChatItem =
       at: string;
       checkpoint: Checkpoint | null;
       queued?: boolean;
+      fromKorev?: boolean;
     }
   | { id: string; kind: 'assistant'; text: string }
   | { id: string; kind: 'thinking'; text: string }
@@ -1403,6 +1404,7 @@ export interface SendOptions {
   planMode: boolean;
   fast: boolean;
   answers?: Record<string, string[]>;
+  fromKorev?: boolean;
 }
 
 export type FileStatus = 'A' | 'M' | 'D' | 'R';

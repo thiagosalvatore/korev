@@ -86,6 +86,37 @@ describe('Transcript', () => {
     ).toBeTruthy();
   });
 
+  it('labels the messages Korev sent', () => {
+    const at = '2026-10-28T09:05:00.000Z';
+    render(
+      <Transcript
+        sessionId="session-1"
+        items={[
+          { id: 'user-1', kind: 'user', text: 'Mine', at, checkpoint: null },
+          {
+            id: 'user-2',
+            kind: 'user',
+            text: 'Fix the checks',
+            at,
+            checkpoint: null,
+            fromKorev: true,
+          },
+        ]}
+        running={false}
+        empty={null}
+        onRevert={vi.fn()}
+        onRespond={vi.fn()}
+        onRetry={vi.fn()}
+        onOpenTurnFile={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByText('Korev')).toHaveLength(1);
+    expect(screen.getByLabelText('Sent by Korev').textContent).toContain(
+      'Fix the checks',
+    );
+  });
+
   function renderAnswer(wide: boolean) {
     render(
       <Transcript

@@ -896,15 +896,16 @@ export function createChats(
     sessionId: string,
     items: ChatItem[],
     turn: ActiveTurn,
-    text: string,
+    options: SendOptions,
   ): boolean {
+    const { text } = options;
     const { session } = locate(sessionId);
     const process = turn.process;
     if (AGENTS[session.agent].input !== 'stream-json' || !process?.inputOpen())
       return false;
     process.write(claudeUserMessage(text));
     turn.written += 1;
-    upsert(sessionId, items, userItem(text));
+    upsert(sessionId, items, userItem(text, options.fromKorev));
     return true;
   }
 
@@ -953,17 +954,24 @@ export function createChats(
     return answered;
   }
 
-  function queue(sessionId: string, items: ChatItem[], text: string) {
-    upsert(sessionId, items, { ...userItem(text), queued: true });
+  function queue(sessionId: string, items: ChatItem[], options: SendOptions) {
+    upsert(sessionId, items, {
+      ...userItem(options.text, options.fromKorev),
+      queued: true,
+    });
   }
 
-  function userItem(text: string): Extract<ChatItem, { kind: 'user' }> {
+  function userItem(
+    text: string,
+    fromKorev = false,
+  ): Extract<ChatItem, { kind: 'user' }> {
     return {
       id: ctx.deps.newId(),
       kind: 'user',
       text,
       at: ctx.deps.now().toISOString(),
       checkpoint: null,
+      ...(fromKorev && { fromKorev }),
     };
   }
 
@@ -984,18 +992,12 @@ export function createChats(
       const questionId = waitingRequestId(sessionId, QUESTION_TOOL);
       if (questionId)
         return replyToQuestion(sessionId, items, questionId, options);
-      if (!steer(sessionId, items, active, options.text))
-        queue(sessionId, items, options.text);
+      if (!steer(sessionId, items, active, options))
+        queue(sessionId, items, options);
       return { ok: true, value: undefined };
     }
     const firstMessage = !items.some((item) => item.kind === 'user');
-    const message: Extract<ChatItem, { kind: 'user' }> = {
-      id: ctx.deps.newId(),
-      kind: 'user',
-      text: options.text,
-      at: ctx.deps.now().toISOString(),
-      checkpoint: null,
-    };
+    const message = userItem(options.text, options.fromKorev);
     upsert(sessionId, items, message);
     const checkpoint = workspace
       ? await createCheckpoint(ctx.git, workspace.path).catch(() => null)

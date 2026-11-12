@@ -383,6 +383,25 @@ function AgentMessageCard({ message }: { message: AgentMessage }) {
   );
 }
 
+function MessageCaption({
+  className = 'text-fg-3',
+  children,
+}: {
+  className?: string;
+  children: string;
+}) {
+  return (
+    <span
+      className={cn(
+        'mb-1 block text-2xs font-medium tracking-wide uppercase',
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 function UserMessage({
   item,
   sessionId,
@@ -414,16 +433,19 @@ function UserMessage({
         ) : null}
       </div>
       <div
+        aria-label={item.fromKorev ? 'Sent by Korev' : undefined}
         className={cn(
-          'flex max-w-[85%] flex-col gap-2 rounded-lg border border-border-1 bg-raised px-3.5 py-2.5 text-md text-fg-1',
+          'flex max-w-[85%] flex-col gap-2 rounded-lg border px-3.5 py-2.5 text-md text-fg-1',
+          item.fromKorev
+            ? 'border-accent-border bg-accent-subtle'
+            : 'border-border-1 bg-raised',
           item.queued && 'border-dashed opacity-60',
         )}
       >
-        {item.queued ? (
-          <span className="mb-1 block text-2xs font-medium tracking-wide text-fg-3 uppercase">
-            Queued
-          </span>
+        {item.fromKorev ? (
+          <MessageCaption className="text-accent-text">Korev</MessageCaption>
         ) : null}
+        {item.queued ? <MessageCaption>Queued</MessageCaption> : null}
         {agentMessages.map((message, index) => (
           <AgentMessageCard key={index} message={message} />
         ))}
