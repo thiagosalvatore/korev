@@ -91,6 +91,7 @@ const SETTINGS: Settings = {
   archiveReviews: false,
   reReviews: 'off',
   keepPrsReady: false,
+  prCheckSeconds: 30,
   reviewReplies: 'reply',
   reviewReplyInstructions: '',
   toolApprovals: false,
