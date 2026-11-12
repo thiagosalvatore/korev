@@ -7,6 +7,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 ### Fixed
 
 - The Pull requests page refreshes again when many pull requests wait for your review. GitHub took too long to answer the single request for both lists, so the page kept showing "Couldn't refresh". Korev now asks for each list on its own, at the same time.
+- `/compact` now shows "Compacted the conversation" in the chat, and the context meter drops to what is left. Before, Claude compacted the chat but Korev showed nothing, and the meter kept the old size. Replies from `/compact`, such as "Not enough messages to compact.", now show too. A slash command also runs after you switch agents mid-chat.
 
 ## [0.32.0] - 2026-11-11
 
@@ -39,7 +40,6 @@ Pick Fable 5.2 for Claude Code, and discard a voice recording while Korev turns 
 ### Fixed
 
 - You can now discard a voice recording while Korev turns it into text, not only while you record. The discard button sits next to the stop button, and Esc works in both steps. Before, a slow transcription had no way out, and a discarded recording held up the next one.
-- `/compact` now shows "Compacted the conversation" in the chat, and the context meter drops to what is left. Before, Claude compacted the chat but Korev showed nothing, and the meter kept the old size. Replies from `/compact`, such as "Not enough messages to compact.", now show too. A slash command also runs after you switch agents mid-chat.
 
 ## [0.29.0] - 2026-11-09
 

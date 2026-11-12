@@ -298,7 +298,6 @@ export function createClaudeParser(cwd: string): TurnParser {
   }
 
   function onCompacted(event: JsonRecord): ChatItem[] {
-    // A /compact turn makes no model call, so the context fill comes from here.
     usedTokens = num(record(event.compact_metadata).post_tokens) || usedTokens;
     return [
       { id: `compact:${str(event.uuid)}`, kind: 'notice', text: COMPACTED },
@@ -318,7 +317,6 @@ export function createClaudeParser(cwd: string): TurnParser {
       costUsd:
         typeof event.total_cost_usd === 'number' ? event.total_cost_usd : null,
     };
-    // A local command such as /compact answers in the result, not in a message.
     const reply = ok && event.local_command ? str(event.result) : '';
     if (!reply) return [result];
     return [

@@ -116,7 +116,6 @@ export function replayPrompt(history: ChatItem[], text: string): string {
   if (!conversation) return text;
   const transcript = conversation.slice(-REPLAY_TOTAL_CHARS);
   const context = `<previous-conversation>\nHere is the conversation so far, for context:\n\n${transcript}\n</previous-conversation>`;
-  // The agent only runs a slash command that opens the message.
   return text.startsWith(SLASH_COMMAND_PREFIX)
     ? `${text}\n\n${context}`
     : `${context}\n\n${text}`;
