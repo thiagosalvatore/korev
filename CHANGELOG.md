@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### Fixed
+
+- The Pull requests page refreshes again when many pull requests wait for your review. GitHub took too long to answer the single request for both lists, so the page kept showing "Couldn't refresh". Korev now asks for each list on its own, at the same time.
+
 ## [0.32.0] - 2026-11-11
 
 Archive review chats once you approve, and let Korev re-check a review when the author asks for it again.
