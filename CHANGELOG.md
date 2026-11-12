@@ -4,6 +4,19 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-12
+
+See which chat messages Korev sent, and open the pull request from a review chat's header.
+
+### New
+
+- **Messages from Korev.** Korev sends many prompts into a chat for you: Keep PR ready fixes, re-reviews, automation runs, lane and worker messages, and the prompts behind the Fix checks, Create PR, Resolve conflicts, Start review, Approve plan and Explain buttons. These messages now have a tinted bubble and a "Korev" caption, on your Mac and on your phone. Text you type or say stays a normal bubble.
+- **Open the pull request from a review chat.** The header of a review chat has a `#<number>` button that opens the pull request on GitHub. You no longer have to scroll the chat to find a link.
+
+### Fixed
+
+- Needs review on the Pull requests page no longer shows pull requests that someone already approved. Before, a review request to your team kept a pull request there after a teammate approved it. A code-owner request that still waits for your review stays in the list. This also applies on your phone.
+
 ## [0.33.0] - 2026-11-12
 
 Pick a theme and an accent color, and keep one pull request ready from its row on the Pull requests page.
