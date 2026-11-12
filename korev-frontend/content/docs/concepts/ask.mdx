@@ -17,9 +17,9 @@ Open it with **New Ask** in the sidebar, or with **Ask about &lt;repo&gt;** on a
 - Before it runs a command, Korev asks you. This lets it do things outside the checkout with your approval, like posting a pull request review with `gh`. To let Ask chats run commands without asking, turn off **Ask before tool calls** and turn on **Ask chats follow the same behavior** in **Settings → Agents**.
 - Plan mode is not available in Ask.
 
-One Ask chat can cover several repositories. Pick them in the repository picker at the top of the chat.
+One Ask chat can cover several repositories. Pick them in the repository picker at the top of the chat. The picker lists up to three **Recent** repositories first, then the rest by name.
 
-To ask a general question, clear all repositories in the picker. The agent then runs in an empty folder, `<workspaces location>/.ask`, and answers without code. An Ask chat without a repository has no **Start workspace** button.
+**New Ask** in the sidebar starts with no repository picked, and **Ask about** on a repository's row picks that repository. To ask a general question, send it without picking a repository. The agent then runs in an empty folder, `<workspaces location>/.ask`, and answers without code. An Ask chat without a repository has no **Start workspace** button.
 
 Korev titles each Ask chat with Claude Haiku after your first message, so you can find it later in the sidebar:
 
@@ -31,7 +31,7 @@ Each list puts the chat with the latest message first and shows how long ago eac
 
 ## Review a pull request
 
-Press **Review a pull request** on the Ask page, press ⌘⇧R, or choose **Review a pull request…** in the command palette. Pick a pull request, or paste its link. Korev opens a new Ask about that pull request's repository, with `Review pull request #<number> <title>.` already in the composer.
+Press **Review a pull request** on the Ask page, press ⌘⇧R, or choose **Review a pull request…** in the command palette. Pick a pull request, or paste its link. Korev opens a new Ask about that pull request's repository, with `Review pull request #<number> <title>.` already in the composer. If the repository has a [Code review prompt](../guides/configure-your-repository.mdx#prompts), Korev adds it after that line.
 
 Add what to look at, such as "check the error handling", or type `/` to run a review skill. Then send it. The agent reads the pull request with `gh pr view` and `gh pr diff`. To post the review on GitHub, ask the agent to do it. You approve the `gh` command first.
 

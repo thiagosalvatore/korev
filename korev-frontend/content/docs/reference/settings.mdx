@@ -7,15 +7,28 @@ Open Settings with ⌘, or from the bottom of the sidebar. Esc closes it.
 
 ## General
 
-| Setting               | Default | What it does                                                                                                                                                                                  |
-| --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Theme                 | System  | System, Light or Dark. ⌘⌥T toggles between light and dark.                                                                                                                                    |
-| Notifications         | On      | Notifies you when an agent finishes or needs your input, while the Korev window is not in focus. Click a notification to go to the workspace.                                                 |
-| Phone notifications   | Empty   | An [ntfy](https://ntfy.sh) topic URL. Korev also sends each notification to this topic, so the ntfy app on your phone shows it. See [Remote access](./remote-access.mdx#phone-notifications). |
-| Sound                 | On      | Plays a sound with each notification.                                                                                                                                                         |
-| Sound file            | Glass   | The sound Korev plays. Click **Choose…** to pick an MP3, M4A, WAV or AIFF file, or **Use default** to go back to Glass.                                                                       |
-| Keep Mac awake        | On      | Keeps the Mac from sleeping while an agent runs.                                                                                                                                              |
-| Import from Conductor |         | See [Import from Conductor](../guides/import-from-conductor.mdx).                                                                                                                             |
+| Setting                             | Default | What it does                                                                                                                                                                                  |
+| ----------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Theme                               | System  | System, Light or Dark. ⌘⌥T toggles between light and dark.                                                                                                                                    |
+| Notifications                       | On      | Notifies you when an agent finishes or needs your input, while the Korev window is not in focus. Click a notification to go to the workspace.                                                 |
+| Phone notifications                 | Empty   | An [ntfy](https://ntfy.sh) topic URL. Korev also sends each notification to this topic, so the ntfy app on your phone shows it. See [Remote access](./remote-access.mdx#phone-notifications). |
+| Sound                               | On      | Plays a sound with each notification.                                                                                                                                                         |
+| Sound file                          | Glass   | The sound Korev plays. Click **Choose…** to pick an MP3, M4A, WAV or AIFF file, or **Use default** to go back to Glass.                                                                       |
+| Keep Mac awake                      | On      | Keeps the Mac from sleeping while an agent runs.                                                                                                                                              |
+| Sign agent commits with a Korev key | Off     | Agents sign their commits with a key in your Mac's Secure Enclave, so signing works while the Mac is locked. See [Sign agent commits](#sign-agent-commits).                                   |
+| Import from Conductor               |         | See [Import from Conductor](../guides/import-from-conductor.mdx).                                                                                                                             |
+
+### Sign agent commits
+
+Your own signing key may need Touch ID or an unlocked Mac, so an agent's commit fails to sign while you are away. With **Sign agent commits with a Korev key** on, agents use a key that Korev keeps in the Secure Enclave. The key cannot be copied off the Mac. While the Mac is on, any app that runs as you can sign with it.
+
+When you turn it on, Korev:
+
+1. Creates the key in `~/Library/Application Support/Korev/signing-key`.
+2. Adds it to your GitHub account as a signing key with `gh`, named `Korev on <your Mac's name>`.
+3. Adds it to the file in your `gpg.ssh.allowedSignersFile` git setting, with your global `user.email`, if that setting is set.
+
+Only Korev's agents and scripts sign with the key. Your own terminal and git config do not change. You can turn the setting on only on the Mac, not from the phone.
 
 ## Default models
 
@@ -31,10 +44,11 @@ Open Settings with ⌘, or from the bottom of the sidebar. Esc closes it.
 
 Has one tab per agent. Each tab shows whether the CLI is **Connected**, **Not signed in** or **Not installed**, with its version and account. **Refresh** checks again, for example after you sign in. A connected agent's tab also sets its default model and effort. Korev lists models only for connected agents.
 
-| Setting                            | Default | What it does                                                                                                                            |
-| ---------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Ask before tool calls              | Off     | Claude Code asks before each edit and command. See [Permissions](../concepts/permissions.mdx).                                          |
-| Ask chats follow the same behavior | Off     | Shows when **Ask before tool calls** is off. Ask chats run commands without asking too. See [Permissions](../concepts/permissions.mdx). |
+| Setting                            | Default | What it does                                                                                                                                    |
+| ---------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ask before tool calls              | Off     | Claude Code asks before each edit and command. See [Permissions](../concepts/permissions.mdx).                                                  |
+| Ask chats follow the same behavior | Off     | Shows when **Ask before tool calls** is off. Ask chats run commands without asking too. See [Permissions](../concepts/permissions.mdx).         |
+| Let agents coordinate other agents | On      | Workspace agents get the `korev` command to start and message workers in linked workspaces. See [Orchestration](../concepts/orchestration.mdx). |
 
 ## Git
 
@@ -79,6 +93,8 @@ One page per repository:
 - **Path**, with a copy button.
 - **Use spotlight testing.** See [Spotlight testing](../guides/spotlight.mdx).
 - **Default branch.** The target branch for new workspaces.
+- **Worktree pool.** How many worktrees Korev keeps and reuses for new workspaces. 0 creates a new worktree for each workspace. See [Reuse worktrees](../guides/configure-your-repository.mdx#reuse-worktrees).
+- **Files to copy.** The gitignored files Korev copies from the main checkout into each new workspace. See [Files to copy](../guides/configure-your-repository.mdx#copy-local-files-into-new-workspaces).
 - **Scripts**: setup, run and archive. Also **Stop other workspaces' run scripts when one starts**.
 - **Prompts**: General, Code review and Create pull request.
 - **Remove repository** archives and deletes all of the repository's workspaces and chats. It does not delete the repository folder.

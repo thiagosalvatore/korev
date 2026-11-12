@@ -20,7 +20,7 @@ Korev uses `origin/HEAD` as the default branch. If that is not set, it uses the 
 
 ## Create a workspace
 
-Press ⌘N (or **New workspace** in the sidebar, or the **+** on a repository row). Describe the task and press Enter.
+Press ⌘N (or **New workspace** in the sidebar, or the **+** on a repository row). Describe the task and press Enter. The repository picker lists up to three **Recent** repositories first, then the rest by name.
 
 <Screenshot
   name="new-workspace"
@@ -29,7 +29,7 @@ Press ⌘N (or **New workspace** in the sidebar, or the **+** on a repository ro
 
 Korev then:
 
-1. Fetches `origin/<target branch>`.
+1. Fetches `origin/<target branch>`. If the repository has no commits yet, Korev first makes an empty `Initial commit` on the target branch and pushes it.
 2. Creates a git worktree on a new branch from it.
 3. Creates a `.context/` folder for notes and attachments. Git ignores it.
 4. Copies your gitignored `.env*` files from the main checkout. See [Files to copy](../guides/configure-your-repository.mdx#copy-local-files-into-new-workspaces).
@@ -48,7 +48,7 @@ The agent's text, tool calls and file changes stream into the chat. While it run
 - Send another message to steer it.
 - Press ⌘⇧⌫ or the stop button to stop it.
 - Open the **Changes** tab in the right panel to see the diff against the target branch.
-- Open the **Terminal** tab (⌘J) for a shell in the worktree.
+- Press ⌘J to show or hide the terminal panel. Click its **Terminal** tab to start a shell in the worktree. ⌘R starts your run script in the **Run** tab.
 
 When the agent finishes, or needs your input, Korev shows a notification if the window is not in focus.
 

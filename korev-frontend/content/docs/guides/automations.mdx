@@ -30,7 +30,7 @@ A **Repeat** automation starts its first run within a minute, or when its time w
 
 Each run is a new chat with your default agent, in a scratch folder that is not a repository. The agent uses the same tools, MCP servers and `gh` sign-in as your other chats, so it can read tickets from wherever your tools reach.
 
-Nobody watches a run, so its tool calls run without approval, as they do in a workspace when **Tool approvals** is off.
+Nobody watches a run, so its tool calls run without approval, as they do in a workspace when **Settings → Agents → Ask before tool calls** is off.
 
 At the end of its reply, the agent lists the workspaces to open. Each one has a repository, a key and a prompt. The key names what the workspace handles, such as a ticket id. Korev then opens each workspace and sends the prompt to a new agent there, with the same defaults as a workspace you create.
 

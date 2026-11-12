@@ -31,10 +31,10 @@ The phone shows next to Settings in the Korev sidebar while the app is open.
 
 The tab bar at the bottom has two tabs, **Workspaces** and **Ask**, and a large **+** button between them that starts a new workspace.
 
-The **Workspaces** tab looks like the Korev sidebar. It shows your folders and repositories in the same order as on the Mac. Each repository shows its icon and its workspaces. Tap a folder or a repository name to collapse it. The tab shows a badge with the number of agents that wait for your answer.
+The **Workspaces** tab looks like the Korev sidebar. It shows your folders and repositories in the same order as on the Mac. Each repository shows its icon and its workspaces. Above them, **Across repos** shows each group of [linked workspaces](../concepts/linked-workspaces.mdx) once, with one row per repository. Tap a folder or a repository name to collapse it. The tab shows a badge with the number of agents that wait for your answer.
 
 - The icon on the left of a workspace shows a spinner while an agent or the setup script runs. It shows a question mark when an agent waits for your answer, and a warning sign when the setup or the agent failed.
-- Otherwise the icon shows the state of the PR, in the same colors as on the Mac. A workspace with no PR shows a branch icon.
+- Otherwise the icon shows the state of the PR, in the same colors as on the Mac. A yellow comment icon shows that a review comment waits for your answer. A workspace with no PR shows a branch icon.
 - `+N −M` shows the lines the workspace adds and removes against its target branch.
 - A dot shows when a workspace has agent output that you did not read.
 
@@ -54,19 +54,21 @@ Tap a workspace to open its chats. A chat that needs you opens first, else the l
 
 The bar at the top shows the name of the open chat. Tap it to see all the chats of the workspace and pick one. A spinner shows that an agent works in a chat, and a yellow dot with **Needs you** shows that a chat waits for your answer. A yellow dot next to the chat name shows that a different chat needs you. Tap **+ New chat** to start a chat with your default agent.
 
-- Agent replies show as plain text. Markdown is not formatted yet.
+- Agent replies show formatted markdown. Swipe a wide table sideways to see all its columns.
+- Long press a message for **Copy message**, which copies the whole message, or **Select text**, which opens it in a sheet where you can select any part.
 - Tap a tool call or **Thinking…** to see its details.
-- Type in the box at the bottom and tap **Send**. While the agent works, your message steers the agent or waits in the queue, the same as on the Mac.
-- Tap **Stop** to stop the agent.
-- Tap **Plan** to turn plan mode on or off. The box has a dashed border in plan mode.
+- Type in the box at the bottom and tap the send arrow. While the agent works, your message steers the agent or waits in the queue, the same as on the Mac.
+- Tap the paperclip to attach a photo or a file.
+- Tap the stop button to stop the agent.
+- Tap the sliders button for **Chat options**: the model, the effort, **Plan mode** and **Fast mode**. The box has a dashed border in plan mode.
 
 When the agent asks before it uses a tool or shows a plan, the chat shows a card. A question shows above the message box, and you can type your own answer there. Answer on the phone before the agent's turn ends.
 
 The plan card works as on the Mac. You can split a plan's lanes into [linked workspaces](../concepts/linked-workspaces.mdx#lanes-from-a-plan), and a Codex plan gets the card under its reply when the turn ends.
 
-Tap the microphone next to **Send** to speak instead of typing. This also works when you start a workspace or ask a question. Tap the red check to stop, or the trash icon to discard. The phone sends the recording to your Mac, and the Mac turns it into text. See [Voice input](../reference/composer.mdx#voice-input).
+To speak instead of typing, hold the microphone while the box is empty. Release it to insert the text. Slide left to cancel, or slide up to lock the recording so you can let go. A locked recording shows a stop button that inserts the text and a trash icon that discards it. This also works when you start a workspace or ask a question. The phone sends the recording to your Mac, and the Mac turns it into text. See [Voice input](../reference/composer.mdx#voice-input).
 
-The phone app cannot attach files yet, and opening a workspace on the phone does not mark it as read on the Mac.
+Opening a workspace on the phone does not mark it as read on the Mac.
 
 ## Pull request
 

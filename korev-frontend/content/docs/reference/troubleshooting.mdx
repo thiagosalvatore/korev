@@ -17,7 +17,25 @@ Releases from 0.3.0 on are notarized and open without this message. Download the
 
 ## "Setup script failed"
 
-Open the **Setup** tab in the terminal panel to see the output. Fix the script, then press **Rerun setup**. To archive a workspace that failed to create, press **Archive workspace**.
+Open the **Setup** tab in the terminal panel to see the output. Fix the script, then press **Rerun setup**. In the sidebar, a red warning sign shows a workspace whose setup or agent failed.
+
+## "Could not create the worktree"
+
+The workspace shows the last lines of the git output. Fix the cause, then press **Try again**. Korev creates the workspace again in the same place, with the same agent, model and task. If you restarted Korev after the failure, Korev cannot try again: press **Archive workspace** and create it again.
+
+## A git hook failed when Korev created a workspace
+
+Korev shows "A git hook failed in", the workspace name and the error. A git hook, such as `post-checkout`, failed after Korev checked out the branch. The workspace still starts: Korev runs your setup script and sends the task. Check the hook if the workspace needs what it does.
+
+## Agent commits fail to sign while the Mac is locked
+
+The agent's chat says "Commit signing failed, probably because your Mac is locked." Your signing key needs Touch ID or an unlocked Mac. Turn on **Settings → General → Sign agent commits with a Korev key**. See [Sign agent commits](./settings.mdx#sign-agent-commits).
+
+If Korev asks for a GitHub scope when you turn it on, run `gh auth refresh -h github.com -s admin:ssh_signing_key`, then turn the setting on again.
+
+## Git or an agent cannot use my SSH key or certificates
+
+Korev takes `SSH_AUTH_SOCK` and the certificate variables from your login shell. Check that they are set in a new terminal window, then quit and open Korev again. See [Variables from your login shell](./environment-variables.mdx#variables-from-your-login-shell).
 
 ## Workspaces are named from the first words of the task
 
