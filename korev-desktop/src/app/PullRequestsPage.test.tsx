@@ -32,6 +32,8 @@ function inboxPr(overrides: Partial<InboxPullRequest>): InboxPullRequest {
     mergeable: 'MERGEABLE',
     checks: 'success',
     unresolvedThreads: 0,
+    hasApproval: false,
+    requestedAsCodeOwner: false,
     ...overrides,
   };
 }

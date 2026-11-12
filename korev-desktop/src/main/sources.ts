@@ -12,6 +12,8 @@ const GH_TIMEOUT_MS = 30_000;
 const LIST_LIMIT = '50';
 const INBOX_LIMIT = 100;
 const THREADS_LIMIT = 100;
+const REVIEWS_LIMIT = 100;
+const APPROVED = 'APPROVED';
 const INBOX_FAILED =
   'Korev could not reach GitHub. Check that `gh` is installed and signed in.';
 const OPEN_PRS = 'is:pr is:open archived:false';
@@ -24,6 +26,8 @@ const INBOX_FRAGMENT = `fragment inboxPr on PullRequest {
   number title url isDraft createdAt updatedAt headRefName baseRefName reviewDecision mergeable
   author { login }
   reviewThreads(first: ${THREADS_LIMIT}) { nodes { isResolved } }
+  latestOpinionatedReviews(first: ${REVIEWS_LIMIT}) { nodes { state } }
+  viewerLatestReviewRequest { asCodeOwner }
   repository { url }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 }`;
@@ -144,6 +148,8 @@ interface SearchedPr {
   author?: { login?: string } | null;
   repository?: { url?: string };
   reviewThreads?: { nodes?: { isResolved?: boolean }[] };
+  latestOpinionatedReviews?: { nodes?: { state?: string }[] };
+  viewerLatestReviewRequest?: { asCodeOwner?: boolean } | null;
   commits?: {
     nodes?: { commit?: { statusCheckRollup?: { state?: string } | null } }[];
   };
@@ -178,6 +184,10 @@ function toInboxPr(
     unresolvedThreads: (pr.reviewThreads?.nodes ?? []).filter(
       (thread) => thread.isResolved === false,
     ).length,
+    hasApproval: (pr.latestOpinionatedReviews?.nodes ?? []).some(
+      (review) => review.state === APPROVED,
+    ),
+    requestedAsCodeOwner: pr.viewerLatestReviewRequest?.asCodeOwner === true,
   };
 }
 
