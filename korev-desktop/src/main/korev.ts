@@ -83,7 +83,10 @@ import {
 } from './git';
 import {
   createPrPrompt,
-  fetchPrStatus,
+  fetchPrByNumber,
+  fetchPrs,
+  githubRepo,
+  type BranchRef,
   fetchReviewStatus,
   findingsAddressed,
   approvePr,
@@ -140,8 +143,11 @@ import {
   activeWorkspaces,
 } from './workspaces';
 import { createVoiceCommands } from './voice-commands';
+import { createGhBackoff } from './gh-backoff';
 
 export const PR_POLL_MS = 30_000;
+export const IDLE_PR_POLL_FACTOR = 4;
+const SECOND_MS = 1000;
 const PR_CLOCK_SKEW_MS = 60_000;
 const FILE_MAX_BYTES = 1_000_000;
 const IMAGE_MAX_BYTES = 10_000_000;
@@ -360,6 +366,7 @@ function readablePath(root: string, home: string, file: string): string {
 export async function createKorev(deps: KorevDeps): Promise<Korev> {
   const store = await openStore(deps.fs, deps.userDataPath, deps.home);
   const git = createGit(deps.run, deps.env);
+  const gh = createGhBackoff(deps.run, () => deps.now().getTime());
   const runtimes = new Map<string, WorkspaceRuntime>();
   let agents: AgentAvailability[] = [];
   let update: Release | null = null;
@@ -559,8 +566,14 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     return ok(repo);
   }
 
-  function fetchPr(workspace: Workspace, ref: string) {
-    return fetchPrStatus(deps.run, deps.env, workspace.path, ref);
+  const repoSlugs = new Map<string, string>();
+
+  async function repoSlug(workspace: Workspace): Promise<string | null> {
+    const slug =
+      repoSlugs.get(workspace.repoId) ??
+      (await githubRepo(gh.run, deps.env, workspace.path));
+    if (slug) repoSlugs.set(workspace.repoId, slug);
+    return slug;
   }
 
   function track(workspace: Workspace, url: string, sessionId: string | null) {
@@ -572,33 +585,75 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   async function trackOpenedPrs(workspaceId: string, links: TurnPrLinks) {
     const workspace = ctx.workspace(workspaceId);
     const since = Date.parse(links.startedAt) - PR_CLOCK_SKEW_MS;
-    const statuses = await Promise.all(
-      links.urls
-        .filter((url) => !workspace.prs.some((pr) => pr.url === url))
-        .map((url) => fetchPr(workspace, url)),
+    const urls = links.urls.filter(
+      (url) => !workspace.prs.some((pr) => pr.url === url),
     );
-    for (const pr of statuses) {
-      if (pr && Date.parse(pr.createdAt) >= since)
+    if (!urls.length) return;
+    const { prs } = await fetchPrs(gh.run, deps.env, workspace.path, {
+      urls,
+      branches: [],
+    });
+    for (const pr of prs.values()) {
+      if (Date.parse(pr.createdAt) >= since)
         track(workspace, pr.url, links.sessionId);
     }
   }
 
+  function isSettled(pr: PrStatus) {
+    return pr.state === 'MERGED' || pr.state === 'CLOSED';
+  }
+
+  // Merged and closed PRs do not change, so only the first refresh after start fetches them.
+  async function prLookup(workspace: Workspace) {
+    const known = ctx.runtime(workspace.id).prs;
+    const settled = new Set(known.filter(isSettled).map((pr) => pr.url));
+    const urls = workspace.prs
+      .map((tracked) => tracked.url)
+      .filter((url) => !settled.has(url));
+    const hasBranchPr = known.some((pr) => pr.headRefName === workspace.branch);
+    const repo = hasBranchPr ? null : await repoSlug(workspace);
+    const branch: BranchRef | null = repo
+      ? { repo, branch: workspace.branch }
+      : null;
+    return { workspace, urls, branch };
+  }
+
   async function refreshPrs(workspaceId: string): Promise<PrStatus[]> {
-    const workspace = ctx.workspace(workspaceId);
-    if (workspace.archivedAt) return [];
-    const branchPr = await fetchPr(workspace, workspace.branch);
-    if (branchPr) track(workspace, branchPr.url, null);
+    const [prs] = await refreshPrsOf([ctx.workspace(workspaceId)]);
+    return prs ?? [];
+  }
+
+  async function refreshPrsOf(workspaces: Workspace[]): Promise<PrStatus[][]> {
+    const live = workspaces.filter((workspace) => !workspace.archivedAt);
+    if (gh.waiting())
+      return live.map((workspace) => ctx.runtime(workspace.id).prs);
+    const polledAt = deps.now().getTime();
+    for (const workspace of live) lastPrPoll.set(workspace.id, polledAt);
+    const lookups = await Promise.all(live.map(prLookup));
+    const fetched = await fetchPrs(gh.run, deps.env, deps.home, {
+      urls: lookups.flatMap((lookup) => lookup.urls),
+      branches: lookups.flatMap((lookup) => lookup.branch ?? []),
+    });
+    const results: PrStatus[][] = [];
+    for (const { workspace, branch } of lookups) {
+      const branchUrl = branch ? fetched.branchPrs.get(branch) : undefined;
+      if (branchUrl) track(workspace, branchUrl, null);
+      results.push(await applyPrs(workspace, fetched.prs));
+    }
+    return results;
+  }
+
+  async function applyPrs(
+    workspace: Workspace,
+    fetched: Map<string, PrStatus>,
+  ): Promise<PrStatus[]> {
+    const workspaceId = workspace.id;
     const runtime = ctx.runtime(workspaceId);
     const lastKnown = (url: string) =>
       runtime.prs.find((pr) => pr.url === url) ?? null;
-    const fetched = await Promise.all(
-      workspace.prs.map(async ({ url }) =>
-        url === branchPr?.url
-          ? branchPr
-          : ((await fetchPr(workspace, url)) ?? lastKnown(url)),
-      ),
-    );
-    const prs = fetched.filter((pr): pr is PrStatus => pr !== null);
+    const prs = workspace.prs
+      .map(({ url }) => fetched.get(url) ?? lastKnown(url))
+      .filter((pr): pr is PrStatus => pr !== null);
     const prsChanged = JSON.stringify(runtime.prs) !== JSON.stringify(prs);
     runtime.prs = prs;
     const strays = await strayWorktrees(ctx, workspace);
@@ -614,17 +669,44 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
 
   let checkingPrs = false;
   let shuttingDown = false;
+  const lastPrPoll = new Map<string, number>();
+  let lastReviewPoll = 0;
 
+  function idlePrPollMs() {
+    return (
+      store.state.settings.prCheckSeconds * SECOND_MS * IDLE_PR_POLL_FACTOR
+    );
+  }
+
+  function prPollMs(workspace: Workspace) {
+    const busy =
+      hasRunningSession(workspace) &&
+      ctx.runtime(workspace.id).prs.some((pr) => pr.state === 'OPEN');
+    return busy
+      ? store.state.settings.prCheckSeconds * SECOND_MS
+      : idlePrPollMs();
+  }
+
+  function prPollDue(workspace: Workspace, now: number) {
+    return (
+      now - (lastPrPoll.get(workspace.id) ?? -Infinity) >= prPollMs(workspace)
+    );
+  }
+
+  // Workspaces without a running agent or an open PR are checked less often.
   async function refreshAllPrs() {
-    if (checkingPrs) return;
+    if (checkingPrs || gh.waiting()) return;
     checkingPrs = true;
     try {
-      for (const workspace of activeWorkspaces(ctx)) {
-        if (shuttingDown) return;
-        await refreshPrs(workspace.id).catch(() => null);
-      }
+      const now = deps.now().getTime();
+      const due = activeWorkspaces(ctx).filter((workspace) =>
+        prPollDue(workspace, now),
+      );
+      await refreshPrsOf(due).catch(() => null);
+      if (now - lastReviewPoll < idlePrPollMs()) return;
+      lastReviewPoll = now;
       for (const ask of openReviewChats()) {
-        if (shuttingDown) return;
+        if (shuttingDown || gh.waiting()) return;
         await refreshReview(ask).catch(() => null);
       }
     } finally {
@@ -642,7 +724,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     const { archiveReviews, reReviews } = store.state.settings;
     if (!ask.reviewOf || (!archiveReviews && reReviews === 'off')) return;
     const status = await fetchReviewStatus(
-      deps.run,
+      gh.run,
       deps.env,
       reviewCwd(ask),
       ask.reviewOf,
@@ -701,7 +783,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   async function approveReviewed(ask: AskChat, reReview: ReReview) {
     if (!ask.reviewOf) return;
     const status = await fetchReviewStatus(
-      deps.run,
+      gh.run,
       deps.env,
       reviewCwd(ask),
       ask.reviewOf,
@@ -778,7 +860,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     const { pr, problems } = unhandled;
     markPrProblemsHandled(workspace, prs, problems);
     const threads = problems.some((found) => found.kind === 'thread')
-      ? await fetchPrThreads(deps.run, deps.env, workspace.path, pr.url)
+      ? await fetchPrThreads(gh.run, deps.env, workspace.path, pr.url)
       : [];
     const config = await workspaceConfig(ctx, workspace);
     const prompt = keepReadyPrompt({
@@ -1114,12 +1196,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     prNumber: number,
   ): Promise<Result<{ askChatId: string }>> {
     const repo = ctx.repo(repoId);
-    const pr = await fetchPrStatus(
-      deps.run,
-      deps.env,
-      repo.path,
-      String(prNumber),
-    );
+    const pr = await fetchPrByNumber(gh.run, deps.env, repo.path, prNumber);
     if (!pr)
       return {
         ok: false,

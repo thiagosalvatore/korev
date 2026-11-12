@@ -92,6 +92,13 @@ const RE_REVIEW_OPTIONS: { value: ReReviews; label: string }[] = [
   { value: 'approve', label: 'Re-check and approve' },
 ];
 
+const PR_CHECK_OPTIONS: { value: string; label: string }[] = [
+  { value: '30', label: 'Every 30 seconds' },
+  { value: '60', label: 'Every minute' },
+  { value: '120', label: 'Every 2 minutes' },
+  { value: '300', label: 'Every 5 minutes' },
+];
+
 const DICTATION_LANGUAGES: { value: DictationLanguage; label: string }[] = [
   { value: 'auto', label: 'Detect' },
   { value: 'pt', label: 'Português' },
@@ -992,6 +999,18 @@ function Git({ settings }: { settings: Settings }) {
         <Switch
           checked={settings.autoRenameBranches}
           onChange={(autoRenameBranches) => update({ autoRenameBranches })}
+        />
+      </Row>
+      <Row
+        title="Check pull requests"
+        description="How often Korev asks GitHub about the pull request of a workspace whose agent is working. Other workspaces are checked 4 times less often. Check less often if GitHub limits your requests."
+      >
+        <Select
+          ariaLabel="Check pull requests"
+          className="w-56"
+          options={PR_CHECK_OPTIONS}
+          value={String(settings.prCheckSeconds)}
+          onChange={(seconds) => update({ prCheckSeconds: Number(seconds) })}
         />
       </Row>
       <Row

@@ -58,7 +58,7 @@ The pull request tab shows the pull request:
 - Its state, conflicts, failing and running checks, and review status.
 - The list of checks. Click one to open it on GitHub.
 
-Korev refreshes the pull request every 30 seconds and after each agent turn.
+Korev refreshes the pull request after each agent turn, every 30 seconds while the workspace's agent is working, and every 2 minutes otherwise. Change this in **Settings → Git → Check pull requests**. Once a pull request is merged or closed, Korev stops asking GitHub about it. When GitHub limits your requests, Korev waits until the limit resets.
 
 ## Comments
 

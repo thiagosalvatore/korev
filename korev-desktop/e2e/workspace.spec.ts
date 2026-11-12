@@ -923,18 +923,21 @@ case "$1 $2" in
       *) exit 1 ;;
     esac ;;
   "pr diff") printf 'diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1,2 @@\n # acme\n+Install it.\n' ;;
+  "repo view") echo 'acme/web' ;;
+  "api -i") echo '{"data":{"viewer":{"login":"me"},"q0":{"number":42,"url":"https://github.com/acme/web/pull/42","title":"Add install steps","state":"OPEN","headRefName":"octo/install","baseRefName":"main","headRefOid":"abc123"}}}' ;;
   *) exit 1 ;;
 esac
 `;
 
 const FAKE_GH_WITH_REVIEW = `#!/bin/sh
 case "$1 $2" in
-  "pr view") echo '{"number":7,"url":"https://github.com/acme/web/pull/7","title":"Add a note","state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefName":"dev-person/add-agent-note","headRefOid":"abc123","baseRefName":"main","createdAt":"2026-01-01T00:00:00Z","statusCheckRollup":[]}' ;;
-  "api graphql")
+  "repo view") echo 'acme/web' ;;
+  "api -i")
     case "$*" in
-      *isRequired*) exit 1 ;;
-      *) echo '{"data":{"viewer":{"login":"me"},"resource":{"reviewThreads":{"nodes":[{"isResolved":false,"first":{"nodes":[{"authorAssociation":"MEMBER","author":{"__typename":"User"}}]},"last":{"nodes":[{"id":"c1","author":{"login":"reviewer"}}]}}]}}}}' ;;
+      *resource*) echo '{"data":{"viewer":{"login":"me"},"q0":{"number":7,"url":"https://github.com/acme/web/pull/7","title":"Add a note","state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefName":"dev-person/add-agent-note","headRefOid":"abc123","baseRefName":"main","createdAt":"2026-01-01T00:00:00Z","reviewThreads":{"nodes":[{"isResolved":false,"first":{"nodes":[{"authorAssociation":"MEMBER","author":{"__typename":"User"}}]},"last":{"nodes":[{"id":"c1","author":{"login":"reviewer"}}]}}]}}}}' ;;
+      *) echo '{"data":{"viewer":{"login":"me"},"q0":{"pullRequests":{"nodes":[{"url":"https://github.com/acme/web/pull/7"}]}}}}' ;;
     esac ;;
+  "api graphql") echo '{"data":{"viewer":{"login":"me"},"resource":{"reviewThreads":{"nodes":[{"isResolved":false,"first":{"nodes":[{"authorAssociation":"MEMBER","author":{"__typename":"User"}}]},"last":{"nodes":[{"id":"c1","author":{"login":"reviewer"}}]}}]}}}}' ;;
   *) exit 1 ;;
 esac
 `;

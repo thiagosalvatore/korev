@@ -3,8 +3,8 @@ import {
   findPrUrls,
   keepReadyPrompt,
   parsePrStack,
+  fetchPrs,
   fetchPrStatus,
-  parsePrStatus,
   parsePrThreads,
   parseReviewStatus,
   parseUnansweredThreads,
@@ -13,49 +13,94 @@ import {
   reviewPrompt,
   reviewReplyInstruction,
 } from './pull-requests';
-import type { CommandResult, CommandRunner } from './command-runner';
+import type { CommandRunner } from './command-runner';
 import { prProblems, type PrStatus, type PrThread } from '../shared/model';
 
+const PR_URL = 'https://github.com/acme/web/pull/7';
+
+type Node = Record<string, unknown>;
+
+function prNode(fields: Node = {}, checks: Node[] = [], hasNextPage = false) {
+  return {
+    number: 7,
+    url: PR_URL,
+    state: 'OPEN',
+    commits: {
+      nodes: [
+        {
+          commit: {
+            statusCheckRollup: {
+              contexts: {
+                pageInfo: { hasNextPage, endCursor: hasNextPage ? 'c1' : null },
+                nodes: checks,
+              },
+            },
+          },
+        },
+      ],
+    },
+    ...fields,
+  };
+}
+
+const LOOKUP = /(q\d+): (resource\(url|repository\()[^"]*("[^"]*")/g;
+
+function batchRunner(
+  answer: (kind: string, value: string, query: string) => unknown,
+) {
+  const calls: string[] = [];
+  const run: CommandRunner = async (_file, args) => {
+    const query = args.find((arg) => arg.startsWith('query=')) ?? '';
+    calls.push(query);
+    const data: Node = { viewer: { login: 'me' } };
+    for (const [, alias, kind, value] of query.matchAll(LOOKUP))
+      data[alias] = answer(kind, JSON.parse(value) as string, query);
+    return {
+      exitCode: 0,
+      stdout: `HTTP/2.0 200 OK\nX-Ratelimit-Remaining: 4000\n\n${JSON.stringify({ data })}`,
+      stderr: '',
+    };
+  };
+  return { run, calls };
+}
+
+async function statusOf(node: Node) {
+  const { run } = batchRunner(() => node);
+  return fetchPrStatus(run, {}, '/repo', PR_URL);
+}
+
 describe('PR status', () => {
-  it('maps check runs and status contexts to check states', () => {
-    const status = parsePrStatus(
-      JSON.stringify({
-        number: 7,
-        url: 'https://github.com/acme/web/pull/7',
-        title: 'Add login',
-        state: 'OPEN',
-        isDraft: false,
-        mergeable: 'CONFLICTING',
-        statusCheckRollup: [
-          {
-            __typename: 'CheckRun',
-            name: 'lint',
-            status: 'COMPLETED',
-            conclusion: 'SUCCESS',
-            detailsUrl: 'https://ci/1',
-          },
-          {
-            __typename: 'CheckRun',
-            name: 'test',
-            status: 'COMPLETED',
-            conclusion: 'FAILURE',
-            detailsUrl: 'https://ci/2',
-          },
-          {
-            __typename: 'CheckRun',
-            name: 'e2e',
-            status: 'IN_PROGRESS',
-            conclusion: '',
-            detailsUrl: '',
-          },
-          {
-            __typename: 'StatusContext',
-            context: 'deploy',
-            state: 'ERROR',
-            targetUrl: 'https://ci/3',
-          },
-        ],
-      }),
+  it('maps check runs and status contexts to check states', async () => {
+    const status = await statusOf(
+      prNode({ title: 'Add login', isDraft: false, mergeable: 'CONFLICTING' }, [
+        {
+          __typename: 'CheckRun',
+          name: 'lint',
+          status: 'COMPLETED',
+          conclusion: 'SUCCESS',
+          detailsUrl: 'https://ci/1',
+        },
+        {
+          __typename: 'CheckRun',
+          name: 'test',
+          status: 'COMPLETED',
+          conclusion: 'FAILURE',
+          detailsUrl: 'https://ci/2',
+        },
+        {
+          __typename: 'CheckRun',
+          name: 'e2e',
+          status: 'IN_PROGRESS',
+          conclusion: '',
+          detailsUrl: '',
+        },
+        {
+          __typename: 'StatusContext',
+          context: 'deploy',
+          state: 'ERROR',
+          targetUrl: 'https://ci/3',
+        },
+      ]),
     );
     expect(status?.mergeable).toBe('CONFLICTING');
     expect(status?.checks.map((check) => [check.name, check.state])).toEqual([
@@ -69,19 +114,114 @@ describe('PR status', () => {
   it.each([
     ['APPROVED', 'APPROVED'],
     ['', null],
-  ])('reads review decision %j as %j', (reviewDecision, expected) => {
-    const status = parsePrStatus(
-      JSON.stringify({ number: 7, state: 'OPEN', reviewDecision }),
-    );
+  ])('reads review decision %j as %j', async (reviewDecision, expected) => {
+    const status = await statusOf(prNode({ reviewDecision }));
     expect(status?.reviewDecision).toBe(expected);
   });
 
-  it('returns null when there is no PR', () => {
-    expect(parsePrStatus('no pull requests found')).toBeNull();
+  it('returns null when there is no PR', async () => {
+    expect(await statusOf(null as unknown as Node)).toBeNull();
+  });
+
+  it('returns null when gh fails', async () => {
+    const run: CommandRunner = async () => ({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'offline',
+    });
+    expect(await fetchPrStatus(run, {}, '/repo', PR_URL)).toBeNull();
+  });
+});
+
+describe('batched PR lookups', () => {
+  function urlOf(number: number) {
+    return `https://github.com/acme/web/pull/${number}`;
+  }
+
+  function numberOf(url: string) {
+    return Number(url.split('/').pop());
+  }
+
+  it('fetches several open PRs with one gh call', async () => {
+    const { run, calls } = batchRunner((_kind, url) =>
+      prNode({ number: numberOf(url), url }),
+    );
+    const urls = [1, 2, 3, 4, 5].map(urlOf);
+
+    const { prs } = await fetchPrs(run, {}, '/repo', { urls, branches: [] });
+
+    expect(calls).toHaveLength(1);
+    expect([...prs.values()].map((pr) => pr.number)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('splits many PRs into requests GitHub answers in time', async () => {
+    const { run, calls } = batchRunner((_kind, url) =>
+      prNode({ number: numberOf(url), url }),
+    );
+    const urls = Array.from({ length: 20 }, (_, index) => urlOf(index + 1));
+
+    const { prs } = await fetchPrs(run, {}, '/repo', { urls, branches: [] });
+
+    expect(calls).toHaveLength(3);
+    expect(prs.size).toBe(20);
+  });
+
+  it('reads the next page of checks for every PR in one more call', async () => {
+    const check = (name: string) => ({
+      __typename: 'CheckRun',
+      name,
+      status: 'COMPLETED',
+      conclusion: 'SUCCESS',
+    });
+    const { run, calls } = batchRunner((_kind, url, query) => {
+      const number = numberOf(url);
+      return query.includes('after: "c1"')
+        ? prNode({ number, url }, [check(`late-${number}`)])
+        : prNode({ number, url }, [check(`early-${number}`)], true);
+    });
+
+    const { prs } = await fetchPrs(run, {}, '/repo', {
+      urls: [urlOf(1), urlOf(2)],
+      branches: [],
+    });
+
+    expect(calls).toHaveLength(2);
+    expect(prs.get(urlOf(2))?.checks.map((found) => found.name)).toEqual([
+      'early-2',
+      'late-2',
+    ]);
+  });
+
+  it('finds the PR of a branch in the same call and fetches it in full', async () => {
+    const branch = { repo: 'acme/web', branch: 'dev/login' };
+    const { run, calls } = batchRunner((kind, value) =>
+      kind.startsWith('repository')
+        ? { pullRequests: { nodes: [{ url: urlOf(9) }] } }
+        : prNode({ number: numberOf(value), url: value }),
+    );
+
+    const result = await fetchPrs(run, {}, '/repo', {
+      urls: [urlOf(1)],
+      branches: [branch],
+    });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain('headRefName: "dev/login"');
+    expect(result.branchPrs.get(branch)).toBe(urlOf(9));
+    expect(result.prs.get(urlOf(9))?.number).toBe(9);
+  });
+
+  it('makes no call when there is nothing to look up', async () => {
+    const { run, calls } = batchRunner(() => null);
+
+    await fetchPrs(run, {}, '/repo', { urls: [], branches: [] });
+
+    expect(calls).toEqual([]);
   });
 });
 
 type StackPr = Record<string, unknown>;
+type StackPullRequest = { number: number; url: string; state: string };
 
 function stackPr(number: number, fields: StackPr = {}): StackPr {
   return {
@@ -99,24 +239,20 @@ function stackPr(number: number, fields: StackPr = {}): StackPr {
 }
 
 function stackResponse(position: number | null, prs: StackPr[]) {
-  return JSON.stringify({
-    data: {
-      resource: {
-        stackEntry: position === null ? null : { position },
-        stack:
-          position === null
-            ? null
-            : {
-                entries: {
-                  nodes: prs.map((pullRequest, index) => ({
-                    position: index + 1,
-                    pullRequest,
-                  })),
-                },
-              },
-      },
-    },
-  });
+  return {
+    stackEntry: position === null ? null : { position },
+    stack:
+      position === null
+        ? null
+        : {
+            entries: {
+              nodes: prs.map((pullRequest, index) => ({
+                position: index + 1,
+                pullRequest: pullRequest as unknown as StackPullRequest,
+              })),
+            },
+          },
+  };
 }
 
 describe('PR stack', () => {
@@ -175,12 +311,7 @@ describe('unanswered review threads', () => {
   }
 
   function detailsResponse(threads: ReturnType<typeof thread>[]) {
-    return JSON.stringify({
-      data: {
-        viewer: { login: 'me' },
-        resource: { reviewThreads: { nodes: threads } },
-      },
-    });
+    return { reviewThreads: { nodes: threads } };
   }
 
   it('lists the last comment of each thread waiting on the author', () => {
@@ -194,59 +325,38 @@ describe('unanswered review threads', () => {
         startedBy: { association: 'COLLABORATOR', type: 'User' },
       }),
     ]);
-    expect(parseUnansweredThreads(json)).toEqual(['c1', 'c5', 'c6']);
+    expect(parseUnansweredThreads(json, 'me')).toEqual(['c1', 'c5', 'c6']);
   });
 
-  it('returns no threads for a malformed response', () => {
-    expect(parseUnansweredThreads('nope')).toEqual([]);
+  it('returns no threads when the PR has none', () => {
+    expect(parseUnansweredThreads({}, 'me')).toEqual([]);
   });
 });
 
 describe('required checks', () => {
-  const view = JSON.stringify({
-    number: 7,
-    url: 'https://github.com/acme/web/pull/7',
-    state: 'OPEN',
-    statusCheckRollup: [
-      { __typename: 'CheckRun', name: 'test', status: 'IN_PROGRESS' },
-      { __typename: 'CheckRun', name: 'preview', status: 'IN_PROGRESS' },
-    ],
-  });
-
-  function runner(requiredChecks: CommandResult): CommandRunner {
-    return async (_file, args) => {
-      if (args[0] === 'pr') return { exitCode: 0, stdout: view, stderr: '' };
-      if (args.includes('--paginate')) return requiredChecks;
-      return { exitCode: 1, stdout: '', stderr: '' };
-    };
-  }
-
-  async function requiredFlags(requiredChecks: CommandResult) {
-    const status = await fetchPrStatus(
-      runner(requiredChecks),
-      {},
-      '/repo',
-      '7',
-    );
-    return status?.checks.map((check) => [check.name, check.required]);
-  }
-
   it('marks only the checks GitHub reports as required', async () => {
-    expect(
-      await requiredFlags({ exitCode: 0, stdout: 'test\n', stderr: '' }),
-    ).toEqual([
-      ['test', true],
-      ['preview', false],
-    ]);
+    const status = await statusOf(
+      prNode({}, [
+        { __typename: 'CheckRun', name: 'test', isRequired: true },
+        { __typename: 'CheckRun', name: 'preview', isRequired: false },
+        { __typename: 'StatusContext', context: 'deploy' },
+      ]),
+    );
+    expect(status?.checks.map((check) => [check.name, check.required])).toEqual(
+      [
+        ['test', true],
+        ['preview', false],
+        ['deploy', true],
+      ],
+    );
   });
 
-  it('treats every check as required when the lookup fails', async () => {
-    expect(
-      await requiredFlags({ exitCode: 1, stdout: '', stderr: 'offline' }),
-    ).toEqual([
-      ['test', true],
-      ['preview', true],
-    ]);
+  it('asks GitHub whether each check is required for this PR', async () => {
+    const { run, calls } = batchRunner(() => prNode());
+
+    await fetchPrStatus(run, {}, '/repo', PR_URL);
+
+    expect(calls[0]).toContain('isRequired(pullRequestNumber: 7)');
   });
 });
 
@@ -426,17 +536,21 @@ describe('review prompt', () => {
 });
 
 describe('keep-ready prompt', () => {
-  const pr = {
-    ...parsePrStatus(
-      JSON.stringify({
-        number: 7,
-        url: 'https://github.com/acme/web/pull/7',
-        state: 'OPEN',
-        mergeable: 'CONFLICTING',
-        headRefOid: 'abc123',
-        baseRefName: 'main',
-      }),
-    )!,
+  const pr: PrStatus = {
+    number: 7,
+    url: 'https://github.com/acme/web/pull/7',
+    title: '',
+    state: 'OPEN',
+    isDraft: false,
+    mergeable: 'CONFLICTING',
+    reviewDecision: null,
+    mergedAt: null,
+    headRefName: '',
+    headRefOid: 'abc123',
+    baseRefName: 'main',
+    createdAt: '',
+    checks: [],
+    stack: null,
     unansweredThreads: ['c1', 'c2'],
   };
   const threads: PrThread[] = ['c1', 'c2'].map((id, index) => ({

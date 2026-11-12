@@ -13,7 +13,11 @@ import {
   vi,
   type Mock,
 } from 'vitest';
-import { runProcess, type CommandRunner } from './command-runner';
+import {
+  runProcess,
+  type CommandResult,
+  type CommandRunner,
+} from './command-runner';
 import { SIGNING_NUDGE } from './commit-signing';
 import type { Notice } from './context';
 import { nodeFileSystem } from './file-system';
@@ -25,7 +29,12 @@ import {
   type WorkspaceSource,
 } from '../shared/model';
 import { AUTOMATION_TICK_MS } from './automations';
-import { createKorev, PR_POLL_MS, type Korev } from './korev';
+import {
+  createKorev,
+  IDLE_PR_POLL_FACTOR,
+  PR_POLL_MS,
+  type Korev,
+} from './korev';
 import { askSections } from '../shared/workspaces';
 import type { RemoteSettings } from './remote-access';
 import type { Release } from './updates';
@@ -81,8 +90,11 @@ let mergeBaseGate: Promise<void> | null = null;
 let mergeBasesStarted = 0;
 let agentVersionGate: Promise<void> | null = null;
 let agentVersionsWaiting = 0;
-let prViewGate: Promise<void> | null = null;
-let prViewsWaiting = 0;
+let prFetchGate: Promise<void> | null = null;
+let prFetchesWaiting = 0;
+let ghCalls: string[][] = [];
+let ghFailure: CommandResult | null = null;
+let clockOffsetMs = 0;
 let prDiff = '';
 let prsByNumber: Record<string, Record<string, unknown>> = {};
 let diffsByNumber: Record<string, string> = {};
@@ -96,13 +108,65 @@ const README_PATCH = `diff --git a/README.md b/README.md
 `;
 
 const BRANCH_PR_URL = 'https://github.com/acme/web/pull/7';
-const NO_PR = { exitCode: 1, stdout: '', stderr: 'no pull requests found' };
 
 function fakePrView(ref: string) {
-  const pr = ref.startsWith('https://')
-    ? prsByUrl[ref]
-    : (prsByNumber[ref] ?? openPr);
-  return pr ? { exitCode: 0, stdout: JSON.stringify(pr), stderr: '' } : NO_PR;
+  const pr = prsByNumber[ref] ?? openPr;
+  return pr
+    ? { exitCode: 0, stdout: JSON.stringify(pr), stderr: '' }
+    : { exitCode: 1, stdout: '', stderr: 'no pull requests found' };
+}
+
+function fakePrAt(url: string) {
+  const number = url.split('/').pop();
+  if (prsByUrl[url]) return prsByUrl[url];
+  if (number && prsByNumber[number]) return prsByNumber[number];
+  return openPr && String(openPr.number) === number ? openPr : null;
+}
+
+function branchPrUrl() {
+  if (!openPr) return null;
+  return String(
+    openPr.url ?? `https://github.com/acme/web/pull/${openPr.number}`,
+  );
+}
+
+function fakePrNode(url: string) {
+  const pr = fakePrAt(url);
+  if (!pr) return null;
+  const checks = (pr.statusCheckRollup as unknown[] | undefined) ?? [];
+  return {
+    url,
+    ...pr,
+    commits: {
+      nodes: [
+        {
+          commit: {
+            statusCheckRollup: {
+              contexts: { pageInfo: { hasNextPage: false }, nodes: checks },
+            },
+          },
+        },
+      ],
+    },
+    ...stacksByUrl[url],
+  };
+}
+
+const ALIASED_LOOKUP = /(q\d+): (resource\(url|repository\()[^"]*("[^"]*")/g;
+
+function fakePrBatch(query: string) {
+  const data: Record<string, unknown> = { viewer: { login: 'me' } };
+  for (const [, alias, kind, value] of query.matchAll(ALIASED_LOOKUP)) {
+    const url = JSON.parse(value) as string;
+    data[alias] = kind.startsWith('resource')
+      ? fakePrNode(url)
+      : {
+          pullRequests: {
+            nodes: branchPrUrl() ? [{ url: branchPrUrl() }] : [],
+          },
+        };
+  }
+  return { exitCode: 0, stdout: JSON.stringify({ data }), stderr: '' };
 }
 
 function fakeReviewStatus(url: string | undefined) {
@@ -136,12 +200,19 @@ function isGhMerge(args: readonly string[]) {
 const runWithFakeSqlite: CommandRunner = async (file, args, options) => {
   if (file === 'sqlite3')
     return { exitCode: 0, stdout: JSON.stringify(conductorRepos), stderr: '' };
-  if (file === 'gh' && args[0] === 'pr' && args[1] === 'view') {
-    if (prViewGate) {
-      prViewsWaiting++;
-      await prViewGate;
-    }
+  if (file === 'gh') ghCalls.push([...args]);
+  if (file === 'gh' && ghFailure) return ghFailure;
+  if (file === 'gh' && args[0] === 'pr' && args[1] === 'view')
     return fakePrView(args[2]);
+  if (file === 'gh' && args[0] === 'repo' && args[1] === 'view')
+    return { exitCode: 0, stdout: 'acme/web\n', stderr: '' };
+  const query = args.find((arg) => arg.startsWith('query=')) ?? '';
+  if (file === 'gh' && args.includes('graphql') && query.includes('q0:')) {
+    if (prFetchGate) {
+      prFetchesWaiting++;
+      await prFetchGate;
+    }
+    return fakePrBatch(query);
   }
   if (file === 'gh' && args[0] === 'pr' && args[1] === 'diff')
     return {
@@ -241,7 +312,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       isWindowFocused: () => windowFocused,
       setBadge: () => undefined,
       keepAwake,
-      now: () => new Date(),
+      now: () => new Date(Date.now() + clockOffsetMs),
       newId: () => randomUUID(),
       chooseDirectory: async () => chosenDirectory,
       chooseSoundFile: async () => chosenSoundFile,
@@ -306,8 +377,11 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     mergeBasesStarted = 0;
     agentVersionGate = null;
     agentVersionsWaiting = 0;
-    prViewGate = null;
-    prViewsWaiting = 0;
+    prFetchGate = null;
+    prFetchesWaiting = 0;
+    ghCalls = [];
+    ghFailure = null;
+    clockOffsetMs = 0;
     prDiff = '';
     prsByNumber = {};
     diffsByNumber = {};
@@ -477,23 +551,169 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     );
   });
 
+  async function pollingKorev() {
+    await korev.shutdown();
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    korev = await openKorev();
+  }
+
+  function pollAfter(ms: number) {
+    clockOffsetMs += ms;
+    vi.advanceTimersByTime(PR_POLL_MS);
+  }
+
+  function pollAfterIdle() {
+    pollAfter(PR_POLL_MS * IDLE_PR_POLL_FACTOR);
+  }
+
+  function prBatches() {
+    return ghCalls.filter((args) => args.includes('graphql'));
+  }
+
+  async function settle() {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+
+  async function workspaceWithOpenPr() {
+    const workspace = await createWorkspace();
+    openPr = {
+      number: 7,
+      url: BRANCH_PR_URL,
+      state: 'OPEN',
+      headRefName: workspace.branch,
+    };
+    await korev.api.prStatuses(workspace.id);
+    ghCalls = [];
+    return workspace;
+  }
+
+  it('checks a workspace without a running agent every 2 minutes, not every 30 seconds', async () => {
+    await pollingKorev();
+    await workspaceWithOpenPr();
+
+    pollAfter(PR_POLL_MS);
+    await settle();
+    expect(prBatches()).toHaveLength(0);
+
+    pollAfterIdle();
+    await waitFor(async () => prBatches().length === 1);
+  });
+
+  it('checks every 30 seconds while an agent works on an open PR', async () => {
+    await pollingKorev();
+    const workspace = await workspaceWithOpenPr();
+    const [session] = workspace.sessions;
+    await korev.api.send(session.id, task('hold-turn'));
+    await waitFor(async () =>
+      (await korev.api.getState()).runningSessions.includes(session.id),
+    );
+
+    pollAfter(PR_POLL_MS);
+
+    await waitFor(async () => prBatches().length === 1);
+    await korev.api.stop(session.id);
+  });
+
+  it('checks the setting interval while an agent works on an open PR', async () => {
+    await pollingKorev();
+    await korev.api.updateSettings({ prCheckSeconds: 120 });
+    const workspace = await workspaceWithOpenPr();
+    const [session] = workspace.sessions;
+    await korev.api.send(session.id, task('hold-turn'));
+    await waitFor(async () =>
+      (await korev.api.getState()).runningSessions.includes(session.id),
+    );
+
+    pollAfter(PR_POLL_MS);
+    await settle();
+    expect(prBatches()).toHaveLength(0);
+
+    pollAfter(120_000);
+    await waitFor(async () => prBatches().length === 1);
+    await korev.api.stop(session.id);
+  });
+
+  it('does not ask GitHub about a merged PR again', async () => {
+    const workspace = await createWorkspace();
+    openPr = {
+      number: 7,
+      url: BRANCH_PR_URL,
+      state: 'MERGED',
+      mergedAt: '2020-01-01T00:00:00Z',
+      headRefName: workspace.branch,
+    };
+    await korev.api.prStatuses(workspace.id);
+    ghCalls = [];
+
+    const prs = await korev.api.prStatuses(workspace.id);
+
+    expect(ghCalls).toEqual([]);
+    expect(prs.map((pr) => [pr.number, pr.state])).toEqual([[7, 'MERGED']]);
+  });
+
+  it('checks the open PRs of every workspace with one gh call', async () => {
+    await pollingKorev();
+    for (const first of [11, 13, 15]) {
+      const workspace = await createWorkspace();
+      const urls = [first, first + 1].map((number) =>
+        fakePr(number, 'OPEN', new Date().toISOString()),
+      );
+      prsByUrl[urls[0]].headRefName = workspace.branch;
+      await sendAndWait(workspace.sessions[0].id, `open-pr ${urls.join(' ')}`);
+      await waitFor(async () => (await trackedUrls(workspace.id)).length === 2);
+      await korev.api.prStatuses(workspace.id);
+    }
+    ghCalls = [];
+
+    pollAfterIdle();
+    await waitFor(async () => prBatches().length === 1);
+    await settle();
+
+    expect(ghCalls).toHaveLength(1);
+    const query = ghCalls[0].find((arg) => arg.startsWith('query='));
+    expect(query?.match(/q\d+: resource/g)).toHaveLength(6);
+  });
+
+  it('stops calling gh while GitHub rate-limits, until the limit resets', async () => {
+    await pollingKorev();
+    const workspace = await createWorkspace();
+    openPr = { number: 7, url: BRANCH_PR_URL, state: 'OPEN' };
+    const resetAt = Math.floor((Date.now() + 10 * 60_000) / 1000);
+    ghFailure = {
+      exitCode: 1,
+      stdout: `HTTP/2.0 200 OK\nX-Ratelimit-Remaining: 0\nX-Ratelimit-Reset: ${resetAt}\n\n{"errors":[{"type":"RATE_LIMIT"}]}`,
+      stderr: 'gh: API rate limit already exceeded for user ID 1.',
+    };
+    await korev.api.prStatuses(workspace.id);
+    ghFailure = null;
+    ghCalls = [];
+
+    pollAfter(5 * 60_000);
+    await korev.api.prStatuses(workspace.id);
+    await settle();
+    expect(ghCalls).toEqual([]);
+
+    pollAfter(6 * 60_000);
+    await waitFor(async () => prBatches().length > 0);
+  });
+
   it('waits for a running PR check before it shuts down', async () => {
     await korev.shutdown();
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     korev = await openKorev();
     await createWorkspace();
-    let releasePrView!: () => void;
-    prViewGate = new Promise((resolve) => (releasePrView = resolve));
+    let releasePrFetch!: () => void;
+    prFetchGate = new Promise((resolve) => (releasePrFetch = resolve));
 
     vi.advanceTimersByTime(PR_POLL_MS);
-    await waitFor(async () => prViewsWaiting > 0);
+    await waitFor(async () => prFetchesWaiting > 0);
     const shutdown = korev.shutdown().then(() => 'shut down');
     const stillWaiting = new Promise((resolve) =>
       setTimeout(() => resolve('waiting'), 100),
     );
 
     expect(await Promise.race([shutdown, stillWaiting])).toBe('waiting');
-    releasePrView();
+    releasePrFetch();
     await shutdown;
     korev = await openKorev();
   });
@@ -1643,7 +1863,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     };
 
     await waitFor(async () => {
-      vi.advanceTimersByTime(PR_POLL_MS);
+      pollAfterIdle();
       return !!(await askOf())?.archivedAt;
     });
     const sections = askSections(await korev.api.getState());
@@ -1689,7 +1909,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
     async function pollUntilReChecked(sessionId: string) {
       await waitFor(async () => {
-        vi.advanceTimersByTime(PR_POLL_MS);
+        pollAfterIdle();
         return (await prompts(sessionId)).length === 2;
       });
       await waitForTurn(sessionId);
@@ -1701,8 +1921,8 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
       await pollUntilReChecked(sessionId);
       await waitFor(async () => ghReviews.length > 0);
-      vi.advanceTimersByTime(PR_POLL_MS);
-      vi.advanceTimersByTime(PR_POLL_MS);
+      pollAfterIdle();
+      pollAfterIdle();
 
       const sent = await prompts(sessionId);
       expect(sent).toHaveLength(2);
