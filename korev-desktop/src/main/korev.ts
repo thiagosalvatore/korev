@@ -874,7 +874,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       : askScratchPath(root);
   }
 
-  function implementOptions(session: ChatSession, text: string): SendOptions {
+  function korevPrompt(session: ChatSession, text: string): SendOptions {
     return {
       text,
       agent: session.agent,
@@ -882,6 +882,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       effort: session.effort,
       planMode: false,
       fast: session.fast,
+      fromKorev: true,
     };
   }
 
@@ -913,7 +914,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
         ctx,
         origin,
         lanes,
-        implementOptions(session, ''),
+        korevPrompt(session, ''),
         plan,
         sendWithHistory(history),
       );
@@ -934,13 +935,13 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     const text = lanes.length
       ? `${IMPLEMENT_APPROVED_PLAN}\n\n${lanesElsewhereNote(lanes)}`
       : IMPLEMENT_APPROVED_PLAN;
-    return chats.send(sessionId, implementOptions(chat.session, text));
+    return chats.send(sessionId, korevPrompt(chat.session, text));
   }
 
   function continueChat(sessionId: string, text: string) {
     const chat = workspaceChat(sessionId);
     if (!chat) return Promise.resolve(fail('That chat no longer exists'));
-    return chats.send(sessionId, implementOptions(chat.session, text));
+    return chats.send(sessionId, korevPrompt(chat.session, text));
   }
 
   const orchestration = createOrchestration({
@@ -1080,14 +1081,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   }
 
   function sendPrompt(session: ChatSession, text: string): Promise<Result> {
-    return chats.send(session.id, {
-      text,
-      agent: session.agent,
-      model: session.model,
-      effort: session.effort,
-      planMode: false,
-      fast: session.fast,
-    });
+    return chats.send(session.id, korevPrompt(session, text));
   }
 
   async function repoIdsByGithubUrl(): Promise<Map<string, string>> {
@@ -1288,14 +1282,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       workspace.sessions.find((entry) => entry.id === sessionId) ??
       workspace.sessions[0];
     if (!session) return fail('No chat in this workspace');
-    return chats.send(session.id, {
-      text,
-      agent: session.agent,
-      model: session.model,
-      effort: session.effort,
-      planMode: false,
-      fast: session.fast,
-    });
+    return sendPrompt(session, text);
   }
 
   const api: KorevApi = {

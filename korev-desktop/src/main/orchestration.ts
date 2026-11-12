@@ -380,6 +380,7 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
         (sameAgent ? coordinator.effort : settings.defaultEffort[agent]),
       planMode: false,
       fast: sameAgent && coordinator.fast,
+      fromKorev: true,
     };
   }
 

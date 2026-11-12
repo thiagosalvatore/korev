@@ -187,7 +187,13 @@ export function UserMessage({
   const styles = useStyles();
   const { body, plans, files } = messageParts(item.text);
   return (
-    <MessageActions text={body} style={styles.userBubble}>
+    <MessageActions
+      text={body}
+      style={[styles.userBubble, item.fromKorev && styles.korevBubble]}
+    >
+      {item.fromKorev ? (
+        <Text style={[styles.dim, styles.korevCaption]}>Korev</Text>
+      ) : null}
       {body ? <Text style={styles.text}>{body}</Text> : null}
       <MessageAttachments plans={plans} files={files} sessionId={sessionId} />
       {item.queued ? <Text style={styles.dim}>Queued</Text> : null}
@@ -456,5 +462,10 @@ function makeStyles(theme: Theme) {
       borderWidth: 1,
       borderColor: theme.border1,
     },
+    korevBubble: {
+      backgroundColor: theme.accentSubtle,
+      borderColor: theme.accent,
+    },
+    korevCaption: { color: theme.accentText, fontWeight: '600' },
   });
 }
