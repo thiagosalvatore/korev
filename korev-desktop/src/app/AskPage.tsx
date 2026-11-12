@@ -9,7 +9,9 @@ import {
   startAsk,
   startFromAsk,
 } from './actions';
+import { api } from './bridge';
 import { ChatView } from './chat/ChatView';
+import { parsePrUrl } from '../shared/explainer';
 import { Composer } from './chat/Composer';
 import { ShareChatButton } from './chat/exportConversation';
 import { WideChatButton } from './chat/WideChatButton';
@@ -154,6 +156,22 @@ function NewAsk({
   );
 }
 
+function ReviewedPrButton({ url }: { url: string }) {
+  const number = parsePrUrl(url)?.number;
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      icon="git-pull-request"
+      className={NO_DRAG}
+      title="Open PR on GitHub"
+      onClick={() => void api.openExternal(url)}
+    >
+      {number ? `#${number}` : 'Open PR'}
+    </Button>
+  );
+}
+
 function AskChatView({ state, ask }: { state: AppState; ask: AskChat }) {
   const sidebar = useUi((ui) => ui.sidebar);
   const running = state.runningSessions.includes(ask.session.id);
@@ -176,6 +194,7 @@ function AskChatView({ state, ask }: { state: AppState; ask: AskChat }) {
           {ask.automationRun ? 'Automation run' : `${repoNames} · read-only`}
         </span>
         <span className="flex-1" />
+        {ask.reviewOf ? <ReviewedPrButton url={ask.reviewOf} /> : null}
         {ask.repoIds.length ? (
           <Button
             size="sm"
