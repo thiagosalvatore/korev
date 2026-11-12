@@ -28,7 +28,6 @@ const INBOX_FRAGMENT = `fragment inboxPr on PullRequest {
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 }`;
 
-// One request per search: together they run past GitHub's 10 s GraphQL limit.
 function inboxQuery(alias: string, filter: string): string {
   return `query {
   ${alias}: search(query: "${OPEN_PRS} ${filter}", type: ISSUE, first: ${INBOX_LIMIT}) { nodes { ...inboxPr } }
