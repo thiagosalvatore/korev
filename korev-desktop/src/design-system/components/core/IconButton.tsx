@@ -1,4 +1,10 @@
-import type { ButtonHTMLAttributes } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+} from 'react';
 import { cn } from '../../cn';
 import { Icon, LOADING_ICON, type IconName } from './Icon';
 import { usePendingClick, type ClickHandler } from './usePendingClick';
@@ -31,9 +37,36 @@ const SIZES: Record<IconButtonSize, string> = {
   md: '',
 };
 
+const TOOLTIP =
+  'pointer-events-none fixed inset-auto m-1 max-w-64 rounded-sm border-0 bg-raised px-2 py-1 text-left text-xs font-normal whitespace-normal text-fg-1 shadow-pop [position-area:top] [position-try-fallbacks:top_span-left,top_span-right,bottom,bottom_span-left,bottom_span-right]';
+const TOOLTIP_DELAY_MS = 500;
+
+// Chromium on macOS shows `title` tooltips unreliably, often only once.
+function useTooltip() {
+  const [shown, setShown] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const anchor = useRef<HTMLButtonElement>(null);
+  const tooltip = useRef<HTMLSpanElement>(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => {
+    if (shown && anchor.current)
+      tooltip.current?.showPopover?.({ source: anchor.current });
+  }, [shown]);
+  const show = () => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setShown(true), TOOLTIP_DELAY_MS);
+  };
+  const hide = () => {
+    clearTimeout(timer.current);
+    setShown(false);
+  };
+  return { shown, show, hide, anchor, tooltip };
+}
+
 export function IconButton({
   icon,
   label,
+  title,
   variant = 'ghost',
   size = 'md',
   active,
@@ -43,22 +76,45 @@ export function IconButton({
   ...rest
 }: IconButtonProps) {
   const { pending, handleClick } = usePendingClick(onClick);
+  const { shown, show, hide, anchor, tooltip } = useTooltip();
+  const tooltipId = useId();
   return (
     <button
+      ref={anchor}
       type="button"
       aria-label={label}
-      title={label}
+      aria-describedby={title ? tooltipId : undefined}
+      // Disabled buttons get no pointer events, so they keep the native tooltip.
+      title={disabled ? (title ?? label) : undefined}
       aria-pressed={active}
       className={cn(BASE, VARIANTS[variant], SIZES[size], className)}
       disabled={disabled || pending}
       aria-busy={pending || undefined}
       onClick={handleClick}
+      onPointerEnter={show}
+      onPointerLeave={hide}
+      onPointerDown={hide}
+      onFocus={show}
+      onBlur={hide}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') hide();
+      }}
       {...rest}
     >
       <Icon
         name={pending ? LOADING_ICON : icon}
         size={size === 'sm' ? 14 : 16}
       />
+      {shown ? (
+        <span ref={tooltip} popover="manual" role="tooltip" className={TOOLTIP}>
+          {title ?? label}
+        </span>
+      ) : null}
+      {title ? (
+        <span id={tooltipId} hidden>
+          {title}
+        </span>
+      ) : null}
     </button>
   );
 }

@@ -1012,6 +1012,14 @@ test('reviews a pull request from the inbox in one click', async () => {
     });
     await expect(row.getByText('Checks failing')).toBeVisible();
     await snap(window, '18-pull-request-inbox');
+    // The row can still shift right after loading and move the button off the pointer.
+    await expect(async () => {
+      await row.getByRole('button', { name: 'Explain' }).hover();
+      await expect(window.getByRole('tooltip')).toHaveText(
+        'Open an explainer that walks through what this pull request changes',
+        { timeout: 1_000 },
+      );
+    }).toPass();
     await row.getByRole('button', { name: 'Review' }).click();
 
     await expect(window.getByText('I added agent-note.txt.')).toBeVisible();

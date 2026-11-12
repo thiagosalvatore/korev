@@ -182,6 +182,11 @@ function RowActions({ state, pr }: { state: AppState; pr: InboxPullRequest }) {
         className={ROW_ACTION}
         icon={review ? 'message-square-text' : 'sparkles'}
         label={review ? 'Open review' : 'Review'}
+        title={
+          review
+            ? 'Open the review chat for this pull request'
+            : 'Start a chat that reviews this pull request'
+        }
         onClick={() =>
           review ? openAsk(review.id) : reviewInboxPullRequest(pr)
         }
@@ -191,6 +196,7 @@ function RowActions({ state, pr }: { state: AppState; pr: InboxPullRequest }) {
         className={ROW_ACTION}
         icon="book-open"
         label="Explain"
+        title="Open an explainer that walks through what this pull request changes"
         onClick={() => explainPullRequest(pr.repoId, pr.number)}
       />
       <IconButton
@@ -198,6 +204,11 @@ function RowActions({ state, pr }: { state: AppState; pr: InboxPullRequest }) {
         className={ROW_ACTION}
         icon={workspace ? 'folder-open' : 'git-branch'}
         label={workspace ? 'Open workspace' : 'Check out'}
+        title={
+          workspace
+            ? 'Open the workspace that has this pull request'
+            : "Create a workspace on this pull request's branch"
+        }
         onClick={() =>
           workspace ? selectWorkspace(workspace.id) : checkOutPullRequest(pr)
         }
@@ -207,6 +218,7 @@ function RowActions({ state, pr }: { state: AppState; pr: InboxPullRequest }) {
         className={ROW_ACTION}
         icon="external-link"
         label="Open on GitHub"
+        title="Open this pull request on GitHub"
         onClick={() => api.openExternal(pr.url)}
       />
     </div>
