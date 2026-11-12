@@ -4,6 +4,7 @@ import {
   FileDiff,
   GitBranch,
   GitPullRequestArrow,
+  Inbox as InboxIcon,
   Link,
   Smartphone,
   type LucideIcon,
@@ -14,6 +15,7 @@ import { Download, Footer, Nav } from '@/components/landing/Chrome';
 import {
   Branch,
   Explain,
+  Inbox,
   Linked,
   MainCommit,
   Phone,
@@ -135,10 +137,24 @@ function FeatureGraph() {
           'Unified or split, with Viewed to collapse a file',
           '“N files changed” after each turn shows only that turn',
           'Open a review chat with its own model',
-          'Pull requests lists what waits for your review; Review starts it in one click',
-          'When the author asks again, Korev re-checks your findings and can approve',
         ]}
         card={<Review />}
+      />
+      <MainCommit sha="d58c2a7" message="Merge #485 Queue webhook deliveries" />
+      <BranchSection
+        name="Inbox"
+        icon={InboxIcon}
+        shortcut="Pull requests · in the sidebar"
+        title="Every pull request that needs you, in one table."
+        body="Pull requests lists the ones that wait for your review and the ones you opened, across all your repositories. The Status column shows what each one waits for."
+        points={[
+          'Views and filters: Needs review, Needs attention, Ready to merge, Mine',
+          'A stack of pull requests shows as one group',
+          'Review starts a review chat in one click',
+          'When the author asks again, Korev re-checks your findings and can approve',
+          'Approve the pull request, and Korev archives the review chat',
+        ]}
+        card={<Inbox />}
       />
       <MainCommit sha="e7d2b18" message="Merge #481 Fix flaky checkout test" />
       <BranchSection

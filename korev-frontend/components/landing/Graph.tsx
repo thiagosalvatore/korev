@@ -15,9 +15,11 @@ import {
   GitBranchPlus,
   GitMerge,
   GitPullRequestArrow,
+  Inbox as InboxIcon,
   MessageCircleQuestion,
   Send,
   Signal,
+  Sparkles,
   Wifi,
   Wrench,
   type LucideIcon,
@@ -238,6 +240,124 @@ export function Ship() {
           </Fragment>
         ))}
       </div>
+    </div>
+  );
+}
+
+type InboxTone = 'success' | 'warning' | 'danger';
+
+interface InboxRow {
+  number: number;
+  title: string;
+  details: string;
+  status: string;
+  tone: InboxTone;
+  stackSize?: number;
+  stacked?: boolean;
+}
+
+const INBOX_VIEWS: [label: string, rows: InboxRow[]][] = [
+  [
+    'Needs review',
+    [
+      {
+        number: 486,
+        title: 'Cache the billing portal session',
+        details: 'acme/web#486 · @maria',
+        status: 'Ready',
+        tone: 'success',
+      },
+      {
+        number: 487,
+        title: 'Queue webhook deliveries',
+        details: 'acme/api#487 · @sam',
+        status: 'Checks running',
+        tone: 'warning',
+        stackSize: 2,
+      },
+      {
+        number: 488,
+        title: 'Retry failed webhooks with backoff',
+        details: 'acme/api#488 · @sam',
+        status: 'Changes requested',
+        tone: 'warning',
+        stacked: true,
+      },
+    ],
+  ],
+  [
+    'Mine',
+    [
+      {
+        number: 489,
+        title: 'Dark mode settings',
+        details: 'acme/web#489 · @thiago',
+        status: 'Ready',
+        tone: 'success',
+      },
+      {
+        number: 490,
+        title: 'Onboarding copy',
+        details: 'acme/web#490 · @thiago',
+        status: 'Checks failing',
+        tone: 'danger',
+      },
+    ],
+  ],
+];
+
+function InboxPullRequest({ row }: { row: InboxRow }) {
+  return (
+    <div className={`b-pr${row.stacked ? ' stacked' : ''}`}>
+      <div className="t">
+        <b>{row.title}</b>
+        <span>
+          {row.stackSize && (
+            <span className="b-stack">
+              <Layers size={11} />
+              Stack of {row.stackSize}
+            </span>
+          )}
+          {row.details}
+        </span>
+      </div>
+      <span className={`b-badge ${row.tone}`}>{row.status}</span>
+      <span className="a">
+        <Button size="sm" variant="ghost" icon={Sparkles} tabIndex={-1}>
+          Review
+        </Button>
+        <Button size="sm" variant="ghost" icon={BookOpenText} tabIndex={-1}>
+          Explain
+        </Button>
+      </span>
+    </div>
+  );
+}
+
+export function Inbox() {
+  const current = useTick(3200, INBOX_VIEWS.length);
+  const rows = INBOX_VIEWS[current][1];
+  return (
+    <div className="b-card">
+      <div className="hd">
+        <InboxIcon size={13} />
+        Pull requests
+        <span className="r b-steps">
+          {INBOX_VIEWS.map(([label, viewRows], index) => (
+            <span key={label} className={index === current ? 's on' : 's'}>
+              {label} {viewRows.length}
+            </span>
+          ))}
+        </span>
+      </div>
+      <div className="b-pr th">
+        <span>Pull request</span>
+        <span>Status</span>
+        <span className="a" />
+      </div>
+      {rows.map((row) => (
+        <InboxPullRequest key={row.number} row={row} />
+      ))}
     </div>
   );
 }

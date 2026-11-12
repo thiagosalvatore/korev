@@ -1,11 +1,14 @@
 import {
-  Archive,
   AudioLines,
+  BellDot,
   CalendarClock,
   FileCog,
   GitPullRequest,
   History,
+  KeyRound,
+  LayoutGrid,
   ListChecks,
+  Network,
   Plug,
   ScanEye,
   type LucideIcon,
@@ -53,9 +56,24 @@ const FEATURES: [LucideIcon, string, string][] = [
     'For apps that only run from the main checkout, Korev syncs a workspace’s changes into it.',
   ],
   [
-    Archive,
-    'Archive on merge',
-    'When the PR merges, Korev stops the agents, snapshots the files and removes the worktree.',
+    BellDot,
+    'Waiting for you',
+    'When an agent asks you something, or a pull request has failing checks, conflicts or unanswered comments, its workspace shows at the top of the sidebar.',
+  ],
+  [
+    Network,
+    'Runs',
+    'One agent splits a task and starts a worker agent for each part, each in its own workspace. Resume a run that paused or was interrupted.',
+  ],
+  [
+    LayoutGrid,
+    'Grid and board',
+    'Watch chats and terminals from different workspaces side by side, or see every workspace on one board, sorted by what its agent does.',
+  ],
+  [
+    KeyRound,
+    'Signed commits',
+    'Agents sign their commits with a key in the Secure Enclave, even while your Mac is locked.',
   ],
 ];
 
