@@ -659,7 +659,7 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     async (_case, keepPrsReady, paused) => {
       await korev.api.updateSettings({ keepPrsReady });
       const workspace = await createWorkspace();
-      if (paused) await korev.api.setPausePrReady(workspace.id, true);
+      if (paused) await korev.api.setKeepPrReady(workspace.id, false);
       reviewedPr('c1');
 
       await korev.api.prStatuses(workspace.id);
@@ -667,6 +667,20 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
       expect(await userPrompts(workspace.sessions[0].id)).toEqual([]);
     },
   );
+
+  it('asks about review comments on a workspace kept ready while the setting is off', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await korev.api.setKeepPrReady(workspace.id, true);
+    reviewedPr('c1');
+
+    await korev.api.prStatuses(workspace.id);
+    await waitUntilIdle(session.id);
+
+    expect(await userPrompts(session.id)).toEqual([
+      expect.stringContaining('Please rename (c1)'),
+    ]);
+  });
 
   it('waits for a running turn to end before it asks about review comments', async () => {
     await korev.api.updateSettings({ keepPrsReady: true });

@@ -52,6 +52,7 @@ const state = {
   repos: [{ id: 'r1', name: 'web' }],
   workspaces: [],
   askChats: [],
+  settings: { keepPrsReady: false },
 } as unknown as AppState;
 
 let call: ReturnType<typeof vi.fn>;
@@ -61,6 +62,8 @@ beforeEach(() => {
     if (method === 'pullRequestInbox') return { ok: true, value: inbox };
     if (method === 'reviewPullRequest')
       return { ok: true, value: { askChatId: 'a1' } };
+    if (method === 'createWorkspaces')
+      return { ok: true, value: [{ id: 'w2' }] };
     return null;
   });
   window.korev = { call, on: () => () => {} } as unknown as Window['korev'];
@@ -123,6 +126,70 @@ describe('PullRequestsPage', () => {
     });
     expect(call).not.toHaveBeenCalledWith('reviewPullRequest', ['r1', 42]);
   });
+
+  it('checks out a pull request and keeps it ready in its new workspace', async () => {
+    render(<PullRequestsPage state={state} />);
+
+    fireEvent.click(
+      within(await rowOf(/#42 Add install steps/)).getByRole('button', {
+        name: 'Keep ready',
+      }),
+    );
+
+    await waitFor(() =>
+      expect(call).toHaveBeenCalledWith('setKeepPrReady', ['w2', true]),
+    );
+    expect(call).toHaveBeenCalledWith('createWorkspaces', [
+      ['r1'],
+      null,
+      { kind: 'pr', number: 42, branch: 'octo/install', baseBranch: 'main' },
+    ]);
+    expect(getUi()).toMatchObject({
+      workspaceId: 'w2',
+      page: { kind: 'workspace' },
+    });
+  });
+
+  it.each([
+    ['turns on', false, true],
+    ['turns off', true, false],
+  ])(
+    '%s keeping a pull request ready in the workspace it already has',
+    async (_case, keepPrReady, keep) => {
+      render(
+        <PullRequestsPage
+          state={
+            {
+              ...state,
+              workspaces: [
+                {
+                  id: 'w1',
+                  repoId: 'r1',
+                  prs: [{ url: MINE_URL }],
+                  pausePrReady: false,
+                  keepPrReady,
+                },
+              ],
+            } as unknown as AppState
+          }
+        />,
+      );
+
+      const button = within(await rowOf(/#7 Fix login/)).getByRole('button', {
+        name: 'Keep ready',
+      });
+      expect(button.getAttribute('aria-pressed')).toBe(String(keepPrReady));
+      fireEvent.click(button);
+
+      await waitFor(() =>
+        expect(call).toHaveBeenCalledWith('setKeepPrReady', ['w1', keep]),
+      );
+      expect(call).not.toHaveBeenCalledWith(
+        'createWorkspaces',
+        expect.anything(),
+      );
+    },
+  );
 
   it('finds a pull request by its number', async () => {
     render(<PullRequestsPage state={state} />);

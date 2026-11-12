@@ -963,6 +963,7 @@ function addDraftWorkspace(
     label: null,
     keepAfterMerge: false,
     pausePrReady: false,
+    keepPrReady: false,
     prReadyHandled: [],
     awaitsLane: false,
     folderId: null,

@@ -390,14 +390,23 @@ export async function reviewInboxPullRequest(pr: InboxPullRequest) {
   if (reportFailure(started)) openAsk(started.value.askChatId);
 }
 
-export async function checkOutPullRequest(pr: InboxPullRequest) {
+export async function checkOutPullRequest(
+  pr: InboxPullRequest,
+): Promise<string | null> {
   const created = await api.createWorkspaces([pr.repoId], null, {
     kind: 'pr',
     number: pr.number,
     branch: pr.headRefName,
     baseBranch: pr.baseRefName,
   });
-  if (reportFailure(created)) selectWorkspace(created.value[0].id);
+  if (!reportFailure(created)) return null;
+  selectWorkspace(created.value[0].id);
+  return created.value[0].id;
+}
+
+export async function keepPullRequestReady(pr: InboxPullRequest) {
+  const workspaceId = await checkOutPullRequest(pr);
+  if (workspaceId) await api.setKeepPrReady(workspaceId, true);
 }
 
 export function toggleBoard() {
