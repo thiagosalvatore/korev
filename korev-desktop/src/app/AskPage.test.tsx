@@ -89,4 +89,20 @@ describe('AskPage', () => {
       screen.queryByRole('button', { name: 'Start workspace' }),
     ).toBeNull();
   });
+
+  it('opens the reviewed pull request from the header of a review chat', () => {
+    const prUrl = 'https://github.com/acme/korev/pull/42';
+    const review = { ...ask, reviewOf: prUrl };
+    render(
+      <AskPage
+        state={{ ...state, askChats: [review] } as unknown as AppState}
+        askChatId="a1"
+        repoIds={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '#42' }));
+
+    expect(window.korev.call).toHaveBeenCalledWith('openExternal', [prUrl]);
+  });
 });

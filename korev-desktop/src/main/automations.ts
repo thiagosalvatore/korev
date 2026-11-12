@@ -114,6 +114,10 @@ export function createAutomations(
     ctx.emitState();
   }
 
+  function automationTask(prompt: string, planMode: boolean): SendOptions {
+    return { ...defaultTask(ctx, prompt, planMode), fromKorev: true };
+  }
+
   function find(automationId: string): Automation {
     const found = automations().find((entry) => entry.id === automationId);
     if (!found) throw new NotFoundError('Automation', automationId);
@@ -212,7 +216,7 @@ export function createAutomations(
     await pruneRuns(automation.id);
     const sent = await host.send(
       session.id,
-      defaultTask(ctx, runPrompt(automation), false),
+      automationTask(runPrompt(automation), false),
     );
     return sent.ok ? { ok: true, value: ask.id } : sent;
   }
@@ -271,7 +275,7 @@ export function createAutomations(
     if (source && !source.ok) return source.message;
     const created = host.createWorkspaces(
       [repo.id],
-      defaultTask(ctx, entry.prompt, ctx.store.state.settings.defaultPlanMode),
+      automationTask(entry.prompt, ctx.store.state.settings.defaultPlanMode),
       source?.value,
     );
     if (!created.ok)

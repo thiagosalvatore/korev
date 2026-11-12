@@ -1356,6 +1356,19 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toMatchObject({ model: 'claude-haiku-4-5', effort: 'low' });
   });
 
+  it('marks the prompts Korev writes, not the ones the user types', async () => {
+    const workspace = await createWorkspace(task('typed by me'));
+
+    const review = await korev.api.startReview(workspace.id);
+
+    if (!review.ok) throw new Error(review.message);
+    const [typed] = await korev.api.transcript(workspace.sessions[0].id);
+    const [written] = await korev.api.transcript(review.value);
+    expect(typed).toMatchObject({ kind: 'user', text: 'typed by me' });
+    expect(typed).not.toHaveProperty('fromKorev');
+    expect(written).toMatchObject({ kind: 'user', fromKorev: true });
+  });
+
   it('starts explanations on the explain model, not the review model', async () => {
     await korev.api.updateSettings({
       reviewModel: {

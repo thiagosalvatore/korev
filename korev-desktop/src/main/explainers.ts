@@ -374,6 +374,7 @@ export function createExplainers(
       effort: session.effort,
       planMode: false,
       fast: session.fast,
+      fromKorev: true,
     });
   }
 
