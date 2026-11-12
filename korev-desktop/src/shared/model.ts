@@ -202,6 +202,8 @@ export interface InboxPullRequest {
   mergeable: PrStatus['mergeable'];
   checks: Exclude<CheckState, 'skipped'> | null;
   unresolvedThreads: number;
+  hasApproval: boolean;
+  requestedAsCodeOwner: boolean;
 }
 
 export const INBOX_GROUPS: {
@@ -294,6 +296,13 @@ function readyToMerge(pr: InboxPullRequest): boolean {
   );
 }
 
+function needsYourReview(pr: InboxPullRequest): boolean {
+  if (pr.reason !== 'review-requested') return false;
+  const codeOwnerReviewRequired =
+    pr.requestedAsCodeOwner && pr.reviewDecision === 'REVIEW_REQUIRED';
+  return !pr.hasApproval || codeOwnerReviewRequired;
+}
+
 const isMine = (pr: InboxPullRequest) => pr.reason === 'authored';
 
 export type InboxViewId = 'all' | 'review' | 'attention' | 'ready' | 'mine';
@@ -314,7 +323,7 @@ export const INBOX_VIEWS: {
     id: 'review',
     label: 'Needs review',
     empty: 'Nobody is waiting for your review.',
-    matches: (pr) => pr.reason === 'review-requested',
+    matches: needsYourReview,
   },
   {
     id: 'attention',

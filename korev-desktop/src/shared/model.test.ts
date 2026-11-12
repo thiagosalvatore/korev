@@ -308,6 +308,8 @@ function inboxPr(overrides: Partial<InboxPullRequest>): InboxPullRequest {
     mergeable: 'MERGEABLE',
     checks: 'success',
     unresolvedThreads: 0,
+    hasApproval: false,
+    requestedAsCodeOwner: false,
     ...overrides,
   };
 }
@@ -403,6 +405,32 @@ describe('INBOX_VIEWS', () => {
 
   it('is ready to merge only when approved, green and without conflicts', () => {
     expect(shownIn('ready', prs)).toEqual([2, 3]);
+  });
+
+  it.each<[string, Partial<InboxPullRequest>, boolean]>([
+    ['nobody has approved it', {}, true],
+    ['someone else approved it', { hasApproval: true }, false],
+    [
+      'your code-owner review is still required',
+      {
+        hasApproval: true,
+        requestedAsCodeOwner: true,
+        reviewDecision: 'REVIEW_REQUIRED',
+      },
+      true,
+    ],
+    [
+      'it is approved even though you are a code owner',
+      {
+        hasApproval: true,
+        requestedAsCodeOwner: true,
+        reviewDecision: 'APPROVED',
+      },
+      false,
+    ],
+    ['you opened it', { reason: 'authored' }, false],
+  ])('needs review when %s', (_case, overrides, shown) => {
+    expect(shownIn('review', [inboxPr(overrides)])).toEqual(shown ? [42] : []);
   });
 });
 

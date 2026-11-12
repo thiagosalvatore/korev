@@ -111,6 +111,40 @@ describe('the pull request inbox', () => {
     ]);
   });
 
+  it('reads whether anyone approved and whether you were asked as a code owner', () => {
+    const json = JSON.stringify({
+      data: {
+        review: {
+          nodes: [
+            searchedPr(1, 'acme/web', {
+              latestOpinionatedReviews: {
+                nodes: [{ state: 'CHANGES_REQUESTED' }, { state: 'APPROVED' }],
+              },
+              viewerLatestReviewRequest: { asCodeOwner: true },
+            }),
+            searchedPr(2, 'acme/web', {
+              latestOpinionatedReviews: {
+                nodes: [{ state: 'CHANGES_REQUESTED' }],
+              },
+              viewerLatestReviewRequest: null,
+            }),
+          ],
+        },
+      },
+    });
+
+    expect(
+      parseInbox([json], repoIds).map((pr) => [
+        pr.number,
+        pr.hasApproval,
+        pr.requestedAsCodeOwner,
+      ]),
+    ).toEqual([
+      [2, false, false],
+      [1, true, true],
+    ]);
+  });
+
   it('is empty when GitHub does not answer with JSON', () => {
     expect(parseInbox(['gh: not logged in'], repoIds)).toEqual([]);
   });

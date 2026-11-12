@@ -301,6 +301,8 @@ function inboxEntry(
     mergeable: pr.mergeable,
     checks,
     unresolvedThreads: 0,
+    hasApproval: pr.reviewDecision === 'APPROVED',
+    requestedAsCodeOwner: false,
   };
 }
 
