@@ -9,12 +9,17 @@ How the Korev desktop app looks and behaves. The tokens live in
   `bg-hover` and `bg-active` for interaction. Text `fg-1` (primary) → `fg-2` → `fg-3` →
   `fg-4`. Borders `border-1` (hairlines) and `border-2` (controls). Never use a hex value
   or a raw palette step in app code. The one exception is the merged-PR purple.
-- **One accent.** Cobalt (`accent`, `accent-text`, `accent-subtle`) marks the selected
+- **One accent.** Cobalt by default (`accent`, `accent-text`, `accent-subtle`) marks the selected
   thing, the primary action, plan mode and unread dots.
 - **Status colours carry meaning.** `danger` = failed or blocked, `warning` = running or
   needs attention, `success` = done or ready to merge.
 - **Themes.** Dark is the default token set; `[data-theme='light']` overrides it. The
-  app follows the macOS appearance unless Settings → General → Theme overrides it.
+  app follows the macOS appearance unless Settings → Appearance → Mode overrides it.
+  Each mode has presets in `tokens.css` (`[data-theme='dark'][data-palette='graphite']`):
+  they override surfaces, borders, text and, if they have their own, the accent. A custom
+  accent from Settings sets the `--accent*` tokens inline on `<html>`, derived from one
+  colour. Every preset must pass `contrast.test.ts`. The accent swatches in
+  `src/app/appearance.ts` are the other exception to "no hex in app code".
 - **Loading.** Use `LoadingRing` for inline work: a button that is busy, a running agent
   or a running check. The `loader-circle` icon name also renders it. Use `SkeletonRows`
   (or `Skeleton` bars in the shape of the row) for lists. Use `Spinner` only for a full

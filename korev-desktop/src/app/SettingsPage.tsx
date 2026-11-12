@@ -39,6 +39,14 @@ import {
   type ReviewReplies,
   type ThemePreference,
 } from '../shared/model';
+import {
+  ACCENT_SWATCHES,
+  accentStyle,
+  applyAccent,
+  DARK_THEMES,
+  isAccentColor,
+  LIGHT_THEMES,
+} from './appearance';
 import { api } from './bridge';
 import { modelChoices } from '../shared/format';
 import { DRAG_REGION, TRAFFIC_LIGHT_GUTTER } from './layout';
@@ -54,6 +62,7 @@ interface Section {
 
 const SECTIONS: Section[] = [
   { id: 'general', label: 'General', icon: 'settings' },
+  { id: 'appearance', label: 'Appearance', icon: 'palette' },
   { id: 'models', label: 'Default models', icon: 'sparkles' },
   { id: 'agents', label: 'Agents', icon: 'bot' },
   { id: 'git', label: 'Git', icon: 'git-branch' },
@@ -171,18 +180,274 @@ async function importFromConductor() {
   toast(importSummary(await api.importFromConductor()), 'success');
 }
 
-function General({ settings }: { settings: Settings }) {
+function ThemeCard({
+  mode,
+  id,
+  label,
+  accent,
+  selected,
+  onSelect,
+}: {
+  mode: 'dark' | 'light';
+  id: string;
+  label: string;
+  accent: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      aria-label={label}
+      className="group flex cursor-pointer flex-col gap-1.5 border-0 bg-transparent p-0 text-left"
+      onClick={onSelect}
+    >
+      <div
+        data-theme={mode}
+        data-palette={id}
+        style={accentStyle(accent, mode === 'light')}
+        className={cn(
+          'flex h-16 w-full overflow-hidden rounded-lg border border-border-2 bg-app outline-2 outline-offset-2 outline-transparent transition-[outline-color] duration-(--dur-fast)',
+          selected ? 'outline-accent' : 'group-hover:outline-border-strong',
+        )}
+      >
+        <div className="flex w-1/3 flex-col gap-1.5 border-r border-border-1 bg-surface p-2">
+          <div className="h-1.5 w-full rounded-full bg-active" />
+          <div className="h-1.5 w-2/3 rounded-full bg-fg-4" />
+          <div className="h-1.5 w-3/4 rounded-full bg-fg-4" />
+        </div>
+        <div className="flex flex-1 flex-col gap-1.5 p-2">
+          <div className="h-1.5 w-3/4 rounded-full bg-fg-1" />
+          <div className="h-1.5 w-1/2 rounded-full bg-fg-3" />
+          <div className="mt-auto ml-auto h-2.5 w-7 rounded-sm bg-accent" />
+        </div>
+      </div>
+      <span
+        className={cn(
+          'text-xs text-fg-2 group-hover:text-fg-1',
+          selected && 'font-medium text-fg-1',
+        )}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function ThemePicker<Id extends string>({
+  title,
+  description,
+  mode,
+  themes,
+  value,
+  accent,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  mode: 'dark' | 'light';
+  themes: { id: Id; label: string }[];
+  value: Id;
+  accent: string;
+  onChange: (id: Id) => void;
+}) {
+  return (
+    <div className="border-b border-border-1 py-4">
+      <div className="text-sm font-medium text-fg-1">{title}</div>
+      <div className="mt-0.5 text-xs text-fg-3">{description}</div>
+      <div
+        role="radiogroup"
+        aria-label={title}
+        className="mt-3 grid grid-cols-4 gap-3"
+      >
+        {themes.map((theme) => (
+          <ThemeCard
+            key={theme.id}
+            mode={mode}
+            id={theme.id}
+            label={theme.label}
+            accent={accent}
+            selected={theme.id === value}
+            onSelect={() => onChange(theme.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const ACCENT_COMMIT_MS = 250;
+
+function previewAccent(accent: string) {
+  const root = document.documentElement;
+  applyAccent(root, accent, root.dataset.theme === 'light');
+}
+
+function AccentSwatch({
+  label,
+  selected,
+  onClick,
+  children,
+}: {
+  label: string;
+  selected: boolean;
+  onClick?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      aria-label={label}
+      title={label}
+      className={cn(
+        'relative flex size-6 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 outline-2 outline-offset-2 outline-transparent transition-[outline-color] duration-(--dur-fast) hover:outline-border-strong',
+        selected && 'outline-fg-1 hover:outline-fg-1',
+      )}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+function AccentPicker({ accent }: { accent: string }) {
+  const [draft, setDraft] = useState(accent);
+  const pending = useRef<{
+    timer: ReturnType<typeof setTimeout>;
+    color: string;
+  }>(null);
+  useEffect(() => setDraft(accent), [accent]);
+  useEffect(
+    () => () => {
+      if (!pending.current) return;
+      clearTimeout(pending.current.timer);
+      update({ accentColor: pending.current.color });
+    },
+    [],
+  );
+
+  const choose = (color: string) => {
+    if (pending.current) clearTimeout(pending.current.timer);
+    pending.current = null;
+    setDraft(color);
+    previewAccent(color);
+    update({ accentColor: color });
+  };
+  const drag = (color: string) => {
+    if (pending.current) clearTimeout(pending.current.timer);
+    setDraft(color);
+    previewAccent(color);
+    pending.current = {
+      color,
+      timer: setTimeout(() => {
+        pending.current = null;
+        update({ accentColor: color });
+      }, ACCENT_COMMIT_MS),
+    };
+  };
+  const custom =
+    isAccentColor(draft) &&
+    !ACCENT_SWATCHES.some(({ color }) => color === draft.toLowerCase());
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Accent color"
+      className="flex items-center gap-2.5"
+    >
+      <AccentSwatch
+        label="Theme default"
+        selected={!isAccentColor(draft)}
+        onClick={() => choose('')}
+      >
+        <span className="flex size-6 items-center justify-center rounded-full border border-border-2 bg-raised text-fg-3">
+          <Icon name="rotate-ccw" size={12} />
+        </span>
+      </AccentSwatch>
+      {ACCENT_SWATCHES.map((swatch) => (
+        <AccentSwatch
+          key={swatch.color}
+          label={swatch.label}
+          selected={draft.toLowerCase() === swatch.color}
+          onClick={() => choose(swatch.color)}
+        >
+          <span
+            className="size-6 rounded-full"
+            style={{ background: swatch.color }}
+          />
+        </AccentSwatch>
+      ))}
+      <label
+        title="Custom color"
+        className={cn(
+          'relative flex size-6 cursor-pointer items-center justify-center rounded-full border border-border-2 bg-raised text-fg-3 outline-2 outline-offset-2 outline-transparent transition-[outline-color] duration-(--dur-fast) hover:outline-border-strong',
+          custom && 'border-transparent text-fg-on-accent outline-fg-1',
+        )}
+        style={custom ? { background: draft } : undefined}
+      >
+        <Icon name="pipette" size={12} />
+        <input
+          type="color"
+          aria-label="Custom color"
+          className="absolute inset-0 size-full cursor-pointer opacity-0"
+          value={isAccentColor(draft) ? draft : ACCENT_SWATCHES[0].color}
+          onChange={(event) => drag(event.target.value)}
+        />
+      </label>
+    </div>
+  );
+}
+
+function Appearance({ settings }: { settings: Settings }) {
   return (
     <>
-      <Row title="Theme" description="Toggle with ⌘⌥T.">
+      <Row
+        title="Mode"
+        description="Follow macOS, or always use light or dark. Toggle with ⌘⌥T."
+      >
         <Select
-          ariaLabel="Theme"
+          ariaLabel="Mode"
           className="w-40"
           options={THEMES}
           value={settings.theme}
           onChange={(theme) => update({ theme: theme as ThemePreference })}
         />
       </Row>
+      <ThemePicker
+        title="Dark theme"
+        description="The colors Korev uses in dark mode."
+        mode="dark"
+        themes={DARK_THEMES}
+        value={settings.darkTheme}
+        accent={settings.accentColor}
+        onChange={(darkTheme) => update({ darkTheme })}
+      />
+      <ThemePicker
+        title="Light theme"
+        description="The colors Korev uses in light mode."
+        mode="light"
+        themes={LIGHT_THEMES}
+        value={settings.lightTheme}
+        accent={settings.accentColor}
+        onChange={(lightTheme) => update({ lightTheme })}
+      />
+      <Row
+        title="Accent color"
+        description="Marks the selected item, the primary button and unread dots. Theme default uses the theme's own color."
+      >
+        <AccentPicker accent={settings.accentColor} />
+      </Row>
+    </>
+  );
+}
+
+function General({ settings }: { settings: Settings }) {
+  return (
+    <>
       <Row
         title="Notifications"
         description="Notify when an agent finishes while Korev is in the background."
@@ -1630,6 +1895,8 @@ export function SettingsPage({
   if (repo) body = <RepoSettings state={state} repo={repo} />;
   else if (current?.id === 'general')
     body = <General settings={state.settings} />;
+  else if (current?.id === 'appearance')
+    body = <Appearance settings={state.settings} />;
   else if (current?.id === 'models') body = <Models state={state} />;
   else if (current?.id === 'agents') body = <Agents state={state} />;
   else if (current?.id === 'git') body = <Git settings={state.settings} />;

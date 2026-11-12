@@ -41,6 +41,10 @@ export const CLAUDE_MODELS: AgentModel[] = [
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
+export type DarkTheme = 'korev' | 'graphite' | 'midnight' | 'warm';
+
+export type LightTheme = 'korev' | 'neutral' | 'warm';
+
 export type EditorId =
   | 'cursor'
   | 'vscode'
@@ -638,6 +642,9 @@ export interface AutomationRun {
 
 export interface Settings {
   theme: ThemePreference;
+  darkTheme: DarkTheme;
+  lightTheme: LightTheme;
+  accentColor: string;
   defaultAgent: AgentKind;
   defaultModels: Record<AgentKind, string>;
   branchPrefix: string;

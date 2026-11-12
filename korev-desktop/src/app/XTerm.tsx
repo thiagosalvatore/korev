@@ -79,6 +79,13 @@ export function XTerm({
       });
     });
     resizer.observe(element);
+    const retheme = new MutationObserver(() => {
+      terminal.options.theme = themeFromTokens().theme;
+    });
+    retheme.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'data-palette', 'style'],
+    });
     let attached = true;
     void api
       .openTerminal(
@@ -100,6 +107,7 @@ export function XTerm({
       stopExit();
       input.dispose();
       resizer.disconnect();
+      retheme.disconnect();
       terminal.dispose();
     };
   }, [ref, workspaceId, kind, interactive, preset]);

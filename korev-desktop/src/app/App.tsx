@@ -3,6 +3,7 @@ import { cn, LoadingRing, Logo } from '../design-system';
 import type { AppState } from '../shared/model';
 import { activeWorkspaces } from '../shared/workspaces';
 import { openNewWorkspace, selectWorkspace } from './actions';
+import { applyAppearance } from './appearance';
 import { AskPage } from './AskPage';
 import { AutomationsPage } from './AutomationsPage';
 import { BoardView } from './BoardView';
@@ -34,9 +35,12 @@ function useTheme(state: AppState | null) {
   const preference = state?.settings.theme ?? 'system';
   const light =
     preference === 'light' || (preference === 'system' && systemLight);
+  const palette =
+    (light ? state?.settings.lightTheme : state?.settings.darkTheme) ?? 'korev';
+  const accent = state?.settings.accentColor ?? '';
   useEffect(() => {
-    document.documentElement.dataset.theme = light ? 'light' : 'dark';
-  }, [light]);
+    applyAppearance(document.documentElement, { light, palette, accent });
+  }, [light, palette, accent]);
 }
 
 function visibleWorkspaceIds(ui: UiState): string {

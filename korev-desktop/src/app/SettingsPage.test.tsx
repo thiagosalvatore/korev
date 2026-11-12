@@ -187,3 +187,72 @@ describe('Sound file setting', () => {
     );
   });
 });
+
+describe('Appearance settings', () => {
+  const appearanceState = (accentColor: string) =>
+    ({
+      ...STATE,
+      settings: {
+        ...STATE.settings,
+        theme: 'dark',
+        darkTheme: 'korev',
+        lightTheme: 'korev',
+        accentColor,
+      },
+    }) as AppState;
+
+  afterEach(() => {
+    vi.useRealTimers();
+    document.documentElement.removeAttribute('style');
+  });
+
+  it('picks a dark theme preset', () => {
+    render(<SettingsPage state={appearanceState('')} section="appearance" />);
+    const darkThemes = screen.getByRole('radiogroup', { name: 'Dark theme' });
+
+    expect(
+      within(darkThemes)
+        .getByRole('radio', { name: 'Korev' })
+        .getAttribute('aria-checked'),
+    ).toBe('true');
+    fireEvent.click(
+      within(darkThemes).getByRole('radio', { name: 'Graphite' }),
+    );
+
+    expect(window.korev.call).toHaveBeenCalledWith('updateSettings', [
+      { darkTheme: 'graphite' },
+    ]);
+  });
+
+  it('goes back to the theme accent', () => {
+    render(
+      <SettingsPage state={appearanceState('#d97757')} section="appearance" />,
+    );
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Theme default' }));
+
+    expect(window.korev.call).toHaveBeenCalledWith('updateSettings', [
+      { accentColor: '' },
+    ]);
+  });
+
+  it('previews a custom accent at once and saves it when the drag settles', () => {
+    vi.useFakeTimers();
+    render(<SettingsPage state={appearanceState('')} section="appearance" />);
+
+    fireEvent.input(screen.getByLabelText('Custom color'), {
+      target: { value: '#123456' },
+    });
+
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(
+      '#123456',
+    );
+    expect(window.korev.call).not.toHaveBeenCalledWith('updateSettings', [
+      { accentColor: '#123456' },
+    ]);
+    vi.runAllTimers();
+    expect(window.korev.call).toHaveBeenCalledWith('updateSettings', [
+      { accentColor: '#123456' },
+    ]);
+  });
+});
