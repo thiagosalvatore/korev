@@ -49,14 +49,45 @@ function declarations(body: string): Tokens {
   );
 }
 
+function presetIds(css: string, mode: string): string[] {
+  const pattern = new RegExp(
+    `\\[data-theme='${mode}'\\]\\[data-palette='([\\w-]+)'\\] \\{`,
+    'g',
+  );
+  return [...css.matchAll(pattern)].map(([, id]) => id);
+}
+
+function presets(
+  css: string,
+  mode: string,
+  base: Tokens,
+): Record<string, Tokens> {
+  return Object.fromEntries(
+    presetIds(css, mode).map((id) => [
+      `${mode} ${id}`,
+      {
+        ...base,
+        ...declarations(
+          blockBody(css, `[data-theme='${mode}'][data-palette='${id}']`),
+        ),
+      },
+    ]),
+  );
+}
+
 function themes(): Record<string, Tokens> {
   const css = stripComments(readFileSync(TOKENS_PATH, 'utf8'));
-  const dark = declarations(blockBody(css, ':root'));
+  const dark = declarations(blockBody(css, "[data-theme='dark']"));
   const light = {
     ...dark,
     ...declarations(blockBody(css, "[data-theme='light']")),
   };
-  return { dark, light };
+  return {
+    dark,
+    light,
+    ...presets(css, 'dark', dark),
+    ...presets(css, 'light', light),
+  };
 }
 
 function resolve(tokens: Tokens, name: string, depth = 0): string {

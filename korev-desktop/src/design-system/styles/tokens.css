@@ -1,4 +1,6 @@
-:root {
+/* data-theme='dark' also matches the theme previews in Settings, so a dark preview works inside the light app. */
+:root,
+[data-theme='dark'] {
   /* Graphite neutrals (cool, low-chroma) */
   --gray-0: #0b0d10;
   --gray-50: #101317;
@@ -206,4 +208,125 @@
     0 0 0 1px var(--border-2), 0 24px 64px rgba(15, 18, 24, 0.18);
   --inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.7);
   --selection-bg: rgba(47, 91, 234, 0.22);
+}
+
+/* Theme presets (Settings → Appearance). Korev is the default above; each preset overrides surfaces, borders, text and, when it has its own, the accent. */
+[data-theme='dark'][data-palette='graphite'] {
+  --bg-app: #181818;
+  --bg-surface: #1e1e1e;
+  --bg-raised: #252526;
+  --bg-hover: #2a2a2b;
+  --bg-active: #333334;
+  --bg-inset: #141414;
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+  --border-1: #2b2b2b;
+  --border-2: #3a3a3a;
+  --border-strong: #555555;
+  --fg-1: #ececec;
+  --fg-2: #b8b8b8;
+  --fg-3: #999999;
+  --fg-4: #6f6f6f;
+  --risk-low: #999999;
+  --syn-comment: #7a7a7a;
+  --syn-punct: #b0b0b0;
+  --syn-plain: #e0e0e0;
+}
+
+[data-theme='dark'][data-palette='midnight'] {
+  --bg-app: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-raised: #121212;
+  --bg-hover: #1a1a1a;
+  --bg-active: #242424;
+  --bg-inset: #050505;
+  --bg-overlay: rgba(0, 0, 0, 0.72);
+  --border-1: #1c1c1c;
+  --border-2: #2a2a2a;
+  --border-strong: #444444;
+  --fg-1: #f2f2f2;
+  --fg-2: #a8a8a8;
+  --fg-3: #8a8a8a;
+  --fg-4: #5e5e5e;
+  --risk-low: #8a8a8a;
+  --syn-comment: #6e6e6e;
+  --syn-punct: #a8a8a8;
+  --syn-plain: #e4e4e4;
+}
+
+[data-theme='dark'][data-palette='warm'] {
+  --bg-app: #1f1e1d;
+  --bg-surface: #262624;
+  --bg-raised: #2d2c2a;
+  --bg-hover: #33322f;
+  --bg-active: #3b3a37;
+  --bg-inset: #1a1918;
+  --bg-overlay: rgba(10, 9, 8, 0.66);
+  --border-1: #34332f;
+  --border-2: #45433f;
+  --border-strong: #5f5c56;
+  --fg-1: #f4f2ee;
+  --fg-2: #c2bfb8;
+  --fg-3: #a5a199;
+  --fg-4: #78746c;
+  --accent: #d97757;
+  --accent-hover: #e38b6d;
+  --accent-press: #c4633f;
+  --accent-text: #eb9a7d;
+  --accent-subtle: rgba(217, 119, 87, 0.16);
+  --accent-border: rgba(217, 119, 87, 0.5);
+  --selection-bg: rgba(217, 119, 87, 0.32);
+  --diff-hunk-bg: rgba(217, 119, 87, 0.08);
+  --diff-hunk-fg: #eb9a7d;
+  --risk-low: #a5a199;
+  --syn-comment: #7f7a71;
+  --syn-punct: #b5b0a7;
+  --syn-plain: #e8e4dc;
+}
+
+[data-theme='light'][data-palette='neutral'] {
+  --bg-app: #f8f8f8;
+  --bg-surface: #ffffff;
+  --bg-raised: #ffffff;
+  --bg-hover: #f0f0f0;
+  --bg-active: #e6e6e6;
+  --bg-inset: #f3f3f3;
+  --border-1: #e5e5e5;
+  --border-2: #d4d4d4;
+  --border-strong: #a3a3a3;
+  --fg-1: #171717;
+  --fg-2: #4d4d4d;
+  --fg-3: #666666;
+  --fg-4: #9e9e9e;
+  --syn-comment: #8c8c8c;
+  --syn-punct: #4d4d4d;
+  --syn-plain: #1f1f1f;
+}
+
+[data-theme='light'][data-palette='warm'] {
+  --bg-app: #f5f4ef;
+  --bg-surface: #faf9f5;
+  --bg-raised: #ffffff;
+  --bg-hover: #efede6;
+  --bg-active: #e6e3da;
+  --bg-inset: #f0eee8;
+  --border-1: #e6e3da;
+  --border-2: #d6d2c7;
+  --border-strong: #a8a397;
+  --fg-1: #1f1e1d;
+  --fg-2: #4d4a44;
+  --fg-3: #66625a;
+  --fg-4: #9b968b;
+  --accent: #c4633f;
+  --accent-hover: #ad5333;
+  --accent-press: #964528;
+  --accent-text: #a14b2b;
+  --accent-subtle: rgba(196, 99, 63, 0.1);
+  --accent-border: rgba(196, 99, 63, 0.4);
+  --selection-bg: rgba(196, 99, 63, 0.22);
+  --diff-hunk-bg: #fbefe9;
+  --diff-hunk-fg: #a14b2b;
+  --warning-text: #7d5e10;
+  --syn-comment: #8f897d;
+  --syn-punct: #4d4a44;
+  --syn-plain: #1f1e1d;
 }

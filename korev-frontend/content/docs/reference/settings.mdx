@@ -9,7 +9,6 @@ Open Settings with ⌘, or from the bottom of the sidebar. Esc closes it.
 
 | Setting                             | Default | What it does                                                                                                                                                                                  |
 | ----------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Theme                               | System  | System, Light or Dark. ⌘⌥T toggles between light and dark.                                                                                                                                    |
 | Notifications                       | On      | Notifies you when an agent finishes or needs your input, while the Korev window is not in focus. Click a notification to go to the workspace.                                                 |
 | Phone notifications                 | Empty   | An [ntfy](https://ntfy.sh) topic URL. Korev also sends each notification to this topic, so the ntfy app on your phone shows it. See [Remote access](./remote-access.mdx#phone-notifications). |
 | Sound                               | On      | Plays a sound with each notification.                                                                                                                                                         |
@@ -29,6 +28,17 @@ When you turn it on, Korev:
 3. Adds it to the file in your `gpg.ssh.allowedSignersFile` git setting, with your global `user.email`, if that setting is set.
 
 Only Korev's agents and scripts sign with the key. Your own terminal and git config do not change. You can turn the setting on only on the Mac, not from the phone.
+
+## Appearance
+
+Each change shows in the window right away.
+
+| Setting      | Default       | What it does                                                                                                                                                    |
+| ------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mode         | System        | System, Light or Dark. ⌘⌥T toggles between light and dark.                                                                                                      |
+| Dark theme   | Korev         | The colors in dark mode: Korev (blue-grey), Graphite (neutral grey), Midnight (true black) or Warm (warm grey, orange accent).                                  |
+| Light theme  | Korev         | The colors in light mode: Korev, Neutral or Warm.                                                                                                               |
+| Accent color | Theme default | The color of the selected item, the primary button and unread dots. Pick a swatch, or any color with the picker. **Theme default** uses the theme's own accent. |
 
 ## Default models
 
