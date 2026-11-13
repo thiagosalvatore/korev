@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-13
+
+Choose how often Korev checks pull requests, and Korev no longer uses up your GitHub rate limit.
+
 ### New
 
 - **Choose how often Korev checks pull requests.** Settings → Git → Check pull requests sets how often Korev asks GitHub about the pull request of a workspace whose agent is working: every 30 seconds, minute, 2 minutes or 5 minutes. Other workspaces are checked 4 times less often.
@@ -11,6 +15,8 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 ### Fixed
 
 - Korev no longer uses up your GitHub rate limit, which slowed down `gh` in your agents. It checks all open pull requests with one request, stops checking merged and closed ones, checks workspaces without a working agent every 2 minutes instead of every 30 seconds, and waits when GitHub says the limit is reached.
+- Keep after merge and Keep PR ready in the workspace header now look different when they are on: an on toggle has the accent tint and border. Before, on and off looked almost the same.
+- On the New workspace page, the base branch chip now reads "new branch off origin/main", so it no longer looks like the same control as Create from....
 
 ## [0.34.0] - 2026-11-12
 
