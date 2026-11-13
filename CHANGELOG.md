@@ -4,6 +4,14 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.35.1] - 2026-11-13
+
+See at a glance which pull requests in a stack are merged.
+
+### Fixed
+
+- The PR dropdown in the workspace header now shows which pull requests in a stack are merged or closed. Open ones come first, merged and closed ones move to the bottom under a "Merged" or "Closed" header, and each icon has its status color. Before, every entry looked open.
+
 ## [0.35.0] - 2026-11-13
 
 Choose how often Korev checks pull requests, and Korev no longer uses up your GitHub rate limit.
