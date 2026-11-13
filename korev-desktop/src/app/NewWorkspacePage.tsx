@@ -87,7 +87,8 @@ function TargetBranchMenu({
         <button
           type="button"
           aria-label="Target branch"
-          className="flex h-7 cursor-pointer items-center gap-1 rounded-sm border-0 bg-transparent px-1.5 font-mono text-xs text-fg-3 hover:bg-hover hover:text-fg-1"
+          title="Start a new branch from this branch. Its pull request targets it too."
+          className="flex h-7 cursor-pointer items-center gap-1 rounded-sm border-0 bg-transparent px-1.5 font-mono text-xs whitespace-nowrap text-fg-3 hover:bg-hover hover:text-fg-1"
           onClick={() => {
             if (!branches.length)
               void api.listBranches(repo.id).then(setBranches);
@@ -95,7 +96,7 @@ function TargetBranchMenu({
           }}
         >
           <Icon name="git-branch" size={12} />
-          from origin/{baseBranch ?? repo.defaultBranch}
+          new branch off origin/{baseBranch ?? repo.defaultBranch}
         </button>
       )}
     />
@@ -215,7 +216,7 @@ export function NewWorkspacePage({
             ) : null}
             <Button
               size="sm"
-              variant={keepAfterMerge ? 'secondary' : 'ghost'}
+              variant="ghost"
               icon="pin"
               aria-pressed={keepAfterMerge}
               title="Don't archive this workspace when its pull request merges"

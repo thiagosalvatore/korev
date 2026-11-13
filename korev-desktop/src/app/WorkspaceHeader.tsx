@@ -232,7 +232,7 @@ export function WorkspaceHeader({
         <TargetBranch workspace={workspace} />
         <Button
           size="sm"
-          variant={workspace.keepAfterMerge ? 'secondary' : 'ghost'}
+          variant="ghost"
           icon="pin"
           aria-pressed={workspace.keepAfterMerge}
           title="Don't archive this workspace when its pull request merges"
@@ -245,7 +245,7 @@ export function WorkspaceHeader({
         {state.settings.keepPrsReady || workspace.keepPrReady ? (
           <Button
             size="sm"
-            variant={keepsReady ? 'secondary' : 'ghost'}
+            variant="ghost"
             icon="shield-check"
             aria-pressed={keepsReady}
             title="Let the agent fix failing checks, conflicts and review comments on this workspace's pull requests"
