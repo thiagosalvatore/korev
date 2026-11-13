@@ -4,6 +4,14 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Choose how often Korev checks pull requests.** Settings → Git → Check pull requests sets how often Korev asks GitHub about the pull request of a workspace whose agent is working: every 30 seconds, minute, 2 minutes or 5 minutes. Other workspaces are checked 4 times less often.
+
+### Fixed
+
+- Korev no longer uses up your GitHub rate limit, which slowed down `gh` in your agents. It checks all open pull requests with one request, stops checking merged and closed ones, checks workspaces without a working agent every 2 minutes instead of every 30 seconds, and waits when GitHub says the limit is reached.
+
 ## [0.34.0] - 2026-11-12
 
 See which chat messages Korev sent, and open the pull request from a review chat's header.

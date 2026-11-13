@@ -102,6 +102,6 @@ The command palette also searches the chats of every workspace, archived ones to
 
 The branch stays unless **Settings → Git → Delete branch on archive** is on.
 
-**Archive on merge** (Settings → Git, or `[git] archive_on_merge`) archives a workspace when its pull request merges. Korev checks every 30 seconds and waits while an agent is running.
+**Archive on merge** (Settings → Git, or `[git] archive_on_merge`) archives a workspace when its pull request merges. Korev checks every 2 minutes, or right after an agent turn, and waits while an agent is running.
 
 Archived workspaces are listed under **History**. **Unarchive** adds the worktree back, restores the snapshot, gives it new ports and runs setup again. **Delete** removes an archived workspace and its chat transcripts. It does not delete the branch.

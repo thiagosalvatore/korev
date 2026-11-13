@@ -668,6 +668,7 @@ export interface Settings {
   archiveReviews: boolean;
   reReviews: ReReviews;
   keepPrsReady: boolean;
+  prCheckSeconds: number;
   reviewReplies: ReviewReplies;
   reviewReplyInstructions: string;
   toolApprovals: boolean;

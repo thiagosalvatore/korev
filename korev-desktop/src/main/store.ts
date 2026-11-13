@@ -97,6 +97,7 @@ export function defaultSettings(home: string): Settings {
     archiveReviews: false,
     reReviews: 'off',
     keepPrsReady: false,
+    prCheckSeconds: 30,
     reviewReplies: 'reply',
     reviewReplyInstructions: '',
     toolApprovals: false,
