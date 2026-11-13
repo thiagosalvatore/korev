@@ -24,7 +24,7 @@ import { api } from './bridge';
 import { groupRepoName, workspaceLabel } from '../shared/workspaces';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { prIcon } from './Sidebar';
-import { Menu } from './ui/Menu';
+import { Menu, type MenuItem } from './ui/Menu';
 import { toast } from './ui/toast';
 import { setUi, updateWorkspaceUi, useUi } from './ui-store';
 
@@ -119,6 +119,34 @@ function TargetBranch({ workspace }: { workspace: Workspace }) {
   );
 }
 
+function isOpen(pr: PrStatus): boolean {
+  return pr.state === 'OPEN';
+}
+
+function openFirst(prs: PrStatus[]): PrStatus[] {
+  return [...prs.filter(isOpen), ...prs.filter((entry) => !isOpen(entry))];
+}
+
+export function prMenuItems(
+  workspace: Workspace,
+  pr: PrStatus,
+  prs: PrStatus[],
+): MenuItem[] {
+  return openFirst(prs).map((entry) => {
+    const status = prIcon(entry);
+    return {
+      id: entry.url,
+      label: `#${entry.number} ${entry.title}`,
+      icon: status.icon,
+      iconClassName: status.className,
+      section: isOpen(entry) ? undefined : status.label,
+      checked: entry.url === pr.url,
+      onSelect: () =>
+        updateWorkspaceUi(workspace.id, () => ({ prUrl: entry.url })),
+    };
+  });
+}
+
 function PrButton({
   workspace,
   pr,
@@ -147,14 +175,7 @@ function PrButton({
       <Menu
         label="Pull requests"
         align="right"
-        items={prs.map((entry) => ({
-          id: entry.url,
-          label: `#${entry.number} ${entry.title}`,
-          icon: prIcon(entry).icon,
-          checked: entry.url === pr.url,
-          onSelect: () =>
-            updateWorkspaceUi(workspace.id, () => ({ prUrl: entry.url })),
-        }))}
+        items={prMenuItems(workspace, pr, prs)}
         trigger={({ toggle }) => (
           <Button
             size="sm"

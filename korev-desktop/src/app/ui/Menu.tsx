@@ -14,6 +14,7 @@ export interface MenuItem {
   label: ReactNode;
   ariaLabel?: string;
   icon?: IconName;
+  iconClassName?: string;
   hint?: string;
   checked?: boolean;
   danger?: boolean;
@@ -135,7 +136,11 @@ export function Menu({
                   }}
                 >
                   {item.icon ? (
-                    <Icon name={item.icon} size={14} className="text-fg-3" />
+                    <Icon
+                      name={item.icon}
+                      size={14}
+                      className={item.iconClassName ?? 'text-fg-3'}
+                    />
                   ) : null}
                   <span className="min-w-0 flex-1 truncate">{item.label}</span>
                   {item.checked ? (
