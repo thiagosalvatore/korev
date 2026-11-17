@@ -77,7 +77,6 @@ function record(value: unknown): Record<string, unknown> {
     : {};
 }
 
-// Claude Code runs a plugin's skills and commands as `/plugin:name`.
 export async function pluginCommands(
   home: string,
   repoPath: string,
