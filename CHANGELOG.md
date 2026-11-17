@@ -4,6 +4,8 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-11-17
+
 See the skills and commands of your Claude Code plugins when you type `/`.
 
 ### New
