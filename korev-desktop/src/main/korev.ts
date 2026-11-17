@@ -110,7 +110,7 @@ import {
   poolSize,
   withPrompt,
 } from './repo-config';
-import { listSkills } from './skills';
+import { commandNames, listSkills, pluginCommands } from './skills';
 import { listInbox, listIssues, listPullRequests } from './sources';
 import { rangeFileDiff, rangeFiles, searchFiles } from './git-review';
 import { findLocalUrl } from './workspace-setup';
@@ -153,7 +153,6 @@ const FILE_MAX_BYTES = 1_000_000;
 const IMAGE_MAX_BYTES = 10_000_000;
 const CONTEXT_DIR = '.context';
 const HIDDEN_PREFIX = '.';
-const COMMAND_EXTENSION = '.md';
 const BUILTIN_COMMANDS = ['compact', 'review', 'init'];
 const IMPLEMENT_PLAN_TASK = 'Implement your part of the plan below.';
 const IMPLEMENT_APPROVED_PLAN = 'Implement the plan.';
@@ -214,12 +213,6 @@ async function listArtifacts(worktree: string): Promise<string[]> {
     .sort();
 }
 
-async function commandNames(dir: string): Promise<string[]> {
-  const entries = await readdir(dir).catch(() => []);
-  return entries
-    .filter((entry) => entry.endsWith(COMMAND_EXTENSION))
-    .map((entry) => entry.slice(0, -COMMAND_EXTENSION.length));
-}
 const REPOS_DIR = 'repos';
 const REPO_NAME_FROM_URL = /([^/:]+?)(?:\.git)?\/?$/;
 
@@ -1117,8 +1110,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     const skills = (await listSkills(deps.home, projectPath))
       .filter((skill) => skill.agents.includes('claude'))
       .map((skill) => skill.name);
+    const plugins = await pluginCommands(deps.home, projectPath);
     return [
-      ...new Set([...BUILTIN_COMMANDS, ...names.flat(), ...skills]),
+      ...new Set([...BUILTIN_COMMANDS, ...names.flat(), ...skills, ...plugins]),
     ].sort();
   }
 

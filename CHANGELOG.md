@@ -4,6 +4,12 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+See the skills and commands of your Claude Code plugins when you type `/`.
+
+### New
+
+- **Plugin skills in the `/` menu.** Typing `/` in the composer now also lists the skills and commands of the Claude Code plugins you have installed and enabled, such as `/superpowers:brainstorming`. Before, the menu showed only the ones in `.claude/skills` and `.claude/commands`.
+
 ## [0.35.1] - 2026-11-13
 
 See at a glance which pull requests in a stack are merged.
