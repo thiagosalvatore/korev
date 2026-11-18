@@ -3192,6 +3192,73 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     expect(approved.workspace.sessions[0].planMode).toBe(false);
   });
 
+  async function holdTurn() {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    const context = path.join(workspace.path, '.context');
+    await mkdir(context, { recursive: true });
+    await korev.api.send(session.id, task('hold-turn'));
+    await waitFor(async () => existsSync(path.join(context, 'claude-args')));
+    return { session, steered: path.join(context, 'steered') };
+  }
+
+  async function queuedMessages(sessionId: string) {
+    return (await korev.api.transcript(sessionId)).filter(
+      (item) => item.kind === 'user' && item.queued,
+    );
+  }
+
+  it('queues a message sent while Claude Code works', async () => {
+    const { session } = await holdTurn();
+
+    await korev.api.send(session.id, task('Also add tests'));
+
+    expect(await queuedMessages(session.id)).toMatchObject([
+      { text: 'Also add tests' },
+    ]);
+    await korev.api.stop(session.id);
+  });
+
+  it('steers the running agent with a queued message sent now', async () => {
+    const { session, steered } = await holdTurn();
+    await korev.api.send(session.id, task('Also add tests'));
+    const [queued] = await queuedMessages(session.id);
+
+    const sent = await korev.api.sendQueuedNow(session.id, queued.id);
+
+    expect(sent.ok).toBe(true);
+    await waitFor(async () => existsSync(steered));
+    expect(await readFile(steered, 'utf8')).toContain('Also add tests');
+    expect(await queuedMessages(session.id)).toEqual([]);
+    expect((await userMessages(session.id)).at(-1)).toBe('Also add tests');
+  });
+
+  it('steers the running agent when queuing is off', async () => {
+    await korev.api.updateSettings({ queueWhileRunning: false });
+    const { session, steered } = await holdTurn();
+
+    await korev.api.send(session.id, task('Also add tests'));
+
+    await waitFor(async () => existsSync(steered));
+    expect(await queuedMessages(session.id)).toEqual([]);
+  });
+
+  it('removes a queued message', async () => {
+    const { session } = await holdTurn();
+    await korev.api.send(session.id, task('Also add tests'));
+    const [queued] = await queuedMessages(session.id);
+
+    await korev.api.removeQueued(session.id, queued.id);
+
+    expect(await userMessages(session.id)).not.toContain('Also add tests');
+    expect(emit).toHaveBeenCalledWith('chat', {
+      sessionId: session.id,
+      item: queued,
+      removed: true,
+    });
+    await korev.api.stop(session.id);
+  });
+
   it('sends a message typed while a plan waits as feedback on the plan', async () => {
     const workspace = await createWorkspace();
     const [session] = workspace.sessions;

@@ -7,9 +7,10 @@ import {
 } from 'react';
 import { Keyboard, Platform } from 'react-native';
 import {
-  upsertChatItem,
+  applyChatUpdate,
   type AppState,
   type ChatItem,
+  type ChatUpdate,
   type ModelChoice,
   type Settings,
 } from '../../korev-desktop/src/shared/model';
@@ -71,15 +72,15 @@ export function useTranscript(sessionId: string): ChatItem[] | null {
   const [items, setItems] = useState<ChatItem[] | null>(null);
   useEffect(() => {
     let loaded: ChatItem[] | null = null;
-    let pending: ChatItem[] = [];
+    let pending: ChatUpdate[] = [];
     let request = 0;
     const stopChat = connection.on('chat', (update) => {
       if (update.sessionId !== sessionId) return;
       if (!loaded) {
-        pending.push(update.item);
+        pending.push(update);
         return;
       }
-      loaded = upsertChatItem(loaded, update.item);
+      loaded = applyChatUpdate(loaded, update);
       setItems(loaded);
     });
     const refresh = () => {
@@ -90,7 +91,7 @@ export function useTranscript(sessionId: string): ChatItem[] | null {
         .transcript(sessionId)
         .then((initial) => {
           if (mine !== request) return;
-          loaded = pending.reduce(upsertChatItem, initial);
+          loaded = pending.reduce(applyChatUpdate, initial);
           setItems(loaded);
         })
         .catch(() => undefined);

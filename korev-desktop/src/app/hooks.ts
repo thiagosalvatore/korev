@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  upsertChatItem,
+  applyChatUpdate,
   type AppState,
   type ChatItem,
+  type ChatUpdate,
   type ModelChoice,
   type Settings,
 } from '../shared/model';
@@ -36,19 +37,19 @@ export function useTranscript(sessionId: string): ChatItem[] | null {
   const [items, setItems] = useState<ChatItem[] | null>(null);
   useEffect(() => {
     let loaded: ChatItem[] | null = null;
-    const pending: ChatItem[] = [];
+    const pending: ChatUpdate[] = [];
     const stop = on('chat', (update) => {
       if (update.sessionId !== sessionId) return;
       if (!loaded) {
-        pending.push(update.item);
+        pending.push(update);
         return;
       }
-      loaded = upsertChatItem(loaded, update.item);
+      loaded = applyChatUpdate(loaded, update);
       setItems(loaded);
     });
     setItems(null);
     void api.transcript(sessionId).then((initial) => {
-      loaded = pending.reduce(upsertChatItem, initial);
+      loaded = pending.reduce(applyChatUpdate, initial);
       setItems(loaded);
     });
     return stop;

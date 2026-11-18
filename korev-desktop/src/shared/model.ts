@@ -684,6 +684,7 @@ export interface Settings {
   reviewModel: ModelSetting | null;
   explainModel: ModelSetting | null;
   autoRenameBranches: boolean;
+  queueWhileRunning: boolean;
   deleteBranchOnArchive: boolean;
   archiveOnMerge: boolean;
   archiveReviews: boolean;
@@ -1417,6 +1418,16 @@ export function answerQuestions(
 export interface ChatUpdate {
   sessionId: string;
   item: ChatItem;
+  removed?: boolean;
+}
+
+export function applyChatUpdate(
+  items: ChatItem[],
+  update: ChatUpdate,
+): ChatItem[] {
+  if (update.removed)
+    return items.filter((entry) => entry.id !== update.item.id);
+  return upsertChatItem(items, update.item);
 }
 
 export function upsertChatItem(items: ChatItem[], item: ChatItem): ChatItem[] {

@@ -814,6 +814,12 @@ test('moves a workspace from Working to Done on the board', async () => {
   const repo = await createRepo(home);
   const { app, window } = await launch(home, repo);
   try {
+    await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'updateSettings',
+        [{ queueWhileRunning: false }],
+      ),
+    );
     await window.getByRole('button', { name: 'Open project' }).click();
     await window.getByRole('textbox', { name: 'Message' }).fill('hold-turn');
     await window.getByRole('textbox', { name: 'Message' }).press('Enter');

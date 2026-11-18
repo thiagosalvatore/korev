@@ -96,7 +96,8 @@ case "$message" in
     echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"task-1","content":"The repo has a README."}]}}'
     ;;
   *hold-turn*)
-    IFS= read -r _
+    IFS= read -r steered
+    [ -d .context ] && echo "$steered" > .context/steered
     echo '{"type":"user","message":{"role":"user","content":"ack"}}'
     ;;
   *share-plan*)
