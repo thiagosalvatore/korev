@@ -4,6 +4,8 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-18
+
 Use the new GPT-6.2 Astra and GPT-6.2 Sol models, and the max and ultra effort levels, in Codex chats.
 
 ### New
