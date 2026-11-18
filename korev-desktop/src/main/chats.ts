@@ -85,6 +85,7 @@ const REPLAY_TOTAL_CHARS = 24_000;
 const SLASH_COMMAND_PREFIX = '/';
 const DENIED_MESSAGE = 'The user denied this request.';
 const NOT_WAITING_MESSAGE = 'This request is no longer waiting for an answer';
+const NOT_QUEUED_MESSAGE = 'This message is no longer queued';
 const NO_PLAN_WAITING_MESSAGE = 'No plan is waiting for an answer';
 const AGENT_FINISHED_TITLE = 'Agent finished';
 const AGENT_FAILED_TITLE = 'Agent failed';
@@ -302,6 +303,8 @@ export interface Chats {
   send(sessionId: string, options: SendOptions): Promise<Result>;
   seed(sessionId: string, history: ChatItem[]): Promise<void>;
   stop(sessionId: string): void;
+  sendQueuedNow(sessionId: string, itemId: string): Promise<Result>;
+  removeQueued(sessionId: string, itemId: string): Promise<Result>;
   stopWorkspace(workspace: Workspace): void;
   refreshWorkspaceStatus(workspace: Workspace): void;
   respondPermission(
@@ -897,17 +900,63 @@ export function createChats(
     sessionId: string,
     items: ChatItem[],
     turn: ActiveTurn,
-    options: SendOptions,
+    message: Pick<SendOptions, 'text' | 'fromKorev'>,
   ): boolean {
-    const { text } = options;
     const { session } = locate(sessionId);
     const process = turn.process;
     if (AGENTS[session.agent].input !== 'stream-json' || !process?.inputOpen())
       return false;
-    process.write(claudeUserMessage(text));
+    process.write(claudeUserMessage(message.text));
     turn.written += 1;
-    upsert(sessionId, items, userItem(text, options.fromKorev));
+    upsert(sessionId, items, userItem(message.text, message.fromKorev));
     return true;
+  }
+
+  function queuesUserMessage(options: SendOptions) {
+    return !options.fromKorev && ctx.store.state.settings.queueWhileRunning;
+  }
+
+  function findQueued(items: ChatItem[], itemId: string) {
+    const item = items.find((entry) => entry.id === itemId);
+    return item?.kind === 'user' && item.queued ? item : null;
+  }
+
+  function removeItem(sessionId: string, items: ChatItem[], item: ChatItem) {
+    items.splice(items.indexOf(item), 1);
+    persist(sessionId, items);
+    ctx.deps.emit('chat', { sessionId, item, removed: true });
+  }
+
+  function sessionOptions(session: ChatSession): SendOptions {
+    const { agent, model, effort, fast, planMode } = session;
+    return { text: '', agent, model, effort, fast, planMode };
+  }
+
+  async function sendQueuedNow(
+    sessionId: string,
+    itemId: string,
+  ): Promise<Result> {
+    const items = await transcript(sessionId);
+    const queued = findQueued(items, itemId);
+    if (!queued) return { ok: false, message: NOT_QUEUED_MESSAGE };
+    const turn = turns.get(sessionId);
+    if (!turn)
+      void sendQueued(sessionId, sessionOptions(locate(sessionId).session));
+    else if (steer(sessionId, items, turn, queued))
+      removeItem(sessionId, items, queued);
+    else stop(sessionId);
+    return { ok: true, value: undefined };
+  }
+
+  async function removeQueued(
+    sessionId: string,
+    itemId: string,
+  ): Promise<Result> {
+    const items = await transcript(sessionId);
+    const queued = findQueued(items, itemId);
+    if (!queued) return { ok: false, message: NOT_QUEUED_MESSAGE };
+    removeItem(sessionId, items, queued);
+    return { ok: true, value: undefined };
   }
 
   function sendPlanFeedback(
@@ -1008,7 +1057,10 @@ export function createChats(
       const questionId = waitingRequestId(sessionId, QUESTION_TOOL);
       if (questionId)
         return replyToQuestion(sessionId, items, questionId, options);
-      if (!steer(sessionId, items, active, options))
+      if (
+        queuesUserMessage(options) ||
+        !steer(sessionId, items, active, options)
+      )
         queue(sessionId, items, options);
       return { ok: true, value: undefined };
     }
@@ -1264,6 +1316,8 @@ export function createChats(
     send,
     seed,
     stop,
+    sendQueuedNow,
+    removeQueued,
     stopWorkspace: (workspace) =>
       workspace.sessions.forEach((session) => stop(session.id)),
     refreshWorkspaceStatus: (workspace) =>

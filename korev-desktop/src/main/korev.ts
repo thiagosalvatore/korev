@@ -1676,6 +1676,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     transcript: (sessionId) => chats.transcript(sessionId),
     send,
     stop: async (sessionId) => chats.stop(sessionId),
+    sendQueuedNow: (sessionId, itemId) =>
+      chats.sendQueuedNow(sessionId, itemId),
+    removeQueued: (sessionId, itemId) => chats.removeQueued(sessionId, itemId),
     async respondPermission(sessionId, itemId, response) {
       const answered = chats.respondPermission(sessionId, itemId, response);
       if (!answered.ok || !response.allow) return answered;

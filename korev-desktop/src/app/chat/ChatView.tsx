@@ -49,6 +49,7 @@ import {
 } from '../ui-store';
 import { ExplainerView } from '../explainer/ExplainerView';
 import { Composer, saveDraft } from './Composer';
+import { QUEUED_HINT } from './ComposerToolbar';
 import { RunDecisions } from '../RunsPage';
 import { PlanReview } from './PermissionCard';
 import { QuestionPanel } from './QuestionPanel';
@@ -247,7 +248,16 @@ export function ChatView({
   function composerSendHint() {
     if (reviewingPlan) return PLAN_FEEDBACK_HINT;
     if (question) return QUESTION_REPLY_SEND_HINT;
+    if (state.settings.queueWhileRunning) return QUEUED_HINT;
     return undefined;
+  }
+
+  async function sendQueuedNow(itemId: string) {
+    reportFailure(await api.sendQueuedNow(session.id, itemId));
+  }
+
+  async function removeQueued(itemId: string) {
+    reportFailure(await api.removeQueued(session.id, itemId));
   }
 
   async function revert(itemId: string) {
@@ -296,6 +306,8 @@ export function ChatView({
             ) : null)
           }
           onRevert={(itemId) => void revert(itemId)}
+          onSendQueuedNow={(itemId) => void sendQueuedNow(itemId)}
+          onRemoveQueued={(itemId) => void removeQueued(itemId)}
           onOpenTurnFile={(file, range) => {
             if (workspace) openDiff(workspace.id, file, range);
           }}

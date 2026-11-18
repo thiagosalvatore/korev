@@ -64,8 +64,10 @@ To start every chat in plan mode, turn on **Settings → Default models → Star
 
 ## Steer, queue and stop
 
-- **Claude Code**: a message you send while it runs goes to the running agent and steers it.
-- **Codex**: a message you send while it runs waits until the agent finishes.
+- **Queue**: a message you send while the agent runs waits until the agent finishes. The chat shows it as **Queued**. When the turn ends, Korev sends it.
+- **Send now**: click **Send now** under a queued message to send it at once. Claude Code reads it during its turn and steers its work. Codex cannot read a message during a turn, so Korev stops the turn and sends the message.
+- **Remove**: click × under a queued message to delete it. Korev does not send it.
+- **Always steer**: turn off **Settings → Agents → Queue messages while the agent works**. Then a message you send to Claude Code steers it at once. Codex always queues.
 - **Stop**: press the stop button or ⌘⇧⌫.
 
 ## Review model

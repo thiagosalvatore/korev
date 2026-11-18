@@ -92,6 +92,7 @@ export function defaultSettings(home: string): Settings {
     reviewModel: null,
     explainModel: null,
     autoRenameBranches: true,
+    queueWhileRunning: true,
     deleteBranchOnArchive: false,
     archiveOnMerge: false,
     archiveReviews: false,

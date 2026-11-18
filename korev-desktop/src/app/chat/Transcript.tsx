@@ -402,16 +402,42 @@ function MessageCaption({
   );
 }
 
+function QueuedActions({
+  onSendNow,
+  onRemove,
+}: {
+  onSendNow: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-0.5">
+      <Button variant="ghost" size="sm" icon="send" onClick={onSendNow}>
+        Send now
+      </Button>
+      <IconButton
+        icon="x"
+        label="Remove queued message"
+        size="sm"
+        onClick={onRemove}
+      />
+    </div>
+  );
+}
+
 function UserMessage({
   item,
   sessionId,
   canRevert,
   onRevert,
+  onSendNow,
+  onRemove,
 }: {
   item: Extract<ChatItem, { kind: 'user' }>;
   sessionId: string;
   canRevert: boolean;
   onRevert: () => void;
+  onSendNow: () => void;
+  onRemove: () => void;
 }) {
   const { body, plans, files, agentMessages } = messageParts(item.text);
   return (
@@ -432,26 +458,37 @@ function UserMessage({
           />
         ) : null}
       </div>
-      <div
-        aria-label={item.fromKorev ? 'Sent by Korev' : undefined}
-        className={cn(
-          'flex max-w-[85%] flex-col gap-2 rounded-lg border px-3.5 py-2.5 text-md text-fg-1',
-          item.fromKorev
-            ? 'border-accent-border bg-accent-subtle'
-            : 'border-border-1 bg-raised',
-          item.queued && 'border-dashed opacity-60',
-        )}
-      >
-        {item.fromKorev ? (
-          <MessageCaption className="text-accent-text">Korev</MessageCaption>
+      <div className="flex max-w-[85%] flex-col items-end gap-1">
+        <div
+          aria-label={item.fromKorev ? 'Sent by Korev' : undefined}
+          className={cn(
+            'flex w-full flex-col gap-2 rounded-lg border px-3.5 py-2.5 text-md text-fg-1',
+            item.fromKorev
+              ? 'border-accent-border bg-accent-subtle'
+              : 'border-border-1 bg-raised',
+            item.queued && 'border-dashed opacity-60',
+          )}
+        >
+          {item.fromKorev ? (
+            <MessageCaption className="text-accent-text">Korev</MessageCaption>
+          ) : null}
+          {item.queued ? <MessageCaption>Queued</MessageCaption> : null}
+          {agentMessages.map((message, index) => (
+            <AgentMessageCard key={index} message={message} />
+          ))}
+          {body ? <Markdown text={body} breaks /> : null}
+          <MessageAttachments
+            plans={plans}
+            files={files}
+            sessionId={sessionId}
+          />
+          <span className="self-end text-2xs text-fg-4">
+            {dateTime(item.at)}
+          </span>
+        </div>
+        {item.queued ? (
+          <QueuedActions onSendNow={onSendNow} onRemove={onRemove} />
         ) : null}
-        {item.queued ? <MessageCaption>Queued</MessageCaption> : null}
-        {agentMessages.map((message, index) => (
-          <AgentMessageCard key={index} message={message} />
-        ))}
-        {body ? <Markdown text={body} breaks /> : null}
-        <MessageAttachments plans={plans} files={files} sessionId={sessionId} />
-        <span className="self-end text-2xs text-fg-4">{dateTime(item.at)}</span>
       </div>
     </div>
   );
@@ -633,6 +670,8 @@ export interface TranscriptProps {
   empty: ReactNode;
   footer?: ReactNode;
   onRevert: (itemId: string) => void;
+  onSendQueuedNow: (itemId: string) => void;
+  onRemoveQueued: (itemId: string) => void;
   onRespond: (itemId: string, response: PermissionResponse) => void;
   onHandoff?: () => void;
   laneRepos?: LaneRepo[];
@@ -653,6 +692,8 @@ export function Transcript({
   empty,
   footer,
   onRevert,
+  onSendQueuedNow,
+  onRemoveQueued,
   onRespond,
   onHandoff,
   laneRepos,
@@ -725,6 +766,8 @@ export function Transcript({
                   sessionId={sessionId}
                   canRevert={!running}
                   onRevert={() => setConfirming(item.id)}
+                  onSendNow={() => onSendQueuedNow(item.id)}
+                  onRemove={() => onRemoveQueued(item.id)}
                 />
               );
             case 'assistant':

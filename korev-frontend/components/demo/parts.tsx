@@ -480,7 +480,9 @@ export function Composer({
           <Zap size={13} />
         </span>
         <span className="km-ml" />
-        {running && <span className="km-hint">Steers the running agent</span>}
+        {running && (
+          <span className="km-hint">Queued until the agent finishes</span>
+        )}
         <span
           className="km-ring"
           style={{ '--p': CONTEXT_USED } as CSSProperties}

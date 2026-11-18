@@ -8,6 +8,7 @@ import {
   KeyRound,
   LayoutGrid,
   ListChecks,
+  ListOrdered,
   Network,
   Plug,
   ScanEye,
@@ -24,6 +25,11 @@ const FEATURES: [LucideIcon, string, string][] = [
     ListChecks,
     'Plan mode',
     'Press ⇧Tab. The agent reads and plans without changing files. Approve the plan to let it build.',
+  ],
+  [
+    ListOrdered,
+    'Message queue',
+    'A message you send while the agent works waits until it finishes. Click Send now to steer the agent with it.',
   ],
   [
     Plug,

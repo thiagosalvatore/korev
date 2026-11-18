@@ -152,6 +152,8 @@ export interface KorevApi {
   transcript(sessionId: string): Promise<ChatItem[]>;
   send(sessionId: string, options: SendOptions): Promise<Result>;
   stop(sessionId: string): Promise<void>;
+  sendQueuedNow(sessionId: string, itemId: string): Promise<Result>;
+  removeQueued(sessionId: string, itemId: string): Promise<Result>;
   respondPermission(
     sessionId: string,
     itemId: string,
