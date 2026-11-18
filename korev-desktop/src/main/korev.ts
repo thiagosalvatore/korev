@@ -392,6 +392,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     runningSessions: new Set(),
     creationRetries: new Map(),
     planLimits: {},
+    agentModels: (agent) =>
+      agents.find((entry) => entry.agent === agent)?.models ?? [],
     focusedWorkspaceIds: [],
     runtime(workspaceId) {
       let runtime = runtimes.get(workspaceId);

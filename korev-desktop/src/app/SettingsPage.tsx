@@ -15,7 +15,7 @@ import {
   AGENT_KINDS,
   AGENT_LABELS,
   DEFAULT_INCLUDE_GLOBS,
-  EFFORT_LEVELS,
+  effortLevels,
   isAgentReady,
   LOADOUT_SIZE,
   loadoutKey,
@@ -649,7 +649,7 @@ function TaskModel({
           <Select
             ariaLabel={`${title} effort`}
             className="w-28"
-            options={[...EFFORT_LEVELS[current.agent]]}
+            options={[...effortLevels(current.agent, choices, current.model)]}
             value={current.effort}
             onChange={(effort) => update({ [setting]: { ...current, effort } })}
           />
@@ -855,7 +855,9 @@ function AgentModel({
         <Select
           ariaLabel={`${label} effort`}
           className="w-28"
-          options={[...EFFORT_LEVELS[agent]]}
+          options={[
+            ...effortLevels(agent, entry.models, settings.defaultModels[agent]),
+          ]}
           value={settings.defaultEffort[agent]}
           onChange={(effort) =>
             update({

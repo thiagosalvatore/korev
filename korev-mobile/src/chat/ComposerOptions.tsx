@@ -2,8 +2,9 @@ import { SlidersHorizontal } from 'lucide-react-native';
 import { useState } from 'react';
 import { Switch } from 'react-native';
 import type { KorevApi } from '../../../korev-desktop/src/shared/api';
+import { modelChoices } from '../../../korev-desktop/src/shared/format';
 import {
-  EFFORT_LEVELS,
+  effortLevels,
   type AppState,
   type ChatSession,
   type ModelChoice,
@@ -54,7 +55,11 @@ export function ComposerOptions({
             label="Effort"
             value={session.effort}
             title="Choose the effort"
-            options={EFFORT_LEVELS[session.agent].map((level) => ({
+            options={effortLevels(
+              session.agent,
+              modelChoices(state, session.agent),
+              session.model,
+            ).map((level) => ({
               key: level,
               label: level,
               selected: level === session.effort,

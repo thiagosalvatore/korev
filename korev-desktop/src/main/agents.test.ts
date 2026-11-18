@@ -138,6 +138,10 @@ const CODEX_SIGNED_IN = {
           display_name: 'GPT Max',
           priority: 1,
           visibility: 'list',
+          supported_reasoning_levels: [
+            { effort: 'low', description: 'Fast' },
+            { effort: 'ultra', description: 'Deepest' },
+          ],
         },
       ],
     }),
@@ -195,7 +199,7 @@ describe('detectAgents', () => {
     expect(detected(agents, 'codex')).toMatchObject({
       account: { method: 'ChatGPT', email: null, organization: null },
       models: [
-        { id: 'gpt-max', label: 'GPT Max' },
+        { id: 'gpt-max', label: 'GPT Max', efforts: ['low', 'ultra'] },
         { id: 'gpt-mini', label: 'GPT Mini' },
       ],
     });
