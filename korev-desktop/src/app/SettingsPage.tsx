@@ -972,7 +972,7 @@ function Agents({ state }: { state: AppState }) {
       </Row>
       <Row
         title="Queue messages while the agent works"
-        description="A message you send while Claude Code works waits until it finishes. Click Send now on the message to steer the agent with it. When off, the message steers the agent at once. Codex always queues."
+        description="A message you send while Claude Code works waits until it finishes. Click its arrow above the message box to steer the agent with it. When off, the message steers the agent at once. Codex always queues."
       >
         <Switch
           checked={state.settings.queueWhileRunning}

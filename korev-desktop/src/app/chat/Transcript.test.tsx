@@ -32,8 +32,6 @@ describe('Transcript', () => {
         running={false}
         empty={null}
         onRevert={vi.fn()}
-        onSendQueuedNow={vi.fn()}
-        onRemoveQueued={vi.fn()}
         onRespond={vi.fn()}
         onRetry={vi.fn()}
         onOpenTurnFile={vi.fn()}
@@ -76,8 +74,6 @@ describe('Transcript', () => {
         running={false}
         empty={null}
         onRevert={vi.fn()}
-        onSendQueuedNow={vi.fn()}
-        onRemoveQueued={vi.fn()}
         onRespond={vi.fn()}
         onRetry={vi.fn()}
         onOpenTurnFile={vi.fn()}
@@ -109,8 +105,6 @@ describe('Transcript', () => {
         running={false}
         empty={null}
         onRevert={vi.fn()}
-        onSendQueuedNow={vi.fn()}
-        onRemoveQueued={vi.fn()}
         onRespond={vi.fn()}
         onRetry={vi.fn()}
         onOpenTurnFile={vi.fn()}
@@ -123,42 +117,6 @@ describe('Transcript', () => {
     );
   });
 
-  it('sends a queued message now or removes it', () => {
-    const onSendQueuedNow = vi.fn();
-    const onRemoveQueued = vi.fn();
-    render(
-      <Transcript
-        sessionId="session-1"
-        items={[
-          {
-            id: 'user-1',
-            kind: 'user',
-            text: 'Also add tests',
-            at: '2026-10-28T09:05:00.000Z',
-            checkpoint: null,
-            queued: true,
-          },
-        ]}
-        running
-        empty={null}
-        onRevert={vi.fn()}
-        onSendQueuedNow={onSendQueuedNow}
-        onRemoveQueued={onRemoveQueued}
-        onRespond={vi.fn()}
-        onRetry={vi.fn()}
-        onOpenTurnFile={vi.fn()}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /Send now/ }));
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Remove queued message' }),
-    );
-
-    expect(onSendQueuedNow).toHaveBeenCalledWith('user-1');
-    expect(onRemoveQueued).toHaveBeenCalledWith('user-1');
-  });
-
   function renderAnswer(wide: boolean) {
     render(
       <Transcript
@@ -167,8 +125,6 @@ describe('Transcript', () => {
         running={false}
         empty={null}
         onRevert={vi.fn()}
-        onSendQueuedNow={vi.fn()}
-        onRemoveQueued={vi.fn()}
         onRespond={vi.fn()}
         onRetry={vi.fn()}
         onOpenTurnFile={vi.fn()}

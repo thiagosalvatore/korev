@@ -29,7 +29,7 @@ const FEATURES: [LucideIcon, string, string][] = [
   [
     ListOrdered,
     'Message queue',
-    'A message you send while the agent works waits until it finishes. Click Send now to steer the agent with it.',
+    'A message you send while the agent works waits above the message box until the agent finishes. Click its arrow to steer the agent with it now.',
   ],
   [
     Plug,
