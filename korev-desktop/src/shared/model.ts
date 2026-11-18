@@ -15,6 +15,7 @@ export const STOP_BEFORE_SWITCHING =
 export interface AgentModel {
   id: string;
   label: string;
+  efforts?: readonly string[];
 }
 
 export interface ModelChoice extends AgentModel {
@@ -23,13 +24,33 @@ export interface ModelChoice extends AgentModel {
 
 export const EFFORT_LEVELS: Record<AgentKind, readonly string[]> = {
   claude: ['low', 'medium', 'high', 'xhigh', 'max'],
-  codex: ['minimal', 'low', 'medium', 'high', 'xhigh'],
+  codex: ['low', 'medium', 'high', 'xhigh', 'max'],
 };
 
 export const DEFAULT_EFFORT: Record<AgentKind, string> = {
   claude: 'high',
   codex: 'medium',
 };
+
+export function effortLevels(
+  agent: AgentKind,
+  models: readonly AgentModel[],
+  modelId: string,
+): readonly string[] {
+  const model = models.find((entry) => entry.id === modelId);
+  return model?.efforts?.length ? model.efforts : EFFORT_LEVELS[agent];
+}
+
+export function supportedEffort(
+  agent: AgentKind,
+  models: readonly AgentModel[],
+  modelId: string,
+  effort: string,
+): string {
+  return effortLevels(agent, models, modelId).includes(effort)
+    ? effort
+    : DEFAULT_EFFORT[agent];
+}
 
 export const CLAUDE_MODELS: AgentModel[] = [
   { id: 'claude-opus-5-5', label: 'Opus 5.5' },

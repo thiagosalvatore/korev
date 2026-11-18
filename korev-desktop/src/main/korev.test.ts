@@ -1337,6 +1337,26 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     });
   });
 
+  it('runs Codex at the default effort when the model does not offer the chosen one', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await waitFor(async () =>
+      (await korev.api.getState()).agents.some(
+        (entry) => entry.agent === 'codex' && entry.models.length,
+      ),
+    );
+
+    await korev.api.send(session.id, {
+      ...task('Add a note'),
+      agent: 'codex',
+      model: 'gpt-fake',
+      effort: 'ultra',
+    });
+
+    const { workspace: after } = await workspaceState(workspace.id);
+    expect(after.sessions[0].effort).toBe(DEFAULT_EFFORT.codex);
+  });
+
   it('starts reviews on the review model when one is set', async () => {
     await korev.api.updateSettings({
       reviewModel: {

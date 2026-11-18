@@ -1,5 +1,7 @@
 import type { KorevEvents } from '../shared/api';
 import type {
+  AgentKind,
+  AgentModel,
   PlanLimits,
   Repo,
   Workspace,
@@ -46,6 +48,7 @@ export interface Context {
   runningSessions: Set<string>;
   creationRetries: Map<string, () => Promise<void>>;
   planLimits: PlanLimits;
+  agentModels(agent: AgentKind): AgentModel[];
   focusedWorkspaceIds: string[];
   runtime(workspaceId: string): WorkspaceRuntime;
   setStatus(

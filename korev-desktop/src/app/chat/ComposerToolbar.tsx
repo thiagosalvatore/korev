@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { cn, Icon, IconButton } from '../../design-system';
 import {
   AGENT_LABELS,
-  EFFORT_LEVELS,
+  effortLevels,
   type AgentKind,
   type ModelChoice,
   type TurnUsage,
@@ -161,12 +161,14 @@ export function ComposerToolbar(props: ComposerToolbarProps) {
       <Menu
         label="Effort"
         side="top"
-        items={EFFORT_LEVELS[props.agent].map((level) => ({
-          id: level,
-          label: level,
-          checked: level === props.effort,
-          onSelect: () => props.onEffortChange(level),
-        }))}
+        items={effortLevels(props.agent, props.models, props.model).map(
+          (level) => ({
+            id: level,
+            label: level,
+            checked: level === props.effort,
+            onSelect: () => props.onEffortChange(level),
+          }),
+        )}
         trigger={({ toggle }) => (
           <button
             type="button"

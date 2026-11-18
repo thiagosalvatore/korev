@@ -4,6 +4,16 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+Use the new GPT-6.2 Astra and GPT-6.2 Sol models, and the max and ultra effort levels, in Codex chats.
+
+### New
+
+- **Effort levels for each Codex model.** The effort menu now shows the levels the chosen Codex model supports, including max and ultra. Update the Codex CLI to see GPT-6.2 Astra and GPT-6.2 Sol in the model menu.
+
+### Fixed
+
+- **Codex effort that the model does not support.** Codex no longer offers minimal effort, which current models reject. If a chat has an effort that its model does not support, Korev runs it at medium.
+
 ## [0.36.0] - 2026-11-17
 
 See the skills and commands of your Claude Code plugins when you type `/`.

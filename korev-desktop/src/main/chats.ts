@@ -21,6 +21,7 @@ import {
   type Repo,
   type Result,
   type SendOptions,
+  supportedEffort,
   type Workspace,
 } from '../shared/model';
 import {
@@ -975,10 +976,25 @@ export function createChats(
     };
   }
 
+  function withSupportedEffort(options: SendOptions): SendOptions {
+    const models = ctx.agentModels(options.agent);
+    if (!models.length) return options;
+    return {
+      ...options,
+      effort: supportedEffort(
+        options.agent,
+        models,
+        options.model,
+        options.effort,
+      ),
+    };
+  }
+
   async function send(
     sessionId: string,
-    options: SendOptions,
+    requested: SendOptions,
   ): Promise<Result> {
+    const options = withSupportedEffort(requested);
     const { owner, session } = locate(sessionId);
     const workspace = owner.kind === 'workspace' ? owner.workspace : null;
     if (workspace?.archivedAt)

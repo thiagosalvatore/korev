@@ -3,6 +3,8 @@ import {
   keepsPrReady,
   answerQuestions,
   conversationText,
+  EFFORT_LEVELS,
+  effortLevels,
   EMPTY_INBOX_FILTER,
   filterInbox,
   finishedCodexPlan,
@@ -16,6 +18,7 @@ import {
   prProblems,
   replyToQuestions,
   stackRows,
+  supportedEffort,
   type AgentQuestion,
   type ChatItem,
   type ChatSession,
@@ -515,5 +518,35 @@ describe('keepsPrReady', () => {
     ],
   ])('when %s', (_case, keepPrsReady, flags, expected) => {
     expect(keepsPrReady(flags, { keepPrsReady })).toBe(expected);
+  });
+});
+
+describe('effort levels', () => {
+  const models = [
+    { id: 'gpt-astra', label: 'Astra', efforts: ['low', 'max', 'ultra'] },
+    { id: 'gpt-luna', label: 'Luna', efforts: ['low', 'max'] },
+  ];
+
+  it('offers the levels the model supports', () => {
+    expect(effortLevels('codex', models, 'gpt-astra')).toEqual([
+      'low',
+      'max',
+      'ultra',
+    ]);
+  });
+
+  it('falls back to the agent levels for a model without its own', () => {
+    expect(effortLevels('codex', models, 'gpt-unknown')).toEqual(
+      EFFORT_LEVELS.codex,
+    );
+  });
+
+  it('replaces a level the model does not support with the default', () => {
+    expect(supportedEffort('codex', models, 'gpt-luna', 'ultra')).toBe(
+      'medium',
+    );
+    expect(supportedEffort('codex', models, 'gpt-astra', 'ultra')).toBe(
+      'ultra',
+    );
   });
 });
