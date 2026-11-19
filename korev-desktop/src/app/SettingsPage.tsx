@@ -1463,7 +1463,8 @@ function ReviewSkillPicker({
 function RepoPromptSettings({ state, repo }: { state: AppState; repo: Repo }) {
   const saved = repo.prompts ?? {};
   const [prompts, setPrompts] = useState<RepoPrompts>(saved);
-  useEffect(() => setPrompts(repo.prompts ?? {}), [repo.id, repo.prompts]);
+  const savedJson = JSON.stringify(saved);
+  useEffect(() => setPrompts(JSON.parse(savedJson)), [repo.id, savedJson]);
   const dirty =
     JSON.stringify(filledPrompts(prompts)) !==
     JSON.stringify(filledPrompts(saved));
@@ -1701,8 +1702,9 @@ function RunScriptsEditor({
 function RepoSettings({ state, repo }: { state: AppState; repo: Repo }) {
   const [scripts, setScripts] = useState<RepoScripts>(repo.scripts);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  useEffect(() => setScripts(repo.scripts), [repo.id, repo.scripts]);
-  const dirty = JSON.stringify(scripts) !== JSON.stringify(repo.scripts);
+  const savedJson = JSON.stringify(repo.scripts);
+  useEffect(() => setScripts(JSON.parse(savedJson)), [repo.id, savedJson]);
+  const dirty = JSON.stringify(scripts) !== savedJson;
   const problem = runScriptsProblem(scripts.run);
   const workspaceCount = state.workspaces.filter(
     (ws) => ws.repoId === repo.id,
