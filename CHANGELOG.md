@@ -4,6 +4,18 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-19
+
+Messages you send while an agent works now wait their turn, and you choose when they go.
+
+### New
+
+- **Queued messages.** A message you send while the agent works now waits in a tray above the message box until the agent finishes. Use the arrow to send it now and steer the agent, or the x to remove it. To steer at once, as before, turn off Settings → Agents → Queue messages while the agent works.
+
+### Fixed
+
+- **Repository prompts and scripts.** Text you type in a repository's Prompts or Scripts settings is no longer erased every few seconds before you save.
+
 ## [0.37.0] - 2026-11-18
 
 Use the new GPT-6.2 Astra and GPT-6.2 Sol models, and the max and ultra effort levels, in Codex chats.
