@@ -315,7 +315,7 @@ export interface Chats {
   handoffPlan(sessionId: string): Result<string>;
   revert(sessionId: string, itemId: string): Promise<Result<string>>;
   forget(sessionId: string): Promise<void>;
-  settled(): Promise<void>;
+  shutdown(): Promise<void>;
   search(query: string): Promise<ChatMatch[]>;
 }
 
@@ -362,6 +362,7 @@ export function createChats(
   const searchTexts = new Map<string, string>();
   const turns = new Map<string, ActiveTurn>();
   const running = new Set<Promise<void>>();
+  let closing = false;
   const nudgedAboutSigning = new Set<string>();
 
   function locate(sessionId: string): { owner: Owner; session: ChatSession } {
@@ -803,8 +804,17 @@ export function createChats(
       await recordTurnChanges(session.id, items, turn);
       turns.delete(session.id);
       finishTurn(turn.owner, session, items, turn);
-      void sendQueued(session.id, options);
+      track(sendQueued(session.id, options));
     }
+  }
+
+  function canStartTurn(sessionId: string) {
+    return !closing && !turns.has(sessionId);
+  }
+
+  function track(task: Promise<void>) {
+    running.add(task);
+    void task.finally(() => running.delete(task));
   }
 
   async function sendQueued(sessionId: string, options: SendOptions) {
@@ -812,7 +822,7 @@ export function createChats(
     const queued = items.flatMap((item) =>
       item.kind === 'user' && item.queued ? [item] : [],
     );
-    if (!queued.length || turns.has(sessionId)) return;
+    if (!queued.length || !canStartTurn(sessionId)) return;
     const { owner } = locate(sessionId);
     const start =
       owner.kind === 'workspace'
@@ -820,7 +830,7 @@ export function createChats(
             () => null,
           )
         : null;
-    if (turns.has(sessionId)) return;
+    if (!canStartTurn(sessionId)) return;
     for (const item of queued)
       upsert(sessionId, items, { ...item, queued: false });
     const text = queued.map((item) => item.text).join('\n\n');
@@ -891,9 +901,7 @@ export function createChats(
     refreshStatus(owner);
     ctx.store.save();
     ctx.emitState();
-    const done = runTurn(session, options, items, turn);
-    running.add(done);
-    void done.finally(() => running.delete(done));
+    track(runTurn(session, options, items, turn));
   }
 
   function steer(
@@ -941,7 +949,7 @@ export function createChats(
     if (!queued) return { ok: false, message: NOT_QUEUED_MESSAGE };
     const turn = turns.get(sessionId);
     if (!turn)
-      void sendQueued(sessionId, sessionOptions(locate(sessionId).session));
+      track(sendQueued(sessionId, sessionOptions(locate(sessionId).session)));
     else if (steer(sessionId, items, turn, queued))
       removeItem(sessionId, items, queued);
     else stop(sessionId);
@@ -1325,7 +1333,9 @@ export function createChats(
     respondPermission,
     handoffPlan,
     revert,
-    async settled() {
+    async shutdown() {
+      closing = true;
+      for (const sessionId of turns.keys()) stop(sessionId);
       while (running.size) await Promise.allSettled(running);
     },
     search,

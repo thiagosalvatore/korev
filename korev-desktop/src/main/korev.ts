@@ -1912,8 +1912,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       clearInterval(automationWatch);
       await spotlight.disableAll();
       await ctx.settled();
-      for (const session of allSessions()) chats.stop(session.id);
-      await chats.settled();
+      await chats.shutdown();
       await ctx.settled();
       ctx.terminals.closeAll();
       await agentServer.close();

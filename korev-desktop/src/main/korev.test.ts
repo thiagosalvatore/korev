@@ -3219,6 +3219,18 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     await korev.api.stop(session.id);
   });
 
+  it('keeps a queued message queued when Korev shuts down', async () => {
+    const { session } = await holdTurn();
+    await korev.api.send(session.id, task('Also add tests'));
+
+    await korev.shutdown();
+    await settle();
+
+    expect(await queuedMessages(session.id)).toMatchObject([
+      { text: 'Also add tests' },
+    ]);
+  });
+
   it('steers the running agent with a queued message sent now', async () => {
     const { session, steered } = await holdTurn();
     await korev.api.send(session.id, task('Also add tests'));
