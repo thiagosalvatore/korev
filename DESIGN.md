@@ -216,6 +216,12 @@ Notes** opens the same page.
 
 - **Tokens.** `korev-mobile/src/theme.ts` mirrors the desktop tokens for dark and light. Use
   its names, never a hex value, in phone code.
+- **Tabs.** The native iOS tab bar (Liquid Glass) has Workspaces, Ask and Pull requests, with
+  SF Symbol icons (Material icons on Android). Workspaces and Ask carry an amber badge with the
+  number of workspaces or Ask chats that wait for you. A separate round **+** button on the right
+  opens New workspace as a sheet and keeps the current tab. Each tab has its own stack with a
+  large title. Chats open over the tabs, so the tab bar hides while a chat is open. The
+  Workspaces header has **Settings** on the right and, in the demo, a **Demo** label on the left.
 - **Can't reach the Mac.** A screen with no data yet shows the offline panel in place of its
   spinner: a WifiOff icon, "Can't reach Korev on your Mac", what to check (Korev open on the
   Mac, Tailscale on the phone, the Mac awake and on Tailscale), **Try again** and **Unpair this
@@ -255,7 +261,7 @@ Notes** opens the same page.
   that open one at a time. Glossary terms have a dotted underline; tapping one shows its meaning.
   Diff rows use `diffAddBg`, `diffDelBg` and `diffHunkBg`, and risks use `riskHigh`, `riskMedium`
   and `riskLow` with their `Subtle` backgrounds. The pull request bar has **Explain** next to the
-  next step, and the Ask tab header has a book button that opens "Explain a pull request".
+  next step, and each pull request in the Pull requests tab has **Explain** in its actions.
 - **Linked group.** The workspace list follows the desktop's Linked group: a foldable **Across
   repos** overline above the repositories, then one entry per group with a link-icon label, the
   shared name and one avatar per repository, and indented rows that lead with the repository

@@ -38,7 +38,7 @@ import {
   type Workspace,
   type WorkspaceRuntime,
   type WorkspaceStatus,
-} from '../../../../korev-desktop/src/shared/model';
+} from '../../../../../korev-desktop/src/shared/model';
 import {
   activeWorkspaces,
   crossRepoLeads,
@@ -47,19 +47,19 @@ import {
   sidebarEntries,
   waitsForLane,
   workspaceLabel,
-} from '../../../../korev-desktop/src/shared/workspaces';
-import { attempt } from '../../attempt';
-import { succeeded } from '../../haptics';
-import { useAppState, useReconnect } from '../../hooks';
-import { useConnection } from '../../korev';
-import { ListRow, ROW_ICON_SIZE } from '../../ListRow';
-import { lifted } from '../../haptics';
-import { Loading } from '../../Offline';
-import { openNewWorkspace } from '../../navigation';
-import { RepoAvatar } from '../../RepoAvatar';
-import { ReorderList } from '../../ReorderList';
-import { MONO_FONT, useTheme, type Theme } from '../../theme';
-import { CHROME_FONT_SCALE, touchSlop } from '../../ui';
+} from '../../../../../korev-desktop/src/shared/workspaces';
+import { attempt } from '../../../attempt';
+import { succeeded } from '../../../haptics';
+import { useAppState, useReconnect } from '../../../hooks';
+import { useConnection } from '../../../korev';
+import { ListRow, ROW_ICON_SIZE } from '../../../ListRow';
+import { lifted } from '../../../haptics';
+import { Loading } from '../../../Offline';
+import { openNewWorkspace } from '../../../navigation';
+import { RepoAvatar } from '../../../RepoAvatar';
+import { ReorderList } from '../../../ReorderList';
+import { MONO_FONT, useTheme, type Theme } from '../../../theme';
+import { CHROME_FONT_SCALE, touchSlop } from '../../../ui';
 
 const REPO_ADD_ICON_SIZE = ROW_ICON_SIZE + 2;
 const ACROSS_REPOS = 'across-repos';
@@ -486,6 +486,7 @@ export default function WorkspacesScreen() {
 
   return (
     <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.page}
       scrollEnabled={!dragging}
       refreshControl={

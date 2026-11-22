@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { timeAgo } from '../../../korev-desktop/src/shared/format';
+import { timeAgo } from '../../../../../korev-desktop/src/shared/format';
 import {
   INBOX_GROUPS,
   inboxStatuses,
@@ -18,18 +18,18 @@ import {
   type InboxPullRequest,
   type InboxStatus,
   type Result,
-} from '../../../korev-desktop/src/shared/model';
+} from '../../../../../korev-desktop/src/shared/model';
 import {
   reviewChatOf,
   workspaceOfPr,
-} from '../../../korev-desktop/src/shared/workspaces';
-import { attempt } from '../attempt';
-import { chooseOption } from '../chooseOption';
-import { useAppState, usePendingAction } from '../hooks';
-import { useConnection } from '../korev';
-import { ListRow, ROW_ICON_SIZE } from '../ListRow';
-import { Loading } from '../Offline';
-import { useTheme, type Theme } from '../theme';
+} from '../../../../../korev-desktop/src/shared/workspaces';
+import { attempt } from '../../../attempt';
+import { chooseOption } from '../../../chooseOption';
+import { useAppState, usePendingAction } from '../../../hooks';
+import { useConnection } from '../../../korev';
+import { ListRow, ROW_ICON_SIZE } from '../../../ListRow';
+import { Loading } from '../../../Offline';
+import { useTheme, type Theme } from '../../../theme';
 
 type Action = 'review' | 'explain' | 'workspace' | 'github';
 type Api = ReturnType<typeof useConnection>['api'];
@@ -46,11 +46,11 @@ function actionLabels(state: AppState, pr: InboxPullRequest) {
 }
 
 function openAskChat(askChatId: string) {
-  router.replace({ pathname: '/ask/[id]', params: { id: askChatId } });
+  router.push({ pathname: '/ask/[id]', params: { id: askChatId } });
 }
 
 function openWorkspace(workspaceId: string) {
-  router.replace({ pathname: '/workspace/[id]', params: { id: workspaceId } });
+  router.push({ pathname: '/workspace/[id]', params: { id: workspaceId } });
 }
 
 async function review(api: Api, state: AppState, pr: InboxPullRequest) {
@@ -151,6 +151,7 @@ export default function PullRequestsScreen() {
 
   return (
     <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.page}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={refresh} />

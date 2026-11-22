@@ -39,10 +39,6 @@ function Screens() {
             name="ask/new"
             options={{ title: 'Ask a question', presentation: 'modal' }}
           />
-          <Stack.Screen
-            name="pulls"
-            options={{ title: 'Pull requests', presentation: 'modal' }}
-          />
           <Stack.Screen name="ask/[id]" options={{ title: '' }} />
         </Stack.Protected>
         <Stack.Protected guard={connection === null}>

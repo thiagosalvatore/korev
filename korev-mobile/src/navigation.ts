@@ -7,7 +7,3 @@ export function openNewWorkspace(repoId?: string) {
 export function openNewAsk() {
   router.push('/ask/new');
 }
-
-export function openPullRequests() {
-  router.push('/pulls');
-}
