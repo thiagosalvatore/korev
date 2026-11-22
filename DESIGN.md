@@ -255,8 +255,23 @@ Notes** opens the same page.
   steps and the full-screen scanner come after that tap.
 - **Pending buttons.** A button whose request is running shows a spinner in place of its
   label and keeps its size. Its siblings are disabled until the request ends.
-- **Waiting chats.** A workspace opens on the chat that waits for an answer. Its tab shows an
-  amber `warning` dot next to the running spinner.
+- **Waiting chats.** A workspace opens on the chat that waits for an answer. When another chat
+  in the workspace waits, the header menu button shows a badge, and the Chats submenu marks
+  that chat "Needs you".
+- **Chat header.** The title is the workspace name (or the Ask chat's title). Under it, one
+  12 pt status line: `LoadingRing` + "Working · 1m 12s", or a dot + "Needs your answer"
+  (`warningText`), "Ready to merge" (`successText`), "Checks failing" / "Has conflicts"
+  (`dangerText`) or "Merged" (`merged`). With no status and more than one chat, it shows the
+  chat's title. The ellipsis button opens a native menu: Chats (each chat, then New chat),
+  Explain changes, Show explanation / Show chat, the next PR step, Checks, Open on GitHub, a
+  Pull requests picker when there are several, and Archive.
+- **Chat accessory.** Under the header, 28 pt capsules on `bgRaised`: the branch
+  (`fix-login → main`) and the PR ("No PR yet", "#87 · checks passed", "#90 · e2e failing" in
+  `dangerText`). The PR capsule opens the checks sheet, a form sheet whose rows open the check
+  on GitHub. An Ask chat shows one capsule with its repositories.
+- **Floating PR action.** Only for Merge, Fix errors and Resolve conflicts: one large button,
+  centred 12 pt above the composer, with a soft shadow. It hides while the keyboard is up.
+  Create PR lives in the menu, so a new workspace shows no PR button.
 - **Jump to latest.** After one screen of scrolling back, a 36 pt round button with a down
   chevron (`bgRaised`, `border2` hairline) shows 12 pt above the composer and 12 pt from the
   right edge. It fades in and out over 150 ms.
@@ -268,7 +283,7 @@ Notes** opens the same page.
 - **Touch targets.** Every control takes taps over at least 44 × 44 pt. A smaller control gets
   `hitSlop` from `touchSlop(size)` in `ui.tsx` instead of growing.
 - **Text size.** Text follows the iOS text size. Controls and headers (buttons, tabs, chips,
-  pickers, the composer, the PR bar) stop growing at 1.4× (`CHROME_FONT_SCALE`), so they never
+  pickers, the composer, the chat header and capsules) stop growing at 1.4× (`CHROME_FONT_SCALE`), so they never
   push the chat off the screen. Chat text and list rows scale fully. Repository avatars keep their
   size and their initials do not scale, like an icon.
 - **Type ramp.** Text sizes come from `TYPE` in `theme.ts`, which follows the iOS text styles:
@@ -279,12 +294,12 @@ Notes** opens the same page.
   repository. An idle Ask chat shows `MessageSquare` (`fg4`), a waiting one
   `MessageCircleQuestion` (`warningText`) with a highlighted title. The tab badge counts waiting
   Ask chats, like the Workspaces badge counts waiting workspaces.
-- **Explainer.** A chat with an explainer opens on Explanation, with an Explanation | Chat switch
-  under the header. The sections follow the desktop in one column. Walkthrough steps are cards
+- **Explainer.** A chat with an explainer opens on Explanation. The header menu switches
+  between Show chat and Show explanation. The sections follow the desktop in one column. Walkthrough steps are cards
   that open one at a time. Glossary terms have a dotted underline; tapping one shows its meaning.
   Diff rows use `diffAddBg`, `diffDelBg` and `diffHunkBg`, and risks use `riskHigh`, `riskMedium`
-  and `riskLow` with their `Subtle` backgrounds. The pull request bar has **Explain** next to the
-  next step, and each pull request in the Pull requests tab has **Explain** in its actions.
+  and `riskLow` with their `Subtle` backgrounds. The header menu has **Explain changes**, and
+  each pull request in the Pull requests tab has **Explain** in its actions.
 - **Linked group.** The workspace list follows the desktop's Linked group: a foldable **Across
   repos** overline above the repositories, then one entry per group with a link-icon label, the
   shared name and one avatar per repository, and indented rows that lead with the repository

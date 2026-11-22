@@ -64,6 +64,15 @@ function Screens() {
             }}
           />
           <Stack.Screen name="ask/[id]" options={{ title: '' }} />
+          <Stack.Screen
+            name="checks/[id]"
+            options={{
+              title: 'Checks',
+              presentation: 'formSheet',
+              sheetAllowedDetents: [0.5, 1],
+              sheetGrabberVisible: true,
+            }}
+          />
         </Stack.Protected>
         <Stack.Protected guard={connection === null}>
           <Stack.Screen name="pair" options={{ headerShown: false }} />

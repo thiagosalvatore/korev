@@ -1,8 +1,8 @@
 import { ChevronDown } from 'lucide-react-native';
-import { useCallback, useRef, useState, type Ref } from 'react';
+import { Stack } from 'expo-router';
+import { useCallback, useRef, useState, type ReactNode, type Ref } from 'react';
 import {
   FlatList,
-  Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -14,6 +14,7 @@ import {
 import {
   KeyboardChatScrollView,
   KeyboardStickyView,
+  useKeyboardState,
 } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { modelLabel } from '../../../korev-desktop/src/shared/format';
@@ -29,6 +30,7 @@ import {
   type ChatSession,
   type PermissionResponse,
   type PlanLane,
+  type PrStatus,
   picksFor,
   withPick,
   type PickedAnswers,
@@ -41,13 +43,9 @@ import { useRepoGithubUrl, useTranscript } from '../hooks';
 import { Loading } from '../Offline';
 import { useConnection } from '../korev';
 import { useTheme, type Theme } from '../theme';
-import {
-  CHROME_FONT_SCALE,
-  ICON_BUTTON_ICON_SIZE,
-  ICON_BUTTON_SIZE,
-  IconButton,
-  touchSlop,
-} from '../ui';
+import { ICON_BUTTON_ICON_SIZE, ICON_BUTTON_SIZE, IconButton } from '../ui';
+import { ChatMenu, ChatTitle, type ChatMenuEntry } from './ChatHeader';
+import { chatStatus } from './chatStatus';
 import { ChatItemView } from './ChatItemView';
 import { BAR_PADDING, Composer, useComposerBottomPadding } from './Composer';
 import { ExplainerView } from './ExplainerView';
@@ -57,48 +55,9 @@ import { QuestionPanel } from './QuestionPanel';
 import { WorkingIndicator } from './WorkingIndicator';
 
 const FADE_MS = 150;
-const MODE_HEIGHT = 30;
+const FLOATING_CLEARANCE = 68;
 
-type ChatMode = 'explainer' | 'chat';
-
-const MODES: { id: ChatMode; label: string }[] = [
-  { id: 'explainer', label: 'Explanation' },
-  { id: 'chat', label: 'Chat' },
-];
-
-function ModeSwitch({
-  mode,
-  onChange,
-}: {
-  mode: ChatMode;
-  onChange: (mode: ChatMode) => void;
-}) {
-  const styles = makeStyles(useTheme());
-  return (
-    <View accessibilityRole="tablist" style={styles.modes}>
-      {MODES.map((entry) => (
-        <Pressable
-          key={entry.id}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: entry.id === mode }}
-          hitSlop={touchSlop(MODE_HEIGHT)}
-          style={[styles.mode, entry.id === mode && styles.modeSelected]}
-          onPress={() => onChange(entry.id)}
-        >
-          <Text
-            maxFontSizeMultiplier={CHROME_FONT_SCALE}
-            style={[
-              styles.modeText,
-              entry.id === mode && styles.modeTextSelected,
-            ]}
-          >
-            {entry.label}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
+export type ChatMode = 'explainer' | 'chat';
 
 function emptyChatHint(state: AppState, session: ChatSession): string {
   const agent = AGENT_LABELS[session.agent];
@@ -152,10 +111,49 @@ function JumpToLatest({ onPress }: { onPress: () => void }) {
   );
 }
 
+function explainerMenuEntry(
+  mode: ChatMode,
+  onChange: (mode: ChatMode) => void,
+): ChatMenuEntry {
+  return mode === 'explainer'
+    ? {
+        label: 'Show chat',
+        icon: 'text.bubble',
+        onPress: () => onChange('chat'),
+      }
+    : {
+        label: 'Show explanation',
+        icon: 'book',
+        onPress: () => onChange('explainer'),
+      };
+}
+
+function FloatingAction({ children }: { children: ReactNode }) {
+  const styles = makeStyles(useTheme());
+  const keyboardShown = useKeyboardState((keyboard) => keyboard.isVisible);
+  if (keyboardShown) return null;
+  return (
+    <Animated.View
+      entering={FadeIn.duration(FADE_MS)}
+      exiting={FadeOut.duration(FADE_MS)}
+      style={styles.floating}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 export function Chat({
   state,
   session,
   repoId,
+  title,
+  subtitle,
+  pr = null,
+  menu = [],
+  menuBadge,
+  accessory,
+  floatingAction,
   laneRepos,
   emptyHint,
   onHandoff,
@@ -163,6 +161,13 @@ export function Chat({
   state: AppState;
   session: ChatSession;
   repoId: string | null;
+  title: string;
+  subtitle?: string;
+  pr?: PrStatus | null;
+  menu?: ChatMenuEntry[];
+  menuBadge?: string;
+  accessory?: ReactNode;
+  floatingAction?: ReactNode;
   laneRepos?: Repo[];
   emptyHint?: string;
   onHandoff?(sessionId: string): void;
@@ -187,6 +192,14 @@ export function Chat({
   const shown = items && withPendingMessage(items, pending);
   const working = running || shown !== items;
   const lastUser = shown?.findLast((item) => item.kind === 'user');
+  const status = chatStatus({
+    running: working,
+    waiting: Boolean(state.waitingSessions?.includes(session.id)),
+    pr,
+  });
+  const menuEntries = session.explainer
+    ? [explainerMenuEntry(mode, setMode), ...menu]
+    : menu;
 
   const startSending = (text: string) => {
     setMode('chat');
@@ -233,7 +246,22 @@ export function Chat({
 
   return (
     <View style={styles.fill}>
-      {session.explainer ? <ModeSwitch mode={mode} onChange={setMode} /> : null}
+      <Stack.Screen
+        options={{
+          headerTitle: () => (
+            <ChatTitle
+              title={title}
+              subtitle={subtitle}
+              status={status}
+              since={lastUser && Date.parse(lastUser.at)}
+            />
+          ),
+        }}
+      />
+      {menuEntries.length ? (
+        <ChatMenu entries={menuEntries} badge={menuBadge} />
+      ) : null}
+      {accessory}
       {explaining ? (
         <ExplainerView
           session={session}
@@ -284,9 +312,10 @@ export function Chat({
                 {emptyHint ?? emptyChatHint(state, session)}
               </Text>
             }
-            contentContainerStyle={
-              shown.length ? styles.transcript : styles.emptyTranscript
-            }
+            contentContainerStyle={[
+              shown.length ? styles.transcript : styles.emptyTranscript,
+              floatingAction ? styles.floatingClearance : null,
+            ]}
             onScroll={trackScroll}
             scrollEventThrottle={100}
           />
@@ -296,6 +325,9 @@ export function Chat({
         <Loading style={styles.fill} />
       )}
       <KeyboardStickyView offset={{ opened: keyboardOffset }}>
+        {floatingAction ? (
+          <FloatingAction>{floatingAction}</FloatingAction>
+        ) : null}
         {question?.questions ? (
           <QuestionPanel
             key={question.id}
@@ -328,26 +360,6 @@ export function Chat({
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
     fill: { flex: 1 },
-    modes: {
-      flexDirection: 'row',
-      alignSelf: 'center',
-      gap: 2,
-      marginTop: 8,
-      padding: 2,
-      borderRadius: 8,
-      backgroundColor: theme.bgSurface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.border1,
-    },
-    mode: {
-      minHeight: MODE_HEIGHT,
-      justifyContent: 'center',
-      paddingHorizontal: 14,
-      borderRadius: 6,
-    },
-    modeSelected: { backgroundColor: theme.bgActive },
-    modeText: { color: theme.fg3, fontSize: 13, fontWeight: '500' },
-    modeTextSelected: { color: theme.fg1 },
     transcript: { padding: 12, gap: 12 },
     emptyTranscript: { flexGrow: 1, padding: 24 },
     emptyHint: {
@@ -356,6 +368,15 @@ function makeStyles(theme: Theme) {
       transform: [{ scaleY: -1 }],
     },
     jump: { position: 'absolute', right: 12, bottom: 12 },
+    floatingClearance: { paddingTop: FLOATING_CLEARANCE },
+    floating: {
+      position: 'absolute',
+      bottom: '100%',
+      alignSelf: 'center',
+      marginBottom: 12,
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+      borderRadius: 12,
+    },
     jumpButton: {
       borderRadius: ICON_BUTTON_SIZE / 2,
       borderWidth: StyleSheet.hairlineWidth,
