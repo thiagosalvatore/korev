@@ -66,6 +66,7 @@ export function NewAskForm({
 
   return (
     <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.page}
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
