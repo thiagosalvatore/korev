@@ -47,6 +47,17 @@ describe('remote server', () => {
     expect(await response.json()).toEqual({ result: { repos: [] } });
   });
 
+  it.each(['sendQueuedNow', 'removeQueued', 'revert', 'restoreWorkspace'])(
+    'lets the phone call %s',
+    async (method) => {
+      const handler = vi.fn(() => ({ ok: true }));
+      const base = await start({ [method]: handler });
+      const response = await call(base, method);
+      expect(response.status).toBe(200);
+      expect(handler).toHaveBeenCalled();
+    },
+  );
+
   it('rejects a call without the pairing token', async () => {
     const handler = vi.fn();
     const base = await start({ getState: handler });
