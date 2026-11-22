@@ -18,7 +18,7 @@ import {
 import { imageType } from '../../../korev-desktop/src/shared/format';
 import type { Todo, TodoStatus } from '../../../korev-desktop/src/shared/model';
 import { LoadingRing } from '../LoadingRing';
-import { MONO_FONT, useTheme, type Theme } from '../theme';
+import { TYPE, MONO_FONT, useTheme, type Theme } from '../theme';
 import { MIN_TOUCH_TARGET } from '../ui';
 import { activityLabel, type ActivityRow, type ToolItem } from './activity';
 import { ImageThumbnail } from './ImagePreview';
@@ -226,13 +226,13 @@ function makeStyles(theme: Theme) {
       minHeight: MIN_TOUCH_TARGET,
       paddingHorizontal: 12,
     },
-    label: { flex: 1, color: theme.fg2, fontSize: 15 },
+    label: { ...TYPE.subhead, flex: 1, color: theme.fg2 },
     chevronOpen: { transform: [{ rotate: '90deg' }] },
     steps: { gap: 8, paddingHorizontal: 12, paddingBottom: 12 },
     stepRow: { flexDirection: 'row', gap: 8 },
     stepIcon: { paddingTop: 3 },
     stepBody: { flex: 1, gap: 6 },
-    step: { color: theme.fg3, fontSize: 13, lineHeight: 19 },
+    step: { ...TYPE.footnote, color: theme.fg3 },
     failed: { color: theme.dangerText },
     code: {
       marginTop: 4,
@@ -240,8 +240,8 @@ function makeStyles(theme: Theme) {
       borderRadius: 6,
       backgroundColor: theme.bgRaised,
       color: theme.fg2,
+      ...TYPE.caption,
       fontFamily: MONO_FONT,
-      fontSize: 12,
     },
     todos: { gap: 6, paddingHorizontal: 12, paddingBottom: 12 },
     track: {
@@ -252,7 +252,7 @@ function makeStyles(theme: Theme) {
     },
     fill: { height: 4, backgroundColor: theme.accent },
     todo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    todoText: { flex: 1, color: theme.fg1, fontSize: 14, lineHeight: 20 },
+    todoText: { ...TYPE.subhead, flex: 1, color: theme.fg1 },
     todoDone: { color: theme.fg3 },
   });
 }

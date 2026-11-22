@@ -20,7 +20,7 @@ import {
 } from '../../../../../korev-desktop/src/shared/model';
 import { findSession, useSessionUpdate } from '../../../chat/sessionUpdate';
 import { useAppState } from '../../../hooks';
-import { useTheme, type Theme } from '../../../theme';
+import { TYPE, useTheme, type Theme } from '../../../theme';
 import { MIN_TOUCH_TARGET, switchTrack } from '../../../ui';
 
 const CHECK_SIZE = 18;
@@ -173,7 +173,7 @@ function makeStyles(theme: Theme) {
     sectionTitle: {
       paddingHorizontal: 16,
       color: theme.fg3,
-      fontSize: 13,
+      ...TYPE.footnote,
       fontWeight: '600',
     },
     group: {
@@ -195,7 +195,7 @@ function makeStyles(theme: Theme) {
     },
     pressed: { backgroundColor: theme.bgHover },
     rowText: { flex: 1 },
-    label: { color: theme.fg1, fontSize: 16 },
-    detail: { color: theme.fg3, fontSize: 13 },
+    label: { ...TYPE.callout, color: theme.fg1 },
+    detail: { ...TYPE.footnote, color: theme.fg3 },
   });
 }

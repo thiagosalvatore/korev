@@ -27,7 +27,7 @@ import { MicButton, RecordingBar } from '../VoiceInput';
 import { useDictation } from '../dictation';
 import { usePendingAction } from '../hooks';
 import { useConnection } from '../korev';
-import { useTheme, type Theme } from '../theme';
+import { TYPE, useTheme, type Theme } from '../theme';
 import {
   CHROME_FONT_SCALE,
   ICON_BUTTON_ICON_SIZE,
@@ -341,7 +341,7 @@ function makeStyles(theme: Theme) {
       paddingHorizontal: 14,
     },
     suggestionPressed: { backgroundColor: theme.bgActive },
-    suggestionText: { color: theme.fg1, fontSize: 15 },
+    suggestionText: { ...TYPE.subhead, color: theme.fg1 },
     pill: {
       flex: 1,
       minHeight: 36,
@@ -363,9 +363,8 @@ function makeStyles(theme: Theme) {
       flex: 1,
       maxHeight: 140,
       padding: 0,
+      ...TYPE.subhead,
       color: theme.fg1,
-      fontSize: 15,
-      lineHeight: 20,
     },
   });
 }

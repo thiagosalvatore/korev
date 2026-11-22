@@ -15,7 +15,7 @@ import {
   type ContextUsage,
   type PlanLimit,
 } from '../../../korev-desktop/src/shared/model';
-import { useTheme, type Theme } from '../theme';
+import { TYPE, useTheme, type Theme } from '../theme';
 import { CHROME_FONT_SCALE, touchSlop } from '../ui';
 import { useSessionUpdate } from './sessionUpdate';
 
@@ -234,7 +234,7 @@ function makeStyles(theme: Theme) {
     },
     chipActive: { backgroundColor: theme.accentSubtle },
     chipPressed: { opacity: 0.7 },
-    chipText: { flexShrink: 1, color: theme.fg2, fontSize: 13 },
+    chipText: { ...TYPE.footnote, flexShrink: 1, color: theme.fg2 },
     chipTextActive: { color: theme.accentText, fontWeight: '600' },
   });
 }
