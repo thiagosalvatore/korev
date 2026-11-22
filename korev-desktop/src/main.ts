@@ -33,13 +33,10 @@ import { nodeFileSystem } from './main/file-system';
 import { registerIpcHandlers } from './main/ipc';
 import { createKorev, type Korev } from './main/korev';
 import { childEnv, resolveLoginEnv } from './main/login-path';
-import {
-  sendPhoneNotification,
-  sendPushNotifications,
-} from './main/phone-notifications';
+import { notifyPhones } from './main/phone-notifications';
 import { createQuitGate, type QuitGate } from './main/quit-gate';
 import { createDictation, WHISPER_MODELS } from './main/dictation';
-import { createRemoteAccess } from './main/remote-access';
+import { createRemoteAccess, remoteAccessFiles } from './main/remote-access';
 import {
   canReplaceBundle,
   fetchRelease,
@@ -59,8 +56,6 @@ const DEV_USER_DATA_DIR = 'Korev Dev';
 const COMMAND_EVENT = 'command';
 const FINISHED_SOUND = '/System/Library/Sounds/Glass.aiff';
 const SOUND_EXTENSIONS = ['mp3', 'm4a', 'aac', 'wav', 'aiff', 'aif', 'caf'];
-const REMOTE_TOKEN_FILE = 'remote-token';
-const PUSH_TOKENS_FILE = 'push-tokens.json';
 const TAILNET_STATE_DIR = 'tailscale';
 const TAILNET_BINARY = 'korev-tailnet';
 const TAILNET_BIN_DIR = 'tailnet/bin';
@@ -141,8 +136,7 @@ function bundledBinary(binDir: string, binary: string): string {
 }
 
 const remote = createRemoteAccess({
-  tokenPath: path.join(app.getPath('userData'), REMOTE_TOKEN_FILE),
-  pushTokensPath: path.join(app.getPath('userData'), PUSH_TOKENS_FILE),
+  ...remoteAccessFiles(app.getPath('userData')),
   api: () => korevApp?.api ?? {},
   startTailnet: tailnetStarter({
     binary: bundledBinary(TAILNET_BIN_DIR, TAILNET_BINARY),
@@ -208,11 +202,6 @@ function showNotice(korev: () => Korev | null, notice: Notice) {
     );
   });
   notification.show();
-}
-
-async function pushToPairedPhones(notice: Notice) {
-  const stale = await sendPushNotifications(await remote.pushTokens(), notice);
-  for (const token of stale) await remote.unregisterPushToken(token);
 }
 
 function playSound(file: string) {
@@ -343,11 +332,11 @@ async function createKorevApp(): Promise<Korev> {
     emit,
     notify: (notice) => {
       showNotice(() => korevApp, notice);
-      void sendPhoneNotification(
+      void notifyPhones(
+        remote,
         korevApp?.settings().phoneNotificationsUrl ?? '',
         notice,
       );
-      void pushToPairedPhones(notice);
     },
     playSound,
     isWindowFocused: () => BrowserWindow.getFocusedWindow() !== null,

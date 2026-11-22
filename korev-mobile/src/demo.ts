@@ -60,6 +60,10 @@ const NO_SCRIPTS: Result = {
   ok: false,
   message: 'The demo has no setup or run scripts.',
 };
+const NO_CLONING: Result<never> = {
+  ok: false,
+  message: 'The demo cannot clone repositories.',
+};
 const NO_PULL_REQUEST: Result<never> = {
   ok: false,
   message: 'The demo has no such pull request.',
@@ -390,6 +394,7 @@ export function createDemoConnection(): Connection {
         })),
       );
     },
+    cloneRepo: async () => NO_CLONING,
     async createWorkspaces(repoIds, task) {
       const created = repoIds.map((repoId) =>
         createWorkspace(repoId, task?.text ?? ''),
