@@ -1,232 +1,147 @@
 import { router } from 'expo-router';
+import { Search } from 'lucide-react-native';
+import { useState } from 'react';
 import {
-  Archive,
-  ChevronDown,
-  ChevronRight,
-  GitBranch,
-  GitMerge,
-  GitPullRequest,
-  GitPullRequestClosed,
-  GitPullRequestDraft,
-  Link,
-  MessageCircleQuestion,
-  MessageSquareWarning,
-  Plus,
-  TriangleAlert,
-  type LucideIcon,
-} from 'lucide-react-native';
-import { useState, type ReactNode } from 'react';
-import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
-import ReanimatedSwipeable, {
-  type SwipeableMethods,
-} from 'react-native-gesture-handler/ReanimatedSwipeable';
-import {
-  prBadge,
-  primaryPr,
-  type AppState,
-  type PrBadge,
-  type Repo,
-  type RepoFolder,
-  type Workspace,
-  type WorkspaceRuntime,
-  type WorkspaceStatus,
-} from '../../../../../korev-desktop/src/shared/model';
-import {
-  activeWorkspaces,
-  crossRepoLeads,
-  isAcrossRepos,
-  repoSections,
-  sidebarEntries,
-  waitsForLane,
-  workspaceLabel,
-} from '../../../../../korev-desktop/src/shared/workspaces';
-import { attempt } from '../../../attempt';
-import { succeeded } from '../../../haptics';
+import type { AppState } from '../../../../../korev-desktop/src/shared/model';
+import { workspaceLabel } from '../../../../../korev-desktop/src/shared/workspaces';
 import { useAppState, useReconnect } from '../../../hooks';
-import { useConnection } from '../../../korev';
-import { ListRow, ROW_ICON_SIZE } from '../../../ListRow';
-import { lifted } from '../../../haptics';
+import {
+  homeSections,
+  type HomeEntry,
+  type HomeSection,
+  type HomeSectionId,
+} from '../../../inbox';
 import { Loading } from '../../../Offline';
-import { openNewWorkspace } from '../../../navigation';
-import { RepoAvatar } from '../../../RepoAvatar';
-import { ReorderList } from '../../../ReorderList';
-import { MONO_FONT, useTheme, type Theme } from '../../../theme';
-import { CHROME_FONT_SCALE, touchSlop } from '../../../ui';
+import { MONO_FONT, TYPE, useTheme, type Theme } from '../../../theme';
+import { CHROME_FONT_SCALE, MIN_TOUCH_TARGET } from '../../../ui';
+import {
+  ARCHIVE_ACTION,
+  StatusIcon,
+  SwipeToArchive,
+  useArchive,
+} from '../../../WorkspaceStatus';
 
-const REPO_ADD_ICON_SIZE = ROW_ICON_SIZE + 2;
-const ACROSS_REPOS = 'across-repos';
-
-const BUSY_STATUSES: ReadonlySet<WorkspaceStatus> = new Set([
-  'creating',
-  'setting-up',
-  'working',
-]);
-
-const BADGE_ICONS: Record<PrBadge, LucideIcon> = {
-  merged: GitMerge,
-  closed: GitPullRequestClosed,
-  conflicts: GitPullRequest,
-  'checks-failing': GitPullRequest,
-  review: MessageSquareWarning,
-  'checks-running': GitPullRequest,
-  draft: GitPullRequestDraft,
-  open: GitPullRequest,
+const SECTION_TITLES: Record<HomeSectionId, string> = {
+  'needs-you': 'Needs you',
+  working: 'Working',
+  ready: 'Ready to merge',
+  other: 'Everything else',
 };
 
-function badgeColor(theme: Theme, badge: PrBadge): string {
-  const colors: Record<PrBadge, string> = {
-    merged: theme.merged,
-    closed: theme.fg4,
-    conflicts: theme.warningText,
-    'checks-failing': theme.dangerText,
-    review: theme.warningText,
-    'checks-running': theme.warningText,
-    draft: theme.fg3,
-    open: theme.successText,
-  };
-  return colors[badge];
-}
+const ICON_COLUMN = 28;
+const SEARCH_ICON_SIZE = 17;
+const SEARCH_HEIGHT = 38;
+const ROW_PADDING = 16;
+const ROW_GAP = 12;
 
 type Styles = ReturnType<typeof makeStyles>;
 
-function toggled(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
-  const next = new Set(set);
-  if (!next.delete(id)) next.add(id);
-  return next;
-}
-
-function StatusIcon({
-  workspace,
-  runtime,
-}: {
-  workspace: Workspace;
-  runtime: WorkspaceRuntime;
-}) {
-  const theme = useTheme();
-  if (BUSY_STATUSES.has(runtime.status))
-    return <ActivityIndicator size="small" color={theme.accentText} />;
-  if (runtime.status === 'waiting')
-    return (
-      <MessageCircleQuestion size={ROW_ICON_SIZE} color={theme.warningText} />
-    );
-  if (runtime.status === 'failed' || runtime.setupError)
-    return <TriangleAlert size={ROW_ICON_SIZE} color={theme.dangerText} />;
-  const pr = primaryPr(workspace, runtime);
-  if (!pr) return <GitBranch size={ROW_ICON_SIZE} color={theme.fg4} />;
-  const badge = prBadge(pr);
-  const Badge = BADGE_ICONS[badge];
-  return <Badge size={ROW_ICON_SIZE} color={badgeColor(theme, badge)} />;
-}
-
-const ARCHIVE_ACTION = 'archive';
-
-function ArchiveAction({
-  onPress,
-  styles,
-}: {
-  onPress: () => void;
-  styles: Styles;
-}) {
-  const theme = useTheme();
+function repoName(state: AppState, entry: HomeEntry): string {
   return (
-    <Pressable
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={styles.archiveAction}
-      onPress={onPress}
-    >
-      <Archive size={ROW_ICON_SIZE} color={theme.fgOnWarning} />
-      <Text
-        maxFontSizeMultiplier={CHROME_FONT_SCALE}
-        style={styles.archiveLabel}
-      >
-        Archive
-      </Text>
-    </Pressable>
+    state.repos.find((repo) => repo.id === entry.workspace.repoId)?.name ?? ''
   );
 }
 
-interface GroupMember {
-  repo: string;
-  waitsOn: string | null;
+function matches(state: AppState, entry: HomeEntry, query: string): boolean {
+  const { workspace } = entry;
+  return [workspaceLabel(workspace), workspace.branch, repoName(state, entry)]
+    .join(' ')
+    .toLowerCase()
+    .includes(query);
 }
 
-function memberDetail(workspace: Workspace, member: GroupMember): string {
-  return member.waitsOn
-    ? `Waits for the plan in ${member.waitsOn}`
-    : workspace.branch;
+function filtered(
+  state: AppState,
+  sections: HomeSection[],
+  query: string,
+): HomeSection[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return sections;
+  return sections
+    .map((section) => ({
+      ...section,
+      entries: section.entries.filter((entry) => matches(state, entry, needle)),
+    }))
+    .filter((section) => section.entries.length > 0);
 }
 
-function WorkspaceRow({
-  workspace,
-  runtime,
-  member,
+function HomeRow({
+  state,
+  entry,
+  section,
+  first,
   styles,
 }: {
-  workspace: Workspace;
-  runtime: WorkspaceRuntime | undefined;
-  member?: GroupMember;
+  state: AppState;
+  entry: HomeEntry;
+  section: HomeSectionId;
+  first: boolean;
   styles: Styles;
 }) {
-  const { api } = useConnection();
+  const theme = useTheme();
+  const { workspace, runtime, status } = entry;
+  const archive = useArchive(workspace);
+  const label = workspaceLabel(workspace);
   const stats = runtime?.stats;
-  const notice = runtime?.message ?? runtime?.setupError;
   const hasStats = stats && (stats.additions > 0 || stats.deletions > 0);
-  const archive = async () =>
-    succeeded(
-      await attempt('Korev could not archive', () =>
-        api.archiveWorkspace(workspace.id),
-      ),
-    );
-  const archiveFromSwipe = async (swipeable: SwipeableMethods) => {
-    if (!(await archive())) swipeable.close();
-  };
+  const failed = runtime?.status === 'failed' || Boolean(runtime?.setupError);
   return (
-    <ReanimatedSwipeable
-      overshootRight={false}
-      childrenContainerStyle={styles.swipeableRow}
-      renderRightActions={(_progress, _translation, swipeable) => (
-        <ArchiveAction
-          onPress={() => void archiveFromSwipe(swipeable)}
-          styles={styles}
-        />
-      )}
-    >
-      <ListRow
-        accessibilityLabel={
-          member
-            ? `Workspace ${workspaceLabel(workspace)} in ${member.repo}`
-            : `Workspace ${workspaceLabel(workspace)}`
-        }
+    <SwipeToArchive archive={archive} background={theme.bgSurface}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Workspace ${label}, ${status}`}
         accessibilityActions={[{ name: ARCHIVE_ACTION, label: 'Archive' }]}
         onAccessibilityAction={({ nativeEvent }) => {
           if (nativeEvent.actionName === ARCHIVE_ACTION) void archive();
         }}
-        icon={
-          runtime ? (
+        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        onPress={() =>
+          router.push({
+            pathname: '/workspace/[id]',
+            params: { id: workspace.id },
+          })
+        }
+      >
+        <View style={styles.icon}>
+          {runtime ? (
             <StatusIcon workspace={workspace} runtime={runtime} />
-          ) : null
-        }
-        title={member ? member.repo : workspace.branch}
-        highlighted={runtime?.unread || runtime?.status === 'waiting'}
-        subtitle={
-          <>
-            {member
-              ? memberDetail(workspace, member)
-              : workspaceLabel(workspace)}
-            {notice ? <Text style={styles.error}> · {notice}</Text> : null}
-          </>
-        }
-        end={
-          <>
+          ) : null}
+        </View>
+        <View style={[styles.body, !first && styles.divider]}>
+          <View style={styles.text}>
+            <Text
+              style={[
+                styles.title,
+                (runtime?.unread || section === 'needs-you') &&
+                  styles.titleStrong,
+              ]}
+              numberOfLines={2}
+            >
+              {label}
+            </Text>
+            <Text
+              style={[styles.status, failed && styles.statusFailed]}
+              numberOfLines={2}
+            >
+              {status}
+            </Text>
+          </View>
+          <View style={styles.end}>
+            <Text
+              maxFontSizeMultiplier={CHROME_FONT_SCALE}
+              style={styles.repo}
+              numberOfLines={1}
+            >
+              {repoName(state, entry)}
+            </Text>
             {hasStats ? (
               <Text
                 maxFontSizeMultiplier={CHROME_FONT_SCALE}
@@ -237,304 +152,99 @@ function WorkspaceRow({
               </Text>
             ) : null}
             {runtime?.unread ? <View style={styles.dot} /> : null}
-          </>
-        }
-        onPress={() =>
-          router.push({
-            pathname: '/workspace/[id]',
-            params: { id: workspace.id },
-          })
-        }
+          </View>
+        </View>
+      </Pressable>
+    </SwipeToArchive>
+  );
+}
+
+function SearchField({
+  value,
+  onChangeText,
+  styles,
+}: {
+  value: string;
+  onChangeText: (text: string) => void;
+  styles: Styles;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={styles.search}>
+      <Search size={SEARCH_ICON_SIZE} color={theme.fg3} />
+      <TextInput
+        accessibilityLabel="Search workspaces"
+        maxFontSizeMultiplier={CHROME_FONT_SCALE}
+        style={styles.searchInput}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder="Search"
+        placeholderTextColor={theme.fg3}
+        returnKeyType="search"
+        clearButtonMode="while-editing"
+        autoCorrect={false}
       />
-    </ReanimatedSwipeable>
-  );
-}
-
-function LinkedGroup({
-  state,
-  lead,
-  members,
-  styles,
-}: {
-  state: AppState;
-  lead: Workspace;
-  members: Workspace[];
-  styles: Styles;
-}) {
-  const theme = useTheme();
-  const repoOf = (workspace: Workspace) =>
-    state.repos.find((repo) => repo.id === workspace.repoId);
-  const repoName = (workspace: Workspace) => repoOf(workspace)?.name ?? '';
-  return (
-    <View accessibilityLabel={`Linked workspace ${workspaceLabel(lead)}`}>
-      <View style={styles.linkedLabel}>
-        <Link size={ROW_ICON_SIZE - 4} color={theme.fg3} />
-        <Text
-          maxFontSizeMultiplier={CHROME_FONT_SCALE}
-          style={styles.linkedName}
-          numberOfLines={1}
-        >
-          {workspaceLabel(lead)}
-        </Text>
-        {members.map((workspace) => {
-          const repo = repoOf(workspace);
-          return repo ? <RepoAvatar key={workspace.id} repo={repo} /> : null;
-        })}
-      </View>
-      <View style={styles.linkedMembers}>
-        {members.map((workspace) => (
-          <WorkspaceRow
-            key={workspace.id}
-            workspace={workspace}
-            runtime={state.runtime[workspace.id]}
-            member={{
-              repo: repoName(workspace),
-              waitsOn: waitsForLane(state, workspace) ? repoName(lead) : null,
-            }}
-            styles={styles}
-          />
-        ))}
-      </View>
     </View>
   );
 }
 
-function Chevron({ collapsed }: { collapsed: boolean }) {
-  const theme = useTheme();
-  const Icon = collapsed ? ChevronRight : ChevronDown;
-  return <Icon size={ROW_ICON_SIZE - 3} color={theme.fg4} />;
+function sectionTitleColor(theme: Theme, id: HomeSectionId): string {
+  if (id === 'needs-you') return theme.warningText;
+  if (id === 'ready') return theme.successText;
+  return theme.fg3;
 }
 
-function AcrossRepos({
-  state,
-  groups,
-  leads,
-  collapsed,
-  onToggle,
-  styles,
-}: {
-  state: AppState;
-  groups: Workspace[][];
-  leads: Map<string, Workspace>;
-  collapsed: boolean;
-  onToggle: () => void;
-  styles: Styles;
-}) {
-  if (!groups.length) return null;
-  return (
-    <View style={styles.group}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded: !collapsed }}
-        style={styles.folderHeader}
-        onPress={onToggle}
-      >
-        <Text
-          maxFontSizeMultiplier={CHROME_FONT_SCALE}
-          style={styles.folderName}
-        >
-          Across repos
-        </Text>
-        <Chevron collapsed={collapsed} />
-      </Pressable>
-      {collapsed
-        ? null
-        : groups.map((members) => (
-            <LinkedGroup
-              key={members[0].groupId}
-              state={state}
-              lead={leads.get(members[0].groupId!)!}
-              members={members}
-              styles={styles}
-            />
-          ))}
-    </View>
-  );
-}
-
-function RepoGroup({
-  state,
-  repo,
-  workspaces,
-  collapsed,
-  onToggle,
-  onReorder,
-  styles,
-}: {
-  state: AppState;
-  repo: Repo;
-  workspaces: Workspace[];
-  collapsed: boolean;
-  onToggle: () => void;
-  onReorder: () => void;
-  styles: Styles;
-}) {
-  const theme = useTheme();
-  return (
-    <View style={styles.group}>
-      <View style={styles.repoHeader}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ expanded: !collapsed }}
-          style={styles.repoToggle}
-          onPress={onToggle}
-          onLongPress={onReorder}
-        >
-          <RepoAvatar repo={repo} />
-          <Text
-            maxFontSizeMultiplier={CHROME_FONT_SCALE}
-            style={styles.repoName}
-            numberOfLines={1}
-          >
-            {repo.name}
-          </Text>
-          <Chevron collapsed={collapsed} />
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`New workspace in ${repo.name}`}
-          hitSlop={touchSlop(REPO_ADD_ICON_SIZE)}
-          onPress={() => openNewWorkspace(repo.id)}
-        >
-          <Plus size={REPO_ADD_ICON_SIZE} color={theme.fg3} />
-        </Pressable>
-      </View>
-      {collapsed
-        ? null
-        : workspaces.map((workspace) => (
-            <WorkspaceRow
-              key={workspace.id}
-              workspace={workspace}
-              runtime={state.runtime[workspace.id]}
-              styles={styles}
-            />
-          ))}
-    </View>
-  );
-}
-
-function FolderGroup({
-  folder,
-  collapsed,
-  onToggle,
-  onReorder,
-  children,
-  styles,
-}: {
-  folder: RepoFolder;
-  collapsed: boolean;
-  onToggle: () => void;
-  onReorder: () => void;
-  children: ReactNode;
-  styles: Styles;
-}) {
-  return (
-    <View style={styles.group}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded: !collapsed }}
-        style={styles.folderHeader}
-        onPress={onToggle}
-        onLongPress={onReorder}
-      >
-        <Text
-          maxFontSizeMultiplier={CHROME_FONT_SCALE}
-          style={styles.folderName}
-          numberOfLines={1}
-        >
-          {folder.name}
-        </Text>
-        <Chevron collapsed={collapsed} />
-      </Pressable>
-      {collapsed ? null : children}
-    </View>
-  );
-}
-
-export default function WorkspacesScreen() {
+export default function HomeScreen() {
   const state = useAppState();
-  const styles = makeStyles(useTheme());
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
-  const toggle = (id: string) => setCollapsed(toggled(collapsed, id));
+  const theme = useTheme();
+  const styles = makeStyles(theme);
   const { refreshing, refresh } = useReconnect();
-  const [reordering, setReordering] = useState(false);
-  const [dragging, setDragging] = useState(false);
-  const startReordering = () => {
-    lifted();
-    setReordering(true);
-  };
-
+  const [query, setQuery] = useState('');
   if (!state) return <Loading style={styles.loading} />;
-
-  const workspaces = activeWorkspaces(state);
-  const leads = crossRepoLeads(state);
-  const sections = repoSections(state);
-  const repoGroup = (repo: Repo) => (
-    <RepoGroup
-      key={repo.id}
-      state={state}
-      repo={repo}
-      workspaces={workspaces.filter(
-        (ws) => ws.repoId === repo.id && !isAcrossRepos(leads, ws),
-      )}
-      collapsed={collapsed.has(repo.id)}
-      onToggle={() => toggle(repo.id)}
-      onReorder={startReordering}
-      styles={styles}
-    />
-  );
-
+  const sections = filtered(state, homeSections(state), query);
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.page}
-      scrollEnabled={!dragging}
+      keyboardDismissMode="on-drag"
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={refresh} />
       }
     >
-      {reordering ? (
-        <ReorderList
-          state={state}
-          onDone={() => setReordering(false)}
-          onDraggingChange={setDragging}
-        />
-      ) : (
-        <>
-          <AcrossRepos
-            state={state}
-            groups={sidebarEntries(
-              workspaces.filter((ws) => isAcrossRepos(leads, ws)),
-              leads,
-            )}
-            leads={leads}
-            collapsed={collapsed.has(ACROSS_REPOS)}
-            onToggle={() => toggle(ACROSS_REPOS)}
-            styles={styles}
-          />
-          {sections.map(({ folder, repos }) =>
-            folder ? (
-              <FolderGroup
-                key={folder.id}
-                folder={folder}
-                collapsed={collapsed.has(folder.id)}
-                onToggle={() => toggle(folder.id)}
-                onReorder={startReordering}
+      <SearchField value={query} onChangeText={setQuery} styles={styles} />
+      {sections.map((section) => (
+        <View key={section.id} style={styles.section}>
+          <Text
+            accessibilityRole="header"
+            maxFontSizeMultiplier={CHROME_FONT_SCALE}
+            style={[
+              styles.sectionTitle,
+              { color: sectionTitleColor(theme, section.id) },
+            ]}
+          >
+            {SECTION_TITLES[section.id]}
+          </Text>
+          <View style={styles.group}>
+            {section.entries.map((entry, index) => (
+              <HomeRow
+                key={entry.workspace.id}
+                state={state}
+                entry={entry}
+                section={section.id}
+                first={index === 0}
                 styles={styles}
-              >
-                {repos.map(repoGroup)}
-              </FolderGroup>
-            ) : (
-              repos.map(repoGroup)
-            ),
-          )}
-        </>
-      )}
-      {sections.length === 0 && (
+              />
+            ))}
+          </View>
+        </View>
+      ))}
+      {sections.length === 0 ? (
         <Text style={styles.empty}>
-          Add a repository in Korev on your Mac to start.
+          {query
+            ? 'No workspace matches your search.'
+            : 'Add a repository in Korev on your Mac to start.'}
         </Text>
-      )}
+      ) : null}
     </ScrollView>
   );
 }
@@ -542,74 +252,71 @@ export default function WorkspacesScreen() {
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
     loading: { marginTop: 40 },
-    page: { padding: 8, paddingBottom: 32 },
-    group: { marginBottom: 12 },
-    folderHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-    },
-    folderName: {
-      color: theme.fg4,
-      fontSize: 11,
-      fontWeight: '600',
-      letterSpacing: 0.6,
-      textTransform: 'uppercase',
-    },
-    repoHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-    },
-    repoToggle: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    repoName: {
-      flexShrink: 1,
-      color: theme.fg1,
-      fontSize: 15,
-      fontWeight: '600',
-    },
-    error: { color: theme.dangerText },
-    linkedLabel: {
+    page: { paddingHorizontal: 16, paddingBottom: 32, gap: 22 },
+    search: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+      minHeight: SEARCH_HEIGHT,
       paddingHorizontal: 10,
-      paddingTop: 6,
+      borderRadius: SEARCH_HEIGHT / 2,
+      backgroundColor: theme.bgActive,
     },
-    linkedName: { flexShrink: 1, color: theme.fg3, fontSize: 12 },
-    linkedMembers: { paddingLeft: 12 },
+    searchInput: { ...TYPE.body, flex: 1, padding: 0, color: theme.fg1 },
+    section: { gap: 6 },
+    sectionTitle: {
+      ...TYPE.footnote,
+      paddingHorizontal: ROW_PADDING,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+    },
+    group: {
+      overflow: 'hidden',
+      borderRadius: 14,
+      backgroundColor: theme.bgSurface,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: ROW_GAP,
+      paddingLeft: ROW_PADDING,
+      backgroundColor: theme.bgSurface,
+    },
+    pressed: { backgroundColor: theme.bgHover },
+    icon: {
+      width: ICON_COLUMN,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    body: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: ROW_GAP,
+      minHeight: MIN_TOUCH_TARGET + 18,
+      paddingVertical: 10,
+      paddingRight: ROW_PADDING,
+    },
+    divider: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.border2,
+    },
+    text: { flex: 1, gap: 2 },
+    title: { ...TYPE.headline, fontWeight: '500', color: theme.fg1 },
+    titleStrong: { fontWeight: '600' },
+    status: { ...TYPE.subhead, color: theme.fg2 },
+    statusFailed: { color: theme.dangerText },
+    end: { alignItems: 'flex-end', gap: 4, maxWidth: '40%' },
+    repo: { ...TYPE.footnote, color: theme.fg3 },
     stats: { fontFamily: MONO_FONT, fontSize: 11 },
     additions: { color: theme.diffAdd },
     deletions: { color: theme.diffDel },
     dot: {
-      width: 7,
-      height: 7,
+      width: 8,
+      height: 8,
       borderRadius: 4,
       backgroundColor: theme.accent,
     },
-    swipeableRow: { backgroundColor: theme.bgApp },
-    archiveAction: {
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 2,
-      paddingHorizontal: 20,
-      borderRadius: 8,
-      backgroundColor: theme.warning,
-    },
-    archiveLabel: {
-      color: theme.fgOnWarning,
-      fontSize: 12,
-      fontWeight: '600',
-    },
-    empty: { padding: 24, color: theme.fg3, textAlign: 'center' },
+    empty: { ...TYPE.body, padding: 24, color: theme.fg3, textAlign: 'center' },
   });
 }
