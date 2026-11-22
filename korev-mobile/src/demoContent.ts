@@ -11,6 +11,7 @@ import {
   type ChatSession,
   type InboxPullRequest,
   type PrStatus,
+  type PrThread,
   type Repo,
   type Settings,
   type Workspace,
@@ -69,6 +70,60 @@ export const DEMO_DIFFS: Record<string, string> = {
   ].join('\n'),
 };
 
+export const DEMO_SETUP_OUTPUT =
+  '$ npm ci\r\n\u001b[32madded 412 packages\u001b[0m in 9s\r\n';
+
+export const DEMO_RUN_OUTPUT =
+  '$ npm run dev\r\n\r\n> acme-web@1.0.0 dev\r\n> vite\r\n\r\n  \u001b[32mVITE\u001b[0m ready in 412 ms\r\n\r\n  ➜  Local: http://localhost:3000/\r\n';
+
+export const DEMO_THREADS: PrThread[] = [
+  {
+    id: 'demo-thread-email',
+    path: 'src/search/query.ts',
+    line: 15,
+    diffHunk:
+      "@@ -12,8 +12,13 @@\n   const rows = await db.query(\n-    'SELECT * FROM accounts WHERE name ILIKE $1',\n+    'SELECT * FROM accounts WHERE name % $1 OR email % $1',",
+    isResolved: false,
+    isOutdated: false,
+    comments: [
+      {
+        id: 'demo-comment-email',
+        author: 'maria',
+        isBot: false,
+        body: 'Does `email % $1` use the new index too? I only see one on `name`.',
+        url: 'https://github.com/acme/acme-web/pull/87',
+        createdAt: '2026-11-22T09:00:00.000Z',
+      },
+    ],
+  },
+  {
+    id: 'demo-thread-limit',
+    path: 'src/search/query.ts',
+    line: 22,
+    diffHunk: '+  return rows.slice(0, MAX_RESULTS);',
+    isResolved: true,
+    isOutdated: false,
+    comments: [
+      {
+        id: 'demo-comment-limit',
+        author: 'maria',
+        isBot: false,
+        body: 'Limit this in SQL rather than in memory?',
+        url: 'https://github.com/acme/acme-web/pull/87',
+        createdAt: '2026-11-22T08:40:00.000Z',
+      },
+      {
+        id: 'demo-comment-limit-reply',
+        author: 'you',
+        isBot: false,
+        body: 'Done, it is a `LIMIT` now.',
+        url: 'https://github.com/acme/acme-web/pull/87',
+        createdAt: '2026-11-22T08:55:00.000Z',
+      },
+    ],
+  },
+];
+
 const DEMO_CONTEXT = { usedTokens: 84_000, windowTokens: 200_000 };
 
 export const DEMO_SLASH_COMMANDS = [
@@ -114,7 +169,11 @@ const WEB: Repo = {
   name: 'acme-web',
   path: `${DEMO_HOME}/code/acme-web`,
   defaultBranch: DEMO_BASE_BRANCH,
-  scripts: EMPTY_SCRIPTS,
+  scripts: {
+    ...EMPTY_SCRIPTS,
+    setup: 'npm ci',
+    run: [{ name: 'dev', command: 'npm run dev' }],
+  },
 };
 
 const API: Repo = {

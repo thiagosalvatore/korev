@@ -13,6 +13,7 @@ import {
   type ChatSession,
   type PrStatus,
   type PrStep,
+  type ScriptKind,
   type Workspace,
   type WorkspaceRuntime,
 } from '../../../../korev-desktop/src/shared/model';
@@ -36,6 +37,7 @@ import { RunDecisions } from '../../chat/RunDecisions';
 import { useAppState, usePendingAction } from '../../hooks';
 import { Loading } from '../../Offline';
 import { useConnection } from '../../korev';
+import { useNewerMac } from '../../newerMac';
 import {
   ACTION_STEPS,
   FLOATING_STEPS,
@@ -95,6 +97,11 @@ function sessionSubtitle(
   return undefined;
 }
 
+function unansweredLabel(count: number): string | undefined {
+  if (!count) return undefined;
+  return count === 1 ? '1 unanswered' : `${count} unanswered`;
+}
+
 function useWorkspaceActions(
   state: AppState,
   workspace: Workspace,
@@ -103,6 +110,7 @@ function useWorkspaceActions(
   onSelect: (sessionId: string) => void,
 ) {
   const { api } = useConnection();
+  const newerMac = useNewerMac();
   const { pending, run } = usePendingAction();
   const [chosenUrl, setChosenUrl] = useState<string | null>(null);
   const prs = runtime?.prs ?? [];
@@ -214,6 +222,20 @@ function useWorkspaceActions(
     ...(pr
       ? [
           {
+            label: 'Review comments',
+            icon: 'bubble.left.and.text.bubble.right' as const,
+            subtitle: unansweredLabel(pr.unansweredThreads.length),
+            onPress: () =>
+              router.push({
+                pathname: '/threads/[id]',
+                params: { id: workspace.id, pr: pr.url },
+              }),
+          },
+        ]
+      : []),
+    ...(pr
+      ? [
+          {
             label: 'Open on GitHub',
             icon: 'arrow.up.right.square' as const,
             onPress: () => void Linking.openURL(pr.url),
@@ -238,6 +260,40 @@ function useWorkspaceActions(
         ]
       : [];
 
+  const scripts = state.repos.find(
+    (repo) => repo.id === workspace.repoId,
+  )?.scripts;
+  const openScript = (kind: ScriptKind) =>
+    router.push({
+      pathname: '/scripts/[id]',
+      params: { id: workspace.id, kind },
+    });
+  const scriptItems: ChatMenuEntry[] = newerMac
+    ? [
+        ...(scripts?.setup
+          ? [
+              {
+                label: 'Setup',
+                icon: 'hammer' as const,
+                onPress: () => openScript('setup'),
+              },
+            ]
+          : []),
+        ...(scripts?.run.length
+          ? [
+              {
+                label: 'Run',
+                icon: 'play.rectangle' as const,
+                subtitle: state.runningTerminals.includes(`${workspace.id}:run`)
+                  ? 'Running'
+                  : undefined,
+                onPress: () => openScript('run'),
+              },
+            ]
+          : []),
+      ]
+    : [];
+
   const menu: ChatMenuEntry[] = [
     chats,
     ...(hasChanges(runtime)
@@ -256,6 +312,9 @@ function useWorkspaceActions(
         ]
       : []),
     { label: 'Pull request', inline: true, items: [...prItems, ...prChoices] },
+    ...(scriptItems.length
+      ? [{ label: 'Scripts', inline: true, items: scriptItems }]
+      : []),
     {
       label: '',
       inline: true,
