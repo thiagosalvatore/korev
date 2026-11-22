@@ -260,5 +260,8 @@ Notes** opens the same page.
   picker per lane.
 - **Bridge.** The phone calls only the methods in `REMOTE_METHODS`. It can send a queued
   message now, remove a queued message, revert to a user message and restore an archived
-  workspace. A Mac with an older Korev answers a newer method with an error, so the phone shows
-  that method's control only after the Mac answers it.
+  workspace. It can start and stop the Setup and Run scripts and read their output, from
+  `scriptOutput` when it connects and from the `terminal-output` and `terminal-exit` events
+  after that. It never sees or writes to an interactive shell. A Mac with an older Korev
+  answers a newer method with an error, so the phone shows that method's control only after
+  the Mac answers it.

@@ -2,6 +2,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
+  isScriptKind,
   presetLaneRepo,
   type AgentKind,
   type ChatSession,
@@ -427,7 +428,7 @@ export async function startScript(
   kind: TerminalKind,
   scriptId: string | null = null,
 ): Promise<Result> {
-  if (kind === 'shell') return { ok: false, message: 'Not a script' };
+  if (!isScriptKind(kind)) return { ok: false, message: 'Not a script' };
   const repo = ctx.repo(workspace.repoId);
   const config = await workspaceConfig(ctx, workspace);
   const runScript = kind === 'run' ? runScriptFor(config, scriptId) : null;

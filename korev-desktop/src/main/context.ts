@@ -1,12 +1,13 @@
 import type { KorevEvents } from '../shared/api';
-import type {
-  AgentKind,
-  AgentModel,
-  PlanLimits,
-  Repo,
-  Workspace,
-  WorkspaceRuntime,
-  WorkspaceStatus,
+import {
+  isScriptKind,
+  type AgentKind,
+  type AgentModel,
+  type PlanLimits,
+  type Repo,
+  type Workspace,
+  type WorkspaceRuntime,
+  type WorkspaceStatus,
 } from '../shared/model';
 import type { AgentAccess } from './agent-server';
 import type { CommandRunner } from './command-runner';
@@ -72,6 +73,11 @@ export class NotFoundError extends Error {
 
 export function terminalRef(workspaceId: string, kind: string): string {
   return `${workspaceId}:${kind}`;
+}
+
+export function isScriptRef(ref: string): boolean {
+  const [, kind, ...rest] = ref.split(':');
+  return rest.length === 0 && isScriptKind(kind ?? '');
 }
 
 export function errorMessage(error: unknown): string {

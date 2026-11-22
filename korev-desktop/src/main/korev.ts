@@ -7,6 +7,7 @@ import { planBlock } from '../shared/message';
 import {
   EMPTY_SCRIPTS,
   hasWorktree,
+  isScriptKind,
   type AgentAvailability,
   type AgentKind,
   type AppState,
@@ -1877,9 +1878,14 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     startScript: (workspaceId, kind, scriptId) =>
       startScript(ctx, workspacePath(workspaceId), kind, scriptId ?? null),
     async stopScript(workspaceId, kind) {
+      if (!isScriptKind(kind)) return;
       ctx.terminals.close(terminalRef(workspaceId, kind));
       ctx.emitState();
     },
+    scriptOutput: async (workspaceId, kind) =>
+      isScriptKind(kind)
+        ? ctx.terminals.output(terminalRef(workspaceId, kind))
+        : null,
     writeTerminal: async (ref, data) => ctx.terminals.write(ref, data),
     resizeTerminal: async (ref, size) => ctx.terminals.resize(ref, size),
     async closeTerminal(ref) {

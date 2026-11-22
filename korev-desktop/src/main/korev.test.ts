@@ -23,7 +23,9 @@ import type { Notice } from './context';
 import { nodeFileSystem } from './file-system';
 import {
   DEFAULT_EFFORT,
+  EMPTY_SCRIPTS,
   type AppState,
+  type ScriptKind,
   type SendOptions,
   type Workspace,
   type WorkspaceSource,
@@ -256,8 +258,12 @@ const noPty = (_file: string, args: string[], options: { cwd: string }) => {
 
 const ptyExits: ((event: { exitCode: number }) => void)[] = [];
 
+const ptyOutputs: ((data: string) => void)[] = [];
+
 const fakePty = () => ({
-  onData: () => undefined,
+  onData: (listener: (data: string) => void) => {
+    ptyOutputs.push(listener);
+  },
   onExit: (listener: (event: { exitCode: number }) => void) => {
     ptyExits.push(listener);
   },
@@ -3003,6 +3009,31 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toContain('"behavior":"deny"');
     const started = await korev.api.startFromAsk(ask.id);
     expect(started.ok).toBe(true);
+  });
+
+  it('reads a script terminal for the phone but never a shell', async () => {
+    const workspace = await createWorkspace();
+    await korev.api.updateRepoScripts(workspace.repoId, {
+      ...EMPTY_SCRIPTS,
+      run: [{ name: 'dev', command: 'npm run dev' }],
+    });
+    const shellRef = `${workspace.id}:shell`;
+    await korev.api.openTerminal(shellRef, workspace.id, 'shell', {
+      cols: 80,
+      rows: 24,
+    });
+    ptyOutputs.at(-1)!('secret');
+    await korev.api.startScript(workspace.id, 'run');
+    ptyOutputs.at(-1)!('ready on :3000');
+
+    expect(await korev.api.scriptOutput(workspace.id, 'run')).toBe(
+      'ready on :3000',
+    );
+    expect(
+      await korev.api.scriptOutput(workspace.id, 'shell' as ScriptKind),
+    ).toBeNull();
+    await korev.api.stopScript(workspace.id, 'shell');
+    expect((await korev.api.getState()).runningTerminals).toContain(shellRef);
   });
 
   it('keeps the workspace working when its setup script finishes during a turn', async () => {
