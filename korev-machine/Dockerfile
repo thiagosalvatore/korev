@@ -15,6 +15,7 @@ RUN npm install --no-save --no-audit --no-fund --ignore-scripts \
 COPY korev-desktop/cli cli
 COPY --from=build /src/.vite/build/headless.cjs .vite/build/headless.cjs
 COPY korev-machine/entrypoint.sh /usr/local/bin/korev-entrypoint
+COPY korev-machine/fly-suspend.sh /usr/local/bin/korev-fly-suspend
 ENV KOREV_REMOTE_HOST=0.0.0.0
 EXPOSE 7420
 ENTRYPOINT ["tini", "-s", "--", "korev-entrypoint"]
