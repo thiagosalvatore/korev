@@ -69,7 +69,10 @@ export function XTerm({
           : `Process exited with code ${exit.exitCode}`;
       terminal.write(`\r\n\x1b[2m[${message}]\x1b[0m\r\n`);
     });
-    const input = terminal.onData((data) => void api.writeTerminal(ref, data));
+    let forwardInput = false;
+    const input = terminal.onData((data) => {
+      if (forwardInput) void api.writeTerminal(ref, data);
+    });
     const resizer = new ResizeObserver(() => {
       if (!element.clientWidth) return;
       fit.fit();
@@ -97,7 +100,9 @@ export function XTerm({
       )
       .then((result) => {
         if (!attached || !reportFailure(result)) return;
-        terminal.write(result.value);
+        terminal.write(result.value, () => {
+          forwardInput = true;
+        });
         buffered.forEach((data) => terminal.write(data));
         replayed = true;
       });
