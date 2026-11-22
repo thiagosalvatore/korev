@@ -25,9 +25,11 @@ import { DEFAULT_REMOTE_PORT, LOOPBACK_HOST } from './main/remote-server';
 
 const CLI_DIR = 'cli';
 const DEFAULT_DATA_DIR = '.korev';
-const DEFAULT_IDLE_EXIT_MINUTES = 15;
+const DEFAULT_IDLE_MINUTES = 15;
 const MINUTE_MS = 60_000;
 const IDLE_CHECK_INTERVAL_MS = MINUTE_MS;
+const IDLE_COMMAND_TIMEOUT_MS = 30_000;
+const POSIX_SHELL = '/bin/sh';
 const NOT_ON_CLOUD_MACHINE = 'Not available on a cloud machine';
 
 const NO_TAILNET: Tailnet = {
@@ -52,20 +54,20 @@ interface HeadlessConfig {
   host: string;
   port: number;
   publicUrl: string;
-  idleExitMs: number;
+  idleMs: number;
+  idleCommand: string | null;
 }
 
 function readConfig(env: NodeJS.ProcessEnv): HeadlessConfig {
   const port = Number(env.KOREV_REMOTE_PORT ?? DEFAULT_REMOTE_PORT);
-  const idleMinutes = Number(
-    env.KOREV_IDLE_EXIT_MINUTES ?? DEFAULT_IDLE_EXIT_MINUTES,
-  );
+  const idleMinutes = Number(env.KOREV_IDLE_MINUTES ?? DEFAULT_IDLE_MINUTES);
   return {
     dataDir: env.KOREV_DATA_DIR ?? path.join(homedir(), DEFAULT_DATA_DIR),
     host: env.KOREV_REMOTE_HOST ?? LOOPBACK_HOST,
     port,
     publicUrl: env.KOREV_PUBLIC_URL ?? `http://localhost:${port}`,
-    idleExitMs: idleMinutes * MINUTE_MS,
+    idleMs: idleMinutes * MINUTE_MS,
+    idleCommand: env.KOREV_IDLE_COMMAND || null,
   };
 }
 
@@ -131,19 +133,33 @@ async function stop(korev: Korev, remote: RemoteAccess) {
   process.exit(0);
 }
 
-function exitWhenIdle(
+async function runIdleCommand(command: string) {
+  const result = await runProcess(POSIX_SHELL, ['-c', command], {
+    timeoutMs: IDLE_COMMAND_TIMEOUT_MS,
+  }).catch((error: unknown) => ({ exitCode: null, stderr: String(error) }));
+  if (result.exitCode !== 0)
+    console.warn(`Idle command failed: ${result.stderr.trim()}`);
+}
+
+function actWhenIdle(
   config: HeadlessConfig,
   korev: Korev,
   remote: RemoteAccess,
 ) {
-  if (config.idleExitMs <= 0) return;
-  const watch = createIdleWatch(config.idleExitMs, Date.now);
+  if (config.idleMs <= 0) return;
+  const watch = createIdleWatch({
+    limitMs: config.idleMs,
+    checkIntervalMs: IDLE_CHECK_INTERVAL_MS,
+    now: Date.now,
+  });
   setInterval(() => {
-    const idle = watch.shouldExit({
+    const idle = watch.idleTooLong({
       runningAgents: korev.runningAgents(),
       connectedDevices: remote.status().devices.length,
     });
-    if (idle) void stop(korev, remote);
+    if (!idle) return;
+    if (config.idleCommand) void runIdleCommand(config.idleCommand);
+    else void stop(korev, remote);
   }, IDLE_CHECK_INTERVAL_MS);
 }
 
@@ -176,7 +192,7 @@ async function main() {
   coreReady(started.api);
   started.emitState();
 
-  exitWhenIdle(config, started, remote);
+  actWhenIdle(config, started, remote);
   process.once('SIGTERM', () => void stop(started, remote));
   process.once('SIGINT', () => void stop(started, remote));
 }

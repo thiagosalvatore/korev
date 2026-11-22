@@ -4,22 +4,35 @@ export interface Activity {
 }
 
 export interface IdleWatch {
-  shouldExit(activity: Activity): boolean;
+  idleTooLong(activity: Activity): boolean;
 }
+
+export interface IdleWatchOptions {
+  limitMs: number;
+  checkIntervalMs: number;
+  now(): number;
+}
+
+const FROZEN_GAP_IN_CHECKS = 2;
 
 function isBusy(activity: Activity): boolean {
   return activity.runningAgents > 0 || activity.connectedDevices > 0;
 }
 
-export function createIdleWatch(limitMs: number, now: () => number): IdleWatch {
-  let idleSince = now();
+export function createIdleWatch(options: IdleWatchOptions): IdleWatch {
+  const frozenGapMs = options.checkIntervalMs * FROZEN_GAP_IN_CHECKS;
+  let idleSince = options.now();
+  let lastCheck = idleSince;
   return {
-    shouldExit(activity) {
-      if (isBusy(activity)) {
-        idleSince = now();
+    idleTooLong(activity) {
+      const time = options.now();
+      const wasFrozen = time - lastCheck > frozenGapMs;
+      lastCheck = time;
+      if (wasFrozen || isBusy(activity)) {
+        idleSince = time;
         return false;
       }
-      return now() - idleSince >= limitMs;
+      return time - idleSince >= options.limitMs;
     },
   };
 }
