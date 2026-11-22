@@ -240,7 +240,11 @@ Notes** opens the same page.
   `hitSlop` from `touchSlop(size)` in `ui.tsx` instead of growing.
 - **Text size.** Text follows the iOS text size. Controls and headers (buttons, tabs, chips,
   pickers, the composer, the PR bar) stop growing at 1.4× (`CHROME_FONT_SCALE`), so they never
-  push the chat off the screen. Chat text and list rows scale fully.
+  push the chat off the screen. Chat text and list rows scale fully. Repository avatars keep their
+  size and their initials do not scale, like an icon.
+- **Type ramp.** Text sizes come from `TYPE` in `theme.ts`, which follows the iOS text styles:
+  `largeTitle` 34, `title3` 20, `headline` 17 semibold, `body` 17, `callout` 16, `subhead` 15,
+  `footnote` 13 and `caption` 12. New phone code uses these names, never a raw font size.
 - **On amber.** Text on a `warning` fill, like the tab badge, uses `fgOnWarning`.
 - **Ask tab.** The list has an overline per group: Across repos, then each repository, then No
   repository. An idle Ask chat shows `MessageSquare` (`fg4`), a waiting one

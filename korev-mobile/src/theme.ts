@@ -1,4 +1,4 @@
-import { Platform, useColorScheme } from 'react-native';
+import { Platform, useColorScheme, type TextStyle } from 'react-native';
 
 const DARK = {
   bgApp: '#0b0d10',
@@ -69,6 +69,17 @@ const LIGHT: Theme = {
   diffDelBg: '#fdeeed',
   diffHunkBg: '#eef2ff',
 };
+
+export const TYPE = {
+  largeTitle: { fontSize: 34, lineHeight: 41, fontWeight: '700' },
+  title3: { fontSize: 20, lineHeight: 25, fontWeight: '600' },
+  headline: { fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  body: { fontSize: 17, lineHeight: 22 },
+  callout: { fontSize: 16, lineHeight: 21 },
+  subhead: { fontSize: 15, lineHeight: 20 },
+  footnote: { fontSize: 13, lineHeight: 18 },
+  caption: { fontSize: 12, lineHeight: 16 },
+} as const satisfies Record<string, TextStyle>;
 
 export const MONO_FONT = Platform.select({
   ios: 'Menlo',
