@@ -1,0 +1,8 @@
+**/node_modules
+**/.vite
+**/out
+.context
+.git
+korev-mobile
+korev-frontend
+**/.env*
