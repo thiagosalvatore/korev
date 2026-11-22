@@ -17,4 +17,4 @@ COPY --from=build /src/.vite/build/headless.cjs .vite/build/headless.cjs
 COPY korev-machine/entrypoint.sh /usr/local/bin/korev-entrypoint
 ENV KOREV_REMOTE_HOST=0.0.0.0
 EXPOSE 7420
-ENTRYPOINT ["tini", "--", "korev-entrypoint"]
+ENTRYPOINT ["tini", "-s", "--", "korev-entrypoint"]
