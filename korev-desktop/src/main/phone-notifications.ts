@@ -69,3 +69,24 @@ export async function sendPushNotifications(
     return [];
   }
 }
+
+export interface PushTokenStore {
+  pushTokens(): Promise<string[]>;
+  unregisterPushToken(token: string): Promise<void>;
+}
+
+async function pushToPairedPhones(store: PushTokenStore, notice: Notice) {
+  const stale = await sendPushNotifications(await store.pushTokens(), notice);
+  for (const token of stale) await store.unregisterPushToken(token);
+}
+
+export async function notifyPhones(
+  store: PushTokenStore,
+  topicUrl: string,
+  notice: Notice,
+): Promise<void> {
+  await Promise.all([
+    sendPhoneNotification(topicUrl, notice),
+    pushToPairedPhones(store, notice),
+  ]);
+}

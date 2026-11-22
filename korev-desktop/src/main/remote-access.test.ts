@@ -22,6 +22,7 @@ const ANY_FREE_PORT = 0;
 const ON = { remoteAccess: true, remotePort: ANY_FREE_PORT };
 const OFF = { remoteAccess: false, remotePort: ANY_FREE_PORT };
 const LOGIN_URL = 'https://login.tailscale.com/a/abc';
+const PUBLIC_URL = 'https://korev-machine.example.com';
 
 interface FakeTailnet extends Tailnet {
   signIn(ip: string): void;
@@ -52,13 +53,14 @@ beforeEach(async () => {
   remote = openRemoteAccess();
 });
 
-function openRemoteAccess() {
+function openRemoteAccess(publicUrl?: string) {
   return createRemoteAccess({
     tokenPath: path.join(dir, 'remote-token'),
     pushTokensPath: path.join(dir, 'push-tokens.json'),
     api: () => ({ getState: async () => ({}) as never }),
     startTailnet: (_port, changed) => (tailnet = fakeTailnet(changed)),
     onChange,
+    publicUrl,
   });
 }
 
@@ -106,6 +108,14 @@ describe('remote access', () => {
     const port = remote.status().address!.split(':')[1];
     expect((await remote.pairing())?.url).toBe(`http://100.1.2.3:${port}`);
     expect(remote.status().loginUrl).toBeNull();
+  });
+
+  it('pairs at its public url without a tailnet', async () => {
+    remote = openRemoteAccess(PUBLIC_URL);
+    await remote.apply(ON);
+
+    expect(await remote.pairing()).toMatchObject({ url: PUBLIC_URL });
+    expect(remote.status().address).toBe(PUBLIC_URL);
   });
 
   it('rejects the old token after revoking devices', async () => {

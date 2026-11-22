@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import type { KorevApi, KorevEvents } from '../shared/api';
 import type { RemotePairing, RemoteStatus, Settings } from '../shared/model';
 import {
@@ -8,6 +9,8 @@ import {
   type RemoteServer,
 } from './remote-server';
 
+const REMOTE_TOKEN_FILE = 'remote-token';
+const PUSH_TOKENS_FILE = 'push-tokens.json';
 const TOKEN_BYTES = 32;
 const TOKEN_FILE_MODE = 0o600;
 const PUSH_TOKEN_PATTERN = /^Expo(nent)?PushToken\[[^\]]+\]$/;
@@ -29,6 +32,8 @@ export interface RemoteAccessOptions {
   api(): Partial<KorevApi>;
   startTailnet: StartTailnet;
   onChange(): void;
+  host?: string;
+  publicUrl?: string;
 }
 
 export interface RemoteAccess {
@@ -44,6 +49,15 @@ export interface RemoteAccess {
     payload: KorevEvents[E],
   ): void;
   close(): Promise<void>;
+}
+
+export function remoteAccessFiles(
+  userDataPath: string,
+): Pick<RemoteAccessOptions, 'tokenPath' | 'pushTokensPath'> {
+  return {
+    tokenPath: path.join(userDataPath, REMOTE_TOKEN_FILE),
+    pushTokensPath: path.join(userDataPath, PUSH_TOKENS_FILE),
+  };
 }
 
 async function writeNewToken(tokenPath: string): Promise<string> {
@@ -100,7 +114,7 @@ export function createRemoteAccess(options: RemoteAccessOptions): RemoteAccess {
       server = await startRemoteServer({
         api: options.api(),
         token: await loadToken(options.tokenPath),
-        host: LOOPBACK_HOST,
+        host: options.host ?? LOOPBACK_HOST,
         port: current.remotePort,
         onDevicesChange: options.onChange,
       });
@@ -111,8 +125,10 @@ export function createRemoteAccess(options: RemoteAccessOptions): RemoteAccess {
   }
 
   function address(): string | null {
+    if (!server) return null;
+    if (options.publicUrl) return options.publicUrl;
     const ip = tailnet?.ip();
-    return server && ip ? `${ip}:${server.port}` : null;
+    return ip ? `${ip}:${server.port}` : null;
   }
 
   async function apply(next: RemoteSettings) {
@@ -134,7 +150,7 @@ export function createRemoteAccess(options: RemoteAccessOptions): RemoteAccess {
       const current = address();
       if (!current) return null;
       return {
-        url: `http://${current}`,
+        url: options.publicUrl ?? `http://${current}`,
         token: await loadToken(options.tokenPath),
       };
     },

@@ -259,6 +259,7 @@ export const REMOTE_METHODS = [
   'newSession',
   'closeSession',
   'updateSession',
+  'cloneRepo',
   'createWorkspaces',
   'archiveWorkspace',
   'retryWorkspace',
