@@ -231,6 +231,17 @@ Notes** opens the same page.
 - **Settings.** A page sheet with **Done**. Grouped sections: Mac (Paired with, **Unpair this
   phone**) or, in the demo, Demo (**Pair your Mac**), then Notifications (opens the iOS
   settings), then the app version.
+- **Home.** The Workspaces tab sorts workspaces by what they need next, in inset grouped
+  sections: **Needs you** (`warningText` header: a question, a failure, or a pull request
+  problem from `prNeedsYou`), **Working**, **Ready to merge** (`successText` header: the next
+  pull request step is a merge), then **Everything else**. An empty section is hidden. A search
+  field under the large title filters by name, branch and repository. A row has the status icon,
+  the workspace name (`headline`, semibold under Needs you or when unread), one status line
+  ("Needs your answer", "Working", "Checks failing · #90", "Ready to merge · #87", "Merged ·
+  #79", "Waits for the plan in acme-web", or the branch), and on the right the repository,
+  `+N −M` and the unread dot. The name and status wrap to two lines at large text sizes.
+  Swipe left to archive. The header's **By repository** button opens the repository tree,
+  where a long press on a repository starts reordering.
 - **Can't reach the Mac.** A screen with no data yet shows the offline panel in place of its
   spinner: a WifiOff icon, "Can't reach Korev on your Mac", what to check (Korev open on the
   Mac, Tailscale on the phone, the Mac awake and on Tailscale), **Try again** and **Unpair this
