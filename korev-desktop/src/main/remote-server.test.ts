@@ -143,12 +143,13 @@ describe('remote server', () => {
     server!.broadcast('terminal-exit', { ref: 'ws-1:shell', exitCode: 0 });
     server!.broadcast('terminal-output', { ref: 'ws-1:run', data: 'ready' });
     server!.broadcast('terminal-exit', { ref: 'ws-1:setup', exitCode: 1 });
-    expect(await nextChunk(reader)).toBe(
-      'event: terminal-output\ndata: {"ref":"ws-1:run","data":"ready"}\n\n',
-    );
-    expect(await nextChunk(reader)).toBe(
-      'event: terminal-exit\ndata: {"ref":"ws-1:setup","exitCode":1}\n\n',
-    );
+    const expected =
+      'event: terminal-output\ndata: {"ref":"ws-1:run","data":"ready"}\n\n' +
+      'event: terminal-exit\ndata: {"ref":"ws-1:setup","exitCode":1}\n\n';
+    let streamed = '';
+    while (streamed.length < expected.length)
+      streamed += await nextChunk(reader);
+    expect(streamed).toBe(expected);
     await reader.cancel();
   });
 
