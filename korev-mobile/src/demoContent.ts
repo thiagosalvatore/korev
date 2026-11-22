@@ -25,6 +25,15 @@ const MINUTE_MS = 60_000;
 export const DEMO_REPLY =
   'This is the Korev demo, so no agent is running. With your Mac paired, the agent would now work on this in its own worktree, and you would watch every step here as it happens.';
 
+const DEMO_CONTEXT = { usedTokens: 84_000, windowTokens: 200_000 };
+
+export const DEMO_SLASH_COMMANDS = [
+  'review',
+  'security-review',
+  'init',
+  'compact',
+];
+
 export const DEMO_REVIEW_REPLY =
   'This is the Korev demo, so no agent is running. With your Mac paired, the agent would now read the pull request with gh and list what to fix, most severe first.';
 
@@ -260,6 +269,7 @@ function finished(id: string, minutes: number): ChatItem {
     text: '',
     durationMs: minutes * MINUTE_MS,
     costUsd: null,
+    context: DEMO_CONTEXT,
   };
 }
 

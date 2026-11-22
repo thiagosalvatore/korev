@@ -25,6 +25,12 @@ const TASK_SHEET = {
   headerLeft: closeButton('Cancel'),
 } as const;
 
+const CHAT_SHEET = {
+  presentation: 'formSheet' as const,
+  sheetAllowedDetents: [0.5, 1],
+  sheetGrabberVisible: true,
+};
+
 function Screens() {
   const { loading, connection } = useKorev();
   const theme = useTheme();
@@ -66,12 +72,11 @@ function Screens() {
           <Stack.Screen name="ask/[id]" options={{ title: '' }} />
           <Stack.Screen
             name="checks/[id]"
-            options={{
-              title: 'Checks',
-              presentation: 'formSheet',
-              sheetAllowedDetents: [0.5, 1],
-              sheetGrabberVisible: true,
-            }}
+            options={{ title: 'Checks', ...CHAT_SHEET }}
+          />
+          <Stack.Screen
+            name="session/[id]/options"
+            options={{ title: 'Chat options', ...CHAT_SHEET }}
           />
         </Stack.Protected>
         <Stack.Protected guard={connection === null}>

@@ -361,6 +361,7 @@ export function Chat({
         <Composer
           state={state}
           session={session}
+          context={lastResult?.context ?? null}
           reviewingPlan={Boolean(codexPlan) || planAwaitingReview(items)}
           answers={question ? picks : undefined}
           sendReady={Boolean(
