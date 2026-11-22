@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { KorevProvider, useKorev } from '../korev';
 import { OfflineBanner } from '../Offline';
 import { HeaderTextButton } from '../TabStack';
@@ -76,9 +77,11 @@ function Screens() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={FILL}>
-      <KorevProvider>
-        <Screens />
-      </KorevProvider>
+      <KeyboardProvider>
+        <KorevProvider>
+          <Screens />
+        </KorevProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }
