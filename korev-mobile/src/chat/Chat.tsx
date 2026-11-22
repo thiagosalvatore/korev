@@ -25,6 +25,7 @@ import {
   planAwaitingReview,
   questionAwaitingAnswer,
   type AppState,
+  type ChatItem,
   type ChatSession,
   type PermissionResponse,
   type PlanLane,
@@ -40,6 +41,7 @@ import { succeeded, warned } from '../haptics';
 import { useRepoGithubUrl, useTranscript } from '../hooks';
 import { Loading } from '../Offline';
 import { useConnection } from '../korev';
+import { useNewerMac } from '../newerMac';
 import { useTheme, type Theme } from '../theme';
 import { ICON_BUTTON_ICON_SIZE, ICON_BUTTON_SIZE, IconButton } from '../ui';
 import { ChatMenu, ChatTitle, type ChatMenuEntry } from './ChatHeader';
@@ -51,6 +53,7 @@ import { BAR_PADDING, Composer, useComposerBottomPadding } from './Composer';
 import { ExplainerView } from './ExplainerView';
 import { pendingSend, withPendingMessage, type PendingSend } from './pending';
 import { PlanReview } from './PermissionCard';
+import { QueuedMessages } from './QueuedMessages';
 import { QuestionPanel } from './QuestionPanel';
 import { WorkingIndicator } from './WorkingIndicator';
 
@@ -63,6 +66,17 @@ function emptyChatHint(state: AppState, session: ChatSession): string {
   const agent = AGENT_LABELS[session.agent];
   const model = modelLabel(state, session);
   return model === agent ? `Message ${agent}` : `Message ${agent} · ${model}`;
+}
+
+type UserItem = Extract<ChatItem, { kind: 'user' }>;
+
+function isQueued(item: ChatItem): item is UserItem {
+  return item.kind === 'user' && Boolean(item.queued);
+}
+
+interface Draft {
+  text: string;
+  version: number;
 }
 
 function finishedLabel(durationMs: number | null): string {
@@ -193,10 +207,18 @@ export function Chat({
   const [pending, setPending] = useState<PendingSend | null>(null);
   const [mode, setMode] = useState<ChatMode>('explainer');
   const [picked, setPicked] = useState<PickedAnswers | null>(null);
+  const [draft, setDraft] = useState<Draft>({ text: '', version: 0 });
+  const newerMac = useNewerMac();
   const explaining = Boolean(session.explainer) && mode === 'explainer';
   const running = state.runningSessions.includes(session.id);
-  const shown = items && withPendingMessage(items, pending);
-  const working = running || shown !== items;
+  const withPending = items && withPendingMessage(items, pending);
+  const delivered = Boolean(pending && items && withPending === items);
+  if (delivered) setPending(null);
+  const working = running || withPending !== items;
+  const queued = newerMac ? (withPending?.filter(isQueued) ?? []) : [];
+  const shown = queued.length
+    ? withPending?.filter((item) => !isQueued(item))
+    : withPending;
   const lastUser = shown?.findLast((item) => item.kind === 'user');
   const lastResult = shown?.findLast((item) => item.kind === 'result');
   const status = chatStatus({
@@ -225,6 +247,27 @@ export function Chat({
           api.respondPermission(session.id, itemId, response),
         ),
     ).then(response.allow ? succeeded : warned);
+
+  const sendQueuedNow = (itemId: string) =>
+    void attempt('Korev could not send the message now', () =>
+      api.sendQueuedNow(session.id, itemId),
+    ).then(succeeded);
+
+  const removeQueued = (itemId: string) =>
+    void attempt('Korev could not remove the message', () =>
+      api.removeQueued(session.id, itemId),
+    );
+
+  const revert = (itemId: string) =>
+    void attempt('Korev could not revert the chat', async () => {
+      const reverted = await api.revert(session.id, itemId);
+      if (reverted.ok)
+        setDraft((current) => ({
+          text: reverted.value,
+          version: current.version + 1,
+        }));
+      return reverted;
+    }).then(succeeded);
 
   const codexPlan = finishedCodexPlan(session, items, running);
   const question = questionAwaitingAnswer(items);
@@ -300,6 +343,11 @@ export function Chat({
                   repoUrl={repoUrl}
                   laneRepos={laneRepos}
                   onRespond={respond}
+                  onRevert={
+                    newerMac && !running && row.item.kind === 'user'
+                      ? () => revert(row.item.id)
+                      : undefined
+                  }
                   onHandoff={handoff}
                   onOpenExplainer={
                     session.explainer ? () => setMode('explainer') : undefined
@@ -345,6 +393,11 @@ export function Chat({
         {floatingAction ? (
           <FloatingAction>{floatingAction}</FloatingAction>
         ) : null}
+        <QueuedMessages
+          items={queued}
+          onSendNow={sendQueuedNow}
+          onRemove={removeQueued}
+        />
         {question?.questions ? (
           <QuestionPanel
             key={question.id}
@@ -359,6 +412,8 @@ export function Chat({
           />
         ) : null}
         <Composer
+          key={draft.version}
+          initialText={draft.text}
           state={state}
           session={session}
           context={lastResult?.context ?? null}

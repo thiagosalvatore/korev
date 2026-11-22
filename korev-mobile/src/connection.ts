@@ -15,12 +15,15 @@ const PAIRING_KEY = 'korev-pairing';
 const DEVICE_HEADER = 'X-Korev-Device';
 const FALLBACK_DEVICE_NAME = 'Phone';
 const HTTP_UNAUTHORIZED = 401;
+const HTTP_NOT_FOUND = 404;
 const RECONNECT_DELAY_MS = 2000;
 export const CONNECT_TIMEOUT_MS = 8000;
 export const IDLE_TIMEOUT_MS = 40_000;
 const OFFLINE_MESSAGE = 'Not connected to Korev on your Mac.';
 
 export class UnauthorizedError extends Error {}
+
+export class UnsupportedMethodError extends Error {}
 
 export type ConnectionState = 'connecting' | 'online' | 'offline';
 
@@ -73,6 +76,8 @@ export async function call(
   if (response.status === HTTP_UNAUTHORIZED)
     throw new UnauthorizedError('Korev no longer accepts this phone.');
   const body = (await response.json()) as { result?: unknown; error?: string };
+  if (response.status === HTTP_NOT_FOUND)
+    throw new UnsupportedMethodError(body.error ?? `Korev has no ${method}.`);
   if (!response.ok)
     throw new Error(body.error ?? `Korev answered ${response.status}.`);
   return body.result;

@@ -9,6 +9,8 @@ vi.mock('expo-secure-store', () => ({}));
 import {
   CONNECT_TIMEOUT_MS,
   IDLE_TIMEOUT_MS,
+  UnsupportedMethodError,
+  call,
   connect,
   type Connection,
 } from './connection';
@@ -114,5 +116,34 @@ describe('connection status', () => {
       'Not connected to Korev on your Mac.',
     );
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('call', () => {
+  function answer(status: number, body: unknown) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        status,
+        ok: status < 400,
+        json: async () => body,
+      })),
+    );
+  }
+
+  beforeEach(() => {
+    streamingFetch.mockImplementation(neverAnswer);
+    open();
+  });
+
+  it('tells an older Mac that lacks a method apart from a failed call', async () => {
+    answer(404, { error: 'Unknown method scriptOutput' });
+    await expect(call(PAIRING, 'scriptOutput', [])).rejects.toBeInstanceOf(
+      UnsupportedMethodError,
+    );
+    answer(500, { error: 'No such workspace' });
+    await expect(call(PAIRING, 'scriptOutput', [])).rejects.not.toBeInstanceOf(
+      UnsupportedMethodError,
+    );
   });
 });

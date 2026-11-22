@@ -59,6 +59,7 @@ const NO_CHECKPOINTS: Result<never> = {
   ok: false,
   message: 'The demo has no file checkpoints to revert to.',
 };
+const DEMO_CHECKPOINT = { head: 'demo', snapshot: 'demo' };
 const NO_SCRIPTS: Result = {
   ok: false,
   message: 'The demo has no setup or run scripts.',
@@ -187,6 +188,23 @@ export function createDemoConnection(): Connection {
     events.emit('chat', { sessionId, item });
   }
 
+  function removeItem(sessionId: string, item: ChatItem) {
+    transcripts.set(
+      sessionId,
+      (transcripts.get(sessionId) ?? []).filter(
+        (entry) => entry.id !== item.id,
+      ),
+    );
+    events.emit('chat', { sessionId, item, removed: true });
+  }
+
+  function queuedItem(sessionId: string, itemId: string) {
+    const item = transcripts
+      .get(sessionId)
+      ?.find((entry) => entry.id === itemId);
+    return item?.kind === 'user' && item.queued ? item : null;
+  }
+
   function cancelReply(sessionId: string) {
     clearTimeout(replies.get(sessionId));
     replies.delete(sessionId);
@@ -310,13 +328,16 @@ export function createDemoConnection(): Connection {
       return transcripts.get(sessionId) ?? [];
     },
     async send(sessionId, options) {
+      const queue = state.runningSessions.includes(sessionId);
       addItem(sessionId, {
         id: newId('user'),
         kind: 'user',
         text: options.text,
         at: now(),
-        checkpoint: null,
+        checkpoint: DEMO_CHECKPOINT,
+        ...(queue ? { queued: true } : {}),
       });
+      if (queue) return ok();
       if (sessionOf(state, sessionId)?.title === NEW_CHAT_TITLE)
         setState(
           withSession(state, sessionId, (session) => ({
@@ -332,9 +353,27 @@ export function createDemoConnection(): Connection {
       if (state.runningSessions.includes(sessionId))
         finishReply(sessionId, Date.now(), false);
     },
-    sendQueuedNow: async () => NO_QUEUED_MESSAGES,
-    removeQueued: async () => NO_QUEUED_MESSAGES,
-    revert: async () => NO_CHECKPOINTS,
+    async sendQueuedNow(sessionId, itemId) {
+      const item = queuedItem(sessionId, itemId);
+      if (!item) return NO_QUEUED_MESSAGES;
+      removeItem(sessionId, item);
+      addItem(sessionId, { ...item, queued: false });
+      return ok();
+    },
+    async removeQueued(sessionId, itemId) {
+      const item = queuedItem(sessionId, itemId);
+      if (!item) return NO_QUEUED_MESSAGES;
+      removeItem(sessionId, item);
+      return ok();
+    },
+    async revert(sessionId, itemId) {
+      const items = transcripts.get(sessionId) ?? [];
+      const index = items.findIndex((entry) => entry.id === itemId);
+      const item = items[index];
+      if (item?.kind !== 'user' || !item.checkpoint) return NO_CHECKPOINTS;
+      for (const later of items.slice(index)) removeItem(sessionId, later);
+      return ok(item.text);
+    },
     async respondPermission(sessionId, itemId, response) {
       const item = transcripts
         .get(sessionId)

@@ -1,7 +1,7 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { GitBranch, GitPullRequest } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Linking, StyleSheet, Text } from 'react-native';
+import { Alert, Linking, StyleSheet, Text } from 'react-native';
 import {
   hasWorktree,
   nextPrStep,
@@ -139,6 +139,25 @@ function useWorkspaceActions(
       }),
     );
 
+  const confirmCloseChat = (chat: ChatSession) =>
+    Alert.alert(
+      `Close ${chat.title}?`,
+      'Korev removes the chat and its messages.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Close',
+          style: 'destructive',
+          onPress: () =>
+            void run('close-chat', () =>
+              attempt('Korev could not close the chat', () =>
+                api.closeSession(workspace.id, chat.id),
+              ),
+            ),
+        },
+      ],
+    );
+
   const openChanges = () =>
     router.push({ pathname: '/changes/[id]', params: { id: workspace.id } });
 
@@ -164,6 +183,17 @@ function useWorkspaceActions(
         disabled: busy,
         onPress: newChat,
       } satisfies ChatMenuEntry,
+      ...(session && workspace.sessions.length > 1
+        ? [
+            {
+              label: 'Close this chat',
+              icon: 'xmark.circle' as const,
+              destructive: true,
+              disabled: busy,
+              onPress: () => confirmCloseChat(session),
+            },
+          ]
+        : []),
     ],
   };
 
