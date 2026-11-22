@@ -134,6 +134,25 @@ describe('remote server', () => {
     await reader.cancel();
   });
 
+  it('streams setup and run output but never an interactive shell', async () => {
+    const base = await start({});
+    const reader = await openEventStream(base);
+    await nextChunk(reader);
+    server!.broadcast('terminal-output', { ref: 'ws-1:shell', data: 'ls' });
+    server!.broadcast('terminal-output', { ref: 'ws-1:tab-2', data: 'pwd' });
+    server!.broadcast('terminal-exit', { ref: 'ws-1:shell', exitCode: 0 });
+    server!.broadcast('terminal-output', { ref: 'ws-1:run', data: 'ready' });
+    server!.broadcast('terminal-exit', { ref: 'ws-1:setup', exitCode: 1 });
+    const expected =
+      'event: terminal-output\ndata: {"ref":"ws-1:run","data":"ready"}\n\n' +
+      'event: terminal-exit\ndata: {"ref":"ws-1:setup","exitCode":1}\n\n';
+    let streamed = '';
+    while (streamed.length < expected.length)
+      streamed += await nextChunk(reader);
+    expect(streamed).toBe(expected);
+    await reader.cancel();
+  });
+
   it('pings open event streams so the phone can tell a dead link from a quiet one', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     try {

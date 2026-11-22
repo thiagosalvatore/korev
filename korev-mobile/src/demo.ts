@@ -56,6 +56,10 @@ const NO_CHECKPOINTS: Result<never> = {
   ok: false,
   message: 'The demo has no file checkpoints to revert to.',
 };
+const NO_SCRIPTS: Result = {
+  ok: false,
+  message: 'The demo has no setup or run scripts.',
+};
 const NO_PULL_REQUEST: Result<never> = {
   ok: false,
   message: 'The demo has no such pull request.',
@@ -578,6 +582,9 @@ export function createDemoConnection(): Connection {
     startExplainer: async () => NO_EXPLAINERS,
     explainer: async () => null,
     updateExplainer: async () => NO_EXPLAINERS,
+    startScript: async () => NO_SCRIPTS,
+    async stopScript() {},
+    scriptOutput: async () => null,
   };
 
   const bridge = {

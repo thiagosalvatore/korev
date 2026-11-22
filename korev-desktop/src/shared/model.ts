@@ -1484,6 +1484,14 @@ export interface TerminalExit {
 
 export type TerminalKind = 'shell' | 'setup' | 'run';
 
+export type ScriptKind = Exclude<TerminalKind, 'shell'>;
+
+const SCRIPT_KINDS: readonly string[] = ['setup', 'run'] satisfies ScriptKind[];
+
+export function isScriptKind(kind: string): kind is ScriptKind {
+  return SCRIPT_KINDS.includes(kind);
+}
+
 export type TerminalPreset = 'shell' | 'claude' | 'codex';
 
 export type AppCommand =

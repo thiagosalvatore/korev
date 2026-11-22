@@ -32,6 +32,7 @@ import type {
   RepoPrompts,
   RepoScripts,
   Result,
+  ScriptKind,
   SendOptions,
   Settings,
   Skill,
@@ -238,6 +239,7 @@ export interface KorevApi {
     scriptId?: string,
   ): Promise<Result>;
   stopScript(workspaceId: string, kind: TerminalKind): Promise<void>;
+  scriptOutput(workspaceId: string, kind: ScriptKind): Promise<string | null>;
   writeTerminal(ref: string, data: string): Promise<void>;
   resizeTerminal(ref: string, size: TerminalSize): Promise<void>;
   closeTerminal(ref: string): Promise<void>;
@@ -298,6 +300,9 @@ export const REMOTE_METHODS = [
   'resumeTask',
   'answerQuestion',
   'resolveGate',
+  'startScript',
+  'stopScript',
+  'scriptOutput',
 ] as const satisfies readonly (keyof KorevApi)[];
 
 export type RemoteMethod = (typeof REMOTE_METHODS)[number];

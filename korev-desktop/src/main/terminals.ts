@@ -43,6 +43,7 @@ const DEFAULT_SIZE: TerminalSize = { cols: 120, rows: 30 };
 
 export interface Terminals {
   attach(ref: string, size: TerminalSize): string | null;
+  output(ref: string): string | null;
   start(ref: string, launch: TerminalLaunch, size?: TerminalSize): void;
   isRunning(ref: string): boolean;
   running(): string[];
@@ -92,11 +93,13 @@ export function createTerminals(deps: TerminalsDeps): Terminals {
     finished.delete(ref);
   }
 
+  function output(ref: string): string | null {
+    return sessions.get(ref)?.scrollback ?? finished.get(ref) ?? null;
+  }
+
   function attach(ref: string, size: TerminalSize): string | null {
-    const running = sessions.get(ref);
-    if (!running) return finished.get(ref) ?? null;
-    running.pty.resize(size.cols, size.rows);
-    return running.scrollback;
+    sessions.get(ref)?.pty.resize(size.cols, size.rows);
+    return output(ref);
   }
 
   function close(ref: string): void {
@@ -110,6 +113,7 @@ export function createTerminals(deps: TerminalsDeps): Terminals {
 
   return {
     attach,
+    output,
     start,
     isRunning: (ref) => sessions.has(ref),
     running: () => [...sessions.keys()],
