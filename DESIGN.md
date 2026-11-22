@@ -269,6 +269,17 @@ Notes** opens the same page.
   (`fix-login → main`) and the PR ("No PR yet", "#87 · checks passed", "#90 · e2e failing" in
   `dangerText`). The PR capsule opens the checks sheet, a form sheet whose rows open the check
   on GitHub. An Ask chat shows one capsule with its repositories.
+- **Transcript.** User messages sit on the right in an 18 pt bubble with a 4 pt bottom-right
+  corner and no timestamp. Their text is native: a long press selects a word, with handles and
+  the iOS menu (Copy, Look Up, Translate, Share). A long press on an agent message opens Copy,
+  Select text and Share. Inline code is `MONO_FONT` on `bgRaised`, never italic.
+- **Activity card.** The tools, thinking and todos between two messages fold into one card on
+  `bgSurface` (12 pt radius, `border1` hairline). Done: a green `CircleCheck` and what the agent
+  did ("Explored 3 files, edited 1 file, ran 2 commands"); a red `CircleX` when a tool failed.
+  Running: `LoadingRing` and the current step ("Editing state.ts"), with the todos under it as a
+  progress bar and check, dot and dashed-circle rows. A tap opens one row per step. A finished
+  turn shows in the header ("Completed in 9s"), not in the transcript; a failed turn keeps its
+  error line.
 - **Floating PR action.** Only for Merge, Fix errors and Resolve conflicts: one large button,
   centred 12 pt above the composer, with a soft shadow. It hides while the keyboard is up.
   Create PR lives in the menu, so a new workspace shows no PR button.

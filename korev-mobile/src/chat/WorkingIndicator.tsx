@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { duration } from '../../../korev-desktop/src/shared/format';
+import { LoadingRing } from '../LoadingRing';
 import { MONO_FONT, useTheme, type Theme } from '../theme';
 
 const TICK_MS = 1000;
@@ -27,7 +28,7 @@ export function WorkingIndicator({
   const styles = makeStyles(theme);
   return (
     <View style={styles.row} accessibilityRole="progressbar">
-      <ActivityIndicator size="small" color={theme.accentText} />
+      <LoadingRing color={theme.accentText} />
       <Text style={styles.label}>{label}</Text>
       {since === undefined ? null : <Elapsed since={since} styles={styles} />}
     </View>

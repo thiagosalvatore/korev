@@ -61,6 +61,17 @@ describe('chatStatus', () => {
     expect(status(pr({ mergeable: 'CONFLICTING' }))).toBe('Has conflicts');
   });
 
+  it('falls back to the finished turn when there is no PR step to take', () => {
+    expect(
+      chatStatus({
+        running: false,
+        waiting: false,
+        pr: null,
+        finished: 'Completed in 9s',
+      }),
+    ).toEqual({ kind: 'idle', label: 'Completed in 9s' });
+  });
+
   it('shows nothing for an idle chat with no PR step to take', () => {
     expect(chatStatus({ running: false, waiting: false, pr: null })).toBeNull();
     expect(

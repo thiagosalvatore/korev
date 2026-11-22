@@ -17,16 +17,14 @@ import {
   useKeyboardState,
 } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { modelLabel } from '../../../korev-desktop/src/shared/format';
+import { duration, modelLabel } from '../../../korev-desktop/src/shared/format';
 import {
   AGENT_LABELS,
   answerQuestions,
   finishedCodexPlan,
   planAwaitingReview,
   questionAwaitingAnswer,
-  isSubagentTool,
   type AppState,
-  type ChatItem,
   type ChatSession,
   type PermissionResponse,
   type PlanLane,
@@ -46,6 +44,8 @@ import { useTheme, type Theme } from '../theme';
 import { ICON_BUTTON_ICON_SIZE, ICON_BUTTON_SIZE, IconButton } from '../ui';
 import { ChatMenu, ChatTitle, type ChatMenuEntry } from './ChatHeader';
 import { chatStatus } from './chatStatus';
+import { foldActivity, type TranscriptRow } from './activity';
+import { ActivityCard } from './ActivityCard';
 import { ChatItemView } from './ChatItemView';
 import { BAR_PADDING, Composer, useComposerBottomPadding } from './Composer';
 import { ExplainerView } from './ExplainerView';
@@ -63,6 +63,12 @@ function emptyChatHint(state: AppState, session: ChatSession): string {
   const agent = AGENT_LABELS[session.agent];
   const model = modelLabel(state, session);
   return model === agent ? `Message ${agent}` : `Message ${agent} · ${model}`;
+}
+
+function finishedLabel(durationMs: number | null): string {
+  return durationMs === null
+    ? 'Completed'
+    : `Completed in ${duration(durationMs)}`;
 }
 
 function useKeyboardOffset(): number {
@@ -181,7 +187,7 @@ export function Chat({
     [],
   );
   const styles = makeStyles(useTheme());
-  const list = useRef<FlatList<ChatItem>>(null);
+  const list = useRef<FlatList<TranscriptRow>>(null);
   const { height: windowHeight } = useWindowDimensions();
   const [scrolledBack, setScrolledBack] = useState(false);
   const [pending, setPending] = useState<PendingSend | null>(null);
@@ -192,10 +198,12 @@ export function Chat({
   const shown = items && withPendingMessage(items, pending);
   const working = running || shown !== items;
   const lastUser = shown?.findLast((item) => item.kind === 'user');
+  const lastResult = shown?.findLast((item) => item.kind === 'result');
   const status = chatStatus({
     running: working,
     waiting: Boolean(state.waitingSessions?.includes(session.id)),
     pr,
+    finished: lastResult?.ok ? finishedLabel(lastResult.durationMs) : undefined,
   });
   const menuEntries = session.explainer
     ? [explainerMenuEntry(mode, setMode), ...menu]
@@ -274,22 +282,31 @@ export function Chat({
             ref={list}
             inverted
             renderScrollComponent={renderScrollView}
-            data={shown.filter((item) => !isSubagentTool(item)).reverse()}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <ChatItemView
-                item={item}
-                sessionId={session.id}
-                repoUrl={repoUrl}
-                running={running}
-                laneRepos={laneRepos}
-                onRespond={respond}
-                onHandoff={handoff}
-                onOpenExplainer={
-                  session.explainer ? () => setMode('explainer') : undefined
-                }
-              />
-            )}
+            data={foldActivity(shown).reverse()}
+            keyExtractor={(row) =>
+              row.kind === 'activity' ? row.id : row.item.id
+            }
+            renderItem={({ item: row, index }) =>
+              row.kind === 'activity' ? (
+                <ActivityCard
+                  run={row}
+                  sessionId={session.id}
+                  running={running && index === 0}
+                />
+              ) : (
+                <ChatItemView
+                  item={row.item}
+                  sessionId={session.id}
+                  repoUrl={repoUrl}
+                  laneRepos={laneRepos}
+                  onRespond={respond}
+                  onHandoff={handoff}
+                  onOpenExplainer={
+                    session.explainer ? () => setMode('explainer') : undefined
+                  }
+                />
+              )
+            }
             ListHeaderComponent={
               working ? (
                 <WorkingIndicator
