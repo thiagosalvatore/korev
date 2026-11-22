@@ -24,7 +24,10 @@ function Initial({ repo }: { repo: Repo }) {
   const theme = useTheme();
   return (
     <View style={[styles.avatar, { backgroundColor: theme.accentSubtle }]}>
-      <Text style={[styles.initial, { color: theme.accentText }]}>
+      <Text
+        allowFontScaling={false}
+        style={[styles.initial, { color: theme.accentText }]}
+      >
         {repoInitials(repo.name).toUpperCase()}
       </Text>
     </View>
