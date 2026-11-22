@@ -7,6 +7,7 @@ import {
   type AskChat,
   type ChatItem,
   type CheckState,
+  type FileChange,
   type ChatSession,
   type InboxPullRequest,
   type PrStatus,
@@ -24,6 +25,49 @@ const MINUTE_MS = 60_000;
 
 export const DEMO_REPLY =
   'This is the Korev demo, so no agent is running. With your Mac paired, the agent would now work on this in its own worktree, and you would watch every step here as it happens.';
+
+export const DEMO_CHANGES: FileChange[] = [
+  {
+    path: 'src/search/query.ts',
+    status: 'M',
+    additions: 6,
+    deletions: 3,
+  },
+  {
+    path: 'db/migrations/add_trigram_index.sql',
+    status: 'A',
+    additions: 6,
+    deletions: 0,
+  },
+];
+
+export const DEMO_DIFFS: Record<string, string> = {
+  'src/search/query.ts': [
+    '@@ -12,8 +12,13 @@ export async function searchAccounts(term: string) {',
+    '   const db = await connect();',
+    '   const rows = await db.query(',
+    "-    'SELECT * FROM accounts WHERE name ILIKE $1',",
+    '-    [`%${term}%`],',
+    "+    'SELECT * FROM accounts WHERE name % $1 OR email % $1',",
+    '+    [term],',
+    '   );',
+    '-  return rows;',
+    '+  if (!rows.length) {',
+    '+    return [];',
+    '+  }',
+    '+  return rows.slice(0, MAX_RESULTS);',
+    ' }',
+  ].join('\n'),
+  'db/migrations/add_trigram_index.sql': [
+    '@@ -0,0 +1,6 @@',
+    '+CREATE EXTENSION IF NOT EXISTS pg_trgm;',
+    '+',
+    '+CREATE INDEX accounts_name_trgm',
+    '+  ON accounts USING gin (name gin_trgm_ops);',
+    '+CREATE INDEX accounts_email_trgm',
+    '+  ON accounts USING gin (email gin_trgm_ops);',
+  ].join('\n'),
+};
 
 const DEMO_CONTEXT = { usedTokens: 84_000, windowTokens: 200_000 };
 

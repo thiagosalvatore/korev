@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { SFSymbol } from 'sf-symbols-typescript';
 import { duration } from '../../../korev-desktop/src/shared/format';
 import { LoadingRing } from '../LoadingRing';
@@ -193,9 +193,26 @@ export function Capsule({
   );
 }
 
-export function ChatAccessory({ children }: { children: ReactNode }) {
+export function ChatAccessory({
+  children,
+  footer,
+}: {
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
   const styles = makeStyles(useTheme());
-  return <View style={styles.accessory}>{children}</View>;
+  return (
+    <View style={styles.accessory}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.capsules}
+      >
+        {children}
+      </ScrollView>
+      {footer}
+    </View>
+  );
 }
 
 function makeStyles(theme: Theme) {
@@ -206,15 +223,12 @@ function makeStyles(theme: Theme) {
     statusText: { ...TYPE.caption, color: theme.fg3 },
     dot: { width: DOT_SIZE, height: DOT_SIZE, borderRadius: DOT_SIZE / 2 },
     accessory: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      alignItems: 'center',
-      gap: 8,
-      paddingHorizontal: 16,
+      gap: 4,
       paddingVertical: 6,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: theme.border1,
     },
+    capsules: { alignItems: 'center', gap: 8, paddingHorizontal: 16 },
     capsule: {
       flexDirection: 'row',
       alignItems: 'center',

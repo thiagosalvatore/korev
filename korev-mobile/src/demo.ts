@@ -28,6 +28,8 @@ import {
   DEMO_REPLY,
   DEMO_REVIEW_REPLY,
   DENIED_REPLY,
+  DEMO_CHANGES,
+  DEMO_DIFFS,
   DEMO_SLASH_COMMANDS,
   demoPullRequest,
   demoRepoUrl,
@@ -477,10 +479,10 @@ export function createDemoConnection(): Connection {
       return DEMO_SLASH_COMMANDS;
     },
     async changes() {
-      return [];
+      return DEMO_CHANGES;
     },
-    async fileDiff() {
-      return '';
+    async fileDiff(_workspaceId: string, path: string) {
+      return DEMO_DIFFS[path] ?? '';
     },
     async rangeChanges() {
       return [];

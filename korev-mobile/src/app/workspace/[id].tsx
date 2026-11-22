@@ -139,6 +139,9 @@ function useWorkspaceActions(
       }),
     );
 
+  const openChanges = () =>
+    router.push({ pathname: '/changes/[id]', params: { id: workspace.id } });
+
   const openChecks = () =>
     router.push({
       pathname: '/checks/[id]',
@@ -210,6 +213,11 @@ function useWorkspaceActions(
     ...(hasChanges(runtime)
       ? [
           {
+            label: 'Changes',
+            icon: 'plus.forwardslash.minus' as const,
+            onPress: openChanges,
+          },
+          {
             label: 'Explain changes',
             icon: 'book' as const,
             disabled: busy,
@@ -244,7 +252,7 @@ function useWorkspaceActions(
     />
   ) : null;
 
-  return { pr, menu, floatingAction, openChecks };
+  return { pr, menu, floatingAction, openChecks, openChanges };
 }
 
 function WorkspaceAccessory({
@@ -252,24 +260,39 @@ function WorkspaceAccessory({
   runtime,
   pr,
   onOpenChecks,
+  onOpenChanges,
 }: {
   workspace: Workspace;
   runtime: WorkspaceRuntime | undefined;
   pr: PrStatus | null;
   onOpenChecks: () => void;
+  onOpenChanges: () => void;
 }) {
   const theme = useTheme();
   const styles = makeStyles(theme);
   const step = pr && nextPrStep(pr);
+  const stats = runtime?.stats;
+  const diffStat =
+    stats && (stats.additions || stats.deletions)
+      ? ` · +${stats.additions} −${stats.deletions}`
+      : '';
   const tone =
     step === 'fix-errors' || step === 'resolve-conflicts'
       ? theme.dangerText
       : undefined;
   return (
-    <ChatAccessory>
+    <ChatAccessory
+      footer={
+        runtime?.message ? (
+          <Text style={styles.message}>{runtime.message}</Text>
+        ) : null
+      }
+    >
       <Capsule
         icon={<GitBranch size={CAPSULE_ICON_SIZE} color={theme.fg3} />}
-        label={`${workspace.branch} → ${workspace.baseBranch}`}
+        label={`${workspace.branch} → ${workspace.baseBranch}${diffStat}`}
+        accessibilityLabel={diffStat ? 'Show the changes' : undefined}
+        onPress={diffStat ? onOpenChanges : undefined}
       />
       <Capsule
         icon={
@@ -280,9 +303,6 @@ function WorkspaceAccessory({
         accessibilityLabel={pr?.checks.length ? 'Show the checks' : undefined}
         onPress={pr?.checks.length ? onOpenChecks : undefined}
       />
-      {runtime?.message ? (
-        <Text style={styles.message}>{runtime.message}</Text>
-      ) : null}
     </ChatAccessory>
   );
 }
@@ -301,13 +321,8 @@ function WorkspaceChat({
   onSelect: (sessionId: string) => void;
 }) {
   const styles = makeStyles(useTheme());
-  const { pr, menu, floatingAction, openChecks } = useWorkspaceActions(
-    state,
-    workspace,
-    runtime,
-    session,
-    onSelect,
-  );
+  const { pr, menu, floatingAction, openChecks, openChanges } =
+    useWorkspaceActions(state, workspace, runtime, session, onSelect);
   const waiting = waitingSessionIds(state);
   const otherChatWaits = workspace.sessions.some(
     (entry) => entry.id !== session?.id && waiting.has(entry.id),
@@ -322,6 +337,7 @@ function WorkspaceChat({
         runtime={runtime}
         pr={pr}
         onOpenChecks={openChecks}
+        onOpenChanges={openChanges}
       />
       {coordinatedRun ? <RunDecisions run={coordinatedRun} /> : null}
     </>
@@ -400,6 +416,10 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
     fill: { flex: 1 },
     empty: { padding: 24, color: theme.fg3, textAlign: 'center' },
-    message: { ...TYPE.footnote, flexBasis: '100%', color: theme.dangerText },
+    message: {
+      ...TYPE.footnote,
+      paddingHorizontal: 16,
+      color: theme.dangerText,
+    },
   });
 }

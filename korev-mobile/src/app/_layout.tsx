@@ -71,6 +71,11 @@ function Screens() {
           />
           <Stack.Screen name="ask/[id]" options={{ title: '' }} />
           <Stack.Screen
+            name="changes/[id]/index"
+            options={{ title: 'Changes' }}
+          />
+          <Stack.Screen name="changes/[id]/diff" options={{ title: '' }} />
+          <Stack.Screen
             name="checks/[id]"
             options={{ title: 'Checks', ...CHAT_SHEET }}
           />
