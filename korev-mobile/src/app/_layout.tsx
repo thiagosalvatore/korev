@@ -1,14 +1,28 @@
-import { SplashScreen, Stack } from 'expo-router';
+import { router, SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KorevProvider, useKorev } from '../korev';
 import { OfflineBanner } from '../Offline';
+import { HeaderTextButton } from '../TabStack';
 import { useTheme } from '../theme';
 
 void SplashScreen.preventAutoHideAsync();
 const FILL = { flex: 1 };
+const SHEET_DETENTS = [0.62, 1];
+
+const closeButton = (label: string, bold = false) =>
+  function CloseButton() {
+    return <HeaderTextButton label={label} bold={bold} onPress={router.back} />;
+  };
+
+const TASK_SHEET = {
+  presentation: 'formSheet',
+  sheetGrabberVisible: true,
+  sheetAllowedDetents: SHEET_DETENTS,
+  headerLeft: closeButton('Cancel'),
+} as const;
 
 function Screens() {
   const { loading, connection } = useKorev();
@@ -24,6 +38,7 @@ function Screens() {
         screenOptions={{
           headerStyle: { backgroundColor: theme.bgSurface },
           headerTintColor: theme.fg1,
+          headerTitleStyle: { color: theme.fg1 },
           headerBackButtonDisplayMode: 'minimal',
           contentStyle: { backgroundColor: theme.bgApp },
         }}
@@ -33,11 +48,19 @@ function Screens() {
           <Stack.Screen name="workspace/[id]" options={{ title: '' }} />
           <Stack.Screen
             name="new"
-            options={{ title: 'New workspace', presentation: 'modal' }}
+            options={{ ...TASK_SHEET, title: 'New workspace' }}
           />
           <Stack.Screen
             name="ask/new"
-            options={{ title: 'Ask a question', presentation: 'modal' }}
+            options={{ ...TASK_SHEET, title: 'Ask a question' }}
+          />
+          <Stack.Screen
+            name="settings"
+            options={{
+              title: 'Settings',
+              presentation: 'modal',
+              headerRight: closeButton('Done', true),
+            }}
           />
           <Stack.Screen name="ask/[id]" options={{ title: '' }} />
         </Stack.Protected>

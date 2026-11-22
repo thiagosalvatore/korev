@@ -222,6 +222,15 @@ Notes** opens the same page.
   opens New workspace as a sheet and keeps the current tab. Each tab has its own stack with a
   large title. Chats open over the tabs, so the tab bar hides while a chat is open. The
   Workspaces header has **Settings** on the right and, in the demo, a **Demo** label on the left.
+- **Task sheets.** New workspace and Ask a question open as native sheets with a grabber. They
+  start at 62 % of the screen and grow to full height with the keyboard. **Cancel** is on the
+  left. Both use the same layout: a full-width repository row, a large task field (dashed
+  `accent` border in plan mode), a row of chips (model, and **Plan** for a workspace) with the
+  mic on the right, then a full-width **Start** (or **Create** with no task) or **Ask** button.
+  The task field does not take focus when the sheet opens.
+- **Settings.** A page sheet with **Done**. Grouped sections: Mac (Paired with, **Unpair this
+  phone**) or, in the demo, Demo (**Pair your Mac**), then Notifications (opens the iOS
+  settings), then the app version.
 - **Can't reach the Mac.** A screen with no data yet shows the offline panel in place of its
   spinner: a WifiOff icon, "Can't reach Korev on your Mac", what to check (Korev open on the
   Mac, Tailscale on the phone, the Mac awake and on Tailscale), **Try again** and **Unpair this

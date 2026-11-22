@@ -89,7 +89,7 @@ export default function AskChatsScreen() {
   if (!state) return <Loading style={styles.loading} />;
   const sections = sectionsOf(state);
   if (!sections.length)
-    return <NewAskForm state={state} autoFocus={false} onAsked={openAskChat} />;
+    return <NewAskForm state={state} onAsked={openAskChat} />;
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
