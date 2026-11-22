@@ -5,9 +5,11 @@ import path from 'node:path';
 import { spawn as spawnPty } from 'node-pty';
 import { renderUnicodeCompact } from 'uqr';
 import { version } from '../package.json';
+import type { KorevApi } from './shared/api';
 import type { DictationStatus, RemotePairing } from './shared/model';
 import { runProcess } from './main/command-runner';
 import { nodeFileSystem } from './main/file-system';
+import { deferredApi } from './main/deferred-api';
 import { createIdleWatch } from './main/idle-exit';
 import { createKorev, type Korev, type KorevDeps } from './main/korev';
 import { childEnv, resolveLoginEnv } from './main/login-path';
@@ -116,7 +118,7 @@ function headlessDeps(
     showFileMenu() {},
     openExternal: async () => {},
     applyTheme() {},
-    remote: { ...remote, apply: () => remote.apply(alwaysOn(config)) },
+    remote: { ...remote, apply: async () => {} },
     dictation: NO_DICTATION,
     appVersion: version,
     fetchRelease: async () => null,
@@ -149,24 +151,30 @@ async function main() {
   const config = readConfig(process.env);
   await mkdir(config.dataDir, { recursive: true });
   let korev: Korev | null = null;
+  let coreReady!: (api: Partial<KorevApi>) => void;
+  const ready = new Promise<Partial<KorevApi>>(
+    (resolve) => (coreReady = resolve),
+  );
   const remote = createRemoteAccess({
     ...remoteAccessFiles(config.dataDir),
-    api: () => korev?.api ?? {},
+    api: () => deferredApi(ready),
     startTailnet: () => NO_TAILNET,
     onChange: () => korev?.emitState(),
     host: config.host,
     publicUrl: config.publicUrl,
   });
-  const login = await resolveLoginEnv(runProcess, process.env);
-  const env = childEnv(process.env, login);
-  korev = await createKorev(headlessDeps(config, env, remote, () => korev));
-  const started = korev;
-
   await remote.apply(alwaysOn(config));
   const pairing = await remote.pairing();
   if (!pairing)
     throw new Error(remote.status().error ?? 'Remote server did not start');
   showPairing(pairing);
+
+  const login = await resolveLoginEnv(runProcess, process.env);
+  const env = childEnv(process.env, login);
+  korev = await createKorev(headlessDeps(config, env, remote, () => korev));
+  const started = korev;
+  coreReady(started.api);
+  started.emitState();
 
   exitWhenIdle(config, started, remote);
   process.once('SIGTERM', () => void stop(started, remote));
