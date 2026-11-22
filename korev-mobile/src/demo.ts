@@ -48,6 +48,14 @@ const NO_EXPLAINERS: Result<never> = {
   ok: false,
   message: 'The demo cannot explain pull requests.',
 };
+const NO_QUEUED_MESSAGES: Result = {
+  ok: false,
+  message: 'The demo has no queued messages.',
+};
+const NO_CHECKPOINTS: Result<never> = {
+  ok: false,
+  message: 'The demo has no file checkpoints to revert to.',
+};
 const NO_PULL_REQUEST: Result<never> = {
   ok: false,
   message: 'The demo has no such pull request.',
@@ -317,6 +325,9 @@ export function createDemoConnection(): Connection {
       if (state.runningSessions.includes(sessionId))
         finishReply(sessionId, Date.now(), false);
     },
+    sendQueuedNow: async () => NO_QUEUED_MESSAGES,
+    removeQueued: async () => NO_QUEUED_MESSAGES,
+    revert: async () => NO_CHECKPOINTS,
     async respondPermission(sessionId, itemId, response) {
       const item = transcripts
         .get(sessionId)
@@ -404,6 +415,15 @@ export function createDemoConnection(): Connection {
       return ok();
     },
     async retryWorkspace() {
+      return ok();
+    },
+    async restoreWorkspace(workspaceId) {
+      setState(
+        withWorkspace(state, workspaceId, (workspace) => ({
+          ...workspace,
+          archivedAt: null,
+        })),
+      );
       return ok();
     },
     async listBranches() {
