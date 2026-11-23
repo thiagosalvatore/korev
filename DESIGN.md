@@ -260,8 +260,11 @@ Notes** opens the same page.
 - **Jump to latest.** After one screen of scrolling back, a 36 pt round button with a down
   chevron (`bgRaised`, `border2` hairline) shows 12 pt above the composer and 12 pt from the
   right edge. It fades in and out over 150 ms.
-- **Empty chat.** One centred `fg3` line names the agent and model: "Message Claude Code ·
-  Opus 5.5".
+- **Empty chat.** One centred `fg3` line just above the composer names the agent and model:
+  "Message Claude Code · Opus 5.5".
+- **Keyboard.** The composer rides on top of the keyboard, and the last message lifts with it.
+  A tap on the chat or a downward swipe closes the keyboard. The rest of the screen keeps its
+  layout; nothing shrinks.
 - **Touch targets.** Every control takes taps over at least 44 × 44 pt. A smaller control gets
   `hitSlop` from `touchSlop(size)` in `ui.tsx` instead of growing.
 - **Text size.** Text follows the iOS text size. Controls and headers (buttons, tabs, chips,

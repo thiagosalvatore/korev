@@ -1,9 +1,7 @@
-import { useHeaderHeight } from 'expo-router/react-navigation';
 import { ChevronDown } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState, type Ref } from 'react';
 import {
   FlatList,
-  KeyboardAvoidingView,
   Pressable,
   StyleSheet,
   Text,
@@ -11,7 +9,12 @@ import {
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ScrollViewProps,
 } from 'react-native';
+import {
+  KeyboardChatScrollView,
+  KeyboardStickyView,
+} from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { modelLabel } from '../../../korev-desktop/src/shared/format';
 import {
@@ -46,7 +49,7 @@ import {
   touchSlop,
 } from '../ui';
 import { ChatItemView } from './ChatItemView';
-import { Composer } from './Composer';
+import { BAR_PADDING, Composer, useComposerBottomPadding } from './Composer';
 import { ExplainerView } from './ExplainerView';
 import { pendingSend, withPendingMessage, type PendingSend } from './pending';
 import { PlanReview } from './PermissionCard';
@@ -103,22 +106,49 @@ function emptyChatHint(state: AppState, session: ChatSession): string {
   return model === agent ? `Message ${agent}` : `Message ${agent} · ${model}`;
 }
 
+function useKeyboardOffset(): number {
+  return useComposerBottomPadding() - BAR_PADDING;
+}
+
+function TranscriptScrollView({
+  ref,
+  ...props
+}: ScrollViewProps & { ref?: Ref<Animated.ScrollView> }) {
+  return (
+    <KeyboardChatScrollView
+      ref={ref}
+      inverted
+      offset={useKeyboardOffset()}
+      automaticallyAdjustContentInsets={false}
+      contentInsetAdjustmentBehavior="never"
+      keyboardDismissMode="interactive"
+      keyboardShouldPersistTaps="handled"
+      {...props}
+    />
+  );
+}
+
 function JumpToLatest({ onPress }: { onPress: () => void }) {
   const theme = useTheme();
   const styles = makeStyles(theme);
   return (
-    <Animated.View
-      entering={FadeIn.duration(FADE_MS)}
-      exiting={FadeOut.duration(FADE_MS)}
+    <KeyboardStickyView
+      offset={{ opened: useKeyboardOffset() }}
       style={styles.jump}
     >
-      <IconButton
-        label="Jump to latest message"
-        icon={<ChevronDown size={ICON_BUTTON_ICON_SIZE} color={theme.fg1} />}
-        background={theme.bgRaised}
-        onPress={onPress}
-      />
-    </Animated.View>
+      <Animated.View
+        entering={FadeIn.duration(FADE_MS)}
+        exiting={FadeOut.duration(FADE_MS)}
+        style={styles.jumpButton}
+      >
+        <IconButton
+          label="Jump to latest message"
+          icon={<ChevronDown size={ICON_BUTTON_ICON_SIZE} color={theme.fg1} />}
+          background={theme.bgRaised}
+          onPress={onPress}
+        />
+      </Animated.View>
+    </KeyboardStickyView>
   );
 }
 
@@ -140,7 +170,11 @@ export function Chat({
   const { api } = useConnection();
   const items = useTranscript(session.id);
   const repoUrl = useRepoGithubUrl(repoId);
-  const headerHeight = useHeaderHeight();
+  const keyboardOffset = useKeyboardOffset();
+  const renderScrollView = useCallback(
+    (props: ScrollViewProps) => <TranscriptScrollView {...props} />,
+    [],
+  );
   const styles = makeStyles(useTheme());
   const list = useRef<FlatList<ChatItem>>(null);
   const { height: windowHeight } = useWindowDimensions();
@@ -198,11 +232,7 @@ export function Chat({
     : undefined;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.fill}
-      behavior="padding"
-      keyboardVerticalOffset={headerHeight}
-    >
+    <View style={styles.fill}>
       {session.explainer ? <ModeSwitch mode={mode} onChange={setMode} /> : null}
       {explaining ? (
         <ExplainerView
@@ -215,6 +245,7 @@ export function Chat({
           <FlatList
             ref={list}
             inverted
+            renderScrollComponent={renderScrollView}
             data={shown.filter((item) => !isSubagentTool(item)).reverse()}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
@@ -256,8 +287,6 @@ export function Chat({
             contentContainerStyle={
               shown.length ? styles.transcript : styles.emptyTranscript
             }
-            keyboardDismissMode="interactive"
-            keyboardShouldPersistTaps="handled"
             onScroll={trackScroll}
             scrollEventThrottle={100}
           />
@@ -266,31 +295,33 @@ export function Chat({
       ) : (
         <Loading style={styles.fill} />
       )}
-      {question?.questions ? (
-        <QuestionPanel
-          key={question.id}
-          questions={question.questions}
-          picks={picks}
-          onPick={(questionText, labels) =>
-            setPicked((current) =>
-              withPick(current, question.id, questionText, labels),
-            )
-          }
-          onRespond={(response) => respond(question.id, response)}
+      <KeyboardStickyView offset={{ opened: keyboardOffset }}>
+        {question?.questions ? (
+          <QuestionPanel
+            key={question.id}
+            questions={question.questions}
+            picks={picks}
+            onPick={(questionText, labels) =>
+              setPicked((current) =>
+                withPick(current, question.id, questionText, labels),
+              )
+            }
+            onRespond={(response) => respond(question.id, response)}
+          />
+        ) : null}
+        <Composer
+          state={state}
+          session={session}
+          reviewingPlan={Boolean(codexPlan) || planAwaitingReview(items)}
+          answers={question ? picks : undefined}
+          sendReady={Boolean(
+            question?.questions && answerQuestions(question.questions, picks),
+          )}
+          onSend={startSending}
+          onSendFailed={() => setPending(null)}
         />
-      ) : null}
-      <Composer
-        state={state}
-        session={session}
-        reviewingPlan={Boolean(codexPlan) || planAwaitingReview(items)}
-        answers={question ? picks : undefined}
-        sendReady={Boolean(
-          question?.questions && answerQuestions(question.questions, picks),
-        )}
-        onSend={startSending}
-        onSendFailed={() => setPending(null)}
-      />
-    </KeyboardAvoidingView>
+      </KeyboardStickyView>
+    </View>
   );
 }
 
@@ -318,16 +349,14 @@ function makeStyles(theme: Theme) {
     modeText: { color: theme.fg3, fontSize: 13, fontWeight: '500' },
     modeTextSelected: { color: theme.fg1 },
     transcript: { padding: 12, gap: 12 },
-    emptyTranscript: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+    emptyTranscript: { flexGrow: 1, padding: 24 },
     emptyHint: {
       color: theme.fg3,
       textAlign: 'center',
       transform: [{ scaleY: -1 }],
     },
-    jump: {
-      position: 'absolute',
-      right: 12,
-      bottom: 12,
+    jump: { position: 'absolute', right: 12, bottom: 12 },
+    jumpButton: {
       borderRadius: ICON_BUTTON_SIZE / 2,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.border2,
