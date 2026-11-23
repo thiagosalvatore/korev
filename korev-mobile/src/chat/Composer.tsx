@@ -53,6 +53,7 @@ export function Composer({
   reviewingPlan,
   answers,
   context,
+  initialText = '',
   sendReady = false,
   onSend,
   onSendFailed,
@@ -60,6 +61,7 @@ export function Composer({
   state: AppState;
   session: ChatSession;
   context: ContextUsage | null;
+  initialText?: string;
   reviewingPlan: boolean;
   answers?: QuestionPicks;
   sendReady?: boolean;
@@ -70,7 +72,7 @@ export function Composer({
   const theme = useTheme();
   const styles = makeStyles(theme);
   const bottomPadding = useComposerBottomPadding();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText);
   const [attachments, setAttachments] = useState<string[]>([]);
   const [uploading, setUploading] = useState(0);
   const running = state.runningSessions.includes(session.id);

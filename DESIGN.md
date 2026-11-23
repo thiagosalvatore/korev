@@ -277,7 +277,7 @@ Notes** opens the same page.
   also has **Changes**.
 - **Transcript.** User messages sit on the right in an 18 pt bubble with a 4 pt bottom-right
   corner and no timestamp. Their text is native: a long press selects a word, with handles and
-  the iOS menu (Copy, Look Up, Translate, Share). A long press on an agent message opens Copy,
+  the iOS menu (Copy, Look Up, Translate, Share); a tap opens the message actions. A long press on an agent message opens Copy,
   Select text and Share. Inline code is `MONO_FONT` on `bgRaised`, never italic.
 - **Activity card.** The tools, thinking and todos between two messages fold into one card on
   `bgSurface` (12 pt radius, `border1` hairline). Done: a green `CircleCheck` and what the agent
@@ -296,6 +296,15 @@ Notes** opens the same page.
 - **Chat options.** A form sheet with a grabber and three inset groups: Model (one row per
   model with its agent, check on the current one), Effort, and Modes (Plan mode, Fast mode
   switches). There is no nested picker.
+- **Queued messages.** A message sent while the agent works waits in a tray above the composer
+  ("Queued until the agent finishes", `caption` `fg3`), one line each with a round accent
+  **Send now** (arrow) and a grey **×**. They leave the transcript while they wait. A Mac too
+  old to answer these methods keeps showing them in the transcript with "Queued".
+- **Message actions.** A tap on a user message opens Copy, **Revert to before this message**
+  (only with a checkpoint and while the agent is idle) and Share. Revert asks first, then puts
+  the message back in the message box. The header menu's Chats submenu ends with **Close this
+  chat** (destructive, asks first) when the workspace has more than one chat. A workspace whose
+  setup failed shows its error with **Try again**.
 - **Floating PR action.** Only for Merge, Fix errors and Resolve conflicts: one large button,
   centred 12 pt above the composer, with a soft shadow. It hides while the keyboard is up.
   Create PR lives in the menu, so a new workspace shows no PR button.

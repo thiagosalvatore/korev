@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type {
   Workspace,
   WorkspaceRuntime,
@@ -7,7 +7,11 @@ import { worktreeProgress } from '../../korev-desktop/src/shared/workspaces';
 import { UserMessage } from './chat/ChatItemView';
 import { pendingUserItem } from './chat/pending';
 import { WorkingIndicator } from './chat/WorkingIndicator';
-import { useTheme, type Theme } from './theme';
+import { attempt } from './attempt';
+import { usePendingAction } from './hooks';
+import { useConnection } from './korev';
+import { TYPE, useTheme, type Theme } from './theme';
+import { Button } from './ui';
 
 export function WorktreePending({
   workspace,
@@ -17,6 +21,8 @@ export function WorktreePending({
   runtime: WorkspaceRuntime;
 }) {
   const styles = makeStyles(useTheme());
+  const { api } = useConnection();
+  const { pending, run } = usePendingAction();
   const creating = runtime.status === 'creating';
   return (
     <ScrollView contentContainerStyle={styles.transcript}>
@@ -27,7 +33,20 @@ export function WorktreePending({
         />
       ) : null}
       {runtime.status === 'failed' ? (
-        <Text style={styles.failed}>{runtime.message}</Text>
+        <View style={styles.failure}>
+          <Text style={styles.failed}>{runtime.message}</Text>
+          <Button
+            label="Try again"
+            pending={pending !== null}
+            onPress={() =>
+              void run('retry', () =>
+                attempt('Korev could not set up the workspace again', () =>
+                  api.retryWorkspace(workspace.id),
+                ),
+              )
+            }
+          />
+        </View>
       ) : (
         <WorkingIndicator
           label={worktreeProgress(workspace, runtime).title}
@@ -46,6 +65,7 @@ function makeStyles(theme: Theme) {
       padding: 12,
       gap: 12,
     },
-    failed: { color: theme.dangerText, fontSize: 13, lineHeight: 19 },
+    failure: { alignItems: 'flex-start', gap: 12 },
+    failed: { ...TYPE.footnote, color: theme.dangerText },
   });
 }

@@ -2,6 +2,7 @@ import { setStringAsync } from 'expo-clipboard';
 import { FileText, Paperclip } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import {
+  Alert,
   Pressable,
   Share,
   StyleSheet,
@@ -164,17 +165,55 @@ function MessageActions({
   );
 }
 
+type UserAction = 'copy' | 'revert' | 'share';
+
+const USER_ACTION_LABELS: Record<UserAction, string> = {
+  copy: 'Copy',
+  revert: 'Revert to before this message',
+  share: 'Share…',
+};
+
+function confirmRevert(onRevert: () => void) {
+  Alert.alert(
+    'Revert to before this message?',
+    'Korev puts the files back as they were before this message and removes it and everything after it. The message goes back into the message box.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Revert', style: 'destructive', onPress: onRevert },
+    ],
+  );
+}
+
 export function UserMessage({
   item,
   sessionId,
+  onRevert,
 }: {
   item: ItemOf<'user'>;
   sessionId: string;
+  onRevert?: () => void;
 }) {
   const styles = useStyles();
   const { body, plans, files } = messageParts(item.text);
+  const canRevert = Boolean(onRevert && item.checkpoint);
+  const actions: UserAction[] = canRevert
+    ? ['copy', 'revert', 'share']
+    : ['copy', 'share'];
+
+  const showActions = async () => {
+    const action = await chooseOption('Message', actions, USER_ACTION_LABELS);
+    if (action === 'copy') await copyMessage(body);
+    if (action === 'share') await Share.share({ message: body });
+    if (action === 'revert' && onRevert) confirmRevert(onRevert);
+  };
+
   return (
-    <View style={[styles.userBubble, item.fromKorev && styles.korevBubble]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityHint="Shows copy, share and revert"
+      style={[styles.userBubble, item.fromKorev && styles.korevBubble]}
+      onPress={() => void showActions()}
+    >
       {item.fromKorev ? (
         <Text style={[styles.dim, styles.korevCaption]}>Korev</Text>
       ) : null}
@@ -185,11 +224,12 @@ export function UserMessage({
           multiline
           scrollEnabled={false}
           style={[styles.text, styles.selectableText]}
+          onPress={() => void showActions()}
         />
       ) : null}
       <MessageAttachments plans={plans} files={files} sessionId={sessionId} />
       {item.queued ? <Text style={styles.dim}>Queued</Text> : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -267,6 +307,7 @@ export function ChatItemView({
   onRespond,
   onHandoff,
   onOpenExplainer,
+  onRevert,
 }: {
   item: ChatItem;
   sessionId: string;
@@ -275,11 +316,14 @@ export function ChatItemView({
   onRespond(itemId: string, response: PermissionResponse): Promise<boolean>;
   onHandoff?(): Promise<boolean>;
   onOpenExplainer?(): void;
+  onRevert?(): void;
 }) {
   const styles = useStyles();
   switch (item.kind) {
     case 'user':
-      return <UserMessage item={item} sessionId={sessionId} />;
+      return (
+        <UserMessage item={item} sessionId={sessionId} onRevert={onRevert} />
+      );
     case 'assistant':
       return (
         <AssistantMessage
