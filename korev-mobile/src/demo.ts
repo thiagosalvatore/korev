@@ -30,7 +30,10 @@ import {
   DENIED_REPLY,
   DEMO_CHANGES,
   DEMO_DIFFS,
+  DEMO_RUN_OUTPUT,
+  DEMO_SETUP_OUTPUT,
   DEMO_SLASH_COMMANDS,
+  DEMO_THREADS,
   demoPullRequest,
   demoRepoUrl,
   demoRuntime,
@@ -547,7 +550,7 @@ export function createDemoConnection(): Connection {
       return state.runtime[workspaceId]?.prs ?? [];
     },
     async prThreads() {
-      return [];
+      return DEMO_THREADS;
     },
     async createPr(workspaceId, sessionId) {
       const workspace = state.workspaces.find(
@@ -629,9 +632,29 @@ export function createDemoConnection(): Connection {
     startExplainer: async () => NO_EXPLAINERS,
     explainer: async () => null,
     updateExplainer: async () => NO_EXPLAINERS,
-    startScript: async () => NO_SCRIPTS,
-    async stopScript() {},
-    scriptOutput: async () => null,
+    async startScript(workspaceId, kind) {
+      if (kind !== 'run') return NO_SCRIPTS;
+      const ref = `${workspaceId}:${kind}`;
+      setState({
+        ...state,
+        runningTerminals: [...state.runningTerminals, ref],
+      });
+      events.emit('terminal-output', { ref, data: DEMO_RUN_OUTPUT });
+      return ok();
+    },
+    async stopScript(workspaceId, kind) {
+      const ref = `${workspaceId}:${kind}`;
+      setState({
+        ...state,
+        runningTerminals: state.runningTerminals.filter(
+          (entry) => entry !== ref,
+        ),
+      });
+      events.emit('terminal-exit', { ref, exitCode: 0 });
+    },
+    async scriptOutput(_workspaceId, kind) {
+      return kind === 'setup' ? DEMO_SETUP_OUTPUT : null;
+    },
   };
 
   const bridge = {

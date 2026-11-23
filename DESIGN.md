@@ -305,6 +305,17 @@ Notes** opens the same page.
   the message back in the message box. The header menu's Chats submenu ends with **Close this
   chat** (destructive, asks first) when the workspace has more than one chat. A workspace whose
   setup failed shows its error with **Try again**.
+- **Review comments.** The header menu's Pull request section has **Review comments** (subtitle
+  "N unanswered"). The screen lists the PR's threads as `bgSurface` cards: `path:line` in mono
+  `caption`, the last four lines of the diff hunk on `bgRaised`, then each comment (author,
+  relative time, markdown). Resolved threads come last at 60 % opacity. A tap on a comment opens
+  it on GitHub.
+- **Setup and Run.** When the repository has those scripts and the Mac answers the script
+  methods, the header menu has a Scripts section with **Setup** and **Run** ("Running" while it
+  runs). The screen shows the script's output as plain mono text (colour codes removed, a line
+  redrawn with a carriage return keeps its last state), follows new output, and ends with
+  "[Exited with code N]". **Start** / **Stop** sit in the header. A Run script with a URL shows it
+  as a link row above the output. The phone never opens or types into a shell.
 - **Floating PR action.** Only for Merge, Fix errors and Resolve conflicts: one large button,
   centred 12 pt above the composer, with a soft shadow. It hides while the keyboard is up.
   Create PR lives in the menu, so a new workspace shows no PR button.
