@@ -4,6 +4,30 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-11-23
+
+The phone app is redesigned: it shows what needs you first, and you can read changes, review comments and script output and manage queued messages from your phone.
+
+### New
+
+- **Phone home sorted by what needs you.** The Workspaces tab groups your workspaces into Needs you, Working, Ready to merge and Everything else, with the same rules as the Mac. Each row shows one status line, such as "Needs your answer".
+- **Native iOS look on the phone.** The phone app uses the iOS tab bar, with Workspaces, Ask and Pull requests. New workspace and Ask a question open as sheets with a Cancel button, and Settings is now its own screen.
+- **One chat header on the phone.** The PR bar and chat bar are now one header. It shows the workspace name and its status, for example "Working · 1m 12s" or "Checks failing". The menu holds the chats, Explain changes, the next pull request step, Checks and Open on GitHub.
+- **Activity cards on the phone.** The tool calls between two messages fold into one card, such as "Explored 3 files, edited 1 file, ran 2 commands". While the agent works, the card shows the current step and the to-do list. Tap the card to see each step.
+- **Chips in the phone composer.** A row above the message box shows the model, Plan, the effort and Fast. Tap Plan or the effort to change them at once. A ring shows how much of the context the chat uses.
+- **Changes and diffs on the phone.** Open Changes from the chat menu or the branch capsule to see each changed file with its added and removed lines. Tap a file to read its diff.
+- **Queued messages, revert and close chat on the phone.** Queued messages wait in a tray above the composer, with Send now and Remove. Tap one of your messages to copy it, share it or revert the workspace to before it. The Chats menu can close a chat.
+- **Review comments and script output on the phone.** The chat menu opens the pull request's review threads, with the number that have no answer yet. You can start and stop the Setup and Run scripts and read their output. The phone never shows or types into a shell.
+
+These phone features need Korev 0.39.0 on your Mac.
+
+### Fixed
+
+- **Junk text in the terminal.** Switching workspaces, tabs or grid view no longer types text such as `1;49R11;rgb:1a1a/1919/1818` into the shell.
+- **Queued messages at quit.** Quitting Korev while an agent works no longer sends your queued messages as a new turn. They stay queued for the next launch.
+- **Phone composer and the keyboard.** The composer stays on top of the keyboard, and the chat keeps its full height. A downward swipe closes the keyboard.
+- **Repository avatars at large text sizes.** The initials on the phone no longer overflow their box at the largest text sizes.
+
 ## [0.38.0] - 2026-11-19
 
 Messages you send while an agent works now wait their turn, and you choose when they go.
