@@ -1979,6 +1979,30 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
 
       expect(ghReviews).toEqual([]);
     });
+
+    it('re-checks without a re-request once every comment you left is resolved', async () => {
+      const sessionId = await reviewedChat();
+      reviewsByUrl[url] = {
+        ...reviewsByUrl[url],
+        reviewRequests: { nodes: [] },
+        reviewThreads: {
+          nodes: [
+            {
+              isResolved: true,
+              opener: { nodes: [{ author: { login: 'me' } }] },
+              latest: {
+                nodes: [{ author: { login: 'me', __typename: 'User' } }],
+              },
+            },
+          ],
+        },
+      };
+      await korev.api.updateSettings({ reReviews: 'check' });
+
+      await pollUntilReChecked(sessionId);
+
+      expect(ghReviews).toEqual([]);
+    });
   });
 
   it('explains a pull request together with the open ones it builds on', async () => {
