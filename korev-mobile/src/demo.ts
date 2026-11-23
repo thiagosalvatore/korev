@@ -28,6 +28,7 @@ import {
   DEMO_REPLY,
   DEMO_REVIEW_REPLY,
   DENIED_REPLY,
+  DEMO_SLASH_COMMANDS,
   demoPullRequest,
   demoRepoUrl,
   demoRuntime,
@@ -478,7 +479,7 @@ export function createDemoConnection(): Connection {
       return ok({ askChatId: ask.id });
     },
     async slashCommands() {
-      return [];
+      return DEMO_SLASH_COMMANDS;
     },
     async changes() {
       return [];

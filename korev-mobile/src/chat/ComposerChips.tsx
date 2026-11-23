@@ -1,22 +1,15 @@
 import { ListChecks, Paperclip, X } from 'lucide-react-native';
 import type { ReactNode } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { fileName } from '../../../korev-desktop/src/shared/format';
 import { planFileName } from '../../../korev-desktop/src/shared/message';
 import type { ChatSession } from '../../../korev-desktop/src/shared/model';
 import { useTheme, type Theme } from '../theme';
-import { CHROME_FONT_SCALE, ICON_BUTTON_SIZE, touchSlop } from '../ui';
+import { LoadingRing } from '../LoadingRing';
+import { CHROME_FONT_SCALE, touchSlop } from '../ui';
 import { PlanChip } from './PlanChip';
 
 const CHIP_ICON_SIZE = 14;
-export const COMPOSER_ROW_GAP = 8;
 
 function RemoveButton({
   label,
@@ -51,19 +44,15 @@ function confirmDiscardPlan(onDiscard: () => void) {
 
 export function ComposerChips({
   pendingPlan,
-  planMode,
   attachments,
   uploading,
   onDiscardPlan,
-  onTurnOffPlanMode,
   onRemoveAttachment,
 }: {
   pendingPlan: ChatSession['pendingPlan'];
-  planMode: boolean;
   attachments: string[];
   uploading: number;
   onDiscardPlan(): void;
-  onTurnOffPlanMode(): void;
   onRemoveAttachment(file: string): void;
 }) {
   const theme = useTheme();
@@ -92,15 +81,6 @@ export function ComposerChips({
         />
       </View>,
     );
-  if (planMode)
-    chips.push(
-      <View key="plan-mode" style={styles.chip}>
-        <Text maxFontSizeMultiplier={CHROME_FONT_SCALE} style={styles.label}>
-          Plan mode
-        </Text>
-        <RemoveButton label="Turn off plan mode" onPress={onTurnOffPlanMode} />
-      </View>,
-    );
   for (const file of attachments)
     chips.push(
       <View key={file} style={styles.chip}>
@@ -121,7 +101,7 @@ export function ComposerChips({
   if (uploading)
     chips.push(
       <View key="uploading" style={styles.chip}>
-        <ActivityIndicator size="small" color={theme.accentText} />
+        <LoadingRing size={CHIP_ICON_SIZE} color={theme.accentText} />
         <Text maxFontSizeMultiplier={CHROME_FONT_SCALE} style={styles.label}>
           Attaching…
         </Text>
@@ -137,7 +117,6 @@ function makeStyles(theme: Theme) {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 6,
-      marginLeft: ICON_BUTTON_SIZE + COMPOSER_ROW_GAP,
     },
     chip: {
       flexDirection: 'row',

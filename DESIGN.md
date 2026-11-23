@@ -280,6 +280,16 @@ Notes** opens the same page.
   progress bar and check, dot and dashed-circle rows. A tap opens one row per step. A finished
   turn shows in the header ("Completed in 9s"), not in the transcript; a failed turn keeps its
   error line.
+- **Composer.** A chip row sits above the message box: the model (opens Chat options), **Plan**
+  (`accentSubtle` and bold `accentText` when on; the box border turns dashed `accent`), the
+  effort (a tap moves to the next level), **Fast** only while it is on, and on the right a 20 pt
+  context ring (`fg3`, `warning` from 80 %, `danger` from 95 %). A tap on the ring shows the
+  context window and the plan limits. Under it: a round **+** (attach), the message box with a
+  **/** button while it is empty (workspace chats only), then send, stop or the mic. **/**
+  types a slash and lists the repository's commands above the composer; a tap inserts one.
+- **Chat options.** A form sheet with a grabber and three inset groups: Model (one row per
+  model with its agent, check on the current one), Effort, and Modes (Plan mode, Fast mode
+  switches). There is no nested picker.
 - **Floating PR action.** Only for Merge, Fix errors and Resolve conflicts: one large button,
   centred 12 pt above the composer, with a soft shadow. It hides while the keyboard is up.
   Create PR lives in the menu, so a new workspace shows no PR button.

@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { SFSymbol } from 'sf-symbols-typescript';
 import { duration } from '../../../korev-desktop/src/shared/format';
 import { LoadingRing } from '../LoadingRing';
-import { useTheme, type Theme } from '../theme';
+import { TYPE, useTheme, type Theme } from '../theme';
 import { CHROME_FONT_SCALE, touchSlop } from '../ui';
 import type { ChatStatus, ChatStatusKind } from './chatStatus';
 
@@ -201,9 +201,9 @@ export function ChatAccessory({ children }: { children: ReactNode }) {
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
     title: { alignItems: 'center', maxWidth: 240 },
-    titleText: { color: theme.fg1, fontSize: 17, fontWeight: '600' },
+    titleText: { ...TYPE.headline, color: theme.fg1 },
     status: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    statusText: { color: theme.fg3, fontSize: 12 },
+    statusText: { ...TYPE.caption, color: theme.fg3 },
     dot: { width: DOT_SIZE, height: DOT_SIZE, borderRadius: DOT_SIZE / 2 },
     accessory: {
       flexDirection: 'row',
@@ -226,6 +226,6 @@ function makeStyles(theme: Theme) {
       backgroundColor: theme.bgRaised,
     },
     pressed: { backgroundColor: theme.bgActive },
-    capsuleText: { color: theme.fg2, fontSize: 13, flexShrink: 1 },
+    capsuleText: { ...TYPE.footnote, color: theme.fg2, flexShrink: 1 },
   });
 }

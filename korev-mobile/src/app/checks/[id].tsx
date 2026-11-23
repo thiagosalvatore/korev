@@ -14,7 +14,7 @@ import {
   type PrCheck,
 } from '../../../../korev-desktop/src/shared/model';
 import { useAppState } from '../../hooks';
-import { useTheme, type Theme } from '../../theme';
+import { TYPE, useTheme, type Theme } from '../../theme';
 import { MIN_TOUCH_TARGET } from '../../ui';
 
 const ICON_SIZE = 16;
@@ -88,8 +88,8 @@ function makeStyles(theme: Theme) {
       paddingVertical: 10,
     },
     pressed: { backgroundColor: theme.bgHover },
-    name: { flex: 1, color: theme.fg1, fontSize: 16 },
-    optional: { color: theme.fg4, fontSize: 13 },
+    name: { ...TYPE.callout, flex: 1, color: theme.fg1 },
+    optional: { ...TYPE.footnote, color: theme.fg4 },
     separator: {
       height: StyleSheet.hairlineWidth,
       marginLeft: 48,

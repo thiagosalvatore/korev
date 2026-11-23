@@ -44,7 +44,7 @@ import {
   runStep,
   stepLabel,
 } from '../../prActions';
-import { useTheme, type Theme } from '../../theme';
+import { TYPE, useTheme, type Theme } from '../../theme';
 import { Button } from '../../ui';
 import { WorktreePending } from '../../WorktreePending';
 
@@ -400,6 +400,6 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
     fill: { flex: 1 },
     empty: { padding: 24, color: theme.fg3, textAlign: 'center' },
-    message: { flexBasis: '100%', color: theme.dangerText, fontSize: 13 },
+    message: { ...TYPE.footnote, flexBasis: '100%', color: theme.dangerText },
   });
 }
