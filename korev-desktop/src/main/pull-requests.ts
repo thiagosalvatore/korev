@@ -844,6 +844,21 @@ function repliesToReview(url: string): string {
   return `Read their replies to your review comments with \`gh api repos/${repo}/pulls/${number}/comments --paginate --jq '.[] | {path, line, user: .user.login, body, in_reply_to_id}'\`.`;
 }
 
+function followUpLines(url: string, status: ReviewStatus): string[] {
+  return [
+    changesSince(url, status),
+    repliesToReview(url),
+    "For each finding you listed earlier in this chat, say whether the new commits or the author's replies address it. Do not edit files and do not post a review.",
+  ];
+}
+
+export function reviewAgainPrompt(url: string, status: ReviewStatus): string {
+  return [
+    `The user asked you to review pull request ${url} again.`,
+    ...followUpLines(url, status),
+  ].join('\n');
+}
+
 export function reReviewPrompt(
   url: string,
   status: ReviewStatus,
@@ -851,9 +866,7 @@ export function reReviewPrompt(
 ): string {
   return [
     `The author responded to your review on pull request ${url}.`,
-    changesSince(url, status),
-    repliesToReview(url),
-    "For each finding you listed earlier in this chat, say whether the new commits or the author's replies address it. Do not edit files and do not post a review.",
+    ...followUpLines(url, status),
     approve
       ? `End your reply with exactly one fenced block that starts with \`\`\`${REVIEW_FENCE} and holds {"addressed": true} when every finding is addressed and nothing new needs a fix, or {"addressed": false} otherwise.`
       : null,

@@ -14,6 +14,7 @@ import {
   openFile,
   openSearch,
   openAsk,
+  openKorevChat,
   openAutomations,
   openGrid,
   openNewWorkspace,
@@ -90,6 +91,13 @@ function paletteItems(
       icon: 'message-circle-question',
       section: 'Actions',
       run: () => openAsk(null),
+    },
+    {
+      id: 'ask-korev',
+      label: 'Ask Korev',
+      icon: 'bot-message-square',
+      section: 'Actions',
+      run: () => void openKorevChat(),
     },
     {
       id: 'grid',

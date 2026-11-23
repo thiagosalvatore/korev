@@ -93,6 +93,7 @@ import {
   approvePr,
   reReviewKey,
   reReviewPrompt,
+  reviewAgainPrompt,
   type ReviewStatus,
   onPrBranch,
   fetchPrThreads,
@@ -116,6 +117,7 @@ import { listInbox, listIssues, listPullRequests } from './sources';
 import { rangeFileDiff, rangeFiles, searchFiles } from './git-review';
 import { findLocalUrl } from './workspace-setup';
 import { createOrchestration } from './orchestration';
+import { createAppCommands } from './app-commands';
 import { createSpotlight } from './spotlight';
 import { repoFavicon } from './repo-icon';
 import { ATTACHMENTS_DIR, attachmentsDir, openStore } from './store';
@@ -158,6 +160,7 @@ const BUILTIN_COMMANDS = ['compact', 'review', 'init'];
 const IMPLEMENT_PLAN_TASK = 'Implement your part of the plan below.';
 const IMPLEMENT_APPROVED_PLAN = 'Implement the plan.';
 const HANDOFF_TASK = 'Implement the plan below.';
+const KOREV_CHAT_TITLE = 'Korev';
 const IMPLEMENT_CONVERSATION_TASK =
   'Implement your part of what we discussed above.';
 const GITHUB_AVATAR_SIZE = 64;
@@ -368,7 +371,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   const editors = installedEditors(deps.home);
   const backgroundTasks = new Set<Promise<unknown>>();
   const agentServer = await startAgentServer(deps.cliDir, (call) =>
-    orchestration.runCli(call),
+    appCommands.runCli(call),
   );
 
   const ctx: Context = {
@@ -749,18 +752,36 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     ask.reReview = reReview;
     saveAndEmit();
     const approve = store.state.settings.reReviews === 'approve';
-    const repo = ctx.repo(ask.repoIds[0]);
-    const { prompts } = await loadRepoConfig(repo, repo.path);
-    const sent = await sendPrompt(
-      ask.session,
-      withPrompt(
-        reReviewPrompt(ask.reviewOf, status, approve),
-        prompts.code_review,
-      ),
+    const sent = await sendReviewPrompt(
+      ask,
+      reReviewPrompt(ask.reviewOf, status, approve),
     );
     if (sent.ok) return;
     reReview.pending = false;
     saveAndEmit();
+  }
+
+  async function sendReviewPrompt(ask: AskChat, prompt: string) {
+    const repo = ctx.repo(ask.repoIds[0]);
+    const { prompts } = await loadRepoConfig(repo, repo.path);
+    return sendPrompt(ask.session, withPrompt(prompt, prompts.code_review));
+  }
+
+  async function rerunReview(ask: AskChat): Promise<Result> {
+    if (!ask.reviewOf) return fail(`${ask.session.title} is not a review chat`);
+    const status = await fetchReviewStatus(
+      gh.run,
+      deps.env,
+      reviewCwd(ask),
+      ask.reviewOf,
+    );
+    if (!status) return fail(`Could not read ${ask.reviewOf} from GitHub`);
+    if (status.state !== 'OPEN')
+      return fail(`${ask.reviewOf} is ${status.state.toLowerCase()}`);
+    const key = reReviewKey(status);
+    if (key)
+      ask.reReview = { key, headRefOid: status.headRefOid, pending: false };
+    return sendReviewPrompt(ask, reviewAgainPrompt(ask.reviewOf, status));
   }
 
   function reviewTurnFinished(session: ChatSession, outcome: TurnOutcome) {
@@ -1031,6 +1052,20 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     stopWorkspace: (workspace) => chats.stopWorkspace(workspace),
     archive,
     transcript: (sessionId) => chats.transcript(sessionId),
+  });
+
+  const appCommands = createAppCommands({
+    ctx,
+    workspaceCli: (call) => orchestration.runCli(call),
+    isRunning: (sessionId) => chats.isRunning(sessionId),
+    waitingSessions: () => chats.waitingSessions(),
+    send: (session, text) =>
+      chats.send(session.id, {
+        ...korevPrompt(session, text),
+        planMode: session.planMode,
+      }),
+    stop: (sessionId) => api.stop(sessionId),
+    rerunReview,
   });
 
   function addSession(workspace: Workspace, agent: AgentKind) {
@@ -1625,6 +1660,20 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       if (!unread.length) return;
       for (const runtime of unread) runtime.unread = false;
       ctx.emitState();
+    },
+    async openKorevChat() {
+      const existing = store.state.askChats.find((ask) => ask.korev);
+      if (existing) {
+        restoreAskChat(existing.id);
+        return existing;
+      }
+      const ask = addAskChat([], {
+        ...newChatSession(ctx, store.state.settings.defaultAgent),
+        title: KOREV_CHAT_TITLE,
+      });
+      ask.korev = true;
+      saveAndEmit();
+      return ask;
     },
     async createAskChat(repoIds) {
       const ask = addAskChat(

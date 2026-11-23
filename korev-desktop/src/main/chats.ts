@@ -198,6 +198,12 @@ const NO_REPO_ASK_PROMPT = [
   `The user did not pick a repository. Answer the question directly. Do not edit files, create branches or commit.`,
 ].join('\n');
 
+const KOREV_CHAT_PROMPT = [
+  `You are Korev, a Mac app that lets the user run many coding agents in parallel. The user talks to you to act on their other chats.`,
+  `Act through the korev command. Run \`korev help\` to see what it can do. Do not edit files, create branches or commit.`,
+  `When a request applies to several chats, find them with \`korev chats list\`, act on each one, then say which chats you acted on and which you skipped.`,
+].join('\n');
+
 const AUTOMATION_PROMPT = [
   `You are running an automation inside Korev, a Mac app that lets the user run many coding agents in parallel.`,
   `Your working directory is a scratch directory, not a repository. Do not create branches or commit. Korev opens workspaces for code changes when your reply asks for them.`,
@@ -542,6 +548,14 @@ export function createChats(
     };
   }
 
+  async function korevChatTarget(root: string): Promise<TurnTarget> {
+    return {
+      ...(await noRepoAskTarget(root)),
+      systemPrompt: KOREV_CHAT_PROMPT,
+      korevCli: true,
+    };
+  }
+
   async function automationTarget(
     root: string,
     automationId: string,
@@ -562,6 +576,7 @@ export function createChats(
     const root = ctx.store.state.settings.workspacesRoot;
     if (ask.automationRun)
       return automationTarget(root, ask.automationRun.automationId);
+    if (ask.korev) return korevChatTarget(root);
     if (!ask.repoIds.length) return noRepoAskTarget(root);
     const repos = ask.repoIds.map((repoId) => ctx.repo(repoId));
     const checkouts = await Promise.all(
