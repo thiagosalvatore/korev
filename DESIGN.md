@@ -265,10 +265,16 @@ Notes** opens the same page.
   chat's title. The ellipsis button opens a native menu: Chats (each chat, then New chat),
   Explain changes, Show explanation / Show chat, the next PR step, Checks, Open on GitHub, a
   Pull requests picker when there are several, and Archive.
-- **Chat accessory.** Under the header, 28 pt capsules on `bgRaised`: the branch
-  (`fix-login → main`) and the PR ("No PR yet", "#87 · checks passed", "#90 · e2e failing" in
-  `dangerText`). The PR capsule opens the checks sheet, a form sheet whose rows open the check
-  on GitHub. An Ask chat shows one capsule with its repositories.
+- **Chat accessory.** Under the header, one row of 28 pt capsules on `bgRaised` that scrolls
+  sideways: the branch with its diff stat (`fix-login → main · +128 −14`), which opens Changes,
+  and the PR ("No PR yet", "#87 · checks passed", "#90 · e2e failing" in `dangerText`), which
+  opens the checks sheet, a form sheet whose rows open the check on GitHub. An Ask chat shows
+  one capsule with its repositories. A workspace error shows as a `dangerText` line under the row.
+- **Changes.** A pushed screen lists the changed files: the status letter in mono (`A`
+  `diffAdd`, `M` `warningText`, `D` `diffDel`, `R` `accentText`), the file name over its folder,
+  and `+N −M`. A tap opens the file's diff: old and new line numbers in `fg4`, mono `caption`
+  code that wraps, `diffAddBg` / `diffDelBg` rows and `diffHunkBg` hunk headers. The header menu
+  also has **Changes**.
 - **Transcript.** User messages sit on the right in an 18 pt bubble with a 4 pt bottom-right
   corner and no timestamp. Their text is native: a long press selects a word, with handles and
   the iOS menu (Copy, Look Up, Translate, Share). A long press on an agent message opens Copy,
