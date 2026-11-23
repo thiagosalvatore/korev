@@ -98,6 +98,7 @@ function statusColor(theme: Theme, kind: ChatStatusKind): string {
     ready: theme.successText,
     done: theme.merged,
     alert: theme.dangerText,
+    idle: theme.fg4,
   }[kind];
 }
 
@@ -114,7 +115,8 @@ export function ChatTitle({
 }) {
   const theme = useTheme();
   const styles = makeStyles(theme);
-  const color = status && statusColor(theme, status.kind);
+  const shownStatus = status?.kind === 'idle' && subtitle ? null : status;
+  const color = shownStatus && statusColor(theme, shownStatus.kind);
   return (
     <View style={styles.title} accessibilityRole="header">
       <Text
@@ -124,11 +126,11 @@ export function ChatTitle({
       >
         {title}
       </Text>
-      {status && color ? (
+      {shownStatus && color ? (
         <View style={styles.status}>
-          {status.kind === 'working' ? (
+          {shownStatus.kind === 'working' ? (
             <LoadingRing size={11} color={color} />
-          ) : (
+          ) : shownStatus.kind === 'idle' ? null : (
             <View style={[styles.dot, { backgroundColor: color }]} />
           )}
           <Text
@@ -136,8 +138,8 @@ export function ChatTitle({
             style={styles.statusText}
             numberOfLines={1}
           >
-            {status.label}
-            {status.kind === 'working' && since !== undefined ? (
+            {shownStatus.label}
+            {shownStatus.kind === 'working' && since !== undefined ? (
               <Elapsed since={since} />
             ) : null}
           </Text>

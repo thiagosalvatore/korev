@@ -2,23 +2,17 @@ import { setStringAsync } from 'expo-clipboard';
 import { FileText, Paperclip } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   View,
   type StyleProp,
-  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import {
-  dateTime,
-  fileName,
-  imageType,
-  resultSummary,
-} from '../../../korev-desktop/src/shared/format';
+import { fileName, imageType } from '../../../korev-desktop/src/shared/format';
 import {
   hasExplainerBlock,
   withoutExplainerBlocks,
@@ -31,7 +25,6 @@ import type {
   ChatItem,
   PermissionResponse,
   Repo,
-  TodoStatus,
 } from '../../../korev-desktop/src/shared/model';
 import { attempt } from '../attempt';
 import { chooseOption } from '../chooseOption';
@@ -46,19 +39,11 @@ import { ReaderSheet } from './ReaderSheet';
 
 type ItemOf<K extends ChatItem['kind']> = Extract<ChatItem, { kind: K }>;
 
-const TODO_MARKS: Record<TodoStatus, string> = {
-  pending: '○',
-  in_progress: '◐',
-  completed: '●',
-};
-
 function useStyles() {
   return makeStyles(useTheme());
 }
 
 const CHIP_ICON_SIZE = 14;
-
-const READ_TOOL = 'Read';
 
 function MessageAttachments({
   plans,
@@ -107,13 +92,14 @@ function MessageAttachments({
   );
 }
 
-type MessageAction = 'copy' | 'select';
+type MessageAction = 'copy' | 'select' | 'share';
 
-const MESSAGE_ACTIONS: MessageAction[] = ['copy', 'select'];
+const MESSAGE_ACTIONS: MessageAction[] = ['copy', 'select', 'share'];
 
 const MESSAGE_ACTION_LABELS: Record<MessageAction, string> = {
-  copy: 'Copy message',
+  copy: 'Copy',
   select: 'Select text',
+  share: 'Share…',
 };
 
 function copyMessage(text: string) {
@@ -142,6 +128,7 @@ function MessageActions({
     );
     if (action === 'copy') await copyMessage(text);
     if (action === 'select') setSelecting(true);
+    if (action === 'share') await Share.share({ message: text });
   };
 
   const longPress = Gesture.LongPress()
@@ -187,81 +174,21 @@ export function UserMessage({
   const styles = useStyles();
   const { body, plans, files } = messageParts(item.text);
   return (
-    <MessageActions
-      text={body}
-      style={[styles.userBubble, item.fromKorev && styles.korevBubble]}
-    >
+    <View style={[styles.userBubble, item.fromKorev && styles.korevBubble]}>
       {item.fromKorev ? (
         <Text style={[styles.dim, styles.korevCaption]}>Korev</Text>
       ) : null}
-      {body ? <Text style={styles.text}>{body}</Text> : null}
+      {body ? (
+        <TextInput
+          value={body}
+          editable={false}
+          multiline
+          scrollEnabled={false}
+          style={[styles.text, styles.selectableText]}
+        />
+      ) : null}
       <MessageAttachments plans={plans} files={files} sessionId={sessionId} />
       {item.queued ? <Text style={styles.dim}>Queued</Text> : null}
-      <Text style={[styles.dim, styles.sentAt]}>{dateTime(item.at)}</Text>
-    </MessageActions>
-  );
-}
-
-function Expandable({
-  header,
-  body,
-  headerStyle,
-}: {
-  header: string;
-  body: string;
-  headerStyle?: StyleProp<TextStyle>;
-}) {
-  const styles = useStyles();
-  const [open, setOpen] = useState(false);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ expanded: open }}
-      onPress={() => setOpen(!open)}
-    >
-      <Text style={[styles.dim, headerStyle]} numberOfLines={open ? 0 : 1}>
-        {header}
-      </Text>
-      {open && body ? (
-        <Text selectable style={styles.code}>
-          {body}
-        </Text>
-      ) : null}
-    </Pressable>
-  );
-}
-
-function ToolLine({
-  item,
-  sessionId,
-  running,
-}: {
-  item: ItemOf<'tool'>;
-  sessionId: string;
-  running: boolean;
-}) {
-  const theme = useTheme();
-  const styles = makeStyles(theme);
-  const body = [item.detail, item.output].filter(Boolean).join('\n\n');
-  const readsImage = item.name === READ_TOOL && imageType(item.summary);
-  const pending = running && item.output === null;
-  return (
-    <View style={styles.tool}>
-      <View style={styles.toolHeader}>
-        {pending ? (
-          <ActivityIndicator size="small" color={theme.accentText} />
-        ) : null}
-        <View style={styles.toolBody}>
-          <Expandable
-            header={`${item.name}  ${item.summary}`}
-            body={body}
-            headerStyle={item.failed ? styles.failed : undefined}
-          />
-        </View>
-      </View>
-      {readsImage && item.output !== null ? (
-        <ImageThumbnail sessionId={sessionId} path={item.summary} />
-      ) : null}
     </View>
   );
 }
@@ -322,35 +249,20 @@ function AssistantMessage({
   );
 }
 
-function TodoList({ item }: { item: ItemOf<'todos'> }) {
-  const styles = useStyles();
-  return (
-    <View>
-      {item.todos.map((todo) => (
-        <Text key={todo.text} style={styles.dim}>
-          {TODO_MARKS[todo.status]} {todo.text}
-        </Text>
-      ))}
-    </View>
-  );
-}
-
 function ResultLine({ item }: { item: ItemOf<'result'> }) {
   const styles = useStyles();
-  if (!item.ok)
-    return (
-      <Text style={styles.failed}>
-        {item.text || 'The agent stopped with an error.'}
-      </Text>
-    );
-  return <Text style={styles.dim}>{resultSummary(item)}</Text>;
+  if (item.ok) return null;
+  return (
+    <Text style={styles.failed}>
+      {item.text || 'The agent stopped with an error.'}
+    </Text>
+  );
 }
 
 export function ChatItemView({
   item,
   sessionId,
   repoUrl,
-  running,
   laneRepos,
   onRespond,
   onHandoff,
@@ -359,7 +271,6 @@ export function ChatItemView({
   item: ChatItem;
   sessionId: string;
   repoUrl: string | null;
-  running: boolean;
   laneRepos?: Repo[];
   onRespond(itemId: string, response: PermissionResponse): Promise<boolean>;
   onHandoff?(): Promise<boolean>;
@@ -379,11 +290,9 @@ export function ChatItemView({
         />
       );
     case 'thinking':
-      return <Expandable header="Thinking…" body={item.text} />;
     case 'tool':
-      return <ToolLine item={item} sessionId={sessionId} running={running} />;
     case 'todos':
-      return <TodoList item={item} />;
+      return null;
     case 'result':
       return <ResultLine item={item} />;
     case 'notice':
@@ -419,20 +328,8 @@ function makeStyles(theme: Theme) {
     explainerChipAction: { color: theme.accentText, fontSize: 14 },
     text: { color: theme.fg1, fontSize: 15, lineHeight: 22 },
     dim: { color: theme.fg3, fontSize: 13, lineHeight: 19 },
-    sentAt: { alignSelf: 'flex-end', fontSize: 11, lineHeight: 15 },
+    selectableText: { padding: 0 },
     failed: { color: theme.dangerText, fontSize: 13, lineHeight: 19 },
-    code: {
-      marginTop: 4,
-      padding: 8,
-      borderRadius: 6,
-      backgroundColor: theme.bgRaised,
-      color: theme.fg2,
-      fontFamily: MONO_FONT,
-      fontSize: 12,
-    },
-    tool: { gap: 6 },
-    toolHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    toolBody: { flex: 1 },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     chip: {
       flexDirection: 'row',
@@ -456,8 +353,10 @@ function makeStyles(theme: Theme) {
       alignSelf: 'flex-end',
       maxWidth: '85%',
       gap: 4,
-      padding: 10,
-      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 18,
+      borderBottomRightRadius: 4,
       backgroundColor: theme.bgRaised,
       borderWidth: 1,
       borderColor: theme.border1,

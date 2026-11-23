@@ -6,7 +6,7 @@ import {
   isPrUrl,
   splitPrRefs,
 } from '../../../korev-desktop/src/shared/pr-links';
-import { useTheme } from '../theme';
+import { MONO_FONT, useTheme } from '../theme';
 
 type OpenImage = (path: string) => void;
 
@@ -102,6 +102,15 @@ export function MarkdownView({
   const elements = useMarkdown(value, {
     colorScheme: useColorScheme(),
     renderer,
+    styles: {
+      codespan: {
+        fontStyle: 'normal',
+        fontWeight: '400',
+        fontFamily: MONO_FONT,
+        fontSize: 14,
+        backgroundColor: theme.bgRaised,
+      },
+    },
     theme: {
       colors: {
         text: theme.fg1,

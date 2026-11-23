@@ -8,7 +8,13 @@ import {
   type PrStep,
 } from '../../../korev-desktop/src/shared/model';
 
-export type ChatStatusKind = 'working' | 'waiting' | 'ready' | 'done' | 'alert';
+export type ChatStatusKind =
+  | 'working'
+  | 'waiting'
+  | 'ready'
+  | 'done'
+  | 'alert'
+  | 'idle';
 
 export interface ChatStatus {
   kind: ChatStatusKind;
@@ -27,17 +33,20 @@ export function chatStatus({
   running,
   waiting,
   pr,
+  finished,
 }: {
   running: boolean;
   waiting: boolean;
   pr: PrStatus | null;
+  finished?: string;
 }): ChatStatus | null {
   if (running) return { kind: 'working', label: 'Working' };
   if (waiting) return { kind: 'waiting', label: 'Needs your answer' };
-  if (!pr) return null;
+  const idle = finished ? { kind: 'idle' as const, label: finished } : null;
+  if (!pr) return idle;
   const step = nextPrStep(pr);
   if (MERGE_STEPS.has(step)) return READY;
-  return STEP_STATUS[step] ?? null;
+  return STEP_STATUS[step] ?? idle;
 }
 
 const PASSED_STATES = new Set(['success', 'skipped']);
