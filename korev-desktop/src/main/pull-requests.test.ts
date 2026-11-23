@@ -626,10 +626,18 @@ describe('review reply instruction', () => {
 });
 
 describe('review status', () => {
+  interface ReviewThreadFixture {
+    opener: string;
+    latest?: string;
+    resolved?: boolean;
+    bot?: boolean;
+  }
+
   function reviewResponse({
     state = 'OPEN',
     review = null as { id: string; state: string; oid: string } | null,
     requested = [] as string[],
+    threads = [] as ReviewThreadFixture[],
   } = {}) {
     return JSON.stringify({
       data: {
@@ -645,6 +653,22 @@ describe('review status', () => {
           reviewRequests: {
             nodes: requested.map((login) => ({
               requestedReviewer: { login },
+            })),
+          },
+          reviewThreads: {
+            nodes: threads.map(({ resolved = false, opener, latest, bot }) => ({
+              isResolved: resolved,
+              opener: { nodes: [{ author: { login: opener } }] },
+              latest: {
+                nodes: [
+                  {
+                    author: {
+                      login: latest ?? opener,
+                      __typename: bot ? 'Bot' : 'User',
+                    },
+                  },
+                ],
+              },
             })),
           },
         },
@@ -665,6 +689,7 @@ describe('review status', () => {
       headRefOid: 'head1',
       latestReview: { id: 'r1', state: 'CHANGES_REQUESTED', commitOid: 'old1' },
       reRequested: true,
+      threadsAnswered: false,
     });
   });
 
@@ -700,6 +725,33 @@ describe('review status', () => {
     expect(reRequested && reReviewKey(reRequested)).toBe('r1@head1');
     expect(notRequested && reReviewKey(notRequested)).toBeNull();
     expect(approved && reReviewKey(approved)).toBeNull();
+  });
+
+  it('asks for a re-check once the author resolves or answers every comment you left', () => {
+    const changesRequested = {
+      review: { id: 'r1', state: 'CHANGES_REQUESTED', oid: 'old1' },
+    };
+    const keyWith = (threads: ReviewThreadFixture[]) => {
+      const status = parseReviewStatus(
+        reviewResponse({ ...changesRequested, threads }),
+      );
+      return status && reReviewKey(status);
+    };
+
+    expect(
+      keyWith([
+        { opener: 'me', resolved: true },
+        { opener: 'me', latest: 'author' },
+        { opener: 'someone' },
+      ]),
+    ).toBe('r1@head1');
+    expect(
+      keyWith([{ opener: 'me', resolved: true }, { opener: 'me' }]),
+    ).toBeNull();
+    expect(
+      keyWith([{ opener: 'me', latest: 'coderabbitai', bot: true }]),
+    ).toBeNull();
+    expect(keyWith([{ opener: 'someone', resolved: true }])).toBeNull();
   });
 
   it('returns null for a response without a pull request', () => {

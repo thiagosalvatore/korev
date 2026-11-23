@@ -1044,7 +1044,7 @@ function Git({ settings }: { settings: Settings }) {
       </Row>
       <Row
         title="Re-check reviews"
-        description="When the author of a pull request you reviewed asks for your review again, Korev sends the new changes to the review chat. The agent checks whether each of its findings was fixed. With Re-check and approve, Korev approves the pull request when every finding is fixed."
+        description="When the author of a pull request you reviewed asks for your review again, or resolves or answers every comment you left, Korev sends the new changes to the review chat. The agent checks whether each of its findings was fixed. With Re-check and approve, Korev approves the pull request when every finding is fixed."
       >
         <Select
           ariaLabel="Re-check reviews"

@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Re-check reviews without a re-request.** Re-check reviews no longer waits for the author to click Re-request review. Korev also re-checks when every review comment you left is resolved or has an answer from someone else. Answers from bots do not count.
+
 ## [0.39.0] - 2026-11-23
 
 The phone app is redesigned: it shows what needs you first, and you can read changes, review comments and script output and manage queued messages from your phone.

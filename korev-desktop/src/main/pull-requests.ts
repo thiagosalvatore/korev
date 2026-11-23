@@ -92,6 +92,7 @@ const PR_THREADS_QUERY = `query($url: URI!) {
   }
 }`;
 const GHOST_AUTHOR = 'ghost';
+const BOT_TYPENAME = 'Bot';
 const MAX_REVIEW_REQUESTS = 100;
 const REVIEW_STATUS_QUERY = `query($url: URI!) {
   viewer { login }
@@ -101,6 +102,13 @@ const REVIEW_STATUS_QUERY = `query($url: URI!) {
       viewerLatestReview { id state commit { oid } }
       reviewRequests(first: ${MAX_REVIEW_REQUESTS}) {
         nodes { requestedReviewer { ... on User { login } } }
+      }
+      reviewThreads(first: ${THREADS_PAGE_SIZE}) {
+        nodes {
+          isResolved
+          opener: comments(first: 1) { nodes { author { login } } }
+          latest: comments(last: 1) { nodes { author { login __typename } } }
+        }
       }
     }
   }
@@ -174,7 +182,7 @@ interface ReviewThreadSummary {
 function startedByTrustedAuthor(thread: ReviewThreadSummary): boolean {
   const opening = thread.first?.nodes[0];
   return (
-    opening?.author?.__typename === 'Bot' ||
+    opening?.author?.__typename === BOT_TYPENAME ||
     TRUSTED_ASSOCIATIONS.has(opening?.authorAssociation ?? '')
   );
 }
@@ -485,6 +493,17 @@ export interface ReviewStatus {
   headRefOid: string;
   latestReview: { id: string; state: string; commitOid: string } | null;
   reRequested: boolean;
+  threadsAnswered: boolean;
+}
+
+interface ThreadAuthor {
+  author?: { login?: string; __typename?: string } | null;
+}
+
+interface ReviewStatusThread {
+  isResolved?: boolean;
+  opener?: { nodes: ThreadAuthor[] };
+  latest?: { nodes: ThreadAuthor[] };
 }
 
 interface ReviewStatusResponse {
@@ -501,8 +520,34 @@ interface ReviewStatusResponse {
       reviewRequests?: {
         nodes: { requestedReviewer?: { login?: string } | null }[];
       };
+      reviewThreads?: { nodes: ReviewStatusThread[] };
     } | null;
   };
+}
+
+function answeredByOthers(thread: ReviewStatusThread, viewer: string): boolean {
+  const author = thread.latest?.nodes[0]?.author;
+  return (
+    !!author?.login &&
+    author.login !== viewer &&
+    author.__typename !== BOT_TYPENAME
+  );
+}
+
+function threadsAnswered(
+  threads: ReviewStatusThread[],
+  viewer: string | undefined,
+): boolean {
+  if (!viewer) return false;
+  const yours = threads.filter(
+    (thread) => thread.opener?.nodes[0]?.author?.login === viewer,
+  );
+  return (
+    yours.length > 0 &&
+    yours.every(
+      (thread) => thread.isResolved || answeredByOthers(thread, viewer),
+    )
+  );
 }
 
 export function parseReviewStatus(json: string): ReviewStatus | null {
@@ -529,6 +574,7 @@ export function parseReviewStatus(json: string): ReviewStatus | null {
     reRequested: (pr.reviewRequests?.nodes ?? []).some(
       (request) => !!viewer && request.requestedReviewer?.login === viewer,
     ),
+    threadsAnswered: threadsAnswered(pr.reviewThreads?.nodes ?? [], viewer),
   };
 }
 
@@ -538,7 +584,8 @@ export function reviewFinished(status: ReviewStatus): boolean {
 
 export function reReviewKey(status: ReviewStatus): string | null {
   const review = status.latestReview;
-  if (status.state !== 'OPEN' || !status.reRequested) return null;
+  const authorReady = status.reRequested || status.threadsAnswered;
+  if (status.state !== 'OPEN' || !authorReady) return null;
   if (!review || review.state === 'APPROVED') return null;
   return `${review.id}@${status.headRefOid}`;
 }
@@ -780,7 +827,8 @@ export function inboxReviewPrompt(pr: PrStatus): string {
 }
 
 const REVIEW_FENCE = 'korev-review';
-const GITHUB_PR_URL = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/\d+$/;
+const GITHUB_PR_URL =
+  /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)$/;
 
 function changesSince(url: string, status: ReviewStatus): string {
   const fullDiff = `\`gh pr diff ${url}\``;
@@ -790,15 +838,22 @@ function changesSince(url: string, status: ReviewStatus): string {
   return `Your last review was on commit ${reviewed}. Read only what changed since then with \`gh api repos/${repo}/compare/${reviewed}...${status.headRefOid} --jq '.files[] | .filename, .patch'\`. If that fails, for example after a force push, read ${fullDiff}.`;
 }
 
+function repliesToReview(url: string): string {
+  const [, repo, number] = GITHUB_PR_URL.exec(url) ?? [];
+  if (!repo) return 'Read their replies to your review comments.';
+  return `Read their replies to your review comments with \`gh api repos/${repo}/pulls/${number}/comments --paginate --jq '.[] | {path, line, user: .user.login, body, in_reply_to_id}'\`.`;
+}
+
 export function reReviewPrompt(
   url: string,
   status: ReviewStatus,
   approve: boolean,
 ): string {
   return [
-    `The author changed pull request ${url} and asked for your review again.`,
+    `The author responded to your review on pull request ${url}.`,
     changesSince(url, status),
-    'For each finding you listed earlier in this chat, say whether the new commits address it. Do not edit files and do not post a review.',
+    repliesToReview(url),
+    "For each finding you listed earlier in this chat, say whether the new commits or the author's replies address it. Do not edit files and do not post a review.",
     approve
       ? `End your reply with exactly one fenced block that starts with \`\`\`${REVIEW_FENCE} and holds {"addressed": true} when every finding is addressed and nothing new needs a fix, or {"addressed": false} otherwise.`
       : null,
@@ -827,7 +882,7 @@ function toPrComment(node: JsonRecord): PrComment {
   return {
     id: str(node.id),
     author: str(author?.login) || GHOST_AUTHOR,
-    isBot: author?.__typename === 'Bot',
+    isBot: author?.__typename === BOT_TYPENAME,
     body: str(node.body),
     url: str(node.url),
     createdAt: str(node.createdAt),
