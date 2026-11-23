@@ -65,6 +65,11 @@ export function openAsk(
   void api.focusWorkspaces([]);
 }
 
+export async function openKorevChat() {
+  const ask = await api.openKorevChat();
+  openAsk(ask.id);
+}
+
 export async function startAsk(
   repoIds: string[],
   question: SendOptions,

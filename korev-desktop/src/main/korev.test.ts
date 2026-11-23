@@ -2005,6 +2005,73 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     });
   });
 
+  it('keeps plan mode on in a chat the Korev chat messages', async () => {
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    await korev.api.updateSession(session.id, { planMode: true });
+
+    const korevChat = await korev.api.openKorevChat();
+    await sendAndWait(korevChat.session.id, 'message-every-chat');
+    await waitForTurn(session.id);
+
+    const prompts = (await korev.api.transcript(session.id)).filter(
+      (item) => item.kind === 'user',
+    );
+    expect(prompts.map((item) => item.kind === 'user' && item.text)).toEqual([
+      'hello from Korev',
+    ]);
+    const state = await korev.api.getState();
+    expect(state.workspaces[0].sessions[0].planMode).toBe(true);
+  });
+
+  it('re-runs every open review from the Korev chat', async () => {
+    const repo = await addRepo();
+    const numbers = [41, 42];
+    const urlOf = (number: number) =>
+      `https://github.com/acme/web/pull/${number}`;
+    prsByNumber = Object.fromEntries(
+      numbers.map((number) => [
+        String(number),
+        { number, url: urlOf(number), title: `PR ${number}`, state: 'OPEN' },
+      ]),
+    );
+    const reviewSessions: string[] = [];
+    for (const number of numbers) {
+      const started = await korev.api.reviewPullRequest(repo.id, number);
+      if (!started.ok) throw new Error(started.message);
+      const ask = (await korev.api.getState()).askChats.find(
+        (entry) => entry.id === started.value.askChatId,
+      )!;
+      await waitForTurn(ask.session.id);
+      reviewSessions.push(ask.session.id);
+      reviewsByUrl[urlOf(number)] = {
+        state: 'OPEN',
+        headRefOid: 'head2',
+        viewerLatestReview: {
+          id: `r${number}`,
+          state: 'CHANGES_REQUESTED',
+          commit: { oid: 'head1' },
+        },
+        reviewRequests: { nodes: [] },
+      };
+    }
+
+    const korevChat = await korev.api.openKorevChat();
+    await sendAndWait(korevChat.session.id, 'rerun-all-reviews');
+
+    for (const sessionId of reviewSessions) {
+      await waitForTurn(sessionId);
+      const prompts = (await korev.api.transcript(sessionId)).filter(
+        (item) => item.kind === 'user',
+      );
+      expect(prompts).toHaveLength(2);
+      expect(prompts[1].kind === 'user' && prompts[1].text).toEqual(
+        expect.stringContaining('compare/head1...head2'),
+      );
+    }
+    expect((await korev.api.openKorevChat()).id).toBe(korevChat.id);
+  });
+
   it('explains a pull request together with the open ones it builds on', async () => {
     const repo = await addRepo();
     prsByNumber = {

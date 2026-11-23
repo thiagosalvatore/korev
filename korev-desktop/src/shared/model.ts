@@ -625,6 +625,7 @@ export interface AskChat {
   reviewOf?: string;
   archivedAt?: string;
   reReview?: ReReview;
+  korev?: boolean;
 }
 
 export interface ReReview {

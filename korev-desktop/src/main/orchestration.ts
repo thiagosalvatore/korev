@@ -119,15 +119,15 @@ export interface Orchestration {
   resolveGate(runId: string, gateId: string, choice: string): Promise<Result>;
 }
 
-type Command = (call: CliCall, args: string[]) => Promise<CliReply>;
+export type Command = (call: CliCall, args: string[]) => Promise<CliReply>;
 
-class CliError extends Error {}
+export class CliError extends Error {}
 
-function done(output: string): CliReply {
+export function done(output: string): CliReply {
   return { ok: true, output };
 }
 
-function failed(output: string): CliReply {
+export function failed(output: string): CliReply {
   return { ok: false, output };
 }
 
@@ -143,7 +143,7 @@ function list(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
-function required(value: string | undefined, flag: string): string {
+export function required(value: string | undefined, flag: string): string {
   if (!value?.trim()) throw new CliError(`Missing --${flag}.`);
   return value.trim();
 }
@@ -157,7 +157,7 @@ function oneOf<T extends string>(
   throw new CliError(`--${flag} must be one of: ${allowed.join(', ')}.`);
 }
 
-function flags<T extends Record<string, 'string' | 'boolean'>>(
+export function flags<T extends Record<string, 'string' | 'boolean'>>(
   args: string[],
   spec: T,
 ): { [K in keyof T]?: T[K] extends 'boolean' ? boolean : string } {
@@ -168,6 +168,26 @@ function flags<T extends Record<string, 'string' | 'boolean'>>(
     return parseArgs({ args, options, strict: true }).values as never;
   } catch (error) {
     throw new CliError(errorMessage(error));
+  }
+}
+
+export async function runCommand(
+  commands: Record<string, Command>,
+  call: CliCall,
+): Promise<CliReply> {
+  const [first = 'help', second = ''] = call.argv;
+  const pair = `${first} ${second}`;
+  const [name, args] = commands[pair]
+    ? [pair, call.argv.slice(2)]
+    : [first, call.argv.slice(1)];
+  const command = commands[name];
+  if (!command)
+    return failed(`Unknown command "${pair.trim()}". Run \`korev help\`.`);
+  try {
+    return await command(call, args);
+  } catch (error) {
+    if (error instanceof CliError) return failed(error.message);
+    throw error;
   }
 }
 
@@ -886,23 +906,6 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
     );
   }
 
-  async function runCli(call: CliCall): Promise<CliReply> {
-    const [first = 'help', second = ''] = call.argv;
-    const pair = `${first} ${second}`;
-    const [name, args] = commands[pair]
-      ? [pair, call.argv.slice(2)]
-      : [first, call.argv.slice(1)];
-    const command = commands[name];
-    if (!command)
-      return failed(`Unknown command "${pair.trim()}". Run \`korev help\`.`);
-    try {
-      return await command(call, args);
-    } catch (error) {
-      if (error instanceof CliError) return failed(error.message);
-      throw error;
-    }
-  }
-
   async function reportUnfinished(
     run: OrchestrationRun,
     task: OrchestrationTask,
@@ -929,7 +932,7 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
   }
 
   return {
-    runCli,
+    runCli: (call) => runCommand(commands, call),
     async turnFinished(sessionId) {
       const found = activeTask(sessionId);
       if (!found || waitsForAnswer(found.run, found.task)) return;
