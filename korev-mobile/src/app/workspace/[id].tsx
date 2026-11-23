@@ -1,18 +1,22 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { GitBranch, GitPullRequest } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Linking, StyleSheet, Text } from 'react-native';
 import {
   hasWorktree,
+  nextPrStep,
+  PR_BADGE_LABELS,
+  PR_STEPS,
+  prBadge,
+  primaryPr,
   type AppState,
   type ChatSession,
+  type PrStatus,
+  type PrStep,
   type Workspace,
+  type WorkspaceRuntime,
 } from '../../../../korev-desktop/src/shared/model';
+import type { SFSymbol } from 'sf-symbols-typescript';
 import {
   crossRepoLead,
   groupRepoName,
@@ -22,20 +26,39 @@ import {
 } from '../../../../korev-desktop/src/shared/workspaces';
 import { attempt } from '../../attempt';
 import { Chat } from '../../chat/Chat';
+import {
+  Capsule,
+  ChatAccessory,
+  type ChatMenuEntry,
+} from '../../chat/ChatHeader';
+import { prCapsuleLabel } from '../../chat/chatStatus';
 import { RunDecisions } from '../../chat/RunDecisions';
 import { useAppState, usePendingAction } from '../../hooks';
 import { Loading } from '../../Offline';
 import { useConnection } from '../../korev';
-import { PickerButton, type PickerOption } from '../../PickerSheet';
-import { PrBar } from '../../PrBar';
+import {
+  ACTION_STEPS,
+  FLOATING_STEPS,
+  hasChanges,
+  PROMPT_STEPS,
+  runStep,
+  stepLabel,
+} from '../../prActions';
 import { useTheme, type Theme } from '../../theme';
-import { CHROME_FONT_SCALE, MIN_TOUCH_TARGET, touchSlop } from '../../ui';
+import { Button } from '../../ui';
 import { WorktreePending } from '../../WorktreePending';
 
-type Styles = ReturnType<typeof makeStyles>;
-
-const NEW_CHAT_HEIGHT = 32;
 const NEEDS_YOU = 'Needs you';
+const CAPSULE_ICON_SIZE = 13;
+
+const STEP_ICONS: Partial<Record<PrStep, SFSymbol>> = {
+  create: 'arrow.triangle.pull',
+  'fix-errors': 'wrench.and.screwdriver',
+  'resolve-conflicts': 'arrow.triangle.branch',
+  merge: 'arrow.triangle.merge',
+  'merge-partial-stack': 'arrow.triangle.merge',
+  'merge-stack': 'arrow.triangle.merge',
+};
 
 function waitingSessionIds(state: AppState): ReadonlySet<string> {
   return new Set(state.waitingSessions ?? []);
@@ -63,91 +86,272 @@ function waitingHint(state: AppState, workspace: Workspace) {
   return `This workspace's agent starts when you approve the plan in ${groupRepoName(state, lead)}.`;
 }
 
-function SessionBar({
+function sessionSubtitle(
+  state: AppState,
+  sessionId: string,
+): string | undefined {
+  if (state.runningSessions.includes(sessionId)) return 'Working';
+  if (waitingSessionIds(state).has(sessionId)) return NEEDS_YOU;
+  return undefined;
+}
+
+function useWorkspaceActions(
+  state: AppState,
+  workspace: Workspace,
+  runtime: WorkspaceRuntime | undefined,
+  session: ChatSession | undefined,
+  onSelect: (sessionId: string) => void,
+) {
+  const { api } = useConnection();
+  const { pending, run } = usePendingAction();
+  const [chosenUrl, setChosenUrl] = useState<string | null>(null);
+  const prs = runtime?.prs ?? [];
+  const pr = primaryPr(workspace, runtime, chosenUrl);
+  const step = nextPrStep(pr);
+  const busy = pending !== null;
+  const canRunStep = !PROMPT_STEPS.has(step) || Boolean(session);
+
+  const runPrStep = (prStep: PrStep) =>
+    void run(prStep, () =>
+      runStep(api, prStep, workspace, pr, session?.id ?? ''),
+    );
+
+  const explain = () =>
+    void run('explain', () =>
+      attempt('Korev could not explain the changes', async () => {
+        const started = await api.startExplainer({
+          kind: 'workspace',
+          workspaceId: workspace.id,
+        });
+        if (started.ok) onSelect(started.value.sessionId);
+        return started;
+      }),
+    );
+
+  const newChat = () =>
+    void run('new-chat', () =>
+      attempt('Korev could not start a chat', async () => {
+        const created = await api.newSession(
+          workspace.id,
+          state.settings.defaultAgent,
+        );
+        onSelect(created.id);
+      }),
+    );
+
+  const openChecks = () =>
+    router.push({
+      pathname: '/checks/[id]',
+      params: { id: workspace.id, pr: pr?.url ?? '' },
+    });
+
+  const chats: ChatMenuEntry = {
+    label: 'Chats',
+    icon: 'bubble.left.and.bubble.right',
+    items: [
+      ...workspace.sessions.map((entry) => ({
+        label: entry.title,
+        subtitle: sessionSubtitle(state, entry.id),
+        isOn: entry.id === session?.id,
+        onPress: () => onSelect(entry.id),
+      })),
+      {
+        label: 'New chat',
+        icon: 'plus.bubble',
+        disabled: busy,
+        onPress: newChat,
+      } satisfies ChatMenuEntry,
+    ],
+  };
+
+  const prItems: ChatMenuEntry[] = [
+    ...(ACTION_STEPS.has(step) && step !== 'archive'
+      ? [
+          {
+            label: stepLabel(step, pr),
+            icon: STEP_ICONS[step],
+            disabled: busy || !canRunStep,
+            onPress: () => runPrStep(step),
+          },
+        ]
+      : []),
+    ...(pr?.checks.length
+      ? [{ label: 'Checks', icon: 'checklist' as const, onPress: openChecks }]
+      : []),
+    ...(pr
+      ? [
+          {
+            label: 'Open on GitHub',
+            icon: 'arrow.up.right.square' as const,
+            onPress: () => void Linking.openURL(pr.url),
+          },
+        ]
+      : []),
+  ];
+
+  const prChoices: ChatMenuEntry[] =
+    pr && prs.length > 1
+      ? [
+          {
+            label: 'Pull requests',
+            icon: 'arrow.triangle.pull',
+            items: prs.map((entry) => ({
+              label: `#${entry.number} ${entry.title}`,
+              subtitle: PR_BADGE_LABELS[prBadge(entry)],
+              isOn: entry.url === pr.url,
+              onPress: () => setChosenUrl(entry.url),
+            })),
+          },
+        ]
+      : [];
+
+  const menu: ChatMenuEntry[] = [
+    chats,
+    ...(hasChanges(runtime)
+      ? [
+          {
+            label: 'Explain changes',
+            icon: 'book' as const,
+            disabled: busy,
+            onPress: explain,
+          },
+        ]
+      : []),
+    { label: 'Pull request', inline: true, items: [...prItems, ...prChoices] },
+    {
+      label: '',
+      inline: true,
+      items: [
+        {
+          label: PR_STEPS.archive.label,
+          icon: 'archivebox',
+          destructive: step !== 'archive',
+          disabled: busy,
+          onPress: () => runPrStep('archive'),
+        },
+      ],
+    },
+  ];
+
+  const floatingAction = FLOATING_STEPS.has(step) ? (
+    <Button
+      label={stepLabel(step, pr)}
+      variant={PR_STEPS[step].tone}
+      pending={pending === step}
+      disabled={busy || !canRunStep}
+      large
+      onPress={() => runPrStep(step)}
+    />
+  ) : null;
+
+  return { pr, menu, floatingAction, openChecks };
+}
+
+function WorkspaceAccessory({
+  workspace,
+  runtime,
+  pr,
+  onOpenChecks,
+}: {
+  workspace: Workspace;
+  runtime: WorkspaceRuntime | undefined;
+  pr: PrStatus | null;
+  onOpenChecks: () => void;
+}) {
+  const theme = useTheme();
+  const styles = makeStyles(theme);
+  const step = pr && nextPrStep(pr);
+  const tone =
+    step === 'fix-errors' || step === 'resolve-conflicts'
+      ? theme.dangerText
+      : undefined;
+  return (
+    <ChatAccessory>
+      <Capsule
+        icon={<GitBranch size={CAPSULE_ICON_SIZE} color={theme.fg3} />}
+        label={`${workspace.branch} → ${workspace.baseBranch}`}
+      />
+      <Capsule
+        icon={
+          <GitPullRequest size={CAPSULE_ICON_SIZE} color={tone ?? theme.fg3} />
+        }
+        label={prCapsuleLabel(pr)}
+        tone={tone}
+        accessibilityLabel={pr?.checks.length ? 'Show the checks' : undefined}
+        onPress={pr?.checks.length ? onOpenChecks : undefined}
+      />
+      {runtime?.message ? (
+        <Text style={styles.message}>{runtime.message}</Text>
+      ) : null}
+    </ChatAccessory>
+  );
+}
+
+function WorkspaceChat({
   state,
   workspace,
-  selected,
+  runtime,
+  session,
   onSelect,
-  styles,
 }: {
   state: AppState;
   workspace: Workspace;
-  selected: ChatSession | undefined;
+  runtime: WorkspaceRuntime | undefined;
+  session: ChatSession | undefined;
   onSelect: (sessionId: string) => void;
-  styles: Styles;
 }) {
-  const { api } = useConnection();
-  const theme = useTheme();
-  const { pending, run } = usePendingAction();
-  const creating = pending !== null;
+  const styles = makeStyles(useTheme());
+  const { pr, menu, floatingAction, openChecks } = useWorkspaceActions(
+    state,
+    workspace,
+    runtime,
+    session,
+    onSelect,
+  );
   const waiting = waitingSessionIds(state);
   const otherChatWaits = workspace.sessions.some(
-    (session) => session.id !== selected?.id && waiting.has(session.id),
+    (entry) => entry.id !== session?.id && waiting.has(entry.id),
+  );
+  const coordinatedRun = state.runs?.findLast((run) =>
+    workspace.sessions.some((entry) => entry.id === run.coordinatorSessionId),
+  );
+  const accessory = (
+    <>
+      <WorkspaceAccessory
+        workspace={workspace}
+        runtime={runtime}
+        pr={pr}
+        onOpenChecks={openChecks}
+      />
+      {coordinatedRun ? <RunDecisions run={coordinatedRun} /> : null}
+    </>
   );
 
-  function sessionIcon(sessionId: string) {
-    if (state.runningSessions.includes(sessionId))
-      return <ActivityIndicator size="small" color={theme.accentText} />;
-    if (waiting.has(sessionId)) return <View style={styles.waitingDot} />;
-    return undefined;
-  }
-
-  const options: PickerOption[] = workspace.sessions.map((session) => ({
-    key: session.id,
-    label: session.title,
-    detail: waiting.has(session.id) ? NEEDS_YOU : undefined,
-    icon: sessionIcon(session.id),
-    selected: session.id === selected?.id,
-  }));
-
-  async function newChat() {
-    const session = await api.newSession(
-      workspace.id,
-      state.settings.defaultAgent,
+  if (!session)
+    return (
+      <>
+        <Stack.Screen options={{ title: workspaceTitle(state, workspace) }} />
+        {accessory}
+        <Text style={styles.empty}>This workspace has no chats.</Text>
+      </>
     );
-    onSelect(session.id);
-  }
-
   return (
-    <View style={styles.sessionBar}>
-      {selected ? (
-        <PickerButton
-          label="Chats"
-          value={selected.title}
-          title="Chats"
-          options={options}
-          onSelect={onSelect}
-        />
-      ) : null}
-      {otherChatWaits ? (
-        <View
-          accessibilityLabel="Another chat needs you"
-          style={styles.waitingDot}
-        />
-      ) : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ busy: creating }}
-        disabled={creating}
-        hitSlop={touchSlop(NEW_CHAT_HEIGHT)}
-        style={styles.newChat}
-        onPress={() =>
-          void run('new-chat', () =>
-            attempt('Korev could not start a chat', newChat),
-          )
-        }
-      >
-        {creating ? (
-          <ActivityIndicator size="small" color={theme.accentText} />
-        ) : null}
-        <Text
-          maxFontSizeMultiplier={CHROME_FONT_SCALE}
-          style={styles.newChatText}
-        >
-          + New chat
-        </Text>
-      </Pressable>
-    </View>
+    <Chat
+      key={session.id}
+      state={state}
+      session={session}
+      repoId={workspace.repoId}
+      title={workspaceTitle(state, workspace)}
+      subtitle={workspace.sessions.length > 1 ? session.title : undefined}
+      pr={pr}
+      menu={menu}
+      menuBadge={otherChatWaits ? '1' : undefined}
+      accessory={accessory}
+      floatingAction={floatingAction}
+      laneRepos={laneRepos(state, workspace)}
+      emptyHint={waitingHint(state, workspace)}
+      onHandoff={onSelect}
+    />
   );
 }
 
@@ -180,41 +384,15 @@ export default function WorkspaceScreen() {
     workspace.sessions.find((entry) => entry.id === selectedId) ??
     defaultSession(state, workspace);
   if (session && session.id !== selectedId) setSelectedId(session.id);
-  const coordinatedRun = state.runs?.findLast((run) =>
-    workspace.sessions.some((entry) => entry.id === run.coordinatorSessionId),
-  );
 
   return (
-    <>
-      <Stack.Screen options={{ title: workspaceTitle(state, workspace) }} />
-      <PrBar
-        workspace={workspace}
-        runtime={runtime}
-        sessionId={session?.id}
-        onExplained={setSelectedId}
-      />
-      {coordinatedRun ? <RunDecisions run={coordinatedRun} /> : null}
-      <SessionBar
-        state={state}
-        workspace={workspace}
-        selected={session}
-        onSelect={setSelectedId}
-        styles={styles}
-      />
-      {session ? (
-        <Chat
-          key={session.id}
-          state={state}
-          session={session}
-          repoId={workspace.repoId}
-          laneRepos={laneRepos(state, workspace)}
-          emptyHint={waitingHint(state, workspace)}
-          onHandoff={setSelectedId}
-        />
-      ) : (
-        <Text style={styles.empty}>This workspace has no chats.</Text>
-      )}
-    </>
+    <WorkspaceChat
+      state={state}
+      workspace={workspace}
+      runtime={runtime}
+      session={session}
+      onSelect={setSelectedId}
+    />
   );
 }
 
@@ -222,30 +400,6 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
     fill: { flex: 1 },
     empty: { padding: 24, color: theme.fg3, textAlign: 'center' },
-    sessionBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      minHeight: MIN_TOUCH_TARGET,
-      paddingHorizontal: 16,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.border1,
-    },
-    newChat: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      minHeight: NEW_CHAT_HEIGHT,
-      marginLeft: 'auto',
-      paddingHorizontal: 10,
-      borderRadius: 6,
-    },
-    newChatText: { color: theme.fg2, fontSize: 13 },
-    waitingDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 4,
-      backgroundColor: theme.warning,
-    },
+    message: { flexBasis: '100%', color: theme.dangerText, fontSize: 13 },
   });
 }
