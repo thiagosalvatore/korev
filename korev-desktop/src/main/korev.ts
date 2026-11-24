@@ -1078,6 +1078,8 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       }),
     stop: (sessionId) => api.stop(sessionId),
     rerunReview,
+    createWorkspaces: (repoIds, task) =>
+      createWorkspaces(ctx, repoIds, task, chats.send),
   });
 
   function addSession(workspace: Workspace, agent: AgentKind) {

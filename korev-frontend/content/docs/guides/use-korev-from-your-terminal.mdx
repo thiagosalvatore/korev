@@ -1,6 +1,6 @@
 ---
 title: Use Korev from your terminal
-description: 'List your chats, message them and stop them with the korev command.'
+description: 'Create workspaces and list, message and stop your chats with the korev command.'
 ---
 
 The `korev` command lets you act on your chats from your own terminal, while Korev is open.
@@ -18,13 +18,22 @@ The link points inside `Korev.app`, so it keeps working after Korev updates.
 
 ## Commands
 
-| Command                                         | What it does                                                                                         |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `korev chats list [--reviews]`                  | Shows one line per open chat: its id, whether it is running, waiting for you or idle, and its title. |
-| `korev chats send --id <chat id> --body "text"` | Sends a message to a chat, the same as typing it in the chat.                                        |
-| `korev chats stop --id <chat id>`               | Stops a running chat.                                                                                |
-| `korev review rerun --id <chat id>`             | Asks a review chat to check its pull request again.                                                  |
-| `korev help`                                    | Shows these commands.                                                                                |
+| Command                                         | What it does                                                                                                                                        |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `korev chats list [--reviews]`                  | Shows one line per open chat: its id, whether it is running, waiting for you or idle, and its title.                                                |
+| `korev chats send --id <chat id> --body "text"` | Sends a message to a chat, the same as typing it in the chat.                                                                                       |
+| `korev chats stop --id <chat id>`               | Stops a running chat.                                                                                                                               |
+| `korev review rerun --id <chat id>`             | Asks a review chat to check its pull request again.                                                                                                 |
+| `korev new --task "text" [--repo <name>]`       | Creates a workspace and starts its agent on the task, with your default agent and plan mode. Leave out `--repo` when Korev has only one repository. |
+| `korev help`                                    | Shows these commands.                                                                                                                               |
+
+For example:
+
+```sh
+korev new --task "Fix the flaky login test" --repo web
+```
+
+`korev` prints the workspace name and the id of its chat. Use the id with `korev chats send` to send the agent another message.
 
 ## How it connects
 
