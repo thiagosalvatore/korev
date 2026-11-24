@@ -4,7 +4,7 @@ import {
   test,
   type Page,
 } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import {
   chmod,
@@ -23,6 +23,7 @@ import type { AppState } from '../src/shared/model';
 
 const APP_ENTRY = '.vite/build/main.cjs';
 const FAKE_AGENT_BIN = path.resolve('test-support/bin');
+const KOREV_CLI = path.resolve('cli/korev');
 const SCREENSHOT_DIR = process.env.KOREV_SCREENSHOT_DIR;
 const ONE_PIXEL_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
@@ -84,6 +85,26 @@ function launchApp(home: string, env: NodeJS.ProcessEnv = {}) {
       HOME: home,
       SHELL: '/bin/sh',
       PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}`,
+      ...env,
+    },
+  });
+}
+
+function runKorevCli(
+  home: string,
+  argv: string[],
+  env: NodeJS.ProcessEnv = {},
+) {
+  const {
+    KOREV_AGENT_URL: _url,
+    KOREV_SESSION_ID: _id,
+    ...shellEnv
+  } = process.env;
+  return spawnSync(KOREV_CLI, argv, {
+    encoding: 'utf8',
+    env: {
+      ...shellEnv,
+      KOREV_CLI_URL_FILE: path.join(home, 'user-data', 'cli-url'),
       ...env,
     },
   });
@@ -1197,6 +1218,28 @@ test('sends unanswered review comments to the agent when PRs are kept ready', as
       window.getByRole('button', { name: 'Keep PR ready' }),
     ).toHaveAttribute('aria-pressed', 'true');
     await snap(window, '20-keep-pr-ready');
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('answers korev from the user terminal but refuses agents without access', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const { app, window } = await launch(home, repo);
+  try {
+    await expect(window.getByText('Run a team of coding agents')).toBeVisible();
+
+    await expect
+      .poll(() => runKorevCli(home, ['chats', 'list']).stdout)
+      .toBe('No open chats.\n');
+    const refused = runKorevCli(home, ['chats', 'list'], {
+      KOREV_SESSION_ID: 'agent-chat',
+    });
+
+    expect(refused.status).toBe(1);
+    expect(refused.stderr).toContain('not given access to Korev');
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });

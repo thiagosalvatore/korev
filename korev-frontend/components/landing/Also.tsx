@@ -14,6 +14,7 @@ import {
   Plug,
   ScanEye,
   TextSearch,
+  SquareTerminal,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -82,6 +83,11 @@ const FEATURES: [LucideIcon, string, string][] = [
     Activity,
     'Runs after you quit',
     'Quit Korev and your agents and automations keep going. Korev waits in the menu bar until you open it again.',
+  ],
+  [
+    SquareTerminal,
+    'korev in your terminal',
+    'List your chats, message them and stop them from your own shell with the korev command.',
   ],
   [
     KeyRound,

@@ -46,7 +46,7 @@ import {
   workspaceLabel,
   type MovedOrder,
 } from '../shared/workspaces';
-import { startAgentServer } from './agent-server';
+import { startAgentServer, USER_CLI_SESSION } from './agent-server';
 import { detectAgents, reconcileDefaultModels } from './agents';
 import type { Dictation } from './dictation';
 import type { RemoteAccess } from './remote-access';
@@ -218,6 +218,7 @@ async function listArtifacts(worktree: string): Promise<string[]> {
 }
 
 const REPOS_DIR = 'repos';
+const CLI_URL_FILE = 'cli-url';
 const REPO_NAME_FROM_URL = /([^/:]+?)(?:\.git)?\/?$/;
 
 interface EditorDefinition extends EditorApp {
@@ -375,6 +376,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   const backgroundTasks = new Set<Promise<unknown>>();
   const agentServer = await startAgentServer(deps.cliDir, (call) =>
     appCommands.runCli(call),
+  );
+  const cliUrlPath = path.join(deps.userDataPath, CLI_URL_FILE);
+  await deps.fs.writeAtomic(
+    cliUrlPath,
+    agentServer.grant(USER_CLI_SESSION, undefined).env.KOREV_AGENT_URL,
   );
 
   const ctx: Context = {
@@ -1064,10 +1070,11 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     workspaceCli: (call) => orchestration.runCli(call),
     isRunning: (sessionId) => chats.isRunning(sessionId),
     waitingSessions: () => chats.waitingSessions(),
-    send: (session, text) =>
+    send: (session, text, fromKorev) =>
       chats.send(session.id, {
         ...korevPrompt(session, text),
         planMode: session.planMode,
+        fromKorev,
       }),
     stop: (sessionId) => api.stop(sessionId),
     rerunReview,
@@ -1989,6 +1996,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       await chats.shutdown();
       await ctx.settled();
       ctx.terminals.closeAll();
+      await deps.fs.remove(cliUrlPath);
       await agentServer.close();
       await store.flush();
     },
