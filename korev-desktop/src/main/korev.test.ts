@@ -2187,6 +2187,14 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     return run();
   }
 
+  it('counts an enabled automation as background work', async () => {
+    expect(korev.hasBackgroundWork()).toBe(false);
+    const automation = await createAutomation('say hello');
+    expect(korev.hasBackgroundWork()).toBe(true);
+    await korev.api.updateAutomation(automation.id, { enabled: false });
+    expect(korev.hasBackgroundWork()).toBe(false);
+  });
+
   it('opens a workspace for each new key a run asks for, only in its own repositories', async () => {
     const automation = await createAutomation('sweep-tickets');
 

@@ -280,6 +280,7 @@ export interface KorevDeps extends CoreDeps {
 export interface Korev {
   api: KorevApi;
   runningAgents(): number;
+  hasBackgroundWork(): boolean;
   settings(): Settings;
   updateSettings(patch: Partial<Settings>): Promise<void>;
   showWhatsNew(): Promise<void>;
@@ -1957,6 +1958,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   return {
     api,
     runningAgents: () => ctx.runningSessions.size,
+    hasBackgroundWork: () =>
+      ctx.runningSessions.size > 0 ||
+      store.state.automations.some((automation) => automation.enabled),
     settings: () => store.state.settings,
     updateSettings,
     showWhatsNew,

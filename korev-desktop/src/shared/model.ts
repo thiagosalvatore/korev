@@ -704,6 +704,7 @@ export interface Settings {
   notificationSound: boolean;
   notificationSoundFile: string;
   keepAwake: boolean;
+  keepRunningInBackground: boolean;
   signAgentCommits: boolean;
   remoteAccess: boolean;
   remotePort: number;

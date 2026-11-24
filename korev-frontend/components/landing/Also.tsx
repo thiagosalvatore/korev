@@ -1,4 +1,5 @@
 import {
+  Activity,
   AudioLines,
   BellDot,
   CalendarClock,
@@ -75,6 +76,11 @@ const FEATURES: [LucideIcon, string, string][] = [
     LayoutGrid,
     'Grid and board',
     'Watch chats and terminals from different workspaces side by side, or see every workspace on one board, sorted by what its agent does.',
+  ],
+  [
+    Activity,
+    'Runs after you quit',
+    'Quit Korev and your agents and automations keep going. Korev waits in the menu bar until you open it again.',
   ],
   [
     KeyRound,

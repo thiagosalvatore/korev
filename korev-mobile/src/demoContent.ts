@@ -217,6 +217,7 @@ const SETTINGS: Settings = {
   notificationSound: true,
   notificationSoundFile: '',
   keepAwake: true,
+  keepRunningInBackground: false,
   signAgentCommits: false,
   remoteAccess: true,
   remotePort: 0,
