@@ -111,7 +111,7 @@ export function defaultSettings(home: string): Settings {
     notificationSound: true,
     notificationSoundFile: '',
     keepAwake: true,
-    keepRunningInBackground: false,
+    keepRunningInBackground: true,
     signAgentCommits: false,
     remoteAccess: false,
     remotePort: DEFAULT_REMOTE_PORT,
