@@ -809,6 +809,67 @@ test('runs a terminal in a grid pane and keeps it in the full view', async () =>
   }
 });
 
+test('keeps an agent working after Quit and finishes its turn when reopened', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const { app, window } = await launch(home, repo);
+  try {
+    await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'updateSettings',
+        [{ queueWhileRunning: false, keepRunningInBackground: true }],
+      ),
+    );
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window.getByRole('textbox', { name: 'Message' }).fill('hold-turn');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+    await expect.poll(() => runningAgents(window)).toBe(1);
+    const state = (await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'getState',
+        [],
+      ),
+    )) as AppState;
+    const sessionId = state.workspaces[0].sessions[0].id;
+
+    await app.evaluate(({ app: electronApp }) => electronApp.quit());
+    await expect
+      .poll(() =>
+        app.evaluate(
+          ({ BrowserWindow }) => BrowserWindow.getAllWindows().length,
+        ),
+      )
+      .toBe(0);
+
+    const reopening = app.waitForEvent('window');
+    await app.evaluate(({ app: electronApp }) => electronApp.emit('activate'));
+    const reopened = await reopening;
+    expect(await runningAgents(reopened)).toBe(1);
+    await reopened.evaluate(
+      (id) =>
+        (globalThis as unknown as { korev: KorevBridge }).korev.call('send', [
+          id,
+          { text: 'finish' },
+        ]),
+      sessionId,
+    );
+    await waitForAgentsToFinish(reopened);
+    const transcript = JSON.stringify(
+      await reopened.evaluate(
+        (id) =>
+          (globalThis as unknown as { korev: KorevBridge }).korev.call(
+            'transcript',
+            [id],
+          ),
+        sessionId,
+      ),
+    );
+    expect(transcript).toContain('I added agent-note.txt.');
+  } finally {
+    await app.close();
+  }
+});
+
 test('moves a workspace from Working to Done on the board', async () => {
   const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
   const repo = await createRepo(home);

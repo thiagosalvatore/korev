@@ -5,11 +5,14 @@ import {
   dialog,
   ipcMain,
   Menu,
+  nativeImage,
   nativeTheme,
   Notification,
+  powerMonitor,
   powerSaveBlocker,
   screen,
   shell,
+  Tray,
   type WebContents,
 } from 'electron';
 import { execFile } from 'node:child_process';
@@ -25,6 +28,7 @@ import {
   type QuitChoice,
 } from './shared/api';
 import type { AppCommand, Result, WindowBounds } from './shared/model';
+import trayIconUrl from '../assets/trayTemplate@2x.png?inline';
 import { appMenuTemplate } from './main/app-menu';
 import { isAppUrl, isWebUrl, type AppOrigin } from './main/app-origin';
 import { runProcess } from './main/command-runner';
@@ -45,6 +49,7 @@ import {
 } from './main/updates';
 import { tailnetStarter } from './main/tailnet';
 import { createListeningWindow } from './main/listening-window';
+import { menuBarTemplate, menuBarTitle } from './main/menu-bar';
 import { loadWhisper } from './main/whisper';
 import { restorableBounds } from './main/window-bounds';
 
@@ -67,6 +72,8 @@ const TAILNET_HOSTNAME_PREFIX = 'korev-';
 const MODELS_DIR = 'models';
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60_000;
 const BUNDLE_FROM_EXE = '../../..';
+const TRAY_ICON_SCALE = 2;
+const NO_TRAY_COUNT = -1;
 
 const appOrigin: AppOrigin = {
   devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
@@ -87,6 +94,10 @@ function useSeparateDevData() {
 }
 
 useSeparateDevData();
+
+if (!app.requestSingleInstanceLock()) {
+  app.exit();
+}
 
 let korevApp: Korev | null = null;
 let quitGate: QuitGate | null = null;
@@ -159,7 +170,69 @@ function emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]) {
     window.webContents.send(eventChannel(event), payload);
   }
   remote.broadcast(event, payload);
-  if (event === 'state') quitGate?.agentsChanged();
+  if (event !== 'state') return;
+  quitGate?.agentsChanged();
+  if (korevApp) syncMenuBar(korevApp);
+}
+
+function showMainWindow() {
+  if (!korevApp) return;
+  void app.dock?.show();
+  const window = mainWindow();
+  if (!window) {
+    createWindow(korevApp);
+    return;
+  }
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+}
+
+function goBackground() {
+  mainWindow()?.close();
+  app.dock?.hide();
+}
+
+let tray: Tray | null = null;
+let trayCount = NO_TRAY_COUNT;
+
+function trayIcon() {
+  const image = nativeImage.createEmpty();
+  image.addRepresentation({
+    scaleFactor: TRAY_ICON_SCALE,
+    dataURL: trayIconUrl,
+  });
+  image.setTemplateImage(true);
+  return image;
+}
+
+function removeTray() {
+  tray?.destroy();
+  tray = null;
+}
+
+function syncMenuBar(korev: Korev) {
+  if (!korev.settings().keepRunningInBackground) {
+    removeTray();
+    return;
+  }
+  if (!tray) {
+    tray = new Tray(trayIcon());
+    trayCount = NO_TRAY_COUNT;
+  }
+  const running = korev.runningAgents();
+  if (running === trayCount) return;
+  trayCount = running;
+  tray.setTitle(menuBarTitle(running));
+  tray.setContextMenu(
+    Menu.buildFromTemplate(
+      menuBarTemplate({
+        running,
+        open: showMainWindow,
+        quit: () => quitGate?.requestQuit(),
+      }),
+    ),
+  );
 }
 
 function sendToFocusedWindow(command: AppCommand) {
@@ -191,11 +264,9 @@ function showNotice(korev: () => Korev | null, notice: Notice) {
   notification.on('close', () => shownNotices.delete(notification));
   notification.on('click', () => {
     shownNotices.delete(notification);
+    showMainWindow();
     const window = mainWindow();
     if (!window) return;
-    if (window.isMinimized()) window.restore();
-    window.show();
-    window.focus();
     window.webContents.send(
       eventChannel('focus-workspace'),
       notice.workspaceId,
@@ -404,6 +475,7 @@ function askQuitNatively(running: number): QuitChoice {
 function askQuit(running: number, gate: QuitGate) {
   const window = mainWindow();
   if (!window) {
+    app.focus({ steal: true });
     setImmediate(() => gate.choose(askQuitNatively(running)));
     return;
   }
@@ -496,6 +568,9 @@ app.whenReady().then(async () => {
   const korev = await createKorevApp();
   const gate = createQuitGate({
     runningAgents: korev.runningAgents,
+    stayResident: () =>
+      korev.settings().keepRunningInBackground && korev.hasBackgroundWork(),
+    background: goBackground,
     ask: (running) => askQuit(running, gate),
     quit: () => app.quit(),
   });
@@ -523,15 +598,13 @@ app.whenReady().then(async () => {
       dictation.close(),
     ]).finally(() => app.quit());
   });
+  powerMonitor.on('shutdown', () => gate.choose('quit'));
+  app.on('second-instance', showMainWindow);
+  app.on('activate', showMainWindow);
   createWindow(korev);
+  syncMenuBar(korev);
   void remote.apply(korev.settings());
   watchForUpdates(korev);
-
-  app.on('activate', () => {
-    if (!mainWindow()) {
-      createWindow(korev);
-    }
-  });
 });
 
 app.on('window-all-closed', () => {
