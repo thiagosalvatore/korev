@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { modelChoices } from '../../../../../korev-desktop/src/shared/format';
 import {
+  AGENT_FEATURES,
   AGENT_LABELS,
   effortLevels,
   loadoutKey,
@@ -109,6 +110,7 @@ export default function ChatOptionsSheet() {
   const running = state.runningSessions.includes(session.id);
   const currentModel = loadoutKey(session.agent, session.model);
   const choices = modelChoices(state, session.agent);
+  const efforts = effortLevels(session.agent, choices, session.model);
 
   function chooseModel(choice: ModelChoice) {
     if (choice.agent !== session?.agent && running)
@@ -134,9 +136,9 @@ export default function ChatOptionsSheet() {
           />
         ))}
       </Section>
-      <Section title="Effort">
-        {effortLevels(session.agent, choices, session.model).map(
-          (effort, index) => (
+      {efforts.length ? (
+        <Section title="Effort">
+          {efforts.map((effort, index) => (
             <ChoiceRow
               key={effort}
               label={effort}
@@ -144,9 +146,9 @@ export default function ChatOptionsSheet() {
               first={index === 0}
               onPress={() => update({ effort })}
             />
-          ),
-        )}
-      </Section>
+          ))}
+        </Section>
+      ) : null}
       <Section title="Modes">
         <SwitchRow
           label="Plan mode"
@@ -154,12 +156,14 @@ export default function ChatOptionsSheet() {
           first
           onChange={(planMode) => update({ planMode })}
         />
-        <SwitchRow
-          label="Fast mode"
-          value={session.fast}
-          first={false}
-          onChange={(fast) => update({ fast })}
-        />
+        {AGENT_FEATURES[session.agent].fast ? (
+          <SwitchRow
+            label="Fast mode"
+            value={session.fast}
+            first={false}
+            onChange={(fast) => update({ fast })}
+          />
+        ) : null}
       </Section>
     </ScrollView>
   );

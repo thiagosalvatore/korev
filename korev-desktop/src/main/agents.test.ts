@@ -36,6 +36,7 @@ describe('forking a chat', () => {
   it.each<[AgentKind, string[]]>([
     ['claude', ['--resume', 'chat-1', '--fork-session']],
     ['codex', ['exec', 'fork']],
+    ['opencode', ['--session', 'chat-1', '--fork']],
   ])('%s continues a copy of the conversation', (agent, expected) => {
     const args = AGENTS[agent].args(REQUEST).join(' ');
 
@@ -148,6 +149,14 @@ const CODEX_SIGNED_IN = {
   },
 };
 
+const OPENCODE_INSTALLED = {
+  'opencode --version': { stdout: '2.4.0' },
+  'opencode auth list --format json': { stdout: '[]' },
+  'opencode models': {
+    stdout: 'opencode/big-pickle\nanthropic/claude-sonnet-5-5\n',
+  },
+};
+
 function detected(agents: AgentAvailability[], agent: AgentKind) {
   return agents.find((entry) => entry.agent === agent);
 }
@@ -206,6 +215,24 @@ describe('detectAgents', () => {
   });
 });
 
+describe('detecting opencode', () => {
+  it('is ready without a login, because its free models need none', async () => {
+    const agents = await detectAgents(runnerWith(OPENCODE_INSTALLED), {});
+
+    expect(detected(agents, 'opencode')).toMatchObject({
+      version: '2.4.0',
+      account: { method: null },
+      models: [
+        { id: 'opencode/big-pickle', label: 'opencode/big-pickle' },
+        {
+          id: 'anthropic/claude-sonnet-5-5',
+          label: 'anthropic/claude-sonnet-5-5',
+        },
+      ],
+    });
+  });
+});
+
 describe('reconcileDefaultModels', () => {
   const READY: AgentAvailability[] = [
     {
@@ -227,8 +254,11 @@ describe('reconcileDefaultModels', () => {
 
   it('picks the first model when the saved one is not offered', () => {
     expect(
-      reconcileDefaultModels({ claude: CLAUDE_MODELS[1].id, codex: '' }, READY),
-    ).toEqual({ claude: CLAUDE_MODELS[1].id, codex: 'gpt-max' });
+      reconcileDefaultModels(
+        { claude: CLAUDE_MODELS[1].id, codex: '', opencode: '' },
+        READY,
+      ),
+    ).toEqual({ claude: CLAUDE_MODELS[1].id, codex: 'gpt-max', opencode: '' });
   });
 
   it('leaves agents that are not ready alone', () => {
@@ -239,11 +269,30 @@ describe('reconcileDefaultModels', () => {
     }));
 
     expect(
-      reconcileDefaultModels({ claude: 'gone', codex: '' }, notReady),
-    ).toEqual({
-      claude: 'gone',
-      codex: '',
-    });
+      reconcileDefaultModels(
+        { claude: 'gone', codex: '', opencode: '' },
+        notReady,
+      ),
+    ).toEqual({ claude: 'gone', codex: '', opencode: '' });
+  });
+});
+
+describe('opencode args', () => {
+  const NEW_CHAT = { ...REQUEST, resumeId: null, fork: false };
+
+  it.each<[string, Partial<TurnRequest>, string]>([
+    ['writes', {}, 'run --format json --thinking --auto --model model'],
+    ['plans', { planMode: true }, '--auto --agent plan --model model'],
+    [
+      'stays read-only',
+      { readOnly: true },
+      '--auto --agent plan --model model',
+    ],
+    ['uses its own default model', { model: '' }, '--thinking --auto'],
+  ])('%s', (_, change, expected) => {
+    const args = AGENTS.opencode.args({ ...NEW_CHAT, ...change }).join(' ');
+
+    expect(args.endsWith(expected)).toBe(true);
   });
 });
 

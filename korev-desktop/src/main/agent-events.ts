@@ -13,8 +13,8 @@ import {
 
 export type JsonRecord = Record<string, unknown>;
 
-const DETAIL_MAX_CHARS = 20_000;
-const OUTPUT_MAX_CHARS = 20_000;
+export const DETAIL_MAX_CHARS = 20_000;
+export const OUTPUT_MAX_CHARS = 20_000;
 const MS_PER_SECOND = 1_000;
 const PERCENT = 100;
 const COMPACT_BOUNDARY = 'compact_boundary';
@@ -94,7 +94,11 @@ function firstString(input: JsonRecord): string {
     | '';
 }
 
-function claudeToolSummary(name: string, input: JsonRecord, cwd: string) {
+export function claudeToolSummary(
+  name: string,
+  input: JsonRecord,
+  cwd: string,
+) {
   const field = CLAUDE_TOOL_TARGETS[name];
   const target = field ? str(input[field]) : (firstString(input) ?? '');
   const shown =
@@ -111,7 +115,7 @@ function editDetail(input: JsonRecord): string | null {
   return [...minus, ...plus].join('\n');
 }
 
-function claudeToolDetail(name: string, input: JsonRecord): string {
+export function claudeToolDetail(name: string, input: JsonRecord): string {
   if (name === 'Bash') return str(input.command);
   if (name === 'Write') return str(input.content);
   if (name === 'Edit') return editDetail(input) ?? '';

@@ -9,6 +9,7 @@ import {
   modelLabel,
 } from '../../../korev-desktop/src/shared/format';
 import {
+  AGENT_FEATURES,
   effortLevels,
   type AppState,
   type ChatSession,
@@ -195,7 +196,7 @@ export function ComposerToolbar({
           onPress={() => update({ effort: nextEffort })}
         />
       ) : null}
-      {session.fast ? (
+      {session.fast && AGENT_FEATURES[session.agent].fast ? (
         <ToolChip
           label="Fast"
           accessibilityLabel="Fast mode. Turn it off"

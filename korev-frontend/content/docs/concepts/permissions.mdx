@@ -18,6 +18,8 @@ When it is off, **Ask chats follow the same behavior** shows below it. Turn it o
 
 Codex cannot ask before a tool call. It always runs in its `workspace-write` sandbox, and in its `read-only` sandbox in plan mode.
 
+opencode cannot ask either. Korev runs it with `--auto`, so it approves its own tool calls. In plan mode and Ask chats it runs as its `plan` agent, which cannot edit files but can run commands.
+
 ## What always asks
 
 Whatever the setting:

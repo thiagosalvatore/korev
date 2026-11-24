@@ -11,6 +11,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 - **Updates wait for your agents.** **Install and restart** keeps the Korev window open while agents work and asks whether to install now or once they finish.
 - **Find in terminals.** Press ⌘F in a terminal to search its output. Korev outlines every match and shows "3 of 12". Press Enter or ⇧Enter to go to the next or previous match, and Esc to close.
 - **`korev` in your own terminal.** Run `korev new --task "..."` to create a workspace from Terminal while Korev is open. `korev chats list`, `korev chats send`, `korev chats stop` and `korev review rerun` act on your chats. See "Use Korev from your terminal" in the docs to put the command on your PATH. Agents that Korev starts can't use it unless they already have their own `korev` access.
+- **opencode chats.** Korev now runs [opencode](https://opencode.ai) as a third agent. Pick it in the model picker or as the default agent in Settings. Korev lists the models that `opencode models` reports, including its free ones, so it works without a login. Plan mode uses opencode's `plan` agent and ends with **Approve plan**. opencode has no effort or fast mode, so Korev hides those chips.
 - **Re-check reviews without a re-request.** Re-check reviews no longer waits for the author to click Re-request review. Korev also re-checks when every review comment you left is resolved or has an answer from someone else. Answers from bots do not count.
 
 ## [0.39.0] - 2026-11-23

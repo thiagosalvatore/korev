@@ -3659,6 +3659,37 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ).toContain('### api');
   });
 
+  it('approves a finished opencode plan and resumes its session', async () => {
+    const origin = await createWorkspace();
+    const [session] = origin.sessions;
+    const opencode = {
+      ...task('make-plan for the settings page'),
+      agent: 'opencode' as const,
+      model: 'opencode/fake-free',
+      planMode: true,
+    };
+    await korev.api.updateSession(session.id, opencode);
+    await korev.api.send(session.id, opencode);
+    await waitFor(
+      async () => (await korev.api.getState()).runningSessions.length === 0,
+    );
+    const contextFile = (name: string) =>
+      readFile(path.join(origin.path, '.context', name), 'utf8');
+    expect(await contextFile('opencode-args')).toContain('--agent plan');
+
+    const approved = await korev.api.approvePlan(session.id, []);
+
+    expect(approved).toEqual({ ok: true, value: undefined });
+    await waitFor(async () => (await userMessages(session.id)).length === 2);
+    await waitForTurn(session.id);
+    expect(await contextFile('opencode-prompt')).toContain(
+      'Implement the plan.',
+    );
+    const args = await contextFile('opencode-args');
+    expect(args).toContain('--session ses_fake');
+    expect(args).not.toContain('--agent plan');
+  });
+
   it('hands a Claude plan off to a new tab that implements it', async () => {
     const workspace = await createWorkspace();
     const [session] = workspace.sessions;

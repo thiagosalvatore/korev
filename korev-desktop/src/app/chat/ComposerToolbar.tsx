@@ -80,6 +80,12 @@ function optionItems(props: ComposerToolbarProps): MenuItem[] {
       checked: props.planMode,
       onSelect: () => props.onPlanModeChange(!props.planMode),
     },
+  ];
+}
+
+function fastItems(props: ComposerToolbarProps): MenuItem[] {
+  if (!AGENT_FEATURES[props.agent].fast) return [];
+  return [
     {
       id: 'fast',
       label: 'Fast mode',
@@ -119,12 +125,13 @@ export function ComposerToolbar(props: ComposerToolbarProps) {
     props.models.find((entry) => isCurrent(props, entry))?.label ?? props.model;
   const showStop = props.running && !props.canSend;
   const hint = sendHint(props);
+  const efforts = effortLevels(props.agent, props.models, props.model);
   return (
     <div className="flex items-center gap-1 px-2 pb-2">
       <Menu
         label="Composer options"
         side="top"
-        items={optionItems(props)}
+        items={[...optionItems(props), ...fastItems(props)]}
         trigger={({ toggle }) => (
           <IconButton
             icon="plus"
@@ -159,45 +166,47 @@ export function ComposerToolbar(props: ComposerToolbarProps) {
           </button>
         )}
       />
-      <Menu
-        label="Effort"
-        side="top"
-        items={effortLevels(props.agent, props.models, props.model).map(
-          (level) => ({
+      {efforts.length ? (
+        <Menu
+          label="Effort"
+          side="top"
+          items={efforts.map((level) => ({
             id: level,
             label: level,
             checked: level === props.effort,
             onSelect: () => props.onEffortChange(level),
-          }),
-        )}
-        trigger={({ toggle }) => (
-          <button
-            type="button"
-            aria-label="Effort"
-            title="Effort (⌘⇧/ cycles)"
-            className={CHIP}
-            onClick={toggle}
-          >
-            <Icon name="brain" size={13} />
-            {props.effort}
-          </button>
-        )}
-      />
-      <button
-        type="button"
-        aria-label="Fast mode"
-        aria-pressed={props.fast}
-        title="Fast mode (⌘⇧E)"
-        className={cn(
-          CHIP,
-          props.fast &&
-            'bg-warning-subtle text-warning-text hover:text-warning-text',
-        )}
-        onClick={() => props.onFastChange(!props.fast)}
-      >
-        <Icon name="zap" size={13} />
-        {props.fast ? 'Fast' : null}
-      </button>
+          }))}
+          trigger={({ toggle }) => (
+            <button
+              type="button"
+              aria-label="Effort"
+              title="Effort (⌘⇧/ cycles)"
+              className={CHIP}
+              onClick={toggle}
+            >
+              <Icon name="brain" size={13} />
+              {props.effort}
+            </button>
+          )}
+        />
+      ) : null}
+      {AGENT_FEATURES[props.agent].fast ? (
+        <button
+          type="button"
+          aria-label="Fast mode"
+          aria-pressed={props.fast}
+          title="Fast mode (⌘⇧E)"
+          className={cn(
+            CHIP,
+            props.fast &&
+              'bg-warning-subtle text-warning-text hover:text-warning-text',
+          )}
+          onClick={() => props.onFastChange(!props.fast)}
+        >
+          <Icon name="zap" size={13} />
+          {props.fast ? 'Fast' : null}
+        </button>
+      ) : null}
       {props.planMode ? (
         <button
           type="button"

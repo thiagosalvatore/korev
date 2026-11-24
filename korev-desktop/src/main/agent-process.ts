@@ -32,7 +32,10 @@ export function spawnAgent(
   args: readonly string[],
   options: AgentProcessOptions,
 ): AgentProcess {
-  const child = spawn(binary, args, { cwd: options.cwd, env: options.env });
+  const child = spawn(binary, args, {
+    cwd: options.cwd,
+    env: { ...options.env, PWD: options.cwd },
+  });
   let stderr = '';
   let partial = '';
   let stopped = false;
