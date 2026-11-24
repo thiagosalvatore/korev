@@ -68,6 +68,9 @@ Three columns:
   the next git action), a tab strip (chats, Changes, open files) and the active tab.
 - **Right panel** (`--panel-w`): the git panel (Files / Changes / PR / Artifacts) on top and
   the terminal panel (Setup / Run / Terminal) below.
+- **Terminal find** (⌘F in any terminal): a raised bar at the top right of the terminal with the
+  query, "3 of 12" or "No results", and Previous, Next and Close. Matches get a `warning`
+  outline and the current match an `accent` outline.
 
 The **Grid** page (⌘G) replaces the centre and the right panel with 2 or 4 panes. Each pane
 shows one chat or terminal tab of a workspace, or one Ask chat. The pane header has the

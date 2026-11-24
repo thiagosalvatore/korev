@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { XTerm } from './XTerm';
 
@@ -65,5 +65,26 @@ describe('XTerm', () => {
 
     await vi.waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]).toMatch(CURSOR_REPLY);
+  });
+
+  it('opens the find box on Cmd+F', async () => {
+    const { container } = render(
+      <XTerm
+        workspaceId="w1"
+        terminalRef="w1:shell"
+        kind="shell"
+        interactive
+      />,
+    );
+    const textarea = container.querySelector('textarea');
+    if (!textarea) throw new Error('terminal input missing');
+
+    fireEvent.keyDown(textarea, { key: 'f', metaKey: true });
+
+    await vi.waitFor(() =>
+      expect(screen.getByLabelText('Find in terminal')).toBe(
+        document.activeElement,
+      ),
+    );
   });
 });
