@@ -6,7 +6,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ### New
 
-- **Agents keep running after you quit.** Turn on **Keep agents running after you quit** in Settings. Quitting Korev then closes its window and leaves agents and automations running, and Korev stays in the menu bar with the number of working agents. Open Korev again from the menu bar, the Dock or Spotlight. Choose **Quit Korev** in the menu bar to stop everything.
+- **Agents keep running after you quit.** Quitting Korev closes its window and leaves agents and automations running. Korev stays in the menu bar with the number of working agents. Open Korev again from the menu bar, the Dock or Spotlight. Choose **Quit Korev** in the menu bar to stop everything. To quit the old way, turn off **Keep agents running after you quit** in Settings.
 - **Updates wait for your agents.** **Install and restart** keeps the Korev window open while agents work and asks whether to install now or once they finish.
 - **Re-check reviews without a re-request.** Re-check reviews no longer waits for the author to click Re-request review. Korev also re-checks when every review comment you left is resolved or has an answer from someone else. Answers from bots do not count.
 
