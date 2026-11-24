@@ -13,6 +13,7 @@ import type {
   Workspace,
   WorkspaceSource,
 } from '../shared/model';
+import { linkRepoId, type NewWorkspaceLink } from '../shared/korev-link';
 import { activeWorkspaces, workspaceLabel } from '../shared/workspaces';
 import { api } from './bridge';
 import { saveDraft } from './chat/Composer';
@@ -51,6 +52,21 @@ export const NEW_WORKSPACE_DRAFT_KEY = 'new-workspace';
 
 export function openNewWorkspace(repoId: string | null) {
   setUi({ page: { kind: 'new-workspace', repoId } });
+  void api.focusWorkspaces([]);
+}
+
+let linksOpened = 0;
+
+export function openNewWorkspaceLink(state: AppState, link: NewWorkspaceLink) {
+  if (link.prompt) saveDraft(NEW_WORKSPACE_DRAFT_KEY, link.prompt);
+  linksOpened += 1;
+  setUi({
+    page: {
+      kind: 'new-workspace',
+      repoId: linkRepoId(state.repos, link.repo),
+      linkId: linksOpened,
+    },
+  });
   void api.focusWorkspaces([]);
 }
 

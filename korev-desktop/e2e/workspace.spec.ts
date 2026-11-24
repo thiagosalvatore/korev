@@ -351,6 +351,59 @@ test('asks a question about a repository without creating a workspace', async ()
   }
 });
 
+test('fills New workspace from a korev:// link without starting anything', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const web = await createRepo(home);
+  const api = await createRepo(home, 'acme-api');
+  const { app, window } = await launch(home, web);
+  try {
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await app.evaluate(({ dialog }, repoPath) => {
+      dialog.showOpenDialog = (async () => ({
+        canceled: false,
+        filePaths: [repoPath],
+      })) as typeof dialog.showOpenDialog;
+    }, api);
+    await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'addRepo',
+        [],
+      ),
+    );
+    const message = window.getByRole('textbox', { name: 'Message' });
+    await message.fill('An old draft');
+    await window.getByRole('button', { name: 'Settings' }).click();
+
+    const openUrl = (url: string) =>
+      app.evaluate(({ app: electronApp }, link) => {
+        electronApp.emit('open-url', { preventDefault: () => {} }, link);
+      }, url);
+    await openUrl('korev://send?prompt=Ignored');
+    await openUrl(
+      `korev://new-workspace?repo=acme-api&prompt=${encodeURIComponent('Fix the login bug\nin the form')}`,
+    );
+
+    await expect(
+      window.getByRole('heading', { name: 'New workspace' }),
+    ).toBeVisible();
+    await expect(message).toHaveValue('Fix the login bug\nin the form');
+    await expect(message).toBeFocused();
+    await expect(
+      window.getByRole('button', { name: 'Repositories' }),
+    ).toHaveText('acme-api');
+    const state = (await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'getState',
+        [],
+      ),
+    )) as AppState;
+    expect(state.workspaces).toHaveLength(0);
+  } finally {
+    await app.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 test('creates a workspace from an existing branch with the create-from picker', async () => {
   const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
   const repo = await createRepo(home);

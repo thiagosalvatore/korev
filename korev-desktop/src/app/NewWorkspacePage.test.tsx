@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState, Repo } from '../shared/model';
+import { NEW_WORKSPACE_DRAFT_KEY } from './actions';
+import { saveDraft } from './chat/Composer';
 import { NewWorkspacePage } from './NewWorkspacePage';
 import { resetUiForTests } from './ui-store';
 
@@ -89,6 +91,23 @@ describe('NewWorkspacePage', () => {
     expect(await screen.findByDisplayValue('Add a note')).toBe(
       screen.getByRole('textbox', { name: 'Message' }),
     );
+  });
+
+  it('focuses the filled message instead of the repository search when opened from a link', () => {
+    saveDraft(NEW_WORKSPACE_DRAFT_KEY, 'Fix the login bug');
+    render(
+      <NewWorkspacePage
+        state={stateWith([repo('korev'), repo('posthog')])}
+        repoId={null}
+        filled
+      />,
+    );
+    expect(
+      screen.queryByRole('textbox', { name: 'Search repositories' }),
+    ).toBeNull();
+    const message = screen.getByRole('textbox', { name: 'Message' });
+    expect(message).toHaveProperty('value', 'Fix the login bug');
+    expect(document.activeElement).toBe(message);
   });
 
   it('starts in plan mode while several repositories are picked', () => {

@@ -24,6 +24,7 @@ import {
   type KorevEvents,
   type QuitChoice,
 } from './shared/api';
+import { parseKorevLink, type NewWorkspaceLink } from './shared/korev-link';
 import type { AppCommand, Result, WindowBounds } from './shared/model';
 import { appMenuTemplate } from './main/app-menu';
 import { isAppUrl, isWebUrl, type AppOrigin } from './main/app-origin';
@@ -122,6 +123,34 @@ function mainWindow(): BrowserWindow | undefined {
   );
 }
 
+const pendingLinks: NewWorkspaceLink[] = [];
+
+function showMainWindow(window: BrowserWindow) {
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+}
+
+// The renderer takes queued links when it loads, and again on each nudge.
+function openLink(url: string) {
+  const link = parseKorevLink(url);
+  if (!link) return;
+  pendingLinks.push(link);
+  if (!korevApp) return;
+  const window = mainWindow();
+  if (!window) {
+    createWindow(korevApp);
+    return;
+  }
+  showMainWindow(window);
+  window.webContents.send(eventChannel('open-link'), null);
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  openLink(url);
+});
+
 function korevCliDir(): string {
   return app.isPackaged
     ? path.join(process.resourcesPath, UNPACKED_ASAR_DIR, CLI_DIR)
@@ -199,9 +228,7 @@ function showNotice(korev: () => Korev | null, notice: Notice) {
     shownNotices.delete(notification);
     const window = mainWindow();
     if (!window) return;
-    if (window.isMinimized()) window.restore();
-    window.show();
-    window.focus();
+    showMainWindow(window);
     window.webContents.send(
       eventChannel('focus-workspace'),
       notice.workspaceId,
@@ -515,6 +542,7 @@ app.whenReady().then(async () => {
     chooseQuit: gate.choose,
     setHandsFree,
     showListening: listeningWindow.show,
+    takeLinks: async () => pendingLinks.splice(0),
   };
   registerIpcHandlers(ipcMain, { ...korev.api, ...desktopApi }, (url) =>
     isAppUrl(url, appOrigin),

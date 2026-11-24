@@ -105,9 +105,11 @@ function TargetBranchMenu({
 export function NewWorkspacePage({
   state,
   repoId,
+  filled = false,
 }: {
   state: AppState;
   repoId: string | null;
+  filled?: boolean;
 }) {
   const sidebar = useUi((ui) => ui.sidebar);
   const onlyRepoId = state.repos.length === 1 ? state.repos[0].id : null;
@@ -177,7 +179,7 @@ export function NewWorkspacePage({
               state={state}
               selected={repoIds}
               onChange={setRepoIds}
-              defaultOpen={!initialRepoId}
+              defaultOpen={!initialRepoId && !filled}
             />
             {singleRepo && !from ? (
               <TargetBranchMenu
@@ -268,7 +270,7 @@ export function NewWorkspacePage({
             planMode={planMode}
             running={creating}
             workspaceId={null}
-            autoFocus={Boolean(initialRepoId)}
+            autoFocus={Boolean(initialRepoId) || filled}
             placeholder={`Describe a task for ${AGENT_LABELS[agent]}. Enter creates the workspace and starts it.`}
             onModelChange={choose}
             onEffortChange={setEffort}

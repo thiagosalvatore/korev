@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Start a workspace from a link.** A `korev://new-workspace?prompt=<text>` link brings Korev to the front, opens New workspace and puts the text in the message box, ready for you to press Enter. Add `&repo=<name>` to select a repository. Use it from a script or a Stream Deck button to start a task from text you selected in another app. A link never sends the message for you.
+
 ## [0.34.0] - 2026-11-12
 
 See which chat messages Korev sent, and open the pull request from a review chat's header.

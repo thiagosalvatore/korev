@@ -45,6 +45,7 @@ import type {
   WorkspaceFolder,
 } from './model';
 import type { Explainer, ExplainerOpened, ExplainerTarget } from './explainer';
+import type { NewWorkspaceLink } from './korev-link';
 
 export interface KorevApi {
   getState(): Promise<AppState>;
@@ -304,6 +305,7 @@ export interface DesktopApi {
   chooseQuit(choice: QuitChoice): void;
   setHandsFree(on: boolean): void;
   showListening(state: ListeningState): void;
+  takeLinks(): Promise<NewWorkspaceLink[]>;
 }
 
 export interface Toast {
@@ -318,6 +320,7 @@ export interface KorevEvents {
   'terminal-exit': TerminalExit;
   command: AppCommand;
   'focus-workspace': string;
+  'open-link': null;
   toast: Toast;
   announce: Announcement;
   listening: ListeningState;

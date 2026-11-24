@@ -22,6 +22,7 @@ import {
   openSearch,
   openIn,
   openNewWorkspace,
+  openNewWorkspaceLink,
   openPrPicker,
   openSettings,
   selectWorkspace,
@@ -188,4 +189,14 @@ export function useCommands(state: AppState | null) {
       stopToasts();
     };
   }, []);
+  const loaded = state !== null;
+  useEffect(() => {
+    if (!loaded) return undefined;
+    const openLinks = async () => {
+      for (const link of await api.takeLinks())
+        if (latest.current) openNewWorkspaceLink(latest.current, link);
+    };
+    void openLinks();
+    return on('open-link', () => void openLinks());
+  }, [loaded]);
 }
