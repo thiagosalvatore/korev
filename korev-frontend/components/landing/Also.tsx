@@ -87,7 +87,7 @@ const FEATURES: [LucideIcon, string, string][] = [
   [
     SquareTerminal,
     'korev in your terminal',
-    'List your chats, message them and stop them from your own shell with the korev command.',
+    'Run korev new --task "..." in your own shell to start a workspace, or list, message and stop your chats.',
   ],
   [
     KeyRound,

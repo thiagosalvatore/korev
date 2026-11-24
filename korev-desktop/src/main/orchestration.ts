@@ -171,6 +171,16 @@ export function flags<T extends Record<string, 'string' | 'boolean'>>(
   }
 }
 
+export function repoNamed(
+  ctx: Context,
+  name: string | undefined,
+): string | null {
+  if (!name) return null;
+  const repo = ctx.store.state.repos.find((entry) => entry.name === name);
+  if (!repo) throw new CliError(`There is no repository named ${name}.`);
+  return repo.id;
+}
+
 export async function runCommand(
   commands: Record<string, Command>,
   call: CliCall,
@@ -328,13 +338,6 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
     return ids;
   }
 
-  function repoNamed(name: string | undefined): string | null {
-    if (!name) return null;
-    const repo = ctx.store.state.repos.find((entry) => entry.name === name);
-    if (!repo) throw new CliError(`There is no repository named ${name}.`);
-    return repo.id;
-  }
-
   function countWake(run: OrchestrationRun) {
     if (run.paused) return;
     run.wakes += 1;
@@ -483,7 +486,7 @@ export function createOrchestration(deps: OrchestrationDeps): Orchestration {
         title: required(values.title, 'title'),
         spec: required(values.spec, 'spec'),
         deps: checkedDeps(run, list(values.deps), run.tasks.length),
-        repoId: repoNamed(values.repo),
+        repoId: repoNamed(ctx, values.repo),
         status: 'pending',
         workspaceId: null,
         sessionId: null,

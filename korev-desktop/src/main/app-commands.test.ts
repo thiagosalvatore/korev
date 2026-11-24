@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AskChat, ChatSession, Result, Workspace } from '../shared/model';
+import type {
+  AskChat,
+  ChatSession,
+  Repo,
+  Result,
+  SendOptions,
+  Workspace,
+} from '../shared/model';
 import { USER_CLI_SESSION } from './agent-server';
 import { createAppCommands } from './app-commands';
 import type { Context } from './context';
@@ -32,7 +39,7 @@ function askChat(id: string, extra: Partial<AskChat> = {}): AskChat {
   };
 }
 
-function setup() {
+function setup(repoNames = ['web']) {
   const korevChat = askChat('korev', { repoIds: [], korev: true });
   const reviews = [
     askChat('review-1', { reviewOf: 'https://github.com/acme/web/pull/1' }),
@@ -49,7 +56,16 @@ function setup() {
     archivedAt: null,
     sessions: [session('ws-chat', 'Fix billing')],
   } as unknown as Workspace;
+  const repos = repoNames.map((name) => ({ id: `${name}-id`, name }) as Repo);
+  const settings = {
+    defaultAgent: 'claude',
+    defaultModels: { claude: 'claude-model' },
+    defaultEffort: { claude: 'high' },
+    defaultPlanMode: true,
+  };
   const state = {
+    repos,
+    settings,
     workspaces: [workspace],
     askChats: [korevChat, ...reviews, archived, askChat('question')],
   };
@@ -59,6 +75,7 @@ function setup() {
   const stopped: string[] = [];
   const sent: { sessionId: string; text: string; fromKorev: boolean }[] = [];
   const rerun: string[] = [];
+  const created: { repoIds: string[]; task: SendOptions }[] = [];
   const workspaceCli = vi.fn(async () => ({ ok: true, output: 'workspace' }));
   const commands = createAppCommands({
     ctx,
@@ -71,6 +88,10 @@ function setup() {
     },
     stop: async (sessionId) => {
       stopped.push(sessionId);
+    },
+    createWorkspaces: (repoIds, task) => {
+      created.push({ repoIds, task });
+      return { ok: true, value: [workspace] };
     },
     rerunReview: async (ask) => {
       rerun.push(ask.id);
@@ -90,6 +111,7 @@ function setup() {
     stopped,
     sent,
     rerun,
+    created,
     workspaceCli,
   };
 }
@@ -220,5 +242,49 @@ describe('Korev chat commands', () => {
       { sessionId: 'ws-chat', text: 'yes', fromKorev: false },
     ]);
     expect(workspaceCli).not.toHaveBeenCalled();
+  });
+
+  it('creates a workspace in the only repository with the default plan mode', async () => {
+    const { userCli, created } = setup();
+
+    const reply = await userCli('new', '--task', 'Fix the login page');
+
+    expect(reply.output).toContain('ws-chat');
+    expect(created).toEqual([
+      {
+        repoIds: ['web-id'],
+        task: expect.objectContaining({
+          text: 'Fix the login page',
+          planMode: true,
+        }),
+      },
+    ]);
+  });
+
+  it('creates a workspace in the repository named by --repo', async () => {
+    const { userCli, created } = setup(['web', 'api']);
+
+    await userCli('new', '--task', 'Add a route', '--repo', 'api');
+
+    expect(created[0].repoIds).toEqual(['api-id']);
+  });
+
+  it('asks for --repo when there are several repositories', async () => {
+    const { userCli, created } = setup(['web', 'api']);
+
+    const reply = await userCli('new', '--task', 'Add a route');
+
+    expect(reply.ok).toBe(false);
+    expect(reply.output).toContain('web, api');
+    expect(created).toEqual([]);
+  });
+
+  it('does not let the Ask Korev chat create workspaces', async () => {
+    const { cli, created } = setup();
+
+    const reply = await cli('new', '--task', 'Fix the login page');
+
+    expect(reply.output).toContain('Unknown command');
+    expect(created).toEqual([]);
   });
 });

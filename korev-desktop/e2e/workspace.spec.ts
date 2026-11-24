@@ -1224,7 +1224,7 @@ test('sends unanswered review comments to the agent when PRs are kept ready', as
   }
 });
 
-test('answers korev from the user terminal but refuses agents without access', async () => {
+test('runs korev from the user terminal but refuses agents without access', async () => {
   const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
   const repo = await createRepo(home);
   const { app, window } = await launch(home, repo);
@@ -1240,6 +1240,20 @@ test('answers korev from the user terminal but refuses agents without access', a
 
     expect(refused.status).toBe(1);
     expect(refused.stderr).toContain('not given access to Korev');
+
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await expect(
+      window.getByRole('heading', { name: 'New workspace' }),
+    ).toBeVisible();
+    const created = runKorevCli(home, ['new', '--task', 'Add a note']);
+
+    expect(created.stdout).toContain('Created');
+    await expect(
+      window
+        .getByRole('navigation', { name: 'Workspaces' })
+        .getByText('dev-person/add-agent-note'),
+    ).toBeVisible();
+    await waitForAgentsToFinish(window);
   } finally {
     await app.close();
     await rm(home, { recursive: true, force: true });

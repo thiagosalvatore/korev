@@ -1,4 +1,10 @@
-import type { AskChat, ChatSession, Result } from '../shared/model';
+import type {
+  AskChat,
+  ChatSession,
+  Result,
+  SendOptions,
+  Workspace,
+} from '../shared/model';
 import { workspaceLabel } from '../shared/workspaces';
 import {
   USER_CLI_SESSION,
@@ -7,11 +13,13 @@ import {
   type CliReply,
 } from './agent-server';
 import type { Context } from './context';
+import { defaultTask } from './workspaces';
 import {
   CliError,
   done,
   failed,
   flags,
+  repoNamed,
   required,
   runCommand,
   type Command,
@@ -49,10 +57,15 @@ Korev must be open.
   korev review rerun --id <chat id>
       Ask a review chat to check its open pull request again. A review chat
       that is still running is refused.
+  korev new --task "<task>" [--repo <repository name>]
+      Create a workspace and start its agent on the task, with your default
+      agent and plan mode. --repo may be left out when Korev has only one
+      repository.
 `;
 
 const ASK_CHAT_PLACE = 'ask chat';
 const NO_CHATS = 'No open chats.';
+const NO_REPOS = 'Add a repository in Korev first.';
 
 export interface AppCommandDeps {
   ctx: Context;
@@ -62,6 +75,7 @@ export interface AppCommandDeps {
   send(session: ChatSession, text: string, fromKorev: boolean): Promise<Result>;
   stop(sessionId: string): Promise<void>;
   rerunReview(ask: AskChat): Promise<Result>;
+  createWorkspaces(repoIds: string[], task: SendOptions): Result<Workspace[]>;
 }
 
 interface OpenChat {
@@ -177,6 +191,28 @@ export function createAppCommands(deps: AppCommandDeps) {
     },
   };
 
+  function repoFor(name: string | undefined): string {
+    const named = repoNamed(deps.ctx, name);
+    if (named) return named;
+    const { repos } = state();
+    if (repos.length === 1) return repos[0].id;
+    if (!repos.length) throw new CliError(NO_REPOS);
+    const names = repos.map((repo) => repo.name).join(', ');
+    throw new CliError(`Pick a repository with --repo: ${names}.`);
+  }
+
+  const newWorkspace: Command = async (_call, args) => {
+    const values = flags(args, { task: 'string', repo: 'string' });
+    const text = required(values.task, 'task');
+    const task = defaultTask(deps.ctx, text, state().settings.defaultPlanMode);
+    const created = deps.createWorkspaces([repoFor(values.repo)], task);
+    if (!created.ok) return failed(created.message);
+    const [workspace] = created.value;
+    return done(
+      `Created ${workspaceLabel(workspace)}. Its chat id is ${workspace.sessions[0].id}.`,
+    );
+  };
+
   const korevChatCommands: Record<string, Command> = {
     ...chatCommands,
     help: async () => done(KOREV_CHAT_GUIDE),
@@ -187,6 +223,7 @@ export function createAppCommands(deps: AppCommandDeps) {
     ...chatCommands,
     help: async () => done(USER_GUIDE),
     'chats send': sendCommand(false),
+    new: newWorkspace,
   };
 
   return {
