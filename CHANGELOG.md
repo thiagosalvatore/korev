@@ -4,8 +4,13 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-24
+
+Korev now runs opencode, keeps your agents running after you quit, and takes commands from your terminal and from links.
+
 ### New
 
+- **Ask Korev.** Choose **Ask Korev** in the command palette (⌘K) to open a chat that acts on your other chats. For example, ask it to "re-run the review on all my review chats", and it does that in one step. Korev keeps one Ask Korev chat.
 - **Claude Ship.** Open Claude Code's `/ship` or `/steward` from the workspace header or the command palette. Korev opens a terminal tab with the command typed, and you press Enter. Set **Settings → Git → Create PRs with** to **Claude Ship** to make **Create PR** do the same. Keep PRs ready waits while the tab is open.
 - **Agents keep running after you quit.** Quitting Korev closes its window and leaves agents and automations running. Korev stays in the menu bar with the number of working agents. Open Korev again from the menu bar, the Dock or Spotlight. Choose **Quit Korev** in the menu bar to stop everything. To quit the old way, turn off **Keep agents running after you quit** in Settings.
 - **Updates wait for your agents.** **Install and restart** keeps the Korev window open while agents work and asks whether to install now or once they finish.
