@@ -29,6 +29,8 @@ const BLOCKING_REVIEW_DECISIONS = new Set([
 ]);
 const MAX_STACK_SIZE = 100;
 const MAX_REVIEW_THREADS = 100;
+const MAX_LABELS = 20;
+const PR_STEWARD_LABEL_PREFIX = 'claude-pr-steward';
 const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 // Measured on PostHog/posthog PRs: 8 PRs answer in 3.5–6 s, under GitHub's 10 s limit.
 const PR_BATCH_SIZE = 8;
@@ -52,6 +54,7 @@ function checksSelection(number: number, after: string | null): string {
 function prSelection(number: number): string {
   return `number url title state isDraft mergeable mergedAt reviewDecision
     headRefName headRefOid baseRefName createdAt
+    labels(first: ${MAX_LABELS}) { nodes { name } }
     ${checksSelection(number, null)}
     reviewThreads(first: ${MAX_REVIEW_THREADS}) {
       nodes {
@@ -137,6 +140,14 @@ interface PrResource {
   stackEntry?: { position: number } | null;
   stack?: { entries: { nodes: StackEntry[] } } | null;
   reviewThreads?: { nodes: ReviewThreadSummary[] } | null;
+}
+
+function hasPrStewardLabel(pr: JsonRecord): boolean {
+  const labels = (pr.labels as { nodes?: { name?: string }[] } | undefined)
+    ?.nodes;
+  return (labels ?? []).some((label) =>
+    str(label.name).startsWith(PR_STEWARD_LABEL_PREFIX),
+  );
 }
 
 function str(value: unknown): string {
@@ -259,6 +270,7 @@ function toPrStatus(
     checks: checks.map(toCheck),
     stack: open ? parsePrStack(pr) : null,
     unansweredThreads: open ? parseUnansweredThreads(pr, viewer) : [],
+    prSteward: hasPrStewardLabel(pr),
   };
 }
 

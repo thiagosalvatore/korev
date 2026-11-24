@@ -29,6 +29,7 @@ const pr: PrStatus = {
   checks: [{ name: 'lint', state: 'success', url: null, required: true }],
   stack: null,
   unansweredThreads: [],
+  prSteward: false,
 };
 
 const thread: PrThread = {

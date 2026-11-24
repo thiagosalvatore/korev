@@ -796,6 +796,7 @@ export interface PrStatus {
   checks: PrCheck[];
   stack: PrStack | null;
   unansweredThreads: string[];
+  prSteward: boolean;
 }
 
 export interface PrStack {
