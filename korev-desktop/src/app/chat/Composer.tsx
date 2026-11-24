@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { cn, Icon } from '../../design-system';
 import {
+  AGENT_FEATURES,
   effortLevels,
   LOADOUT_SIZE,
   PENDING_PLAN_PLACEHOLDER,
@@ -99,6 +100,7 @@ function formatTabContext(contexts: TabContext[]): string {
 function nextEffort(props: ComposerProps): string {
   const levels = effortLevels(props.agent, props.models, props.model);
   const { effort } = props;
+  if (!levels.length) return effort;
   return levels[(levels.indexOf(effort) + 1) % levels.length];
 }
 
@@ -285,9 +287,9 @@ export function Composer(props: ComposerProps) {
     const key = event.key.toLowerCase();
     if (event.key === 'Tab' && event.shiftKey)
       props.onPlanModeChange(!planMode);
-    else if (command && event.shiftKey && key === 'e')
-      props.onFastChange(!props.fast);
-    else if (command && event.shiftKey && (key === '/' || key === '?'))
+    else if (command && event.shiftKey && key === 'e') {
+      if (AGENT_FEATURES[props.agent].fast) props.onFastChange(!props.fast);
+    } else if (command && event.shiftKey && (key === '/' || key === '?'))
       props.onEffortChange(nextEffort(props));
     else if (command && key === 'u') picker.current?.click();
     else if (command && key === ';') openSnippets();

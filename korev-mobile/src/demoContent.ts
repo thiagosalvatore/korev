@@ -190,7 +190,7 @@ const SETTINGS: Settings = {
   lightTheme: 'korev',
   accentColor: '',
   defaultAgent: 'claude',
-  defaultModels: { claude: CLAUDE_MODELS[0].id, codex: '' },
+  defaultModels: { claude: CLAUDE_MODELS[0].id, codex: '', opencode: '' },
   branchPrefix: '',
   workspacesRoot: `${DEMO_HOME}/korev/workspaces`,
   defaultEffort: DEFAULT_EFFORT,

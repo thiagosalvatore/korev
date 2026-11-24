@@ -1,0 +1,17 @@
+#!/bin/sh
+case " $* " in
+  " --version ") echo "9.9.9"; exit 0 ;;
+  " auth list --format json ") echo '[]'; exit 0 ;;
+  " models ") echo "opencode/fake-free"; exit 0 ;;
+esac
+prompt=$(cat)
+if [ -d .context ]; then
+  printf '%s' "$prompt" > .context/opencode-prompt
+  printf '%s' "$*" > .context/opencode-args
+fi
+case "$prompt" in
+  *make-plan*) reply='# Settings\n\n## Lanes\n### api\nAdd the endpoint.\n### ui\nBuild the page.' ;;
+  *) reply='Done.' ;;
+esac
+printf '%s\n' "{\"type\":\"text\",\"sessionID\":\"ses_fake\",\"part\":{\"id\":\"prt_text\",\"type\":\"text\",\"text\":\"$reply\"}}"
+printf '%s\n' '{"type":"step_finish","sessionID":"ses_fake","part":{"id":"prt_finish","type":"step-finish","reason":"stop","cost":0}}'

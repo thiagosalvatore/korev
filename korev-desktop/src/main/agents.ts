@@ -16,6 +16,12 @@ import {
   type TurnParser,
 } from './agent-events';
 import { readCodexUsage } from './codex-usage';
+import {
+  createOpencodeParser,
+  opencodeArgs,
+  parseOpencodeAccount,
+  parseOpencodeModels,
+} from './opencode-agent';
 
 const VERSION_PATTERN = /\d+\.\d+\.\d+\S*/;
 const PROBE_TIMEOUT_MS = 15_000;
@@ -256,6 +262,26 @@ export const AGENTS: Record<AgentKind, AgentDefinition> = {
     async models(run, env) {
       const result = await probe(run, env, 'codex', ['debug', 'models']);
       return result ? parseCodexModels(result.stdout) : [];
+    },
+  },
+  opencode: {
+    binary: 'opencode',
+    input: 'prompt',
+    args: opencodeArgs,
+    parser: createOpencodeParser,
+    usage: async () => null,
+    async account(run, env) {
+      const result = await probe(run, env, 'opencode', [
+        'auth',
+        'list',
+        '--format',
+        'json',
+      ]);
+      return result ? parseOpencodeAccount(result.stdout) : null;
+    },
+    async models(run, env) {
+      const result = await probe(run, env, 'opencode', ['models']);
+      return result ? parseOpencodeModels(result.stdout) : [];
     },
   },
 };

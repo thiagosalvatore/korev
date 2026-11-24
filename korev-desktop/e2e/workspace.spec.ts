@@ -73,7 +73,14 @@ async function pickRepositories(window: Page, names: string[]) {
     await window.getByRole('checkbox', { name }).check();
 }
 
-function launchApp(home: string, env: NodeJS.ProcessEnv = {}) {
+async function shellRcWithPath(home: string, bins: string[]) {
+  const rc = path.join(home, '.shrc');
+  await writeFile(rc, `export PATH=${bins.join(':')}:$PATH\n`);
+  return rc;
+}
+
+async function launchApp(home: string, extraBins: string[] = []) {
+  const rc = await shellRcWithPath(home, [...extraBins, FAKE_AGENT_BIN]);
   return electron.launch({
     args: [
       APP_ENTRY,
@@ -85,7 +92,7 @@ function launchApp(home: string, env: NodeJS.ProcessEnv = {}) {
       HOME: home,
       SHELL: '/bin/sh',
       PATH: `${FAKE_AGENT_BIN}:${process.env.PATH}`,
-      ...env,
+      ENV: rc,
     },
   });
 }
@@ -110,8 +117,8 @@ function runKorevCli(
   });
 }
 
-async function launch(home: string, repo: string, env: NodeJS.ProcessEnv = {}) {
-  const app = await launchApp(home, env);
+async function launch(home: string, repo: string, extraBins: string[] = []) {
+  const app = await launchApp(home, extraBins);
   await app.evaluate(({ dialog }, repoPath) => {
     dialog.showOpenDialog = (async () => ({
       canceled: false,
@@ -1095,9 +1102,8 @@ async function launchWithFakeGh(home: string, fakeGh = FAKE_GH) {
   await mkdir(fakeBin);
   await writeFile(path.join(fakeBin, 'gh'), fakeGh);
   await chmod(path.join(fakeBin, 'gh'), 0o755);
-  await writeFile(path.join(home, '.shrc'), `export PATH=${fakeBin}:$PATH\n`);
   return {
-    ...(await launch(home, repo, { ENV: path.join(home, '.shrc') })),
+    ...(await launch(home, repo, [fakeBin])),
     repo,
   };
 }
@@ -1266,6 +1272,7 @@ test('sends unanswered review comments to the agent when PRs are kept ready', as
     await expect(
       window.getByText(/Reviewers left comments on pull request #7/),
     ).toBeVisible();
+    await expect(window.getByText('I added agent-note.txt.')).toHaveCount(2);
     await waitForAgentsToFinish(window);
     await expect(
       window.getByRole('button', { name: 'Keep PR ready' }),

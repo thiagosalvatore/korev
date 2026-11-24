@@ -95,9 +95,9 @@ function Hero() {
       </div>
       <div>
         <p>
-          Korev runs Claude Code and Codex in parallel on your Mac. Each task
-          gets a git worktree with its own chats, terminal, diff and pull
-          request.
+          Korev runs Claude Code, Codex and opencode in parallel on your Mac.
+          Each task gets a git worktree with its own chats, terminal, diff and
+          pull request.
         </p>
         <Download />
       </div>
@@ -260,9 +260,9 @@ export default function Home() {
           <div>
             <h3>Uses the agents you already have.</h3>
             <p>
-              Korev runs the <code>claude</code> and <code>codex</code> CLIs
-              with their own sign-in, MCP servers and skills, and uses{' '}
-              <code>gh</code> for pull requests and checks.
+              Korev runs the <code>claude</code>, <code>codex</code> and{' '}
+              <code>opencode</code> CLIs with their own sign-in, MCP servers and
+              skills, and uses <code>gh</code> for pull requests and checks.
             </p>
             <Download withNote={false} />
           </div>

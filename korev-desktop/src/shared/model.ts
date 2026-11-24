@@ -1,12 +1,17 @@
 import type { ExplainerRef } from './explainer';
 
-export type AgentKind = 'claude' | 'codex';
+export type AgentKind = 'claude' | 'codex' | 'opencode';
 
-export const AGENT_KINDS: readonly AgentKind[] = ['claude', 'codex'];
+export const AGENT_KINDS: readonly AgentKind[] = [
+  'claude',
+  'codex',
+  'opencode',
+];
 
 export const AGENT_LABELS: Record<AgentKind, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
+  opencode: 'opencode',
 };
 
 export interface AgentFeatures {
@@ -17,6 +22,7 @@ export interface AgentFeatures {
 export const AGENT_FEATURES: Record<AgentKind, AgentFeatures> = {
   claude: { interactive: true, fast: true },
   codex: { interactive: false, fast: true },
+  opencode: { interactive: false, fast: false },
 };
 
 export const STOP_BEFORE_SWITCHING =
@@ -35,11 +41,13 @@ export interface ModelChoice extends AgentModel {
 export const EFFORT_LEVELS: Record<AgentKind, readonly string[]> = {
   claude: ['low', 'medium', 'high', 'xhigh', 'max'],
   codex: ['low', 'medium', 'high', 'xhigh', 'max'],
+  opencode: [],
 };
 
 export const DEFAULT_EFFORT: Record<AgentKind, string> = {
   claude: 'high',
   codex: 'medium',
+  opencode: '',
 };
 
 export function effortLevels(

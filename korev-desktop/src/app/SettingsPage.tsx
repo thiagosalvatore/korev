@@ -806,6 +806,7 @@ const AGENT_STATUS: Record<AgentStatus, { label: string; dot: string }> = {
 const SIGN_IN_COMMANDS: Record<AgentKind, string> = {
   claude: 'claude auth login',
   codex: 'codex login',
+  opencode: 'opencode auth login',
 };
 
 function agentStatus(entry: AgentAvailability | undefined): AgentStatus {
@@ -849,6 +850,11 @@ function AgentModel({
   const { settings } = state;
   const { agent } = entry;
   const label = AGENT_LABELS[agent];
+  const efforts = effortLevels(
+    agent,
+    entry.models,
+    settings.defaultModels[agent],
+  );
   return (
     <Row
       title="Default model"
@@ -869,19 +875,19 @@ function AgentModel({
             })
           }
         />
-        <Select
-          ariaLabel={`${label} effort`}
-          className="w-28"
-          options={[
-            ...effortLevels(agent, entry.models, settings.defaultModels[agent]),
-          ]}
-          value={settings.defaultEffort[agent]}
-          onChange={(effort) =>
-            update({
-              defaultEffort: { ...settings.defaultEffort, [agent]: effort },
-            })
-          }
-        />
+        {efforts.length ? (
+          <Select
+            ariaLabel={`${label} effort`}
+            className="w-28"
+            options={[...efforts]}
+            value={settings.defaultEffort[agent]}
+            onChange={(effort) =>
+              update({
+                defaultEffort: { ...settings.defaultEffort, [agent]: effort },
+              })
+            }
+          />
+        ) : null}
       </div>
     </Row>
   );
@@ -957,7 +963,7 @@ function Agents({ state }: { state: AppState }) {
       <AgentTab state={state} agent={agent} />
       <Row
         title="Ask before tool calls"
-        description="Claude Code asks you to allow each edit and command. Plan approvals and questions always ask. Codex runs in its workspace-write sandbox either way."
+        description="Claude Code asks you to allow each edit and command. Plan approvals and questions always ask. Other agents never ask. Codex stays in its workspace-write sandbox."
       >
         <Switch
           checked={state.settings.toolApprovals}
@@ -989,7 +995,7 @@ function Agents({ state }: { state: AppState }) {
       </Row>
       <Row
         title="Queue messages while the agent works"
-        description="A message you send while Claude Code works waits until it finishes. Click its arrow above the message box to steer the agent with it. When off, the message steers the agent at once. Codex always queues."
+        description="A message you send while Claude Code works waits until it finishes. Click its arrow above the message box to steer the agent with it. When off, the message steers the agent at once. Other agents always queue."
       >
         <Switch
           checked={state.settings.queueWhileRunning}

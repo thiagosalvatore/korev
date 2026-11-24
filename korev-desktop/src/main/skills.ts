@@ -8,6 +8,7 @@ const COMMAND_EXTENSION = '.md';
 const SKILL_DIRS: Record<AgentKind, string[]> = {
   claude: ['.claude/skills'],
   codex: ['.agents/skills', '.codex/skills'],
+  opencode: ['.opencode/skills', '.config/opencode/skills'],
 };
 
 async function isSkill(dir: string, name: string): Promise<boolean> {
