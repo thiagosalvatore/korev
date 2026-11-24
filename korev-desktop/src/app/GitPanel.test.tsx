@@ -1,8 +1,8 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState, PrStatus, PrThread, Workspace } from '../shared/model';
 import { GitPanel } from './GitPanel';
-import { resetUiForTests, setUi } from './ui-store';
+import { getUi, resetUiForTests, setUi } from './ui-store';
 
 const workspace = {
   id: 'w1',
@@ -88,5 +88,31 @@ describe('GitPanel PR tab', () => {
 
     expect(screen.getByRole('tab', { name: 'PR' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Create PR' })).toBeTruthy();
+  });
+
+  it('opens Claude Ship with /ship typed when PRs are created with Claude Ship', () => {
+    const state = {
+      ...stateWith([]),
+      settings: { createPrWith: 'claude-ship' },
+      agents: [
+        {
+          agent: 'claude',
+          version: '2.1.330',
+          account: { method: 'claude.ai', email: null, organization: null },
+          models: [],
+        },
+      ],
+    } as unknown as AppState;
+    render(<GitPanel state={state} workspace={workspace} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create PR' }));
+
+    expect(getUi().workspaces.w1.extraTabs).toEqual([
+      expect.objectContaining({ preset: 'ship', input: '/ship' }),
+    ]);
+    expect(window.korev.call).not.toHaveBeenCalledWith(
+      'createPr',
+      expect.anything(),
+    );
   });
 });

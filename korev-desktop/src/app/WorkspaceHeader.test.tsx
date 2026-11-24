@@ -23,6 +23,7 @@ const state = {
   workspaces: [workspace],
   runtime: {},
   editors: [],
+  agents: [],
   settings: {},
 } as unknown as AppState;
 

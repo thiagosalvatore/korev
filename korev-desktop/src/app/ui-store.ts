@@ -14,7 +14,7 @@ export type MainTab =
   | { kind: 'file'; file: string; line?: number | null; editing?: boolean }
   | { kind: 'search' }
   | { kind: 'comments' }
-  | { kind: 'terminal'; id: string; preset: TerminalPreset }
+  | { kind: 'terminal'; id: string; preset: TerminalPreset; input?: string }
   | { kind: 'browser'; id: string; url: string };
 
 export type DiffLayout = 'unified' | 'split';

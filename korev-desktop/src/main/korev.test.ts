@@ -922,6 +922,32 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     ]);
   });
 
+  it('leaves review comments to Claude Ship while its terminal is open', async () => {
+    await korev.api.updateSettings({ keepPrsReady: true });
+    const workspace = await createWorkspace();
+    const [session] = workspace.sessions;
+    const shipRef = `${workspace.id}:tab-ship`;
+    await korev.api.openTerminal(
+      shipRef,
+      workspace.id,
+      'shell',
+      { cols: 80, rows: 24 },
+      'ship',
+      '/ship',
+    );
+    reviewedPr('c1');
+
+    await korev.api.prStatuses(workspace.id);
+    expect(await userPrompts(session.id)).toEqual([]);
+
+    await korev.api.closeTerminal(shipRef);
+    await korev.api.prStatuses(workspace.id);
+    await waitUntilIdle(session.id);
+    expect(await userPrompts(session.id)).toEqual([
+      expect.stringContaining('Please rename (c1)'),
+    ]);
+  });
+
   it('waits for a running turn to end before it asks about review comments', async () => {
     await korev.api.updateSettings({ keepPrsReady: true });
     const workspace = await createWorkspace();

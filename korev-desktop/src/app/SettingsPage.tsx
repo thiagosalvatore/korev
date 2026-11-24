@@ -35,6 +35,7 @@ import {
   type RepoScripts,
   type Settings,
   type Skill,
+  type CreatePrWith,
   type ReReviews,
   type ReviewReplies,
   type ThemePreference,
@@ -84,6 +85,11 @@ const REVIEW_REPLY_OPTIONS: { value: ReviewReplies; label: string }[] = [
   { value: 'reply-and-resolve', label: 'Reply and resolve' },
   { value: 'none', label: "Don't post anything" },
   { value: 'custom', label: 'Custom' },
+];
+
+const CREATE_PR_WITH_OPTIONS: { value: CreatePrWith; label: string }[] = [
+  { value: 'korev', label: 'Korev' },
+  { value: 'claude-ship', label: 'Claude Ship' },
 ];
 
 const RE_REVIEW_OPTIONS: { value: ReReviews; label: string }[] = [
@@ -1064,6 +1070,20 @@ function Git({ settings }: { settings: Settings }) {
           value={settings.reReviews}
           onChange={(reReviews) =>
             update({ reReviews: reReviews as ReReviews })
+          }
+        />
+      </Row>
+      <Row
+        title="Create PRs with"
+        description="Korev asks the workspace's chat to commit, push and open the pull request. Claude Ship opens Claude Code in a terminal with /ship typed. Press Enter and Claude commits, pushes, opens the pull request, reviews it and then fixes its checks and review comments while the terminal stays open. Keep PRs ready waits until you close that terminal. Needs Claude Code 2.1.330 or later. The phone always uses Korev."
+      >
+        <Select
+          ariaLabel="Create PRs with"
+          className="w-56"
+          options={CREATE_PR_WITH_OPTIONS}
+          value={settings.createPrWith}
+          onChange={(createPrWith) =>
+            update({ createPrWith: createPrWith as CreatePrWith })
           }
         />
       </Row>

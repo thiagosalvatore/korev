@@ -13,6 +13,7 @@ import {
   withPick,
   type PickedAnswers,
   STOP_BEFORE_SWITCHING,
+  supportsClaudeShip,
   type AppState,
   type ChatItem,
   type ChatSession,
@@ -23,6 +24,8 @@ import {
 import {
   focusComposer,
   handoffPlan,
+  isClaudeShipLine,
+  openClaudeShip,
   openDiff,
   openFile,
   selectWorkspace,
@@ -216,7 +219,19 @@ export function ChatView({
     question?.questions && answerQuestions(question.questions, picks),
   );
 
+  function opensClaudeShip(text: string): boolean {
+    return (
+      session.agent === 'claude' &&
+      supportsClaudeShip(state.agents) &&
+      isClaudeShipLine(text)
+    );
+  }
+
   function send(text: string) {
+    if (workspace && opensClaudeShip(text)) {
+      openClaudeShip(workspace, text.trim());
+      return Promise.resolve(true);
+    }
     if (session.explainer) setExplainerMode('chat');
     return api
       .send(session.id, {

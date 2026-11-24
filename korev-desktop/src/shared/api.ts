@@ -233,6 +233,7 @@ export interface KorevApi {
     kind: TerminalKind,
     size: TerminalSize,
     preset?: TerminalPreset,
+    input?: string,
   ): Promise<Result<string>>;
   startScript(
     workspaceId: string,

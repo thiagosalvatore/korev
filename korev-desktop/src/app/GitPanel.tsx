@@ -490,7 +490,7 @@ function PullRequest({
           size="sm"
           variant="primary"
           icon="git-pull-request-arrow"
-          onClick={() => createPr(workspace)}
+          onClick={() => createPr(state, workspace)}
         >
           Create PR
         </Button>
