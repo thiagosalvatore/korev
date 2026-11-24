@@ -140,7 +140,9 @@ function UpdateAvailable({ release }: { release: ReleaseInfo }) {
           </Button>
           <Button
             variant="primary"
-            onClick={async () => reportFailure(await api.installUpdate())}
+            onClick={async () => {
+              if (reportFailure(await api.installUpdate())) close();
+            }}
           >
             Install and restart
           </Button>

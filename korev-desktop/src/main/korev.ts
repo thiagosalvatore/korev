@@ -280,6 +280,7 @@ export interface KorevDeps extends CoreDeps {
 export interface Korev {
   api: KorevApi;
   runningAgents(): number;
+  hasBackgroundWork(): boolean;
   settings(): Settings;
   updateSettings(patch: Partial<Settings>): Promise<void>;
   showWhatsNew(): Promise<void>;
@@ -848,7 +849,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   }
 
   function firstUnhandledPrProblems(workspace: Workspace, prs: PrStatus[]) {
-    for (const pr of prs) {
+    for (const pr of prs.filter((tracked) => !tracked.prSteward)) {
       const problems = prProblems(pr).filter(
         (found) => !workspace.prReadyHandled.includes(found.key),
       );
@@ -1972,6 +1973,9 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   return {
     api,
     runningAgents: () => ctx.runningSessions.size,
+    hasBackgroundWork: () =>
+      ctx.runningSessions.size > 0 ||
+      store.state.automations.some((automation) => automation.enabled),
     settings: () => store.state.settings,
     updateSettings,
     showWhatsNew,

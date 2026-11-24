@@ -507,6 +507,7 @@ describe('review prompt', () => {
       checks: [],
       stack: null,
       unansweredThreads: [],
+      prSteward: false,
       ...overrides,
     };
   }
@@ -552,6 +553,7 @@ describe('keep-ready prompt', () => {
     checks: [],
     stack: null,
     unansweredThreads: ['c1', 'c2'],
+    prSteward: false,
   };
   const threads: PrThread[] = ['c1', 'c2'].map((id, index) => ({
     id: `t${index + 1}`,

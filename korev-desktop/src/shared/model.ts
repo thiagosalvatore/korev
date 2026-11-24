@@ -705,6 +705,7 @@ export interface Settings {
   notificationSound: boolean;
   notificationSoundFile: string;
   keepAwake: boolean;
+  keepRunningInBackground: boolean;
   signAgentCommits: boolean;
   remoteAccess: boolean;
   remotePort: number;
@@ -799,6 +800,7 @@ export interface PrStatus {
   checks: PrCheck[];
   stack: PrStack | null;
   unansweredThreads: string[];
+  prSteward: boolean;
 }
 
 export interface PrStack {

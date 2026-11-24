@@ -218,6 +218,7 @@ const SETTINGS: Settings = {
   notificationSound: true,
   notificationSoundFile: '',
   keepAwake: true,
+  keepRunningInBackground: true,
   signAgentCommits: false,
   remoteAccess: true,
   remotePort: 0,
@@ -327,6 +328,7 @@ export function demoPullRequest(
     }),
     stack: null,
     unansweredThreads: [],
+    prSteward: false,
     ...patch,
   };
 }

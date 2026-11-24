@@ -525,6 +525,17 @@ function General({ settings }: { settings: Settings }) {
         />
       </Row>
       <Row
+        title="Keep agents running after you quit"
+        description="Quitting Korev closes its window and leaves agents and automations running. Korev stays in the menu bar. Choose Quit Korev there to stop everything."
+      >
+        <Switch
+          checked={settings.keepRunningInBackground}
+          onChange={(keepRunningInBackground) =>
+            update({ keepRunningInBackground })
+          }
+        />
+      </Row>
+      <Row
         title="Sign agent commits with a Korev key"
         description="Works while your Mac is locked. Korev keeps the key in your Mac's Secure Enclave, where it cannot be copied, and adds it to your GitHub account as a signing key. While your Mac is on, any app running as you can sign with it."
       >

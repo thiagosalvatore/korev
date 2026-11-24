@@ -894,6 +894,20 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     },
   );
 
+  it('leaves a PR to Claude PR Steward while it is working on it', async () => {
+    await korev.api.updateSettings({ keepPrsReady: true });
+    const workspace = await createWorkspace();
+    reviewedPr('c1');
+    openPr = {
+      ...openPr,
+      labels: { nodes: [{ name: 'claude-pr-steward-watching' }] },
+    };
+
+    await korev.api.prStatuses(workspace.id);
+
+    expect(await userPrompts(workspace.sessions[0].id)).toEqual([]);
+  });
+
   it('asks about review comments on a workspace kept ready while the setting is off', async () => {
     const workspace = await createWorkspace();
     const [session] = workspace.sessions;
@@ -2198,6 +2212,14 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     );
     return run();
   }
+
+  it('counts an enabled automation as background work', async () => {
+    expect(korev.hasBackgroundWork()).toBe(false);
+    const automation = await createAutomation('say hello');
+    expect(korev.hasBackgroundWork()).toBe(true);
+    await korev.api.updateAutomation(automation.id, { enabled: false });
+    expect(korev.hasBackgroundWork()).toBe(false);
+  });
 
   it('opens a workspace for each new key a run asks for, only in its own repositories', async () => {
     const automation = await createAutomation('sweep-tickets');

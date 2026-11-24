@@ -24,6 +24,7 @@ const READY_PR: PrStatus = {
   checks: [{ name: 'lint', state: 'success', url: null, required: true }],
   stack: null,
   unansweredThreads: [],
+  prSteward: false,
 };
 
 function actionLabel(pr: PrStatus): string {
