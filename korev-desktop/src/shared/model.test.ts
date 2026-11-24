@@ -124,6 +124,7 @@ describe('prBadge', () => {
     checks: [{ name: 'lint', state: 'failure', url: null, required: true }],
     stack: null,
     unansweredThreads: [],
+    prSteward: false,
   };
 
   it('shows conflicts before failing checks', () => {

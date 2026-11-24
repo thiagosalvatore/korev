@@ -326,6 +326,7 @@ export function demoPullRequest(
     }),
     stack: null,
     unansweredThreads: [],
+    prSteward: false,
     ...patch,
   };
 }

@@ -845,7 +845,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   }
 
   function firstUnhandledPrProblems(workspace: Workspace, prs: PrStatus[]) {
-    for (const pr of prs) {
+    for (const pr of prs.filter((tracked) => !tracked.prSteward)) {
       const problems = prProblems(pr).filter(
         (found) => !workspace.prReadyHandled.includes(found.key),
       );

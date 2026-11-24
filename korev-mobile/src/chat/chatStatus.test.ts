@@ -22,6 +22,7 @@ function pr(overrides: Partial<PrStatus> = {}): PrStatus {
     checks: [],
     stack: null,
     unansweredThreads: [],
+    prSteward: false,
     ...overrides,
   };
 }
