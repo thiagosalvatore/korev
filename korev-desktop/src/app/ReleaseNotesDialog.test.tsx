@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CHANGELOG_URL } from '../shared/links';
 import type { AppState } from '../shared/model';
@@ -84,11 +90,12 @@ describe('ReleaseNotesDialog', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('installs the update from its notes', () => {
+  it('installs the update from its notes, then closes them', async () => {
     renderDialog({ update: RELEASE });
     fireEvent.click(
       screen.getByRole('button', { name: 'Install and restart' }),
     );
     expect(call).toHaveBeenCalledWith('installUpdate', []);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 });

@@ -101,6 +101,7 @@ if (!app.requestSingleInstanceLock()) {
 
 let korevApp: Korev | null = null;
 let quitGate: QuitGate | null = null;
+let installOnQuit = false;
 
 const PRELOAD_PATH = path.join(__dirname, 'preload.cjs');
 
@@ -376,7 +377,10 @@ async function installUpdate(release: Release): Promise<Result> {
     return { ok: true, value: undefined };
   }
   const downloaded = await downloadUpdate();
-  if (downloaded.ok) autoUpdater.quitAndInstall();
+  if (downloaded.ok) {
+    installOnQuit = true;
+    quitGate?.requestQuit();
+  }
   return downloaded;
 }
 
@@ -572,7 +576,7 @@ app.whenReady().then(async () => {
       korev.settings().keepRunningInBackground && korev.hasBackgroundWork(),
     background: goBackground,
     ask: (running) => askQuit(running, gate),
-    quit: () => app.quit(),
+    quit: () => (installOnQuit ? autoUpdater.quitAndInstall() : app.quit()),
   });
   quitGate = gate;
   const desktopApi: DesktopApi = {
