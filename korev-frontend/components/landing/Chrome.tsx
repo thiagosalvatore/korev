@@ -47,10 +47,15 @@ export function Download({ withNote = true }: { withNote?: boolean }) {
       </div>
       <OtherMacDownload />
       {withNote && (
-        <span className="note">
-          Free and open source · macOS · Needs the <code>claude</code> or{' '}
-          <code>codex</code> CLI and <code>gh</code>
-        </span>
+        <>
+          <span className="note">
+            Free and open source · macOS · Needs the <code>claude</code> or{' '}
+            <code>codex</code> CLI and <code>gh</code>
+          </span>
+          <span className="note">
+            Or <code>brew install --cask thiagosalvatore/korev/korev</code>
+          </span>
+        </>
       )}
     </div>
   );
