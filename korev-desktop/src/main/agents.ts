@@ -51,6 +51,11 @@ export interface AgentDefinition {
   args(request: TurnRequest): string[];
   parser(cwd: string): TurnParser;
   usage(parser: TurnParser, env: NodeJS.ProcessEnv): Promise<TurnUsage | null>;
+  account(
+    run: CommandRunner,
+    env: NodeJS.ProcessEnv,
+  ): Promise<AgentAccount | null>;
+  models(run: CommandRunner, env: NodeJS.ProcessEnv): Promise<AgentModel[]>;
 }
 
 function claudePermissionMode(request: TurnRequest): string {
@@ -144,24 +149,7 @@ function codexArgs(request: TurnRequest): string[] {
   return ['exec', ...options, STDIN_PROMPT];
 }
 
-export const AGENTS: Record<AgentKind, AgentDefinition> = {
-  claude: {
-    binary: 'claude',
-    input: 'stream-json',
-    args: claudeArgs,
-    parser: createClaudeParser,
-    usage: async (parser) => parser.usage(),
-  },
-  codex: {
-    binary: 'codex',
-    input: 'prompt',
-    args: codexArgs,
-    parser: createCodexParser,
-    usage: (parser, env) => readCodexUsage(env, parser.sessionId()),
-  },
-};
-
-export function codexPrompt(request: TurnRequest, text: string): string {
+export function contextPrompt(request: TurnRequest, text: string): string {
   if (request.resumeId) return text;
   return `<workspace-context>\n${request.systemPrompt}\n</workspace-context>\n\n${text}`;
 }
@@ -240,16 +228,13 @@ export function parseCodexAccount(output: string): AgentAccount | null {
   return method ? { method, email: null, organization: null } : null;
 }
 
-interface AgentProbe {
-  account(
-    run: CommandRunner,
-    env: NodeJS.ProcessEnv,
-  ): Promise<AgentAccount | null>;
-  models(run: CommandRunner, env: NodeJS.ProcessEnv): Promise<AgentModel[]>;
-}
-
-const AGENT_PROBES: Record<AgentKind, AgentProbe> = {
+export const AGENTS: Record<AgentKind, AgentDefinition> = {
   claude: {
+    binary: 'claude',
+    input: 'stream-json',
+    args: claudeArgs,
+    parser: createClaudeParser,
+    usage: async (parser) => parser.usage(),
     async account(run, env) {
       const result = await probe(run, env, 'claude', ['auth', 'status']);
       return result ? parseClaudeAccount(result.stdout) : null;
@@ -257,6 +242,11 @@ const AGENT_PROBES: Record<AgentKind, AgentProbe> = {
     models: async () => CLAUDE_MODELS,
   },
   codex: {
+    binary: 'codex',
+    input: 'prompt',
+    args: codexArgs,
+    parser: createCodexParser,
+    usage: (parser, env) => readCodexUsage(env, parser.sessionId()),
     async account(run, env) {
       const result = await probe(run, env, 'codex', ['login', 'status']);
       return result
@@ -279,8 +269,8 @@ async function detectAgent(
   const version = installed
     ? (VERSION_PATTERN.exec(installed.stdout)?.[0] ?? null)
     : null;
-  const account = version ? await AGENT_PROBES[agent].account(run, env) : null;
-  const models = account ? await AGENT_PROBES[agent].models(run, env) : [];
+  const account = version ? await AGENTS[agent].account(run, env) : null;
+  const models = account ? await AGENTS[agent].models(run, env) : [];
   return { agent, version, account, models };
 }
 

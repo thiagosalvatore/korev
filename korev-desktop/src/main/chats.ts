@@ -4,7 +4,7 @@ import { planFileName } from '../shared/message';
 import { workspaceLabel } from '../shared/workspaces';
 import {
   conversationText,
-  finishedCodexPlan,
+  finishedTextPlan,
   hasWorktree,
   PLAN_TOOL,
   QUESTION_TOOL,
@@ -40,7 +40,7 @@ import {
   AGENTS,
   backgroundTaskCount,
   claudeUserMessage,
-  codexPrompt,
+  contextPrompt,
   isUserMessageAck,
   type TurnRequest,
 } from './agents';
@@ -472,8 +472,8 @@ export function createChats(
     const runtime = ctx.runtime(workspace.id);
     if (!isWatching(workspace)) runtime.unread = true;
     ctx.background(refreshStats(ctx, workspace));
-    const codexPlan = finishedCodexPlan(session, items, false);
-    if (codexPlan) keepPlan(workspace, codexPlan.plan);
+    const textPlan = finishedTextPlan(session, items, false);
+    if (textPlan) keepPlan(workspace, textPlan.plan);
     onWorkspaceTurnFinished(workspace.id, {
       sessionId: session.id,
       startedAt: turn.startedAt,
@@ -488,7 +488,7 @@ export function createChats(
       failure
         ? `${workspaceLabel(workspace)}: ${failure}`
         : workspaceLabel(workspace),
-      turnEndAttention(failure, codexPlan !== null),
+      turnEndAttention(failure, textPlan !== null),
     );
   }
 
@@ -794,7 +794,7 @@ export function createChats(
         process.write(claudeUserMessage(prompt));
         turn.written = 1;
       } else {
-        process.write(codexPrompt(request, prompt));
+        process.write(contextPrompt(request, prompt));
         process.closeInput();
       }
       const exit = await process.done;

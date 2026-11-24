@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { cn, Icon, IconButton } from '../../design-system';
 import {
+  AGENT_FEATURES,
   AGENT_LABELS,
   effortLevels,
   type AgentKind,
@@ -8,6 +9,7 @@ import {
   type TurnUsage,
 } from '../../shared/model';
 import { Menu, type MenuItem } from '../ui/Menu';
+import { AGENT_ICONS } from '../agentIcons';
 import { ContextMeter } from './ContextMeter';
 
 export interface ComposerToolbarProps {
@@ -44,7 +46,9 @@ function sendHint(props: ComposerToolbarProps): string | null {
   if (!props.canSend) return null;
   if (props.sendHint) return props.sendHint;
   if (!props.running) return null;
-  return props.agent === 'claude' ? 'Steers the running agent' : QUEUED_HINT;
+  return AGENT_FEATURES[props.agent].interactive
+    ? 'Steers the running agent'
+    : QUEUED_HINT;
 }
 
 function optionItems(props: ComposerToolbarProps): MenuItem[] {
@@ -149,10 +153,7 @@ export function ComposerToolbar(props: ComposerToolbarProps) {
             className={cn(CHIP, 'font-medium text-fg-2')}
             onClick={toggle}
           >
-            <Icon
-              name={props.agent === 'claude' ? 'sparkle' : 'hexagon'}
-              size={13}
-            />
+            <Icon name={AGENT_ICONS[props.agent]} size={13} />
             {modelLabel}
             <Icon name="chevron-down" size={12} className="text-fg-4" />
           </button>

@@ -30,7 +30,7 @@ export function record(value: unknown): JsonRecord {
   return value && typeof value === 'object' ? (value as JsonRecord) : {};
 }
 
-function str(value: unknown): string {
+export function str(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
@@ -42,7 +42,7 @@ export function epochMs(seconds: unknown): number | null {
   return typeof seconds === 'number' ? seconds * MS_PER_SECOND : null;
 }
 
-function clip(text: string, max: number): string {
+export function clip(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}\n…` : text;
 }
 
@@ -63,7 +63,7 @@ function realpath(dir: string): string {
   }
 }
 
-function relative(cwd: string, file: string): string {
+export function relative(cwd: string, file: string): string {
   for (const root of new Set([cwd, realpath(cwd)])) {
     if (file.startsWith(`${root}/`)) return path.relative(root, file);
   }
@@ -125,7 +125,7 @@ const TODO_STATUSES = new Set<TodoStatus>([
   'completed',
 ]);
 
-function claudeTodos(input: JsonRecord): Todo[] {
+export function claudeTodos(input: JsonRecord): Todo[] {
   const todos = Array.isArray(input.todos) ? input.todos : [];
   return todos.map((todo) => {
     const entry = record(todo);

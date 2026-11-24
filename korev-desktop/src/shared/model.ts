@@ -9,6 +9,16 @@ export const AGENT_LABELS: Record<AgentKind, string> = {
   codex: 'Codex',
 };
 
+export interface AgentFeatures {
+  interactive: boolean;
+  fast: boolean;
+}
+
+export const AGENT_FEATURES: Record<AgentKind, AgentFeatures> = {
+  claude: { interactive: true, fast: true },
+  codex: { interactive: false, fast: true },
+};
+
 export const STOP_BEFORE_SWITCHING =
   'Stop the agent before switching to another one';
 
@@ -1295,13 +1305,16 @@ export function splitLabel(count: number): string {
   return `Approve and split off ${count} ${count === 1 ? 'lane' : 'lanes'}`;
 }
 
-export function finishedCodexPlan(
+export function inTextPlanMode(session: ChatSession): boolean {
+  return session.planMode && !AGENT_FEATURES[session.agent].interactive;
+}
+
+export function finishedTextPlan(
   session: ChatSession,
   items: ChatItem[] | null,
   running: boolean,
 ): { id: string; plan: string } | null {
-  if (session.agent !== 'codex' || !session.planMode || running || !items)
-    return null;
+  if (!inTextPlanMode(session) || running || !items) return null;
   const last = items.at(-1);
   if (last?.kind !== 'result' || !last.ok) return null;
   const plan = latestPlan(items);

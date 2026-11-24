@@ -10,7 +10,6 @@ import {
 import { askRepoNames } from '../shared/format';
 import {
   hasWorktree,
-  type AgentKind,
   type AppState,
   type AskChat,
   type Workspace,
@@ -61,16 +60,12 @@ import {
   WorktreePending,
 } from './WorkspaceView';
 import { XTerm } from './XTerm';
+import { AGENT_ICONS } from './agentIcons';
 
 const LAYOUT_ICONS: Record<GridLayout, IconName> = {
   '2x1': 'columns-2',
   '1x2': 'rows-2',
   '2x2': 'grid-2x2',
-};
-
-const AGENT_ICONS: Record<AgentKind, IconName> = {
-  claude: 'sparkle',
-  codex: 'hexagon',
 };
 
 function LayoutPicker({ layout }: { layout: GridLayout }) {
