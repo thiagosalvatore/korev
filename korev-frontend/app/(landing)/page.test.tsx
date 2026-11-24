@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import Home from './page';
 
@@ -50,5 +56,16 @@ describe('landing page', () => {
         name: 'Every pull request that needs you, in one table.',
       }),
     ).toBeTruthy();
+  });
+
+  it('shows starting a workspace from a korev:// link', () => {
+    render(<Home />);
+    const launch = screen.getByRole('region', { name: 'Launch' });
+    expect(
+      within(launch).getByRole('heading', {
+        name: 'Start a task from any app.',
+      }),
+    ).toBeTruthy();
+    expect(launch.textContent).toContain('korev://new-workspace');
   });
 });

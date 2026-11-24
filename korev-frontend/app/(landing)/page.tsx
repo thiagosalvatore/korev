@@ -7,6 +7,7 @@ import {
   Inbox as InboxIcon,
   Link,
   Smartphone,
+  SquareTerminal,
   type LucideIcon,
 } from 'lucide-react';
 import { KorevDemo } from '@/components/demo/KorevDemo';
@@ -16,6 +17,7 @@ import {
   Branch,
   Explain,
   Inbox,
+  Launch,
   Linked,
   MainCommit,
   Phone,
@@ -127,6 +129,29 @@ function FeatureGraph() {
         card={<Worktrees />}
       />
       <MainCommit sha="a41e0c9" message="Merge #479 Dark mode settings" />
+      <BranchSection
+        name="Launch"
+        icon={SquareTerminal}
+        shortcut="korev:// · from any app"
+        title="Start a task from any app."
+        body={
+          <>
+            A <code>korev://new-workspace</code> link opens New workspace with
+            your text in the message box. Put it behind a Stream Deck button or
+            a keyboard shortcut, and the bug report you selected becomes a
+            workspace.
+          </>
+        }
+        points={[
+          <>
+            Add <code>repo=</code> to pick the repository
+          </>,
+          'Korev never sends it: you read the text and press Enter',
+          'The docs have a script that sends the selected text',
+        ]}
+        card={<Launch />}
+      />
+      <MainCommit sha="6b0d3fe" message="Merge #491 Gift card checkout" />
       <BranchSection
         name="Review"
         icon={FileDiff}
