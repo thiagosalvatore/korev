@@ -45,7 +45,7 @@ Each task gets a git worktree with its own chats, terminal, diff and pull reques
 
 ## Install
 
-Download the DMG for your Mac from the [latest release](https://github.com/thiagosalvatore/korev/releases/latest): `arm64` for Apple silicon, `x64` for Intel. Open it and drag Korev to Applications. Korev is signed and notarized by Apple, and it updates itself.
+Download the DMG for your Mac from the [latest release](https://github.com/thiagosalvatore/korev/releases/latest): `arm64` for Apple silicon, `x64` for Intel. Open it and drag Korev to Applications. Korev is signed and notarized by Apple, and it updates itself. Or install it with Homebrew: `brew install --cask thiagosalvatore/korev/korev`.
 
 Korev needs:
 
