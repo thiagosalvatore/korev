@@ -5,6 +5,8 @@ const SCROLLBACK_CHARS = 256 * 1024;
 const LOGIN_SHELL_ARGS = ['-l'];
 const COMMAND_FLAG = '-lc';
 const TERMINAL_TYPE = 'xterm-256color';
+const INPUT_AFTER_QUIET_MS = 500;
+const READY_OUTPUT_WINDOW_CHARS = 4096;
 
 export interface Pty {
   onData(listener: (data: string) => void): unknown;
@@ -37,6 +39,8 @@ export interface TerminalLaunch {
   cwd: string;
   env: NodeJS.ProcessEnv;
   command?: string;
+  input?: string;
+  typeInputAfter?: RegExp;
 }
 
 const DEFAULT_SIZE: TerminalSize = { cols: 120, rows: 30 };
@@ -59,6 +63,29 @@ interface Session {
   scrollback: string;
 }
 
+function typeWhenQuiet(
+  type: () => void,
+  readyOutput: RegExp | undefined,
+): (data: string) => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let output = '';
+  let ready = !readyOutput;
+  let typed = false;
+  return (data) => {
+    if (typed) return;
+    if (!ready) {
+      output = (output + data).slice(-READY_OUTPUT_WINDOW_CHARS);
+      ready = Boolean(readyOutput?.test(output));
+    }
+    if (!ready) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      typed = true;
+      type();
+    }, INPUT_AFTER_QUIET_MS);
+  };
+}
+
 export function createTerminals(deps: TerminalsDeps): Terminals {
   const sessions = new Map<string, Session>();
   const finished = new Map<string, string>();
@@ -79,9 +106,16 @@ export function createTerminals(deps: TerminalsDeps): Terminals {
       ...size,
     });
     const session: Session = { pty, scrollback: '' };
+    const { input } = launch;
+    const typeInputWhenQuiet = input
+      ? typeWhenQuiet(() => {
+          if (sessions.get(ref) === session) pty.write(input);
+        }, launch.typeInputAfter)
+      : null;
     pty.onData((data) => {
       session.scrollback = (session.scrollback + data).slice(-SCROLLBACK_CHARS);
       deps.onOutput(ref, data);
+      typeInputWhenQuiet?.(data);
     });
     pty.onExit(({ exitCode }) => {
       if (sessions.get(ref) !== session) return;

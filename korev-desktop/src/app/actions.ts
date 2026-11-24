@@ -13,6 +13,7 @@ import type {
   Workspace,
   WorkspaceSource,
 } from '../shared/model';
+import { supportsClaudeShip } from '../shared/model';
 import { activeWorkspaces, workspaceLabel } from '../shared/workspaces';
 import { api } from './bridge';
 import { saveDraft } from './chat/Composer';
@@ -186,6 +187,35 @@ export function openTerminalTab(workspaceId: string, preset: TerminalPreset) {
   openExtraTab(workspaceId, { kind: 'terminal', id: tabId(), preset });
 }
 
+const CLAUDE_SHIP_LINE = /^\/(ship|steward)(\s.*)?$/;
+
+export function isClaudeShipLine(text: string): boolean {
+  return CLAUDE_SHIP_LINE.test(text.trim());
+}
+
+export function claudeShipCommand(
+  state: AppState,
+  workspace: Workspace,
+): '/ship' | '/steward' {
+  const branchHasOpenPr = (state.runtime[workspace.id]?.prs ?? []).some(
+    (pr) => pr.state === 'OPEN' && pr.headRefName === workspace.branch,
+  );
+  return branchHasOpenPr ? '/steward' : '/ship';
+}
+
+export function claudeShipLabel(command: string): string {
+  return `Open Claude Ship (${command})`;
+}
+
+export function openClaudeShip(workspace: Workspace, input: string) {
+  openExtraTab(workspace.id, {
+    kind: 'terminal',
+    id: tabId(),
+    preset: 'ship',
+    input,
+  });
+}
+
 export function openBrowser(workspaceId: string, url: string) {
   openExtraTab(workspaceId, { kind: 'browser', id: tabId(), url });
 }
@@ -282,7 +312,12 @@ export async function openIn(workspace: Workspace, editor: EditorId) {
   reportFailure(await api.openIn(workspace.id, editor));
 }
 
-export async function createPr(workspace: Workspace) {
+export async function createPr(state: AppState, workspace: Workspace) {
+  if (
+    state.settings.createPrWith === 'claude-ship' &&
+    supportsClaudeShip(state.agents)
+  )
+    return openClaudeShip(workspace, '/ship');
   reportFailure(await api.createPr(workspace.id, activeSessionId(workspace)));
 }
 

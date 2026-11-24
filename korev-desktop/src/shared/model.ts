@@ -691,6 +691,7 @@ export interface Settings {
   archiveReviews: boolean;
   reReviews: ReReviews;
   keepPrsReady: boolean;
+  createPrWith: CreatePrWith;
   prCheckSeconds: number;
   reviewReplies: ReviewReplies;
   reviewReplyInstructions: string;
@@ -714,6 +715,8 @@ export interface Settings {
 }
 
 export type ReReviews = 'off' | 'check' | 'approve';
+
+export type CreatePrWith = 'korev' | 'claude-ship';
 
 export type ReviewReplies = 'none' | 'reply' | 'reply-and-resolve' | 'custom';
 
@@ -1002,6 +1005,18 @@ export interface AgentAvailability {
 
 export function isAgentReady(entry: AgentAvailability): boolean {
   return Boolean(entry.version && entry.account);
+}
+
+const CLAUDE_SHIP_MIN_VERSION = '2.1.330';
+
+export function supportsClaudeShip(agents: AgentAvailability[]): boolean {
+  const claude = agents.find((entry) => entry.agent === 'claude');
+  if (!claude?.version || !isAgentReady(claude)) return false;
+  return (
+    claude.version.localeCompare(CLAUDE_SHIP_MIN_VERSION, undefined, {
+      numeric: true,
+    }) >= 0
+  );
 }
 
 export interface AppState {
@@ -1493,7 +1508,7 @@ export function isScriptKind(kind: string): kind is ScriptKind {
   return SCRIPT_KINDS.includes(kind);
 }
 
-export type TerminalPreset = 'shell' | 'claude' | 'codex';
+export type TerminalPreset = 'shell' | 'claude' | 'codex' | 'ship';
 
 export type AppCommand =
   | 'new-workspace'

@@ -19,6 +19,7 @@ import {
   replyToQuestions,
   stackRows,
   supportedEffort,
+  supportsClaudeShip,
   type AgentQuestion,
   type ChatItem,
   type ChatSession,
@@ -547,6 +548,29 @@ describe('effort levels', () => {
     );
     expect(supportedEffort('codex', models, 'gpt-astra', 'ultra')).toBe(
       'ultra',
+    );
+  });
+});
+
+describe('supportsClaudeShip', () => {
+  const claude = (version: string) => ({
+    agent: 'claude' as const,
+    version,
+    account: { method: 'claude.ai', email: null, organization: null },
+    models: [],
+  });
+
+  it.each([
+    ['2.1.329', false],
+    ['2.1.330', true],
+    ['2.2.0', true],
+  ])('Claude Code %s supports Claude Ship: %s', (version, supported) => {
+    expect(supportsClaudeShip([claude(version)])).toBe(supported);
+  });
+
+  it('needs a signed-in Claude Code', () => {
+    expect(supportsClaudeShip([{ ...claude('2.2.0'), account: null }])).toBe(
+      false,
     );
   });
 });

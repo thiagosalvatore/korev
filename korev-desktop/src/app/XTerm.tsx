@@ -30,6 +30,7 @@ export interface XTermProps {
   kind: TerminalKind;
   interactive: boolean;
   preset?: TerminalPreset;
+  initialInput?: string;
 }
 
 export function XTerm({
@@ -38,6 +39,7 @@ export function XTerm({
   kind,
   interactive,
   preset,
+  initialInput,
 }: XTermProps) {
   const host = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -97,6 +99,7 @@ export function XTerm({
         kind,
         { cols: terminal.cols, rows: terminal.rows },
         preset,
+        initialInput,
       )
       .then((result) => {
         if (!attached || !reportFailure(result)) return;
@@ -115,6 +118,6 @@ export function XTerm({
       retheme.disconnect();
       terminal.dispose();
     };
-  }, [ref, workspaceId, kind, interactive, preset]);
+  }, [ref, workspaceId, kind, interactive, preset, initialInput]);
   return <div ref={host} className="min-h-0 flex-1 bg-inset py-1 pl-2" />;
 }

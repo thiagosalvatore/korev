@@ -329,6 +329,7 @@ function WorkspacePaneBody({
         terminalRef={terminalTabRef(workspace.id, content.terminal.id)}
         kind="shell"
         preset={content.terminal.preset}
+        initialInput={content.terminal.input}
         interactive
       />
     );

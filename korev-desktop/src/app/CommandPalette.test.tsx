@@ -20,6 +20,7 @@ const state = {
     },
   ],
   askChats: [],
+  agents: [],
   settings: {},
 } as unknown as AppState;
 

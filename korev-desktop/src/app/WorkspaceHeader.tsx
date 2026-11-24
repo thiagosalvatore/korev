@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, cn, Icon, IconButton, type IconName } from '../design-system';
 import {
   keepsPrReady,
+  supportsClaudeShip,
   MERGE_STEPS,
   nextPrStep,
   PR_STEPS,
@@ -14,9 +15,12 @@ import {
 } from '../shared/model';
 import {
   archiveWorkspace,
+  claudeShipCommand,
+  claudeShipLabel,
   createPr,
   fixErrors,
   mergePr,
+  openClaudeShip,
   openIn,
   resolveConflicts,
 } from './actions';
@@ -56,7 +60,7 @@ function stepRun(
   workspace: Workspace,
   pr: PrStatus | null,
 ): () => unknown {
-  if (!pr || step === 'create') return () => createPr(workspace);
+  if (!pr || step === 'create') return () => createPr(state, workspace);
   if (step === 'archive') return () => archiveWorkspace(state, workspace);
   if (step === 'resolve-conflicts')
     return () => resolveConflicts(workspace, pr);
@@ -192,6 +196,58 @@ function PrButton({
   );
 }
 
+function NextActionButton({
+  state,
+  workspace,
+  pr,
+}: {
+  state: AppState;
+  workspace: Workspace;
+  pr: PrStatus | null;
+}) {
+  const action = nextAction(state, workspace, pr);
+  const canShip = supportsClaudeShip(state.agents);
+  const shipCommand = claudeShipCommand(state, workspace);
+  return (
+    <div className="flex items-center">
+      <Button
+        size="sm"
+        variant={action.variant}
+        icon={action.icon}
+        className={canShip ? 'rounded-r-none' : undefined}
+        onClick={action.run}
+      >
+        {action.label}
+      </Button>
+      {canShip ? (
+        <Menu
+          label="More next steps"
+          align="right"
+          items={[
+            {
+              id: 'claude-ship',
+              label: claudeShipLabel(shipCommand),
+              icon: 'square-terminal',
+              onSelect: () => openClaudeShip(workspace, shipCommand),
+            },
+          ]}
+          trigger={({ toggle }) => (
+            <Button
+              size="sm"
+              variant={action.variant}
+              className="-ml-px rounded-l-none px-1.5"
+              aria-label="More next steps"
+              onClick={toggle}
+            >
+              <Icon name="chevron-down" size={13} />
+            </Button>
+          )}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export function WorkspaceHeader({
   state,
   workspace,
@@ -205,7 +261,6 @@ export function WorkspaceHeader({
   const runtime = state.runtime[workspace.id];
   const repoName = groupRepoName(state, workspace);
   const pr = primaryPr(workspace, runtime, prUrl);
-  const action = nextAction(state, workspace, pr);
   const keepsReady = keepsPrReady(workspace, state.settings);
   const editor =
     state.editors.find((entry) => entry.id === state.settings.editor) ??
@@ -320,14 +375,7 @@ export function WorkspaceHeader({
         {pr ? (
           <PrButton workspace={workspace} pr={pr} prs={runtime?.prs ?? []} />
         ) : null}
-        <Button
-          size="sm"
-          variant={action.variant}
-          icon={action.icon}
-          onClick={action.run}
-        >
-          {action.label}
-        </Button>
+        <NextActionButton state={state} workspace={workspace} pr={pr} />
         <IconButton
           icon={panel ? 'panel-right-close' : 'panel-right-open'}
           label={panel ? 'Hide right sidebar' : 'Show right sidebar'}

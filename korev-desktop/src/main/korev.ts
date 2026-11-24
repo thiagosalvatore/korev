@@ -303,7 +303,9 @@ const TERMINAL_PRESETS: Record<TerminalPreset, string | null> = {
   shell: null,
   claude: 'claude',
   codex: 'codex',
+  ship: 'claude --permission-mode auto',
 };
+const CLAUDE_AUTO_MODE_PROMPT = /auto.{0,12}mode.{0,12}on/;
 
 function mergedSinceRestore(workspace: Workspace, pr: PrStatus): boolean {
   if (pr.state !== 'MERGED') return false;
@@ -669,6 +671,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
   let checkingPrs = false;
   let shuttingDown = false;
   const lastPrPoll = new Map<string, number>();
+  const claudeShipRefs = new Set<string>();
   let lastReviewPoll = 0;
 
   function idlePrPollMs() {
@@ -872,6 +875,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     if (workspace.archivedAt) return;
     if (!keepsPrReady(workspace, store.state.settings)) return;
     if (hasRunningSession(workspace)) return;
+    if (claudeShipRunning(workspaceId)) return;
     const unhandled = firstUnhandledPrProblems(workspace, prs);
     if (!unhandled) return;
     const { pr, problems } = unhandled;
@@ -1158,6 +1162,7 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     ref: string,
     workspaceId: string,
     preset: TerminalPreset,
+    input?: string,
   ) {
     const workspace = workspacePath(workspaceId);
     const repo = ctx.repo(workspace.repoId);
@@ -1165,7 +1170,17 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
       cwd: workspace.path,
       env: await scriptEnv(ctx, repo, workspace),
       command: TERMINAL_PRESETS[preset] ?? undefined,
+      input,
+      typeInputAfter: CLAUDE_AUTO_MODE_PROMPT,
     });
+    if (preset === 'ship') claudeShipRefs.add(ref);
+  }
+
+  function claudeShipRunning(workspaceId: string) {
+    return [...claudeShipRefs].some(
+      (ref) =>
+        ref.startsWith(`${workspaceId}:`) && ctx.terminals.isRunning(ref),
+    );
   }
 
   function assertOwnRef(ref: string, workspaceId: string) {
@@ -1916,10 +1931,10 @@ export async function createKorev(deps: KorevDeps): Promise<Korev> {
     installUpdate: async () =>
       update ? deps.installUpdate(update) : fail('No update is available'),
     dismissWhatsNew,
-    async openTerminal(ref, workspaceId, kind, size, preset = 'shell') {
+    async openTerminal(ref, workspaceId, kind, size, preset = 'shell', input) {
       assertOwnRef(ref, workspaceId);
       if (kind === 'shell' && !ctx.terminals.isRunning(ref)) {
-        await openShell(ref, workspaceId, preset);
+        await openShell(ref, workspaceId, preset, input);
         ctx.emitState();
       }
       return ok(ctx.terminals.attach(ref, size) ?? '');

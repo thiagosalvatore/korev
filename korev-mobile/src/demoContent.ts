@@ -204,6 +204,7 @@ const SETTINGS: Settings = {
   archiveReviews: false,
   reReviews: 'off',
   keepPrsReady: false,
+  createPrWith: 'korev',
   prCheckSeconds: 30,
   reviewReplies: 'reply',
   reviewReplyInstructions: '',

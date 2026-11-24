@@ -86,6 +86,7 @@ export const PRESET_LABELS: Record<TerminalPreset, string> = {
   shell: 'Terminal',
   claude: 'Claude Code',
   codex: 'Codex',
+  ship: 'Claude Ship',
 };
 
 export const TERMINAL_PRESETS = ['shell', 'claude', 'codex'] as const;
@@ -417,6 +418,7 @@ function WorkspaceWithWorktree({
               terminalRef={terminalTabRef(workspace.id, activeTab.id)}
               kind="shell"
               preset={activeTab.preset}
+              initialInput={activeTab.input}
               interactive
             />
           ) : null}

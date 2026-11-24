@@ -6,6 +6,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ### New
 
+- **Claude Ship.** Open Claude Code's `/ship` or `/steward` from the workspace header or the command palette. Korev opens a terminal tab with the command typed, and you press Enter. Set **Settings → Git → Create PRs with** to **Claude Ship** to make **Create PR** do the same. Keep PRs ready waits while the tab is open.
 - **Re-check reviews without a re-request.** Re-check reviews no longer waits for the author to click Re-request review. Korev also re-checks when every review comment you left is resolved or has an answer from someone else. Answers from bots do not count.
 
 ## [0.39.0] - 2026-11-23
