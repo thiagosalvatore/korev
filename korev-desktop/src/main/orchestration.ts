@@ -55,7 +55,7 @@ Coordinator
   korev task list [--ready] [--json]
   korev task update --id t1 [--title ...] [--spec ...] [--deps ...]
                     [--status pending|completed|failed]
-  korev worker start --task t1 [--agent claude|codex] [--model <id>]
+  korev worker start --task t1 [--agent ${AGENT_KINDS.join('|')}] [--model <id>]
                      [--effort <level>] [--workspace <name>] [--allow-stale]
       Starts a worker in a new linked workspace. --workspace reuses the
       workspace of a finished worker instead. Korev refuses a reused
@@ -79,8 +79,8 @@ Worker
 Everyone
   korev send --to <target> --body "<text>" [--type status|escalation|handoff|merge_ready]
       Targets: @coordinator, @all (every worker in the run), @idle (workers
-      that are not running), @claude, @codex, a task id (t1) or a linked
-      workspace name.
+      that are not running), ${AGENT_KINDS.map((kind) => `@${kind}`).join(', ')}, a task id (t1) or a
+      linked workspace name.
   korev gate create --task t1 --question "<decision>" --options a,b
   korev gate list [--task t1]
       A decision gate blocks its task until the user picks an option in

@@ -21,7 +21,7 @@ import { duration, modelLabel } from '../../../korev-desktop/src/shared/format';
 import {
   AGENT_LABELS,
   answerQuestions,
-  finishedCodexPlan,
+  finishedTextPlan,
   planAwaitingReview,
   questionAwaitingAnswer,
   type AppState,
@@ -269,7 +269,7 @@ export function Chat({
       return reverted;
     }).then(succeeded);
 
-  const codexPlan = finishedCodexPlan(session, items, running);
+  const textPlan = finishedTextPlan(session, items, running);
   const question = questionAwaitingAnswer(items);
   const picks = picksFor(picked, question?.id);
 
@@ -361,10 +361,10 @@ export function Chat({
                   label="Working…"
                   since={lastUser && Date.parse(lastUser.at)}
                 />
-              ) : codexPlan ? (
+              ) : textPlan ? (
                 <PlanReview
-                  key={codexPlan.id}
-                  plan={codexPlan.plan}
+                  key={textPlan.id}
+                  plan={textPlan.plan}
                   showPlan={false}
                   laneRepos={laneRepos}
                   onApprove={approvePlan}
@@ -417,7 +417,7 @@ export function Chat({
           state={state}
           session={session}
           context={lastResult?.context ?? null}
-          reviewingPlan={Boolean(codexPlan) || planAwaitingReview(items)}
+          reviewingPlan={Boolean(textPlan) || planAwaitingReview(items)}
           answers={question ? picks : undefined}
           sendReady={Boolean(
             question?.questions && answerQuestions(question.questions, picks),

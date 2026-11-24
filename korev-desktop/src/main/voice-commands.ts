@@ -1,5 +1,6 @@
 import {
-  finishedCodexPlan,
+  finishedTextPlan,
+  inTextPlanMode,
   type AgentQuestion,
   type ChatItem,
   type ChatSession,
@@ -89,7 +90,7 @@ export type Attention =
 
 type Pending =
   | { session: ChatSession; item: PermissionItem }
-  | { session: ChatSession; codexPlan: string };
+  | { session: ChatSession; textPlan: string };
 
 export interface VoiceActions {
   transcript(sessionId: string): Promise<ChatItem[]>;
@@ -143,8 +144,8 @@ function clip(text: string, max: number): string {
 }
 
 function describePending(pending: Pending) {
-  if ('codexPlan' in pending)
-    return { kind: 'plan', plan: clip(pending.codexPlan, PLAN_CHARS) };
+  if ('textPlan' in pending)
+    return { kind: 'plan', plan: clip(pending.textPlan, PLAN_CHARS) };
   const { item } = pending;
   if (item.questions)
     return {
@@ -199,13 +200,13 @@ export function createVoiceCommands(ctx: Context, actions: VoiceActions) {
         );
         if (item) return { session, item };
       }
-      if (session.agent !== 'codex' || !session.planMode) continue;
-      const plan = finishedCodexPlan(
+      if (!inTextPlanMode(session)) continue;
+      const plan = finishedTextPlan(
         session,
         await actions.transcript(session.id),
         actions.isRunning(session.id),
       );
-      if (plan) return { session, codexPlan: plan.plan };
+      if (plan) return { session, textPlan: plan.plan };
     }
     return null;
   }
@@ -306,7 +307,7 @@ export function createVoiceCommands(ctx: Context, actions: VoiceActions) {
         ok: false,
         message: `Nothing is waiting in ${workspaceLabel(workspace)}.`,
       };
-    if ('codexPlan' in pending)
+    if ('textPlan' in pending)
       return actions.approvePlan(pending.session.id, []);
     return actions.respondPermission(pending.session.id, pending.item.id, {
       allow: true,
@@ -315,7 +316,7 @@ export function createVoiceCommands(ctx: Context, actions: VoiceActions) {
 
   async function deny(workspace: Workspace, command: VoiceCommand) {
     const pending = await pendingIn(workspace);
-    if (!pending || 'codexPlan' in pending) return reply(workspace, command);
+    if (!pending || 'textPlan' in pending) return reply(workspace, command);
     return actions.respondPermission(pending.session.id, pending.item.id, {
       allow: false,
       message: command.text,

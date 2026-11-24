@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Button, cn, Icon, Spinner, Tabs } from '../../design-system';
 import {
   AGENT_LABELS,
-  finishedCodexPlan,
+  finishedTextPlan,
   answerQuestions,
   planAwaitingReview,
   PLAN_FEEDBACK_PLACEHOLDER,
@@ -30,6 +30,7 @@ import {
   openFile,
   selectWorkspace,
 } from '../actions';
+import { AGENT_ICONS } from '../agentIcons';
 import { api } from '../bridge';
 import { loadoutChoices, modelChoices } from '../../shared/format';
 import { useRepoGithubUrl, useTranscript } from '../hooks';
@@ -141,11 +142,7 @@ function EmptyChat({
     );
   return (
     <div className="flex max-w-md flex-col items-center gap-2 text-center">
-      <Icon
-        name={session.agent === 'claude' ? 'sparkle' : 'hexagon'}
-        size={22}
-        className="text-fg-3"
-      />
+      <Icon name={AGENT_ICONS[session.agent]} size={22} className="text-fg-3" />
       <p className="m-0 text-lg font-semibold text-fg-1">
         {AGENT_LABELS[session.agent]} in {workspaceLabel(workspace)}
       </p>
@@ -256,10 +253,8 @@ export function ChatView({
     setPicked((current) => withPick(current, itemId, questionText, labels));
   }
 
-  const codexPlan = workspace
-    ? finishedCodexPlan(session, items, running)
-    : null;
-  const reviewingPlan = Boolean(codexPlan) || planAwaitingReview(items);
+  const textPlan = workspace ? finishedTextPlan(session, items, running) : null;
+  const reviewingPlan = Boolean(textPlan) || planAwaitingReview(items);
   const handoff = workspace
     ? () => void handoffPlan(workspace, session.id)
     : undefined;
@@ -360,10 +355,10 @@ export function ChatView({
           wide={wide}
           footer={
             <>
-              {codexPlan ? (
+              {textPlan ? (
                 <PlanReview
-                  key={codexPlan.id}
-                  plan={codexPlan.plan}
+                  key={textPlan.id}
+                  plan={textPlan.plan}
                   showPlan={false}
                   laneRepos={repos}
                   onApprove={(lanes) =>

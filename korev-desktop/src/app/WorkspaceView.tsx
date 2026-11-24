@@ -34,6 +34,7 @@ import { PrComments } from './comments/PrComments';
 import { SearchView } from './SearchView';
 import { BrowserView } from './BrowserView';
 import { XTerm } from './XTerm';
+import { AGENT_ICONS } from './agentIcons';
 import { fileName } from '../shared/format';
 import { worktreeProgress, WORKTREE_FAILED } from '../shared/workspaces';
 import { DRAG_REGION } from './layout';
@@ -195,9 +196,7 @@ function TabStrip({
                 <Icon
                   name={
                     session
-                      ? session.agent === 'claude'
-                        ? 'sparkle'
-                        : 'hexagon'
+                      ? AGENT_ICONS[session.agent]
                       : TAB_ICONS[entry.tab.kind as keyof typeof TAB_ICONS]
                   }
                   size={13}

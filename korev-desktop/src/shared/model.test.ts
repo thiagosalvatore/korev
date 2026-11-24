@@ -7,7 +7,7 @@ import {
   effortLevels,
   EMPTY_INBOX_FILTER,
   filterInbox,
-  finishedCodexPlan,
+  finishedTextPlan,
   INBOX_VIEWS,
   planLanes,
   presetLaneRepo,
@@ -214,7 +214,7 @@ describe('presetLaneRepo', () => {
   });
 });
 
-describe('finishedCodexPlan', () => {
+describe('finishedTextPlan', () => {
   const session = { agent: 'codex', planMode: true } as ChatSession;
   const result = (ok: boolean): ChatItem => ({
     id: 'result:1',
@@ -231,17 +231,17 @@ describe('finishedCodexPlan', () => {
   ];
 
   it('offers the reply of a finished Codex plan mode turn', () => {
-    expect(finishedCodexPlan(session, turn(true), false)).toEqual({
+    expect(finishedTextPlan(session, turn(true), false)).toEqual({
       id: 'result:1',
       plan: '# Plan',
     });
   });
 
   it('offers nothing while running, after a failed turn or outside plan mode', () => {
-    expect(finishedCodexPlan(session, turn(true), true)).toBeNull();
-    expect(finishedCodexPlan(session, turn(false), false)).toBeNull();
+    expect(finishedTextPlan(session, turn(true), true)).toBeNull();
+    expect(finishedTextPlan(session, turn(false), false)).toBeNull();
     expect(
-      finishedCodexPlan({ ...session, planMode: false }, turn(true), false),
+      finishedTextPlan({ ...session, planMode: false }, turn(true), false),
     ).toBeNull();
   });
 });
