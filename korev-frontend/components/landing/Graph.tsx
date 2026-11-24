@@ -20,6 +20,7 @@ import {
   Send,
   Signal,
   Sparkles,
+  SquareTerminal,
   Wifi,
   Wrench,
   type LucideIcon,
@@ -130,6 +131,54 @@ export function Worktrees() {
           <span className="p">:{port}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+const LAUNCH_SELECTION =
+  'Checkout fails when the cart has a gift card and a discount code.';
+const LAUNCH_URL =
+  'korev://new-workspace?repo=acme-web&prompt=Checkout%20fails%20when…';
+const LAUNCH_STEPS = ['⌘C', 'open link', 'press Enter'];
+
+export function Launch() {
+  const current = useTick(1800, LAUNCH_STEPS.length);
+  return (
+    <div className="b-card">
+      <div className="hd">
+        <SquareTerminal size={13} />
+        copy-to-korev.sh
+        <span className="r b-steps">
+          {LAUNCH_STEPS.map((label, index) => (
+            <span
+              key={label}
+              className={
+                index === current ? 's on' : index < current ? 's done' : 's'
+              }
+            >
+              {label}
+            </span>
+          ))}
+        </span>
+      </div>
+      <div className="b-explain b-launch">
+        <span className="ov">Selected in your bug tracker</span>
+        <p className="sel">{LAUNCH_SELECTION}</p>
+        <code className={current >= 1 ? 'url on' : 'url'}>
+          open &quot;{LAUNCH_URL}&quot;
+        </code>
+        <div className="b-ask">
+          <span className="repo">acme-web</span>
+          {current >= 1 ? (
+            <span className="q">{LAUNCH_SELECTION}</span>
+          ) : (
+            <span className="q empty">Describe a task…</span>
+          )}
+          <Button size="sm" variant="primary" icon={Send} tabIndex={-1}>
+            Start
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

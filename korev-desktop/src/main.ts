@@ -192,7 +192,6 @@ function showMainWindow() {
 
 const pendingLinks: NewWorkspaceLink[] = [];
 
-// The renderer takes queued links when it loads, and again on each nudge.
 function openLink(url: string) {
   const link = parseKorevLink(url);
   if (!link) return;

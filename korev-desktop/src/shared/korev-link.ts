@@ -5,7 +5,6 @@ export const MAX_LINK_PROMPT = 20_000;
 const NEW_WORKSPACE_HOST = 'new-workspace';
 const ROOT_PATHS = ['', '/'];
 
-// Any website can open a korev:// link, so a link only fills the draft.
 export interface NewWorkspaceLink {
   prompt: string | null;
   repo: string | null;
