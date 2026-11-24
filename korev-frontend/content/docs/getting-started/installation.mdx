@@ -54,12 +54,13 @@ Open **Settings → Agents**. Each agent tab shows **Connected**, **Not signed i
 
 ## Where Korev keeps its files
 
-| Path                                                   | What it holds                                                      |
-| ------------------------------------------------------ | ------------------------------------------------------------------ |
-| `~/Library/Application Support/Korev/korev-state.json` | Settings, repositories, workspaces and chats                       |
-| `~/Library/Application Support/Korev/transcripts/`     | Chat transcripts                                                   |
-| `~/Library/Application Support/Korev/repos/`           | Repositories added with **Clone from URL**                         |
-| `~/korev/workspaces/<repo>/<workspace>`                | Workspace worktrees. Change the location in **Settings → Storage** |
-| `~/korev/workspaces/<repo>/.ask`                       | The shared checkout that Ask chats read                            |
+| Path                                                   | What it holds                                                                                       |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `~/Library/Application Support/Korev/korev-state.json` | Settings, repositories, workspaces and chats                                                        |
+| `~/Library/Application Support/Korev/transcripts/`     | Chat transcripts                                                                                    |
+| `~/Library/Application Support/Korev/repos/`           | Repositories added with **Clone from URL**                                                          |
+| `~/Library/Application Support/Korev/cli-url`          | The address the [`korev` command](../guides/use-korev-from-your-terminal.mdx) uses while Korev runs |
+| `~/korev/workspaces/<repo>/<workspace>`                | Workspace worktrees. Change the location in **Settings → Storage**                                  |
+| `~/korev/workspaces/<repo>/.ask`                       | The shared checkout that Ask chats read                                                             |
 
 Next: [create your first workspace](./first-workspace.mdx).

@@ -9,6 +9,8 @@ import path from 'node:path';
 import { errorMessage } from './context';
 import { LOOPBACK_HOST, readBody } from './remote-server';
 
+export const USER_CLI_SESSION = 'user';
+
 const CLI_PATH_PREFIX = '/cli/';
 const ARGUMENT_FIELD = 'a';
 const TOKEN_BYTES = 24;

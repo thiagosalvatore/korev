@@ -475,6 +475,25 @@ describe('Korev core', { timeout: TEST_TIMEOUT_MS }, () => {
     );
   });
 
+  it('answers the user CLI at the URL in its file until shutdown', async () => {
+    const urlFile = path.join(home, 'user-data', 'cli-url');
+    const url = (await readFile(urlFile, 'utf8')).trim();
+
+    const response = await fetch(url, {
+      method: 'POST',
+      body: new URLSearchParams([
+        ['a', 'chats'],
+        ['a', 'list'],
+      ]),
+    });
+    await korev.shutdown();
+    const fileAfterShutdown = existsSync(urlFile);
+    korev = await openKorev();
+
+    expect(await response.text()).toBe('No open chats.\n');
+    expect(fileAfterShutdown).toBe(false);
+  });
+
   it('shows the notes of the installed version once', async () => {
     await korev.showWhatsNew();
     expect(fetchRelease).toHaveBeenCalledWith(APP_VERSION);

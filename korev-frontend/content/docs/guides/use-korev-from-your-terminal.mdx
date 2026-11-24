@@ -1,0 +1,35 @@
+---
+title: Use Korev from your terminal
+description: 'List your chats, message them and stop them with the korev command.'
+---
+
+The `korev` command lets you act on your chats from your own terminal, while Korev is open.
+
+## Install the command
+
+Link the command into a folder on your PATH:
+
+```sh
+mkdir -p ~/.local/bin
+ln -s /Applications/Korev.app/Contents/Resources/app.asar.unpacked/cli/korev ~/.local/bin/korev
+```
+
+The link points inside `Korev.app`, so it keeps working after Korev updates.
+
+## Commands
+
+| Command                                         | What it does                                                                                         |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `korev chats list [--reviews]`                  | Shows one line per open chat: its id, whether it is running, waiting for you or idle, and its title. |
+| `korev chats send --id <chat id> --body "text"` | Sends a message to a chat, the same as typing it in the chat.                                        |
+| `korev chats stop --id <chat id>`               | Stops a running chat.                                                                                |
+| `korev review rerun --id <chat id>`             | Asks a review chat to check its pull request again.                                                  |
+| `korev help`                                    | Shows these commands.                                                                                |
+
+## How it connects
+
+When Korev starts, it writes an address with a secret token to `~/Library/Application Support/Korev/cli-url`. Only your user can read the file. Korev deletes it when it quits, so `korev` says "Korev is not running" until you open Korev again.
+
+## Agents can't use it
+
+Agents that Korev starts can't use your `korev` command, even when it is on their PATH. Only two kinds of chat get their own `korev` access: workspace chats while **Settings → Agents → Let agents coordinate other agents** is on (see [orchestration](../concepts/orchestration.mdx)), and the Ask Korev chat. Every other agent, such as a read-only Ask chat or an automation, gets "this agent was not given access to Korev".

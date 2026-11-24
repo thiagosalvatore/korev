@@ -1,6 +1,11 @@
 import type { AskChat, ChatSession, Result } from '../shared/model';
 import { workspaceLabel } from '../shared/workspaces';
-import type { CliCall, CliHandler, CliReply } from './agent-server';
+import {
+  USER_CLI_SESSION,
+  type CliCall,
+  type CliHandler,
+  type CliReply,
+} from './agent-server';
 import type { Context } from './context';
 import {
   CliError,
@@ -30,6 +35,22 @@ const KOREV_CHAT_GUIDE = `korev: act on the other chats in Korev.
       still running is refused.
 `;
 
+const USER_GUIDE = `korev: act on your chats in Korev from your own terminal.
+Korev must be open.
+
+  korev chats list [--reviews]
+      One line per open chat: its id, whether it is running, waiting for you
+      or idle, its title, and its workspace or the pull request it reviews.
+      --reviews lists only the review chats.
+  korev chats send --id <chat id> --body "<text>"
+      Send a message to a chat, the same as typing it in the chat.
+  korev chats stop --id <chat id>
+      Stop a running chat.
+  korev review rerun --id <chat id>
+      Ask a review chat to check its open pull request again. A review chat
+      that is still running is refused.
+`;
+
 const ASK_CHAT_PLACE = 'ask chat';
 const NO_CHATS = 'No open chats.';
 
@@ -38,7 +59,7 @@ export interface AppCommandDeps {
   workspaceCli: CliHandler;
   isRunning(sessionId: string): boolean;
   waitingSessions(): string[];
-  send(session: ChatSession, text: string): Promise<Result>;
+  send(session: ChatSession, text: string, fromKorev: boolean): Promise<Result>;
   stop(sessionId: string): Promise<void>;
   rerunReview(ask: AskChat): Promise<Result>;
 }
@@ -108,9 +129,21 @@ export function createAppCommands(deps: AppCommandDeps) {
     return `${session.id} [${stateOf(session, waiting)}] ${session.title} - ${place}`;
   }
 
-  const commands: Record<string, Command> = {
-    help: async () => done(KOREV_CHAT_GUIDE),
+  function sendCommand(fromKorev: boolean): Command {
+    return async (_call, args) => {
+      const values = flags(args, { id: 'string', body: 'string' });
+      const { session } = chatById(required(values.id, 'id'));
+      if (fromKorev && deps.waitingSessions().includes(session.id))
+        throw new CliError(
+          `${session.title} is waiting for the user to answer it. Tell the user instead.`,
+        );
+      const body = required(values.body, 'body');
+      const sent = await deps.send(session, body, fromKorev);
+      return replyOf(sent, `Sent to ${session.title}.`);
+    };
+  }
 
+  const chatCommands: Record<string, Command> = {
     'chats list': async (_call, args) => {
       const values = flags(args, { reviews: 'boolean' });
       const waiting = new Set(deps.waitingSessions());
@@ -119,17 +152,6 @@ export function createAppCommands(deps: AppCommandDeps) {
       );
       if (!chats.length) return done(NO_CHATS);
       return done(chats.map((chat) => chatLine(chat, waiting)).join('\n'));
-    },
-
-    'chats send': async (_call, args) => {
-      const values = flags(args, { id: 'string', body: 'string' });
-      const { session } = chatById(required(values.id, 'id'));
-      if (deps.waitingSessions().includes(session.id))
-        throw new CliError(
-          `${session.title} is waiting for the user to answer it. Tell the user instead.`,
-        );
-      const sent = await deps.send(session, required(values.body, 'body'));
-      return replyOf(sent, `Sent to ${session.title}.`);
     },
 
     'chats stop': async (_call, args) => {
@@ -155,10 +177,24 @@ export function createAppCommands(deps: AppCommandDeps) {
     },
   };
 
+  const korevChatCommands: Record<string, Command> = {
+    ...chatCommands,
+    help: async () => done(KOREV_CHAT_GUIDE),
+    'chats send': sendCommand(true),
+  };
+
+  const userCommands: Record<string, Command> = {
+    ...chatCommands,
+    help: async () => done(USER_GUIDE),
+    'chats send': sendCommand(false),
+  };
+
   return {
     runCli(call: CliCall): Promise<CliReply> {
+      if (call.sessionId === USER_CLI_SESSION)
+        return runCommand(userCommands, call);
       if (!isKorevChat(call.sessionId)) return deps.workspaceCli(call);
-      return runCommand(commands, call);
+      return runCommand(korevChatCommands, call);
     },
   };
 }

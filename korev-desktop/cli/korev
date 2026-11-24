@@ -1,11 +1,19 @@
 #!/bin/bash
-if [ -z "$KOREV_AGENT_URL" ]; then
-  echo "korev: only agents started by Korev can run this command." >&2
+if [ -n "$KOREV_SESSION_ID" ] && [ -z "$KOREV_AGENT_URL" ]; then
+  echo "korev: this agent was not given access to Korev." >&2
   exit 1
+fi
+url="$KOREV_AGENT_URL"
+if [ -z "$url" ]; then
+  url_file="${KOREV_CLI_URL_FILE:-$HOME/Library/Application Support/Korev/cli-url}"
+  if ! url=$(cat "$url_file" 2>/dev/null); then
+    echo "korev: Korev is not running. Open Korev and try again." >&2
+    exit 1
+  fi
 fi
 arguments=()
 for argument in "$@"; do
   arguments+=(--data-urlencode "a=$argument")
 done
 exec curl --silent --show-error --fail-with-body --request POST \
-  "${arguments[@]}" "$KOREV_AGENT_URL"
+  "${arguments[@]}" --config - <<<"url = \"$url\""

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AskChat, ChatSession, Result, Workspace } from '../shared/model';
+import { USER_CLI_SESSION } from './agent-server';
 import { createAppCommands } from './app-commands';
 import type { Context } from './context';
 
@@ -56,7 +57,7 @@ function setup() {
   const running = new Set<string>();
   const waiting: string[] = [];
   const stopped: string[] = [];
-  const sent: { sessionId: string; text: string }[] = [];
+  const sent: { sessionId: string; text: string; fromKorev: boolean }[] = [];
   const rerun: string[] = [];
   const workspaceCli = vi.fn(async () => ({ ok: true, output: 'workspace' }));
   const commands = createAppCommands({
@@ -64,8 +65,8 @@ function setup() {
     workspaceCli,
     isRunning: (sessionId) => running.has(sessionId),
     waitingSessions: () => waiting,
-    send: async (session, text) => {
-      sent.push({ sessionId: session.id, text });
+    send: async (session, text, fromKorev) => {
+      sent.push({ sessionId: session.id, text, fromKorev });
       return OK;
     },
     stop: async (sessionId) => {
@@ -78,9 +79,12 @@ function setup() {
   });
   const cli = (...argv: string[]) =>
     commands.runCli({ sessionId: korevChat.session.id, argv });
+  const userCli = (...argv: string[]) =>
+    commands.runCli({ sessionId: USER_CLI_SESSION, argv });
   return {
     commands,
     cli,
+    userCli,
     running,
     waiting,
     stopped,
@@ -121,7 +125,9 @@ describe('Korev chat commands', () => {
     const reply = await cli('chats', 'send', '--id', 'ws-chat', '--body', 'go');
 
     expect(reply.ok).toBe(true);
-    expect(sent).toEqual([{ sessionId: 'ws-chat', text: 'go' }]);
+    expect(sent).toEqual([
+      { sessionId: 'ws-chat', text: 'go', fromKorev: true },
+    ]);
   });
 
   it('refuses to send to an archived chat or one waiting for the user', async () => {
@@ -194,5 +200,25 @@ describe('Korev chat commands', () => {
     expect(reply.output).toBe('workspace');
     expect(workspaceCli).toHaveBeenCalledWith(call);
     expect(sent).toEqual([]);
+  });
+
+  it('lets the user send to a chat that is waiting for them', async () => {
+    const { userCli, waiting, sent, workspaceCli } = setup();
+    waiting.push('ws-chat');
+
+    const reply = await userCli(
+      'chats',
+      'send',
+      '--id',
+      'ws-chat',
+      '--body',
+      'yes',
+    );
+
+    expect(reply.ok).toBe(true);
+    expect(sent).toEqual([
+      { sessionId: 'ws-chat', text: 'yes', fromKorev: false },
+    ]);
+    expect(workspaceCli).not.toHaveBeenCalled();
   });
 });
