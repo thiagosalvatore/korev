@@ -6,6 +6,7 @@ import {
 } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { REMOTE_METHODS, type KorevApi, type KorevEvents } from '../shared/api';
+import { isScriptRef } from './context';
 import { callHandler, UnknownMethodError, type IpcHandlers } from './ipc';
 
 const REMOTE_EVENTS: ReadonlySet<keyof KorevEvents> = new Set([
@@ -13,7 +14,22 @@ const REMOTE_EVENTS: ReadonlySet<keyof KorevEvents> = new Set([
   'chat',
   'toast',
   'announce',
+  'terminal-output',
+  'terminal-exit',
 ]);
+const TERMINAL_EVENTS: ReadonlySet<keyof KorevEvents> = new Set([
+  'terminal-output',
+  'terminal-exit',
+]);
+
+function reachesPhone<E extends keyof KorevEvents>(
+  event: E,
+  payload: KorevEvents[E],
+): boolean {
+  if (!REMOTE_EVENTS.has(event)) return false;
+  if (!TERMINAL_EVENTS.has(event)) return true;
+  return isScriptRef((payload as KorevEvents['terminal-output']).ref);
+}
 
 export const DEFAULT_REMOTE_PORT = 7420;
 export const HEARTBEAT_MS = 15_000;
@@ -181,7 +197,7 @@ export function startRemoteServer(
       resolve({
         port: (server.address() as AddressInfo).port,
         broadcast(event, payload) {
-          if (!REMOTE_EVENTS.has(event)) return;
+          if (!reachesPhone(event, payload)) return;
           const message = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
           for (const subscriber of subscribers.keys())
             subscriber.write(message);

@@ -439,13 +439,11 @@ function UserMessage({
           item.fromKorev
             ? 'border-accent-border bg-accent-subtle'
             : 'border-border-1 bg-raised',
-          item.queued && 'border-dashed opacity-60',
         )}
       >
         {item.fromKorev ? (
           <MessageCaption className="text-accent-text">Korev</MessageCaption>
         ) : null}
-        {item.queued ? <MessageCaption>Queued</MessageCaption> : null}
         {agentMessages.map((message, index) => (
           <AgentMessageCard key={index} message={message} />
         ))}

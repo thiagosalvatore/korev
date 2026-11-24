@@ -152,7 +152,7 @@ export function runCommand(state: AppState, command: AppCommand) {
     case 'open-in':
       return void openIn(workspace, state.settings.editor);
     case 'create-pr':
-      return void createPr(workspace);
+      return void createPr(state, workspace);
     case 'merge-pr':
       return void (pr && mergePr(workspace, pr));
     case 'fix-errors':

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, cn, Icon, IconButton, type IconName } from '../design-system';
 import {
   keepsPrReady,
+  supportsClaudeShip,
   MERGE_STEPS,
   nextPrStep,
   PR_STEPS,
@@ -14,9 +15,12 @@ import {
 } from '../shared/model';
 import {
   archiveWorkspace,
+  claudeShipCommand,
+  claudeShipLabel,
   createPr,
   fixErrors,
   mergePr,
+  openClaudeShip,
   openIn,
   resolveConflicts,
 } from './actions';
@@ -24,7 +28,7 @@ import { api } from './bridge';
 import { groupRepoName, workspaceLabel } from '../shared/workspaces';
 import { DRAG_REGION, NO_DRAG, TRAFFIC_LIGHT_GUTTER } from './layout';
 import { prIcon } from './Sidebar';
-import { Menu } from './ui/Menu';
+import { Menu, type MenuItem } from './ui/Menu';
 import { toast } from './ui/toast';
 import { setUi, updateWorkspaceUi, useUi } from './ui-store';
 
@@ -56,7 +60,7 @@ function stepRun(
   workspace: Workspace,
   pr: PrStatus | null,
 ): () => unknown {
-  if (!pr || step === 'create') return () => createPr(workspace);
+  if (!pr || step === 'create') return () => createPr(state, workspace);
   if (step === 'archive') return () => archiveWorkspace(state, workspace);
   if (step === 'resolve-conflicts')
     return () => resolveConflicts(workspace, pr);
@@ -119,6 +123,34 @@ function TargetBranch({ workspace }: { workspace: Workspace }) {
   );
 }
 
+function isOpen(pr: PrStatus): boolean {
+  return pr.state === 'OPEN';
+}
+
+function openFirst(prs: PrStatus[]): PrStatus[] {
+  return [...prs.filter(isOpen), ...prs.filter((entry) => !isOpen(entry))];
+}
+
+export function prMenuItems(
+  workspace: Workspace,
+  pr: PrStatus,
+  prs: PrStatus[],
+): MenuItem[] {
+  return openFirst(prs).map((entry) => {
+    const status = prIcon(entry);
+    return {
+      id: entry.url,
+      label: `#${entry.number} ${entry.title}`,
+      icon: status.icon,
+      iconClassName: status.className,
+      section: isOpen(entry) ? undefined : status.label,
+      checked: entry.url === pr.url,
+      onSelect: () =>
+        updateWorkspaceUi(workspace.id, () => ({ prUrl: entry.url })),
+    };
+  });
+}
+
 function PrButton({
   workspace,
   pr,
@@ -147,14 +179,7 @@ function PrButton({
       <Menu
         label="Pull requests"
         align="right"
-        items={prs.map((entry) => ({
-          id: entry.url,
-          label: `#${entry.number} ${entry.title}`,
-          icon: prIcon(entry).icon,
-          checked: entry.url === pr.url,
-          onSelect: () =>
-            updateWorkspaceUi(workspace.id, () => ({ prUrl: entry.url })),
-        }))}
+        items={prMenuItems(workspace, pr, prs)}
         trigger={({ toggle }) => (
           <Button
             size="sm"
@@ -167,6 +192,58 @@ function PrButton({
           </Button>
         )}
       />
+    </div>
+  );
+}
+
+function NextActionButton({
+  state,
+  workspace,
+  pr,
+}: {
+  state: AppState;
+  workspace: Workspace;
+  pr: PrStatus | null;
+}) {
+  const action = nextAction(state, workspace, pr);
+  const canShip = supportsClaudeShip(state.agents);
+  const shipCommand = claudeShipCommand(state, workspace);
+  return (
+    <div className="flex items-center">
+      <Button
+        size="sm"
+        variant={action.variant}
+        icon={action.icon}
+        className={canShip ? 'rounded-r-none' : undefined}
+        onClick={action.run}
+      >
+        {action.label}
+      </Button>
+      {canShip ? (
+        <Menu
+          label="More next steps"
+          align="right"
+          items={[
+            {
+              id: 'claude-ship',
+              label: claudeShipLabel(shipCommand),
+              icon: 'square-terminal',
+              onSelect: () => openClaudeShip(workspace, shipCommand),
+            },
+          ]}
+          trigger={({ toggle }) => (
+            <Button
+              size="sm"
+              variant={action.variant}
+              className="-ml-px rounded-l-none px-1.5"
+              aria-label="More next steps"
+              onClick={toggle}
+            >
+              <Icon name="chevron-down" size={13} />
+            </Button>
+          )}
+        />
+      ) : null}
     </div>
   );
 }
@@ -184,7 +261,6 @@ export function WorkspaceHeader({
   const runtime = state.runtime[workspace.id];
   const repoName = groupRepoName(state, workspace);
   const pr = primaryPr(workspace, runtime, prUrl);
-  const action = nextAction(state, workspace, pr);
   const keepsReady = keepsPrReady(workspace, state.settings);
   const editor =
     state.editors.find((entry) => entry.id === state.settings.editor) ??
@@ -232,7 +308,7 @@ export function WorkspaceHeader({
         <TargetBranch workspace={workspace} />
         <Button
           size="sm"
-          variant={workspace.keepAfterMerge ? 'secondary' : 'ghost'}
+          variant="ghost"
           icon="pin"
           aria-pressed={workspace.keepAfterMerge}
           title="Don't archive this workspace when its pull request merges"
@@ -245,7 +321,7 @@ export function WorkspaceHeader({
         {state.settings.keepPrsReady || workspace.keepPrReady ? (
           <Button
             size="sm"
-            variant={keepsReady ? 'secondary' : 'ghost'}
+            variant="ghost"
             icon="shield-check"
             aria-pressed={keepsReady}
             title="Let the agent fix failing checks, conflicts and review comments on this workspace's pull requests"
@@ -299,14 +375,7 @@ export function WorkspaceHeader({
         {pr ? (
           <PrButton workspace={workspace} pr={pr} prs={runtime?.prs ?? []} />
         ) : null}
-        <Button
-          size="sm"
-          variant={action.variant}
-          icon={action.icon}
-          onClick={action.run}
-        >
-          {action.label}
-        </Button>
+        <NextActionButton state={state} workspace={workspace} pr={pr} />
         <IconButton
           icon={panel ? 'panel-right-close' : 'panel-right-open'}
           label={panel ? 'Hide right sidebar' : 'Show right sidebar'}

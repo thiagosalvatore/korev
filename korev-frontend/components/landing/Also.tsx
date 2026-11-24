@@ -1,4 +1,5 @@
 import {
+  Activity,
   AudioLines,
   BellDot,
   CalendarClock,
@@ -8,9 +9,11 @@ import {
   KeyRound,
   LayoutGrid,
   ListChecks,
+  ListOrdered,
   Network,
   Plug,
   ScanEye,
+  TextSearch,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -24,6 +27,11 @@ const FEATURES: [LucideIcon, string, string][] = [
     ListChecks,
     'Plan mode',
     'Press ⇧Tab. The agent reads and plans without changing files. Approve the plan to let it build.',
+  ],
+  [
+    ListOrdered,
+    'Message queue',
+    'A message you send while the agent works waits above the message box until the agent finishes. Click its arrow to steer the agent with it now.',
   ],
   [
     Plug,
@@ -71,9 +79,19 @@ const FEATURES: [LucideIcon, string, string][] = [
     'Watch chats and terminals from different workspaces side by side, or see every workspace on one board, sorted by what its agent does.',
   ],
   [
+    Activity,
+    'Runs after you quit',
+    'Quit Korev and your agents and automations keep going. Korev waits in the menu bar until you open it again.',
+  ],
+  [
     KeyRound,
     'Signed commits',
     'Agents sign their commits with a key in the Secure Enclave, even while your Mac is locked.',
+  ],
+  [
+    TextSearch,
+    'Find in terminals',
+    'Press ⌘F in any terminal to search its output and step through each match.',
   ],
 ];
 

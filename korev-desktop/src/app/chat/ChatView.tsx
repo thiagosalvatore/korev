@@ -13,6 +13,7 @@ import {
   withPick,
   type PickedAnswers,
   STOP_BEFORE_SWITCHING,
+  supportsClaudeShip,
   type AppState,
   type ChatItem,
   type ChatSession,
@@ -23,6 +24,8 @@ import {
 import {
   focusComposer,
   handoffPlan,
+  isClaudeShipLine,
+  openClaudeShip,
   openDiff,
   openFile,
   selectWorkspace,
@@ -49,9 +52,11 @@ import {
 } from '../ui-store';
 import { ExplainerView } from '../explainer/ExplainerView';
 import { Composer, saveDraft } from './Composer';
+import { QUEUED_HINT } from './ComposerToolbar';
 import { RunDecisions } from '../RunsPage';
 import { PlanReview } from './PermissionCard';
 import { QuestionPanel } from './QuestionPanel';
+import { QueuedMessages } from './QueuedMessages';
 import { Transcript } from './Transcript';
 
 function toWorkspaceRelative(workspacePath: string, file: string): string {
@@ -85,6 +90,19 @@ function latestContext(items: ChatItem[] | null): ContextUsage | null {
     (item) => item.kind === 'result' && item.context,
   );
   return result?.kind === 'result' ? (result.context ?? null) : null;
+}
+
+type UserItem = Extract<ChatItem, { kind: 'user' }>;
+
+function isQueued(item: ChatItem): item is UserItem {
+  return item.kind === 'user' && Boolean(item.queued);
+}
+
+function splitQueued(items: ChatItem[]) {
+  return {
+    queued: items.filter(isQueued),
+    sent: items.filter((item) => !isQueued(item)),
+  };
 }
 
 function WaitingForLane({ lead, repo }: { lead: Workspace; repo: string }) {
@@ -149,6 +167,7 @@ export function ChatView({
   autoFocus = true,
 }: ChatViewProps) {
   const items = useTranscript(session.id);
+  const { queued, sent } = splitQueued(items ?? []);
   const running = state.runningSessions.includes(session.id);
   const comments = useUi((ui) =>
     workspace
@@ -200,7 +219,19 @@ export function ChatView({
     question?.questions && answerQuestions(question.questions, picks),
   );
 
+  function opensClaudeShip(text: string): boolean {
+    return (
+      session.agent === 'claude' &&
+      supportsClaudeShip(state.agents) &&
+      isClaudeShipLine(text)
+    );
+  }
+
   function send(text: string) {
+    if (workspace && opensClaudeShip(text)) {
+      openClaudeShip(workspace, text.trim());
+      return Promise.resolve(true);
+    }
     if (session.explainer) setExplainerMode('chat');
     return api
       .send(session.id, {
@@ -247,7 +278,16 @@ export function ChatView({
   function composerSendHint() {
     if (reviewingPlan) return PLAN_FEEDBACK_HINT;
     if (question) return QUESTION_REPLY_SEND_HINT;
+    if (state.settings.queueWhileRunning) return QUEUED_HINT;
     return undefined;
+  }
+
+  async function sendQueuedNow(itemId: string) {
+    reportFailure(await api.sendQueuedNow(session.id, itemId));
+  }
+
+  async function removeQueued(itemId: string) {
+    reportFailure(await api.removeQueued(session.id, itemId));
   }
 
   async function revert(itemId: string) {
@@ -283,7 +323,7 @@ export function ChatView({
       ) : items ? (
         <Transcript
           sessionId={session.id}
-          items={items}
+          items={sent}
           running={running}
           empty={
             empty ??
@@ -358,6 +398,11 @@ export function ChatView({
                 onRespond={(response) => respond(question.id, response)}
               />
             ) : null}
+            <QueuedMessages
+              messages={queued}
+              onSendNow={(itemId) => void sendQueuedNow(itemId)}
+              onRemove={(itemId) => void removeQueued(itemId)}
+            />
             <Composer
               key={`${session.id}:${draftVersion}`}
               draftKey={session.id}

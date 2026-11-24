@@ -5,11 +5,14 @@ import {
   dialog,
   ipcMain,
   Menu,
+  nativeImage,
   nativeTheme,
   Notification,
+  powerMonitor,
   powerSaveBlocker,
   screen,
   shell,
+  Tray,
   type WebContents,
 } from 'electron';
 import { execFile } from 'node:child_process';
@@ -26,6 +29,7 @@ import {
 } from './shared/api';
 import { parseKorevLink, type NewWorkspaceLink } from './shared/korev-link';
 import type { AppCommand, Result, WindowBounds } from './shared/model';
+import trayIconUrl from '../assets/trayTemplate@2x.png?inline';
 import { appMenuTemplate } from './main/app-menu';
 import { isAppUrl, isWebUrl, type AppOrigin } from './main/app-origin';
 import { runProcess } from './main/command-runner';
@@ -34,13 +38,10 @@ import { nodeFileSystem } from './main/file-system';
 import { registerIpcHandlers } from './main/ipc';
 import { createKorev, type Korev } from './main/korev';
 import { childEnv, resolveLoginEnv } from './main/login-path';
-import {
-  sendPhoneNotification,
-  sendPushNotifications,
-} from './main/phone-notifications';
+import { notifyPhones } from './main/phone-notifications';
 import { createQuitGate, type QuitGate } from './main/quit-gate';
 import { createDictation, WHISPER_MODELS } from './main/dictation';
-import { createRemoteAccess } from './main/remote-access';
+import { createRemoteAccess, remoteAccessFiles } from './main/remote-access';
 import {
   canReplaceBundle,
   fetchRelease,
@@ -49,6 +50,7 @@ import {
 } from './main/updates';
 import { tailnetStarter } from './main/tailnet';
 import { createListeningWindow } from './main/listening-window';
+import { menuBarTemplate, menuBarTitle } from './main/menu-bar';
 import { loadWhisper } from './main/whisper';
 import { restorableBounds } from './main/window-bounds';
 
@@ -60,8 +62,6 @@ const DEV_USER_DATA_DIR = 'Korev Dev';
 const COMMAND_EVENT = 'command';
 const FINISHED_SOUND = '/System/Library/Sounds/Glass.aiff';
 const SOUND_EXTENSIONS = ['mp3', 'm4a', 'aac', 'wav', 'aiff', 'aif', 'caf'];
-const REMOTE_TOKEN_FILE = 'remote-token';
-const PUSH_TOKENS_FILE = 'push-tokens.json';
 const TAILNET_STATE_DIR = 'tailscale';
 const TAILNET_BINARY = 'korev-tailnet';
 const TAILNET_BIN_DIR = 'tailnet/bin';
@@ -73,6 +73,8 @@ const TAILNET_HOSTNAME_PREFIX = 'korev-';
 const MODELS_DIR = 'models';
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60_000;
 const BUNDLE_FROM_EXE = '../../..';
+const TRAY_ICON_SCALE = 2;
+const NO_TRAY_COUNT = -1;
 
 const appOrigin: AppOrigin = {
   devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
@@ -94,8 +96,13 @@ function useSeparateDevData() {
 
 useSeparateDevData();
 
+if (!app.requestSingleInstanceLock()) {
+  app.exit();
+}
+
 let korevApp: Korev | null = null;
 let quitGate: QuitGate | null = null;
+let installOnQuit = false;
 
 const PRELOAD_PATH = path.join(__dirname, 'preload.cjs');
 
@@ -123,34 +130,6 @@ function mainWindow(): BrowserWindow | undefined {
   );
 }
 
-const pendingLinks: NewWorkspaceLink[] = [];
-
-function showMainWindow(window: BrowserWindow) {
-  if (window.isMinimized()) window.restore();
-  window.show();
-  window.focus();
-}
-
-// The renderer takes queued links when it loads, and again on each nudge.
-function openLink(url: string) {
-  const link = parseKorevLink(url);
-  if (!link) return;
-  pendingLinks.push(link);
-  if (!korevApp) return;
-  const window = mainWindow();
-  if (!window) {
-    createWindow(korevApp);
-    return;
-  }
-  showMainWindow(window);
-  window.webContents.send(eventChannel('open-link'), null);
-}
-
-app.on('open-url', (event, url) => {
-  event.preventDefault();
-  openLink(url);
-});
-
 function korevCliDir(): string {
   return app.isPackaged
     ? path.join(process.resourcesPath, UNPACKED_ASAR_DIR, CLI_DIR)
@@ -170,8 +149,7 @@ function bundledBinary(binDir: string, binary: string): string {
 }
 
 const remote = createRemoteAccess({
-  tokenPath: path.join(app.getPath('userData'), REMOTE_TOKEN_FILE),
-  pushTokensPath: path.join(app.getPath('userData'), PUSH_TOKENS_FILE),
+  ...remoteAccessFiles(app.getPath('userData')),
   api: () => korevApp?.api ?? {},
   startTailnet: tailnetStarter({
     binary: bundledBinary(TAILNET_BIN_DIR, TAILNET_BINARY),
@@ -194,7 +172,85 @@ function emit<E extends keyof KorevEvents>(event: E, payload: KorevEvents[E]) {
     window.webContents.send(eventChannel(event), payload);
   }
   remote.broadcast(event, payload);
-  if (event === 'state') quitGate?.agentsChanged();
+  if (event !== 'state') return;
+  quitGate?.agentsChanged();
+  if (korevApp) syncMenuBar(korevApp);
+}
+
+function showMainWindow() {
+  if (!korevApp) return;
+  void app.dock?.show();
+  const window = mainWindow();
+  if (!window) {
+    createWindow(korevApp);
+    return;
+  }
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+}
+
+const pendingLinks: NewWorkspaceLink[] = [];
+
+// The renderer takes queued links when it loads, and again on each nudge.
+function openLink(url: string) {
+  const link = parseKorevLink(url);
+  if (!link) return;
+  pendingLinks.push(link);
+  showMainWindow();
+  mainWindow()?.webContents.send(eventChannel('open-link'), null);
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  openLink(url);
+});
+
+function goBackground() {
+  mainWindow()?.close();
+  app.dock?.hide();
+}
+
+let tray: Tray | null = null;
+let trayCount = NO_TRAY_COUNT;
+
+function trayIcon() {
+  const image = nativeImage.createEmpty();
+  image.addRepresentation({
+    scaleFactor: TRAY_ICON_SCALE,
+    dataURL: trayIconUrl,
+  });
+  image.setTemplateImage(true);
+  return image;
+}
+
+function removeTray() {
+  tray?.destroy();
+  tray = null;
+}
+
+function syncMenuBar(korev: Korev) {
+  if (!korev.settings().keepRunningInBackground) {
+    removeTray();
+    return;
+  }
+  if (!tray) {
+    tray = new Tray(trayIcon());
+    trayCount = NO_TRAY_COUNT;
+  }
+  const running = korev.runningAgents();
+  if (running === trayCount) return;
+  trayCount = running;
+  tray.setTitle(menuBarTitle(running));
+  tray.setContextMenu(
+    Menu.buildFromTemplate(
+      menuBarTemplate({
+        running,
+        open: showMainWindow,
+        quit: () => quitGate?.requestQuit(),
+      }),
+    ),
+  );
 }
 
 function sendToFocusedWindow(command: AppCommand) {
@@ -226,20 +282,15 @@ function showNotice(korev: () => Korev | null, notice: Notice) {
   notification.on('close', () => shownNotices.delete(notification));
   notification.on('click', () => {
     shownNotices.delete(notification);
+    showMainWindow();
     const window = mainWindow();
     if (!window) return;
-    showMainWindow(window);
     window.webContents.send(
       eventChannel('focus-workspace'),
       notice.workspaceId,
     );
   });
   notification.show();
-}
-
-async function pushToPairedPhones(notice: Notice) {
-  const stale = await sendPushNotifications(await remote.pushTokens(), notice);
-  for (const token of stale) await remote.unregisterPushToken(token);
 }
 
 function playSound(file: string) {
@@ -343,7 +394,10 @@ async function installUpdate(release: Release): Promise<Result> {
     return { ok: true, value: undefined };
   }
   const downloaded = await downloadUpdate();
-  if (downloaded.ok) autoUpdater.quitAndInstall();
+  if (downloaded.ok) {
+    installOnQuit = true;
+    quitGate?.requestQuit();
+  }
   return downloaded;
 }
 
@@ -370,11 +424,11 @@ async function createKorevApp(): Promise<Korev> {
     emit,
     notify: (notice) => {
       showNotice(() => korevApp, notice);
-      void sendPhoneNotification(
+      void notifyPhones(
+        remote,
         korevApp?.settings().phoneNotificationsUrl ?? '',
         notice,
       );
-      void pushToPairedPhones(notice);
     },
     playSound,
     isWindowFocused: () => BrowserWindow.getFocusedWindow() !== null,
@@ -442,6 +496,7 @@ function askQuitNatively(running: number): QuitChoice {
 function askQuit(running: number, gate: QuitGate) {
   const window = mainWindow();
   if (!window) {
+    app.focus({ steal: true });
     setImmediate(() => gate.choose(askQuitNatively(running)));
     return;
   }
@@ -534,8 +589,11 @@ app.whenReady().then(async () => {
   const korev = await createKorevApp();
   const gate = createQuitGate({
     runningAgents: korev.runningAgents,
+    stayResident: () =>
+      korev.settings().keepRunningInBackground && korev.hasBackgroundWork(),
+    background: goBackground,
     ask: (running) => askQuit(running, gate),
-    quit: () => app.quit(),
+    quit: () => (installOnQuit ? autoUpdater.quitAndInstall() : app.quit()),
   });
   quitGate = gate;
   const desktopApi: DesktopApi = {
@@ -562,15 +620,13 @@ app.whenReady().then(async () => {
       dictation.close(),
     ]).finally(() => app.quit());
   });
+  powerMonitor.on('shutdown', () => gate.choose('quit'));
+  app.on('second-instance', showMainWindow);
+  app.on('activate', showMainWindow);
   createWindow(korev);
+  syncMenuBar(korev);
   void remote.apply(korev.settings());
   watchForUpdates(korev);
-
-  app.on('activate', () => {
-    if (!mainWindow()) {
-      createWindow(korev);
-    }
-  });
 });
 
 app.on('window-all-closed', () => {

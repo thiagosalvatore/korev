@@ -68,6 +68,9 @@ Three columns:
   the next git action), a tab strip (chats, Changes, open files) and the active tab.
 - **Right panel** (`--panel-w`): the git panel (Files / Changes / PR / Artifacts) on top and
   the terminal panel (Setup / Run / Terminal) below.
+- **Terminal find** (⌘F in any terminal): a raised bar at the top right of the terminal with the
+  query, "3 of 12" or "No results", and Previous, Next and Close. Matches get a `warning`
+  outline and the current match an `accent` outline.
 
 The **Grid** page (⌘G) replaces the centre and the right panel with 2 or 4 panes. Each pane
 shows one chat or terminal tab of a workspace, or one Ask chat. The pane header has the
@@ -216,6 +219,32 @@ Notes** opens the same page.
 
 - **Tokens.** `korev-mobile/src/theme.ts` mirrors the desktop tokens for dark and light. Use
   its names, never a hex value, in phone code.
+- **Tabs.** The native iOS tab bar (Liquid Glass) has Workspaces, Ask and Pull requests, with
+  SF Symbol icons (Material icons on Android). Workspaces and Ask carry an amber badge with the
+  number of workspaces or Ask chats that wait for you. A separate round **+** button on the right
+  opens New workspace as a sheet and keeps the current tab. Each tab has its own stack with a
+  large title. Chats open over the tabs, so the tab bar hides while a chat is open. The
+  Workspaces header has **Settings** on the right and, in the demo, a **Demo** label on the left.
+- **Task sheets.** New workspace and Ask a question open as native sheets with a grabber. They
+  start at 62 % of the screen and grow to full height with the keyboard. **Cancel** is on the
+  left. Both use the same layout: a full-width repository row, a large task field (dashed
+  `accent` border in plan mode), a row of chips (model, and **Plan** for a workspace) with the
+  mic on the right, then a full-width **Start** (or **Create** with no task) or **Ask** button.
+  The task field does not take focus when the sheet opens.
+- **Settings.** A page sheet with **Done**. Grouped sections: Mac (Paired with, **Unpair this
+  phone**) or, in the demo, Demo (**Pair your Mac**), then Notifications (opens the iOS
+  settings), then the app version.
+- **Home.** The Workspaces tab sorts workspaces by what they need next, in inset grouped
+  sections: **Needs you** (`warningText` header: a question, a failure, or a pull request
+  problem from `prNeedsYou`), **Working**, **Ready to merge** (`successText` header: the next
+  pull request step is a merge), then **Everything else**. An empty section is hidden. A search
+  field under the large title filters by name, branch and repository. A row has the status icon,
+  the workspace name (`headline`, semibold under Needs you or when unread), one status line
+  ("Needs your answer", "Working", "Checks failing · #90", "Ready to merge · #87", "Merged ·
+  #79", "Waits for the plan in acme-web", or the branch), and on the right the repository,
+  `+N −M` and the unread dot. The name and status wrap to two lines at large text sizes.
+  Swipe left to archive. The header's **By repository** button opens the repository tree,
+  where a long press on a repository starts reordering.
 - **Can't reach the Mac.** A screen with no data yet shows the offline panel in place of its
   spinner: a WifiOff icon, "Can't reach Korev on your Mac", what to check (Korev open on the
   Mac, Tailscale on the phone, the Mac awake and on Tailscale), **Try again** and **Unpair this
@@ -229,32 +258,108 @@ Notes** opens the same page.
   steps and the full-screen scanner come after that tap.
 - **Pending buttons.** A button whose request is running shows a spinner in place of its
   label and keeps its size. Its siblings are disabled until the request ends.
-- **Waiting chats.** A workspace opens on the chat that waits for an answer. Its tab shows an
-  amber `warning` dot next to the running spinner.
+- **Waiting chats.** A workspace opens on the chat that waits for an answer. When another chat
+  in the workspace waits, the header menu button shows a badge, and the Chats submenu marks
+  that chat "Needs you".
+- **Chat header.** The title is the workspace name (or the Ask chat's title). Under it, one
+  12 pt status line: `LoadingRing` + "Working · 1m 12s", or a dot + "Needs your answer"
+  (`warningText`), "Ready to merge" (`successText`), "Checks failing" / "Has conflicts"
+  (`dangerText`) or "Merged" (`merged`). With no status and more than one chat, it shows the
+  chat's title. The ellipsis button opens a native menu: Chats (each chat, then New chat),
+  Explain changes, Show explanation / Show chat, the next PR step, Checks, Open on GitHub, a
+  Pull requests picker when there are several, and Archive.
+- **Chat accessory.** Under the header, one row of 28 pt capsules on `bgRaised` that scrolls
+  sideways: the branch with its diff stat (`fix-login → main · +128 −14`), which opens Changes,
+  and the PR ("No PR yet", "#87 · checks passed", "#90 · e2e failing" in `dangerText`), which
+  opens the checks sheet, a form sheet whose rows open the check on GitHub. An Ask chat shows
+  one capsule with its repositories. A workspace error shows as a `dangerText` line under the row.
+- **Changes.** A pushed screen lists the changed files: the status letter in mono (`A`
+  `diffAdd`, `M` `warningText`, `D` `diffDel`, `R` `accentText`), the file name over its folder,
+  and `+N −M`. A tap opens the file's diff: old and new line numbers in `fg4`, mono `caption`
+  code that wraps, `diffAddBg` / `diffDelBg` rows and `diffHunkBg` hunk headers. The header menu
+  also has **Changes**.
+- **Transcript.** User messages sit on the right in an 18 pt bubble with a 4 pt bottom-right
+  corner and no timestamp. Their text is native: a long press selects a word, with handles and
+  the iOS menu (Copy, Look Up, Translate, Share); a tap opens the message actions. A long press on an agent message opens Copy,
+  Select text and Share. Inline code is `MONO_FONT` on `bgRaised`, never italic.
+- **Activity card.** The tools, thinking and todos between two messages fold into one card on
+  `bgSurface` (12 pt radius, `border1` hairline). Done: a green `CircleCheck` and what the agent
+  did ("Explored 3 files, edited 1 file, ran 2 commands"); a red `CircleX` when a tool failed.
+  Running: `LoadingRing` and the current step ("Editing state.ts"), with the todos under it as a
+  progress bar and check, dot and dashed-circle rows. A tap opens one row per step. A finished
+  turn shows in the header ("Completed in 9s"), not in the transcript; a failed turn keeps its
+  error line.
+- **Composer.** A chip row sits above the message box: the model (opens Chat options), **Plan**
+  (`accentSubtle` and bold `accentText` when on; the box border turns dashed `accent`), the
+  effort (a tap moves to the next level), **Fast** only while it is on, and on the right a 20 pt
+  context ring (`fg3`, `warning` from 80 %, `danger` from 95 %). A tap on the ring shows the
+  context window and the plan limits. Under it: a round **+** (attach), the message box with a
+  **/** button while it is empty (workspace chats only), then send, stop or the mic. **/**
+  types a slash and lists the repository's commands above the composer; a tap inserts one.
+- **Chat options.** A form sheet with a grabber and three inset groups: Model (one row per
+  model with its agent, check on the current one), Effort, and Modes (Plan mode, Fast mode
+  switches). There is no nested picker.
+- **Queued messages.** A message sent while the agent works waits in a tray above the composer
+  ("Queued until the agent finishes", `caption` `fg3`), one line each with a round accent
+  **Send now** (arrow) and a grey **×**. They leave the transcript while they wait. A Mac too
+  old to answer these methods keeps showing them in the transcript with "Queued".
+- **Message actions.** A tap on a user message opens Copy, **Revert to before this message**
+  (only with a checkpoint and while the agent is idle) and Share. Revert asks first, then puts
+  the message back in the message box. The header menu's Chats submenu ends with **Close this
+  chat** (destructive, asks first) when the workspace has more than one chat. A workspace whose
+  setup failed shows its error with **Try again**.
+- **Review comments.** The header menu's Pull request section has **Review comments** (subtitle
+  "N unanswered"). The screen lists the PR's threads as `bgSurface` cards: `path:line` in mono
+  `caption`, the last four lines of the diff hunk on `bgRaised`, then each comment (author,
+  relative time, markdown). Resolved threads come last at 60 % opacity. A tap on a comment opens
+  it on GitHub.
+- **Setup and Run.** When the repository has those scripts and the Mac answers the script
+  methods, the header menu has a Scripts section with **Setup** and **Run** ("Running" while it
+  runs). The screen shows the script's output as plain mono text (colour codes removed, a line
+  redrawn with a carriage return keeps its last state), follows new output, and ends with
+  "[Exited with code N]". **Start** / **Stop** sit in the header. A Run script with a URL shows it
+  as a link row above the output. The phone never opens or types into a shell.
+- **Floating PR action.** Only for Merge, Fix errors and Resolve conflicts: one large button,
+  centred 12 pt above the composer, with a soft shadow. It hides while the keyboard is up.
+  Create PR lives in the menu, so a new workspace shows no PR button.
 - **Jump to latest.** After one screen of scrolling back, a 36 pt round button with a down
   chevron (`bgRaised`, `border2` hairline) shows 12 pt above the composer and 12 pt from the
   right edge. It fades in and out over 150 ms.
-- **Empty chat.** One centred `fg3` line names the agent and model: "Message Claude Code ·
-  Opus 5.5".
+- **Empty chat.** One centred `fg3` line just above the composer names the agent and model:
+  "Message Claude Code · Opus 5.5".
+- **Keyboard.** The composer rides on top of the keyboard, and the last message lifts with it.
+  A tap on the chat or a downward swipe closes the keyboard. The rest of the screen keeps its
+  layout; nothing shrinks.
 - **Touch targets.** Every control takes taps over at least 44 × 44 pt. A smaller control gets
   `hitSlop` from `touchSlop(size)` in `ui.tsx` instead of growing.
 - **Text size.** Text follows the iOS text size. Controls and headers (buttons, tabs, chips,
-  pickers, the composer, the PR bar) stop growing at 1.4× (`CHROME_FONT_SCALE`), so they never
-  push the chat off the screen. Chat text and list rows scale fully.
+  pickers, the composer, the chat header and capsules) stop growing at 1.4× (`CHROME_FONT_SCALE`), so they never
+  push the chat off the screen. Chat text and list rows scale fully. Repository avatars keep their
+  size and their initials do not scale, like an icon.
+- **Type ramp.** Text sizes come from `TYPE` in `theme.ts`, which follows the iOS text styles:
+  `largeTitle` 34, `title3` 20, `headline` 17 semibold, `body` 17, `callout` 16, `subhead` 15,
+  `footnote` 13 and `caption` 12. New phone code uses these names, never a raw font size.
 - **On amber.** Text on a `warning` fill, like the tab badge, uses `fgOnWarning`.
 - **Ask tab.** The list has an overline per group: Across repos, then each repository, then No
   repository. An idle Ask chat shows `MessageSquare` (`fg4`), a waiting one
   `MessageCircleQuestion` (`warningText`) with a highlighted title. The tab badge counts waiting
   Ask chats, like the Workspaces badge counts waiting workspaces.
-- **Explainer.** A chat with an explainer opens on Explanation, with an Explanation | Chat switch
-  under the header. The sections follow the desktop in one column. Walkthrough steps are cards
+- **Explainer.** A chat with an explainer opens on Explanation. The header menu switches
+  between Show chat and Show explanation. The sections follow the desktop in one column. Walkthrough steps are cards
   that open one at a time. Glossary terms have a dotted underline; tapping one shows its meaning.
   Diff rows use `diffAddBg`, `diffDelBg` and `diffHunkBg`, and risks use `riskHigh`, `riskMedium`
-  and `riskLow` with their `Subtle` backgrounds. The pull request bar has **Explain** next to the
-  next step, and the Ask tab header has a book button that opens "Explain a pull request".
+  and `riskLow` with their `Subtle` backgrounds. The header menu has **Explain changes**, and
+  each pull request in the Pull requests tab has **Explain** in its actions.
 - **Linked group.** The workspace list follows the desktop's Linked group: a foldable **Across
   repos** overline above the repositories, then one entry per group with a link-icon label, the
   shared name and one avatar per repository, and indented rows that lead with the repository
   name. A repository group leaves those workspaces out. The workspace title is "<repository> · <name>", and a waiting workspace's
   empty chat says its agent starts when you approve the plan. The lanes card has a repository
   picker per lane.
+- **Bridge.** The phone calls only the methods in `REMOTE_METHODS`. It can send a queued
+  message now, remove a queued message, revert to a user message and restore an archived
+  workspace. It can start and stop the Setup and Run scripts and read their output, from
+  `scriptOutput` when it connects and from the `terminal-output` and `terminal-exit` events
+  after that. It never sees or writes to an interactive shell. A Mac with an older Korev
+  answers a newer method with an error, so the phone shows that method's control only after
+  the Mac answers it.

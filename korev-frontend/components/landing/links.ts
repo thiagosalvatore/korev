@@ -1,3 +1,4 @@
+export const SITE_URL = 'https://korev.ai';
 export const GITHUB_OWNER = 'thiagosalvatore';
 export const GITHUB_REPO = 'korev';
 export const GITHUB_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;

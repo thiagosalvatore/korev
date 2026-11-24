@@ -726,6 +726,12 @@ test('opens a terminal tab and an in-app browser tab', async () => {
     await expect(main.locator('.xterm-rows')).toContainText(
       'korev-big-terminal',
     );
+    await window.keyboard.press('Meta+f');
+    const find = main.getByRole('textbox', { name: 'Find in terminal' });
+    await find.fill('korev-big-terminal');
+    await expect(main.getByText(/^\d+ of \d+$/)).toBeVisible();
+    await find.press('Escape');
+    await expect(find).toBeHidden();
 
     await window.getByRole('button', { name: 'New tab' }).click();
     await window.getByRole('menuitem', { name: 'New browser tab' }).click();
@@ -862,11 +868,78 @@ test('runs a terminal in a grid pane and keeps it in the full view', async () =>
   }
 });
 
+test('keeps an agent working after Quit and finishes its turn when reopened', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
+  const repo = await createRepo(home);
+  const { app, window } = await launch(home, repo);
+  try {
+    await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'updateSettings',
+        [{ queueWhileRunning: false, keepRunningInBackground: true }],
+      ),
+    );
+    await window.getByRole('button', { name: 'Open project' }).click();
+    await window.getByRole('textbox', { name: 'Message' }).fill('hold-turn');
+    await window.getByRole('textbox', { name: 'Message' }).press('Enter');
+    await expect.poll(() => runningAgents(window)).toBe(1);
+    const state = (await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'getState',
+        [],
+      ),
+    )) as AppState;
+    const sessionId = state.workspaces[0].sessions[0].id;
+
+    await app.evaluate(({ app: electronApp }) => electronApp.quit());
+    await expect
+      .poll(() =>
+        app.evaluate(
+          ({ BrowserWindow }) => BrowserWindow.getAllWindows().length,
+        ),
+      )
+      .toBe(0);
+
+    const reopening = app.waitForEvent('window');
+    await app.evaluate(({ app: electronApp }) => electronApp.emit('activate'));
+    const reopened = await reopening;
+    expect(await runningAgents(reopened)).toBe(1);
+    await reopened.evaluate(
+      (id) =>
+        (globalThis as unknown as { korev: KorevBridge }).korev.call('send', [
+          id,
+          { text: 'finish' },
+        ]),
+      sessionId,
+    );
+    await waitForAgentsToFinish(reopened);
+    const transcript = JSON.stringify(
+      await reopened.evaluate(
+        (id) =>
+          (globalThis as unknown as { korev: KorevBridge }).korev.call(
+            'transcript',
+            [id],
+          ),
+        sessionId,
+      ),
+    );
+    expect(transcript).toContain('I added agent-note.txt.');
+  } finally {
+    await app.close();
+  }
+});
+
 test('moves a workspace from Working to Done on the board', async () => {
   const home = await mkdtemp(path.join(tmpdir(), 'korev-e2e-'));
   const repo = await createRepo(home);
   const { app, window } = await launch(home, repo);
   try {
+    await window.evaluate(() =>
+      (globalThis as unknown as { korev: KorevBridge }).korev.call(
+        'updateSettings',
+        [{ queueWhileRunning: false }],
+      ),
+    );
     await window.getByRole('button', { name: 'Open project' }).click();
     await window.getByRole('textbox', { name: 'Message' }).fill('hold-turn');
     await window.getByRole('textbox', { name: 'Message' }).press('Enter');
@@ -976,18 +1049,21 @@ case "$1 $2" in
       *) exit 1 ;;
     esac ;;
   "pr diff") printf 'diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1,2 @@\n # acme\n+Install it.\n' ;;
+  "repo view") echo 'acme/web' ;;
+  "api -i") echo '{"data":{"viewer":{"login":"me"},"q0":{"number":42,"url":"https://github.com/acme/web/pull/42","title":"Add install steps","state":"OPEN","headRefName":"octo/install","baseRefName":"main","headRefOid":"abc123"}}}' ;;
   *) exit 1 ;;
 esac
 `;
 
 const FAKE_GH_WITH_REVIEW = `#!/bin/sh
 case "$1 $2" in
-  "pr view") echo '{"number":7,"url":"https://github.com/acme/web/pull/7","title":"Add a note","state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefName":"dev-person/add-agent-note","headRefOid":"abc123","baseRefName":"main","createdAt":"2026-01-01T00:00:00Z","statusCheckRollup":[]}' ;;
-  "api graphql")
+  "repo view") echo 'acme/web' ;;
+  "api -i")
     case "$*" in
-      *isRequired*) exit 1 ;;
-      *) echo '{"data":{"viewer":{"login":"me"},"resource":{"reviewThreads":{"nodes":[{"isResolved":false,"first":{"nodes":[{"authorAssociation":"MEMBER","author":{"__typename":"User"}}]},"last":{"nodes":[{"id":"c1","author":{"login":"reviewer"}}]}}]}}}}' ;;
+      *resource*) echo '{"data":{"viewer":{"login":"me"},"q0":{"number":7,"url":"https://github.com/acme/web/pull/7","title":"Add a note","state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefName":"dev-person/add-agent-note","headRefOid":"abc123","baseRefName":"main","createdAt":"2026-01-01T00:00:00Z","reviewThreads":{"nodes":[{"isResolved":false,"first":{"nodes":[{"authorAssociation":"MEMBER","author":{"__typename":"User"}}]},"last":{"nodes":[{"id":"c1","author":{"login":"reviewer"}}]}}]}}}}' ;;
+      *) echo '{"data":{"viewer":{"login":"me"},"q0":{"pullRequests":{"nodes":[{"url":"https://github.com/acme/web/pull/7"}]}}}}' ;;
     esac ;;
+  "api graphql") echo '{"data":{"viewer":{"login":"me"},"resource":{"reviewThreads":{"nodes":[{"isResolved":false,"first":{"nodes":[{"authorAssociation":"MEMBER","author":{"__typename":"User"}}]},"last":{"nodes":[{"id":"c1","author":{"login":"reviewer"}}]}}]}}}}' ;;
   *) exit 1 ;;
 esac
 `;

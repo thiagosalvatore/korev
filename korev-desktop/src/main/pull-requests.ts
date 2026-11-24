@@ -17,8 +17,6 @@ import { withPrompt } from './repo-config';
 import { lastFencedBlock } from '../shared/explainer';
 
 const GH_TIMEOUT_MS = 60_000;
-const PR_FIELDS =
-  'number,url,title,state,isDraft,mergeable,mergedAt,reviewDecision,statusCheckRollup,headRefName,headRefOid,baseRefName,createdAt';
 const PR_URL = /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/g;
 const COMPLETED = 'COMPLETED';
 const PASSING = new Set(['SUCCESS', 'NEUTRAL']);
@@ -31,58 +29,53 @@ const BLOCKING_REVIEW_DECISIONS = new Set([
 ]);
 const MAX_STACK_SIZE = 100;
 const MAX_REVIEW_THREADS = 100;
+const MAX_LABELS = 20;
+const PR_STEWARD_LABEL_PREFIX = 'claude-pr-steward';
 const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
-const PR_DETAILS_QUERY = `query($url: URI!) {
-  viewer { login }
-  resource(url: $url) {
-    ... on PullRequest {
-      reviewThreads(first: ${MAX_REVIEW_THREADS}) {
-        nodes {
-          isResolved
-          first: comments(first: 1) { nodes { authorAssociation author { __typename } } }
-          last: comments(last: 1) { nodes { id author { login } } }
-        }
-      }
-      stackEntry { position }
-      stack {
-        entries(first: ${MAX_STACK_SIZE}) {
-          nodes {
-            position
-            pullRequest {
-              number url state isDraft mergeable reviewDecision
-              commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
-            }
-          }
-        }
-      }
-    }
-  }
-}`;
-
+// Measured on PostHog/posthog PRs: 8 PRs answer in 3.5–6 s, under GitHub's 10 s limit.
+const PR_BATCH_SIZE = 8;
 const CHECKS_PAGE_SIZE = 100;
-const REQUIRED_CHECKS_QUERY = `query($url: URI!, $number: Int!, $endCursor: String) {
-  resource(url: $url) {
-    ... on PullRequest {
-      commits(last: 1) {
+const PR_NUMBER = /\/pull\/(\d+)/;
+
+function checksSelection(number: number, after: string | null): string {
+  const cursor = after ? `, after: ${JSON.stringify(after)}` : '';
+  return `commits(last: 1) { nodes { commit { statusCheckRollup {
+    contexts(first: ${CHECKS_PAGE_SIZE}${cursor}) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        __typename
+        ... on CheckRun { name status conclusion detailsUrl isRequired(pullRequestNumber: ${number}) }
+        ... on StatusContext { context state targetUrl isRequired(pullRequestNumber: ${number}) }
+      }
+    }
+  } } } }`;
+}
+
+function prSelection(number: number): string {
+  return `number url title state isDraft mergeable mergedAt reviewDecision
+    headRefName headRefOid baseRefName createdAt
+    labels(first: ${MAX_LABELS}) { nodes { name } }
+    ${checksSelection(number, null)}
+    reviewThreads(first: ${MAX_REVIEW_THREADS}) {
+      nodes {
+        isResolved
+        first: comments(first: 1) { nodes { authorAssociation author { __typename } } }
+        last: comments(last: 1) { nodes { id author { login } } }
+      }
+    }
+    stackEntry { position }
+    stack {
+      entries(first: ${MAX_STACK_SIZE}) {
         nodes {
-          commit {
-            statusCheckRollup {
-              contexts(first: ${CHECKS_PAGE_SIZE}, after: $endCursor) {
-                pageInfo { hasNextPage endCursor }
-                nodes {
-                  ... on CheckRun { name isRequired(pullRequestNumber: $number) }
-                  ... on StatusContext { context isRequired(pullRequestNumber: $number) }
-                }
-              }
-            }
+          position
+          pullRequest {
+            number url state isDraft mergeable reviewDecision
+            commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
           }
         }
       }
-    }
-  }
-}`;
-const REQUIRED_CHECK_NAMES =
-  '.data.resource.commits.nodes[0].commit.statusCheckRollup.contexts.nodes[]? | select(.isRequired) | .name // .context';
+    }`;
+}
 
 const THREADS_PAGE_SIZE = 100;
 const THREAD_REPLIES_PAGE_SIZE = 50;
@@ -102,6 +95,7 @@ const PR_THREADS_QUERY = `query($url: URI!) {
   }
 }`;
 const GHOST_AUTHOR = 'ghost';
+const BOT_TYPENAME = 'Bot';
 const MAX_REVIEW_REQUESTS = 100;
 const REVIEW_STATUS_QUERY = `query($url: URI!) {
   viewer { login }
@@ -111,6 +105,13 @@ const REVIEW_STATUS_QUERY = `query($url: URI!) {
       viewerLatestReview { id state commit { oid } }
       reviewRequests(first: ${MAX_REVIEW_REQUESTS}) {
         nodes { requestedReviewer { ... on User { login } } }
+      }
+      reviewThreads(first: ${THREADS_PAGE_SIZE}) {
+        nodes {
+          isResolved
+          opener: comments(first: 1) { nodes { author { login } } }
+          latest: comments(last: 1) { nodes { author { login __typename } } }
+        }
       }
     }
   }
@@ -135,13 +136,18 @@ interface StackEntry {
   pullRequest: StackPullRequest | null;
 }
 
-interface StackResponse {
-  data?: {
-    resource?: {
-      stackEntry?: { position: number } | null;
-      stack?: { entries: { nodes: StackEntry[] } } | null;
-    } | null;
-  };
+interface PrResource {
+  stackEntry?: { position: number } | null;
+  stack?: { entries: { nodes: StackEntry[] } } | null;
+  reviewThreads?: { nodes: ReviewThreadSummary[] } | null;
+}
+
+function hasPrStewardLabel(pr: JsonRecord): boolean {
+  const labels = (pr.labels as { nodes?: { name?: string }[] } | undefined)
+    ?.nodes;
+  return (labels ?? []).some((label) =>
+    str(label.name).startsWith(PR_STEWARD_LABEL_PREFIX),
+  );
 }
 
 function str(value: unknown): string {
@@ -169,38 +175,7 @@ function toCheck(check: JsonRecord): PrCheck {
     name: str(isStatusContext ? check.context : check.name),
     state: isStatusContext ? statusContextState(check) : checkRunState(check),
     url: str(isStatusContext ? check.targetUrl : check.detailsUrl) || null,
-    required: true,
-  };
-}
-
-export function parsePrStatus(json: string): PrStatus | null {
-  let raw: JsonRecord;
-  try {
-    raw = JSON.parse(json) as JsonRecord;
-  } catch {
-    return null;
-  }
-  if (typeof raw.number !== 'number') return null;
-  const rollup = Array.isArray(raw.statusCheckRollup)
-    ? (raw.statusCheckRollup as JsonRecord[])
-    : [];
-  return {
-    number: raw.number,
-    url: str(raw.url),
-    title: str(raw.title),
-    state: str(raw.state) as PrStatus['state'],
-    isDraft: raw.isDraft === true,
-    mergeable: (str(raw.mergeable) || 'UNKNOWN') as PrStatus['mergeable'],
-    reviewDecision: (str(raw.reviewDecision) ||
-      null) as PrStatus['reviewDecision'],
-    mergedAt: str(raw.mergedAt) || null,
-    headRefName: str(raw.headRefName),
-    headRefOid: str(raw.headRefOid),
-    baseRefName: str(raw.baseRefName),
-    createdAt: str(raw.createdAt),
-    checks: rollup.map(toCheck),
-    stack: null,
-    unansweredThreads: [],
+    required: check.isRequired !== false,
   };
 }
 
@@ -215,31 +190,19 @@ interface ReviewThreadSummary {
   last?: { nodes: { id: string; author?: { login?: string } | null }[] };
 }
 
-interface DetailsResponse {
-  data?: {
-    viewer?: { login?: string };
-    resource?: { reviewThreads?: { nodes: ReviewThreadSummary[] } } | null;
-  };
-}
-
 function startedByTrustedAuthor(thread: ReviewThreadSummary): boolean {
   const opening = thread.first?.nodes[0];
   return (
-    opening?.author?.__typename === 'Bot' ||
+    opening?.author?.__typename === BOT_TYPENAME ||
     TRUSTED_ASSOCIATIONS.has(opening?.authorAssociation ?? '')
   );
 }
 
-export function parseUnansweredThreads(json: string): string[] {
-  let response: DetailsResponse;
-  try {
-    response = JSON.parse(json) as DetailsResponse;
-  } catch {
-    return [];
-  }
-  const viewer = response.data?.viewer?.login;
-  const threads = response.data?.resource?.reviewThreads?.nodes ?? [];
-  return threads.flatMap((thread) => {
+export function parseUnansweredThreads(
+  pr: PrResource,
+  viewer: string,
+): string[] {
+  return (pr.reviewThreads?.nodes ?? []).flatMap((thread) => {
     const last = thread.last?.nodes[0];
     if (!last || thread.isResolved || !startedByTrustedAuthor(thread))
       return [];
@@ -247,17 +210,10 @@ export function parseUnansweredThreads(json: string): string[] {
   });
 }
 
-export function parsePrStack(json: string): PrStack | null {
-  let response: StackResponse;
-  try {
-    response = JSON.parse(json) as StackResponse;
-  } catch {
-    return null;
-  }
-  const resource = response.data?.resource;
-  const position = resource?.stackEntry?.position;
+export function parsePrStack(pr: PrResource): PrStack | null {
+  const position = pr.stackEntry?.position;
   if (typeof position !== 'number') return null;
-  const open = (resource?.stack?.entries.nodes ?? []).filter(
+  const open = (pr.stack?.entries.nodes ?? []).filter(
     (entry) => entry.pullRequest?.state === 'OPEN',
   );
   const below = open.filter((entry) => entry.position < position);
@@ -290,103 +246,255 @@ function readyToMerge(pr: StackPullRequest): boolean {
   );
 }
 
-type PrDetails = Pick<PrStatus, 'stack' | 'unansweredThreads'>;
-
-const NO_DETAILS: PrDetails = { stack: null, unansweredThreads: [] };
-
-async function fetchPrDetails(
-  run: CommandRunner,
-  env: NodeJS.ProcessEnv,
-  cwd: string,
-  url: string,
-): Promise<PrDetails> {
-  try {
-    const result = await run(
-      'gh',
-      ['api', 'graphql', '-f', `query=${PR_DETAILS_QUERY}`, '-f', `url=${url}`],
-      { cwd, env, timeoutMs: GH_TIMEOUT_MS },
-    );
-    if (result.exitCode !== 0) return NO_DETAILS;
-    return {
-      stack: parsePrStack(result.stdout),
-      unansweredThreads: parseUnansweredThreads(result.stdout),
-    };
-  } catch {
-    return NO_DETAILS;
-  }
-}
-
-async function fetchRequiredChecks(
-  run: CommandRunner,
-  env: NodeJS.ProcessEnv,
-  cwd: string,
-  pr: PrStatus,
-): Promise<Set<string> | null> {
-  try {
-    const result = await run(
-      'gh',
-      [
-        'api',
-        'graphql',
-        '--paginate',
-        '-f',
-        `query=${REQUIRED_CHECKS_QUERY}`,
-        '-f',
-        `url=${pr.url}`,
-        '-F',
-        `number=${pr.number}`,
-        '--jq',
-        REQUIRED_CHECK_NAMES,
-      ],
-      { cwd, env, timeoutMs: GH_TIMEOUT_MS },
-    );
-    return result.exitCode === 0
-      ? new Set(result.stdout.split('\n').filter(Boolean))
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function withRequiredChecks(
-  checks: PrCheck[],
-  required: Set<string> | null,
-): PrCheck[] {
-  if (!required) return checks;
-  return checks.map((check) => ({
-    ...check,
-    required: required.has(check.name),
-  }));
+function toPrStatus(
+  pr: JsonRecord,
+  checks: JsonRecord[],
+  viewer: string,
+): PrStatus {
+  const state = str(pr.state) as PrStatus['state'];
+  const open = state === 'OPEN';
+  return {
+    number: pr.number as number,
+    url: str(pr.url),
+    title: str(pr.title),
+    state,
+    isDraft: pr.isDraft === true,
+    mergeable: (str(pr.mergeable) || 'UNKNOWN') as PrStatus['mergeable'],
+    reviewDecision: (str(pr.reviewDecision) ||
+      null) as PrStatus['reviewDecision'],
+    mergedAt: str(pr.mergedAt) || null,
+    headRefName: str(pr.headRefName),
+    headRefOid: str(pr.headRefOid),
+    baseRefName: str(pr.baseRefName),
+    createdAt: str(pr.createdAt),
+    checks: checks.map(toCheck),
+    stack: open ? parsePrStack(pr) : null,
+    unansweredThreads: open ? parseUnansweredThreads(pr, viewer) : [],
+    prSteward: hasPrStewardLabel(pr),
+  };
 }
 
 export function findPrUrls(text: string): string[] {
   return [...new Set(text.match(PR_URL))];
 }
 
+interface CheckPage {
+  pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
+  nodes?: JsonRecord[];
+}
+
+function checkPage(pr: JsonRecord | undefined): CheckPage {
+  const commits = pr?.commits as
+    | {
+        nodes?: {
+          commit?: { statusCheckRollup?: { contexts?: CheckPage } | null };
+        }[];
+      }
+    | undefined;
+  return commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts ?? {};
+}
+
+function prNumber(url: string): number {
+  return Number(PR_NUMBER.exec(url)?.[1] ?? 0);
+}
+
+function resourceQuery(url: string, selection: string): string {
+  return `resource(url: ${JSON.stringify(url)}) { ... on PullRequest { ${selection} } }`;
+}
+
+export interface BranchRef {
+  repo: string;
+  branch: string;
+}
+
+function branchQuery({ repo, branch }: BranchRef): string {
+  const [owner, name] = repo.split('/');
+  return `repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) {
+    pullRequests(headRefName: ${JSON.stringify(branch)}, first: 1, orderBy: { field: CREATED_AT, direction: DESC }) {
+      nodes { url }
+    }
+  }`;
+}
+
+// `gh api -i` prints the response headers before the body.
+function responseBody(stdout: string): string {
+  return stdout.startsWith('HTTP/')
+    ? stdout.slice(stdout.search(/\r?\n\r?\n/) + 1)
+    : stdout;
+}
+
+interface BatchResult {
+  viewer: string;
+  nodes: (JsonRecord | undefined)[];
+}
+
+// One aliased GraphQL request per chunk, instead of several `gh` calls per PR.
+async function queryBatch(
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  selections: string[],
+): Promise<BatchResult> {
+  const batch: BatchResult = { viewer: '', nodes: [] };
+  for (let start = 0; start < selections.length; start += PR_BATCH_SIZE) {
+    const chunk = selections.slice(start, start + PR_BATCH_SIZE);
+    const query = `query {
+  viewer { login }
+  ${chunk.map((selection, index) => `q${index}: ${selection}`).join('\n  ')}
+}`;
+    let data: JsonRecord | undefined;
+    try {
+      const result = await run(
+        'gh',
+        ['api', '-i', 'graphql', '-f', `query=${query}`],
+        { cwd, env, timeoutMs: GH_TIMEOUT_MS },
+      );
+      data = (JSON.parse(responseBody(result.stdout)) as { data?: JsonRecord })
+        .data;
+    } catch {
+      data = undefined;
+    }
+    batch.viewer ||= str((data?.viewer as JsonRecord | undefined)?.login);
+    batch.nodes.push(
+      ...chunk.map((_, index) => {
+        const node = data?.[`q${index}`];
+        return node && typeof node === 'object'
+          ? (node as JsonRecord)
+          : undefined;
+      }),
+    );
+  }
+  return batch;
+}
+
+async function remainingChecks(
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  prs: Map<string, JsonRecord>,
+): Promise<Map<string, JsonRecord[]>> {
+  const checks = new Map(
+    [...prs].map(([url, pr]) => [url, checkPage(pr).nodes ?? []]),
+  );
+  let pages = new Map([...prs].map(([url, pr]) => [url, checkPage(pr)]));
+  for (;;) {
+    const pending = [...pages].filter(([, page]) => page.pageInfo?.hasNextPage);
+    if (!pending.length) return checks;
+    const { nodes } = await queryBatch(
+      run,
+      env,
+      cwd,
+      pending.map(([url, page]) =>
+        resourceQuery(
+          url,
+          checksSelection(prNumber(url), page.pageInfo?.endCursor ?? null),
+        ),
+      ),
+    );
+    pages = new Map(
+      pending.map(([url], index) => [url, checkPage(nodes[index])]),
+    );
+    for (const [url, page] of pages)
+      checks.get(url)?.push(...(page.nodes ?? []));
+  }
+}
+
+function prQuery(url: string): string {
+  return resourceQuery(url, prSelection(prNumber(url)));
+}
+
+function addPrs(
+  found: Map<string, JsonRecord>,
+  urls: string[],
+  nodes: (JsonRecord | undefined)[],
+) {
+  urls.forEach((url, index) => {
+    const pr = nodes[index];
+    if (typeof pr?.number === 'number') found.set(url, pr);
+  });
+}
+
+export interface PrLookup {
+  urls: string[];
+  branches: BranchRef[];
+}
+
+export interface PrLookupResult {
+  prs: Map<string, PrStatus>;
+  branchPrs: Map<BranchRef, string>;
+}
+
+export async function fetchPrs(
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  { urls, branches }: PrLookup,
+): Promise<PrLookupResult> {
+  const unique = [...new Set(urls)];
+  const first = await queryBatch(run, env, cwd, [
+    ...unique.map(prQuery),
+    ...branches.map(branchQuery),
+  ]);
+  const found = new Map<string, JsonRecord>();
+  addPrs(found, unique, first.nodes);
+  const branchPrs = new Map<BranchRef, string>();
+  branches.forEach((ref, index) => {
+    const pulls = first.nodes[unique.length + index]?.pullRequests as
+      | { nodes?: JsonRecord[] }
+      | undefined;
+    const url = str(pulls?.nodes?.[0]?.url);
+    if (url) branchPrs.set(ref, url);
+  });
+  const discovered = [...new Set(branchPrs.values())].filter(
+    (url) => !found.has(url),
+  );
+  const second = await queryBatch(run, env, cwd, discovered.map(prQuery));
+  addPrs(found, discovered, second.nodes);
+  const viewer = first.viewer || second.viewer;
+  const checks = await remainingChecks(run, env, cwd, found);
+  const prs = new Map(
+    [...found].map(([url, pr]) => [
+      url,
+      toPrStatus(pr, checks.get(url) ?? [], viewer),
+    ]),
+  );
+  return { prs, branchPrs };
+}
+
 export async function fetchPrStatus(
   run: CommandRunner,
   env: NodeJS.ProcessEnv,
   cwd: string,
-  ref: string,
+  url: string,
 ): Promise<PrStatus | null> {
+  const { prs } = await fetchPrs(run, env, cwd, { urls: [url], branches: [] });
+  return prs.get(url) ?? null;
+}
+
+export async function fetchPrByNumber(
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  number: number,
+): Promise<PrStatus | null> {
+  const repo = await githubRepo(run, env, cwd);
+  return repo
+    ? fetchPrStatus(run, env, cwd, `https://github.com/${repo}/pull/${number}`)
+    : null;
+}
+
+export async function githubRepo(
+  run: CommandRunner,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+): Promise<string | null> {
   try {
-    const result = await run('gh', ['pr', 'view', ref, '--json', PR_FIELDS], {
-      cwd,
-      env,
-      timeoutMs: GH_TIMEOUT_MS,
-    });
-    if (result.exitCode !== 0) return null;
-    const status = parsePrStatus(result.stdout);
-    if (status?.state !== 'OPEN') return status;
-    const [details, required] = await Promise.all([
-      fetchPrDetails(run, env, cwd, status.url),
-      fetchRequiredChecks(run, env, cwd, status),
-    ]);
-    return {
-      ...status,
-      ...details,
-      checks: withRequiredChecks(status.checks, required),
-    };
+    const result = await run(
+      'gh',
+      ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
+      { cwd, env, timeoutMs: GH_TIMEOUT_MS },
+    );
+    return result.exitCode === 0 ? result.stdout.trim() || null : null;
   } catch {
     return null;
   }
@@ -397,6 +505,17 @@ export interface ReviewStatus {
   headRefOid: string;
   latestReview: { id: string; state: string; commitOid: string } | null;
   reRequested: boolean;
+  threadsAnswered: boolean;
+}
+
+interface ThreadAuthor {
+  author?: { login?: string; __typename?: string } | null;
+}
+
+interface ReviewStatusThread {
+  isResolved?: boolean;
+  opener?: { nodes: ThreadAuthor[] };
+  latest?: { nodes: ThreadAuthor[] };
 }
 
 interface ReviewStatusResponse {
@@ -413,8 +532,34 @@ interface ReviewStatusResponse {
       reviewRequests?: {
         nodes: { requestedReviewer?: { login?: string } | null }[];
       };
+      reviewThreads?: { nodes: ReviewStatusThread[] };
     } | null;
   };
+}
+
+function answeredByOthers(thread: ReviewStatusThread, viewer: string): boolean {
+  const author = thread.latest?.nodes[0]?.author;
+  return (
+    !!author?.login &&
+    author.login !== viewer &&
+    author.__typename !== BOT_TYPENAME
+  );
+}
+
+function threadsAnswered(
+  threads: ReviewStatusThread[],
+  viewer: string | undefined,
+): boolean {
+  if (!viewer) return false;
+  const yours = threads.filter(
+    (thread) => thread.opener?.nodes[0]?.author?.login === viewer,
+  );
+  return (
+    yours.length > 0 &&
+    yours.every(
+      (thread) => thread.isResolved || answeredByOthers(thread, viewer),
+    )
+  );
 }
 
 export function parseReviewStatus(json: string): ReviewStatus | null {
@@ -441,6 +586,7 @@ export function parseReviewStatus(json: string): ReviewStatus | null {
     reRequested: (pr.reviewRequests?.nodes ?? []).some(
       (request) => !!viewer && request.requestedReviewer?.login === viewer,
     ),
+    threadsAnswered: threadsAnswered(pr.reviewThreads?.nodes ?? [], viewer),
   };
 }
 
@@ -450,7 +596,8 @@ export function reviewFinished(status: ReviewStatus): boolean {
 
 export function reReviewKey(status: ReviewStatus): string | null {
   const review = status.latestReview;
-  if (status.state !== 'OPEN' || !status.reRequested) return null;
+  const authorReady = status.reRequested || status.threadsAnswered;
+  if (status.state !== 'OPEN' || !authorReady) return null;
   if (!review || review.state === 'APPROVED') return null;
   return `${review.id}@${status.headRefOid}`;
 }
@@ -692,7 +839,8 @@ export function inboxReviewPrompt(pr: PrStatus): string {
 }
 
 const REVIEW_FENCE = 'korev-review';
-const GITHUB_PR_URL = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/\d+$/;
+const GITHUB_PR_URL =
+  /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)$/;
 
 function changesSince(url: string, status: ReviewStatus): string {
   const fullDiff = `\`gh pr diff ${url}\``;
@@ -702,15 +850,35 @@ function changesSince(url: string, status: ReviewStatus): string {
   return `Your last review was on commit ${reviewed}. Read only what changed since then with \`gh api repos/${repo}/compare/${reviewed}...${status.headRefOid} --jq '.files[] | .filename, .patch'\`. If that fails, for example after a force push, read ${fullDiff}.`;
 }
 
+function repliesToReview(url: string): string {
+  const [, repo, number] = GITHUB_PR_URL.exec(url) ?? [];
+  if (!repo) return 'Read their replies to your review comments.';
+  return `Read their replies to your review comments with \`gh api repos/${repo}/pulls/${number}/comments --paginate --jq '.[] | {path, line, user: .user.login, body, in_reply_to_id}'\`.`;
+}
+
+function followUpLines(url: string, status: ReviewStatus): string[] {
+  return [
+    changesSince(url, status),
+    repliesToReview(url),
+    "For each finding you listed earlier in this chat, say whether the new commits or the author's replies address it. Do not edit files and do not post a review.",
+  ];
+}
+
+export function reviewAgainPrompt(url: string, status: ReviewStatus): string {
+  return [
+    `The user asked you to review pull request ${url} again.`,
+    ...followUpLines(url, status),
+  ].join('\n');
+}
+
 export function reReviewPrompt(
   url: string,
   status: ReviewStatus,
   approve: boolean,
 ): string {
   return [
-    `The author changed pull request ${url} and asked for your review again.`,
-    changesSince(url, status),
-    'For each finding you listed earlier in this chat, say whether the new commits address it. Do not edit files and do not post a review.',
+    `The author responded to your review on pull request ${url}.`,
+    ...followUpLines(url, status),
     approve
       ? `End your reply with exactly one fenced block that starts with \`\`\`${REVIEW_FENCE} and holds {"addressed": true} when every finding is addressed and nothing new needs a fix, or {"addressed": false} otherwise.`
       : null,
@@ -739,7 +907,7 @@ function toPrComment(node: JsonRecord): PrComment {
   return {
     id: str(node.id),
     author: str(author?.login) || GHOST_AUTHOR,
-    isBot: author?.__typename === 'Bot',
+    isBot: author?.__typename === BOT_TYPENAME,
     body: str(node.body),
     url: str(node.url),
     createdAt: str(node.createdAt),

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  upsertChatItem,
+  applyChatUpdate,
   type AppState,
   type ChatItem,
 } from '../../korev-desktop/src/shared/model';
@@ -25,8 +25,7 @@ function workspaceOf(state: AppState, sessionId: string) {
 async function followTranscript(sessionId: string) {
   let items: ChatItem[] = await connection.api.transcript(sessionId);
   connection.on('chat', (update) => {
-    if (update.sessionId === sessionId)
-      items = upsertChatItem(items, update.item);
+    if (update.sessionId === sessionId) items = applyChatUpdate(items, update);
   });
   return () => items;
 }
@@ -75,6 +74,58 @@ describe('demo connection', () => {
     expect((await connection.api.getState()).runningSessions).not.toContain(
       session.id,
     );
+  });
+
+  it('queues a message sent while the agent works until Send now', async () => {
+    const state = await connection.api.getState();
+    const session = state.workspaces.at(-1)!.sessions[0];
+    const transcript = await followTranscript(session.id);
+    const send = (text: string) =>
+      connection.api.send(session.id, {
+        text,
+        agent: session.agent,
+        model: session.model,
+        effort: session.effort,
+        planMode: false,
+        fast: false,
+      });
+    await send('Add a dark mode toggle');
+    await send('Also cover the settings page');
+    const queued = transcript().find(
+      (item) => item.kind === 'user' && item.queued,
+    )!;
+    expect(queued).toMatchObject({ text: 'Also cover the settings page' });
+
+    await vi.advanceTimersByTimeAsync(LONG_ENOUGH_MS);
+    await connection.api.sendQueuedNow(session.id, queued.id);
+
+    expect(transcript().at(-1)).toMatchObject({
+      id: queued.id,
+      queued: false,
+    });
+  });
+
+  it('reverts to before a sent message and hands its text back', async () => {
+    const state = await connection.api.getState();
+    const session = state.workspaces.at(-1)!.sessions[0];
+    const transcript = await followTranscript(session.id);
+    const before = transcript().length;
+    await connection.api.send(session.id, {
+      text: 'Add a dark mode toggle',
+      agent: session.agent,
+      model: session.model,
+      effort: session.effort,
+      planMode: false,
+      fast: false,
+    });
+    await vi.advanceTimersByTimeAsync(LONG_ENOUGH_MS);
+    const sent = transcript()[before];
+
+    expect(await connection.api.revert(session.id, sent.id)).toEqual({
+      ok: true,
+      value: 'Add a dark mode toggle',
+    });
+    expect(transcript()).toHaveLength(before);
   });
 
   it('reviews a pull request waiting for review in one Ask chat', async () => {

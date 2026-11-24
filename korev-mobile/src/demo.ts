@@ -28,6 +28,12 @@ import {
   DEMO_REPLY,
   DEMO_REVIEW_REPLY,
   DENIED_REPLY,
+  DEMO_CHANGES,
+  DEMO_DIFFS,
+  DEMO_RUN_OUTPUT,
+  DEMO_SETUP_OUTPUT,
+  DEMO_SLASH_COMMANDS,
+  DEMO_THREADS,
   demoPullRequest,
   demoRepoUrl,
   demoRuntime,
@@ -47,6 +53,23 @@ const NO_RUNS: Result = {
 const NO_EXPLAINERS: Result<never> = {
   ok: false,
   message: 'The demo cannot explain pull requests.',
+};
+const NO_QUEUED_MESSAGES: Result = {
+  ok: false,
+  message: 'The demo has no queued messages.',
+};
+const NO_CHECKPOINTS: Result<never> = {
+  ok: false,
+  message: 'The demo has no file checkpoints to revert to.',
+};
+const DEMO_CHECKPOINT = { head: 'demo', snapshot: 'demo' };
+const NO_SCRIPTS: Result = {
+  ok: false,
+  message: 'The demo has no setup or run scripts.',
+};
+const NO_CLONING: Result<never> = {
+  ok: false,
+  message: 'The demo cannot clone repositories.',
 };
 const NO_PULL_REQUEST: Result<never> = {
   ok: false,
@@ -172,6 +195,23 @@ export function createDemoConnection(): Connection {
     events.emit('chat', { sessionId, item });
   }
 
+  function removeItem(sessionId: string, item: ChatItem) {
+    transcripts.set(
+      sessionId,
+      (transcripts.get(sessionId) ?? []).filter(
+        (entry) => entry.id !== item.id,
+      ),
+    );
+    events.emit('chat', { sessionId, item, removed: true });
+  }
+
+  function queuedItem(sessionId: string, itemId: string) {
+    const item = transcripts
+      .get(sessionId)
+      ?.find((entry) => entry.id === itemId);
+    return item?.kind === 'user' && item.queued ? item : null;
+  }
+
   function cancelReply(sessionId: string) {
     clearTimeout(replies.get(sessionId));
     replies.delete(sessionId);
@@ -295,13 +335,16 @@ export function createDemoConnection(): Connection {
       return transcripts.get(sessionId) ?? [];
     },
     async send(sessionId, options) {
+      const queue = state.runningSessions.includes(sessionId);
       addItem(sessionId, {
         id: newId('user'),
         kind: 'user',
         text: options.text,
         at: now(),
-        checkpoint: null,
+        checkpoint: DEMO_CHECKPOINT,
+        ...(queue ? { queued: true } : {}),
       });
+      if (queue) return ok();
       if (sessionOf(state, sessionId)?.title === NEW_CHAT_TITLE)
         setState(
           withSession(state, sessionId, (session) => ({
@@ -316,6 +359,27 @@ export function createDemoConnection(): Connection {
     async stop(sessionId) {
       if (state.runningSessions.includes(sessionId))
         finishReply(sessionId, Date.now(), false);
+    },
+    async sendQueuedNow(sessionId, itemId) {
+      const item = queuedItem(sessionId, itemId);
+      if (!item) return NO_QUEUED_MESSAGES;
+      removeItem(sessionId, item);
+      addItem(sessionId, { ...item, queued: false });
+      return ok();
+    },
+    async removeQueued(sessionId, itemId) {
+      const item = queuedItem(sessionId, itemId);
+      if (!item) return NO_QUEUED_MESSAGES;
+      removeItem(sessionId, item);
+      return ok();
+    },
+    async revert(sessionId, itemId) {
+      const items = transcripts.get(sessionId) ?? [];
+      const index = items.findIndex((entry) => entry.id === itemId);
+      const item = items[index];
+      if (item?.kind !== 'user' || !item.checkpoint) return NO_CHECKPOINTS;
+      for (const later of items.slice(index)) removeItem(sessionId, later);
+      return ok(item.text);
     },
     async respondPermission(sessionId, itemId, response) {
       const item = transcripts
@@ -375,6 +439,7 @@ export function createDemoConnection(): Connection {
         })),
       );
     },
+    cloneRepo: async () => NO_CLONING,
     async createWorkspaces(repoIds, task) {
       const created = repoIds.map((repoId) =>
         createWorkspace(repoId, task?.text ?? ''),
@@ -404,6 +469,15 @@ export function createDemoConnection(): Connection {
       return ok();
     },
     async retryWorkspace() {
+      return ok();
+    },
+    async restoreWorkspace(workspaceId) {
+      setState(
+        withWorkspace(state, workspaceId, (workspace) => ({
+          ...workspace,
+          archivedAt: null,
+        })),
+      );
       return ok();
     },
     async listBranches() {
@@ -449,13 +523,13 @@ export function createDemoConnection(): Connection {
       return ok({ askChatId: ask.id });
     },
     async slashCommands() {
-      return [];
+      return DEMO_SLASH_COMMANDS;
     },
     async changes() {
-      return [];
+      return DEMO_CHANGES;
     },
-    async fileDiff() {
-      return '';
+    async fileDiff(_workspaceId: string, path: string) {
+      return DEMO_DIFFS[path] ?? '';
     },
     async rangeChanges() {
       return [];
@@ -476,7 +550,7 @@ export function createDemoConnection(): Connection {
       return state.runtime[workspaceId]?.prs ?? [];
     },
     async prThreads() {
-      return [];
+      return DEMO_THREADS;
     },
     async createPr(workspaceId, sessionId) {
       const workspace = state.workspaces.find(
@@ -558,6 +632,29 @@ export function createDemoConnection(): Connection {
     startExplainer: async () => NO_EXPLAINERS,
     explainer: async () => null,
     updateExplainer: async () => NO_EXPLAINERS,
+    async startScript(workspaceId, kind) {
+      if (kind !== 'run') return NO_SCRIPTS;
+      const ref = `${workspaceId}:${kind}`;
+      setState({
+        ...state,
+        runningTerminals: [...state.runningTerminals, ref],
+      });
+      events.emit('terminal-output', { ref, data: DEMO_RUN_OUTPUT });
+      return ok();
+    },
+    async stopScript(workspaceId, kind) {
+      const ref = `${workspaceId}:${kind}`;
+      setState({
+        ...state,
+        runningTerminals: state.runningTerminals.filter(
+          (entry) => entry !== ref,
+        ),
+      });
+      events.emit('terminal-exit', { ref, exitCode: 0 });
+    },
+    async scriptOutput(_workspaceId, kind) {
+      return kind === 'setup' ? DEMO_SETUP_OUTPUT : null;
+    },
   };
 
   const bridge = {

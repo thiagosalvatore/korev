@@ -1,7 +1,14 @@
 import { File } from 'expo-file-system';
-import { ArrowUp, Paperclip, Square } from 'lucide-react-native';
-import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ArrowUp, Plus, Slash, Square } from 'lucide-react-native';
+import { useRef, useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatAttachments } from '../../../korev-desktop/src/shared/message';
 import {
@@ -9,38 +16,52 @@ import {
   PLAN_FEEDBACK_PLACEHOLDER,
   QUESTION_REPLY_PLACEHOLDER,
   type QuestionPicks,
-  STOP_BEFORE_SWITCHING,
   type AppState,
   type ChatSession,
-  type ModelChoice,
+  type ContextUsage,
 } from '../../../korev-desktop/src/shared/model';
 import { insertDictation } from '../../../korev-desktop/src/shared/dictation';
 import { attempt } from '../attempt';
 import { succeeded } from '../haptics';
 import { MicButton, RecordingBar } from '../VoiceInput';
 import { useDictation } from '../dictation';
-import { useKeyboardShown, usePendingAction } from '../hooks';
+import { usePendingAction } from '../hooks';
 import { useConnection } from '../korev';
-import { useTheme, type Theme } from '../theme';
-import { CHROME_FONT_SCALE, ICON_BUTTON_ICON_SIZE, IconButton } from '../ui';
+import { TYPE, useTheme, type Theme } from '../theme';
+import {
+  CHROME_FONT_SCALE,
+  ICON_BUTTON_ICON_SIZE,
+  IconButton,
+  MIN_TOUCH_TARGET,
+  touchSlop,
+} from '../ui';
 import { composerAction } from './composerAction';
-import { COMPOSER_ROW_GAP, ComposerChips } from './ComposerChips';
-import { ComposerOptions, type SessionPatch } from './ComposerOptions';
+import { ComposerChips } from './ComposerChips';
+import { ComposerToolbar } from './ComposerToolbar';
 import { pickAttachments, type PickedFile } from './pickAttachments';
+import { useSessionUpdate } from './sessionUpdate';
+import { slashSuggestions } from './slashCommands';
 
-const BAR_PADDING = 8;
+export const BAR_PADDING = 8;
+const SLASH_SIZE = 22;
+const SLASH_ICON_SIZE = 16;
+const SUGGESTIONS_MAX_HEIGHT = 200;
 
 export function Composer({
   state,
   session,
   reviewingPlan,
   answers,
+  context,
+  initialText = '',
   sendReady = false,
   onSend,
   onSendFailed,
 }: {
   state: AppState;
   session: ChatSession;
+  context: ContextUsage | null;
+  initialText?: string;
   reviewingPlan: boolean;
   answers?: QuestionPicks;
   sendReady?: boolean;
@@ -50,12 +71,8 @@ export function Composer({
   const { api } = useConnection();
   const theme = useTheme();
   const styles = makeStyles(theme);
-  const insets = useSafeAreaInsets();
-  const keyboardShown = useKeyboardShown();
-  const bottomPadding = keyboardShown
-    ? BAR_PADDING
-    : Math.max(insets.bottom, BAR_PADDING);
-  const [text, setText] = useState('');
+  const bottomPadding = useComposerBottomPadding();
+  const [text, setText] = useState(initialText);
   const [attachments, setAttachments] = useState<string[]>([]);
   const [uploading, setUploading] = useState(0);
   const running = state.runningSessions.includes(session.id);
@@ -68,6 +85,10 @@ export function Composer({
     setText((current) => insertDictation(current, current.length, spoken).text),
   );
   const dictating = dictation.phase !== 'idle';
+  const input = useRef<TextInput>(null);
+  const [commands, setCommands] = useState<string[] | null>(null);
+  const suggestions = commands && slashSuggestions(text, commands);
+  const updateSession = useSessionUpdate(session.id);
   const sending = usePendingAction();
   const canSend =
     Boolean(text.trim() || pendingPlan || attachments.length || sendReady) &&
@@ -126,15 +147,12 @@ export function Composer({
     for (const file of picked) await upload(file);
   }
 
-  const updateSession = (patch: SessionPatch) =>
-    void attempt('Korev could not change the chat settings', () =>
-      api.updateSession(session.id, patch),
-    );
-
-  function changeModel(choice: ModelChoice) {
-    if (choice.agent !== session.agent && running)
-      return Alert.alert(STOP_BEFORE_SWITCHING);
-    updateSession({ agent: choice.agent, model: choice.id });
+  async function startSlashCommand() {
+    if (!workspaceId) return;
+    setText('/');
+    input.current?.focus();
+    if (commands) return;
+    setCommands(await api.slashCommands(workspaceId).catch(() => []));
   }
 
   const stop = () =>
@@ -171,23 +189,28 @@ export function Composer({
 
   return (
     <View style={[styles.composer, { paddingBottom: bottomPadding }]}>
+      {suggestions?.length ? (
+        <SlashSuggestions
+          commands={suggestions}
+          onPick={(name) => setText(`/${name} `)}
+        />
+      ) : null}
       <ComposerChips
         pendingPlan={pendingPlan}
-        planMode={session.planMode}
         attachments={attachments}
         uploading={uploading}
         onDiscardPlan={() => updateSession({ pendingPlan: null })}
-        onTurnOffPlanMode={() => updateSession({ planMode: false })}
         onRemoveAttachment={(file) =>
           setAttachments((current) => current.filter((entry) => entry !== file))
         }
       />
+      <ComposerToolbar state={state} session={session} context={context} />
       <View style={styles.row}>
-        <ComposerOptions
-          state={state}
-          session={session}
-          onUpdate={updateSession}
-          onChangeModel={changeModel}
+        <IconButton
+          label="Attach a photo or file"
+          icon={<Plus size={ICON_BUTTON_ICON_SIZE} color={theme.fg2} />}
+          background={theme.bgActive}
+          onPress={() => void attach()}
         />
         <View
           style={[
@@ -201,6 +224,7 @@ export function Composer({
           ) : (
             <>
               <TextInput
+                ref={input}
                 maxFontSizeMultiplier={CHROME_FONT_SCALE}
                 style={styles.input}
                 value={text}
@@ -214,15 +238,17 @@ export function Composer({
                 placeholderTextColor={theme.fg4}
                 multiline
               />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Attach a photo or file"
-                hitSlop={8}
-                style={styles.attach}
-                onPress={() => void attach()}
-              >
-                <Paperclip size={ICON_BUTTON_ICON_SIZE} color={theme.fg3} />
-              </Pressable>
+              {workspaceId && !text ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Slash commands"
+                  hitSlop={touchSlop(SLASH_SIZE)}
+                  style={styles.slash}
+                  onPress={() => void startSlashCommand()}
+                >
+                  <Slash size={SLASH_ICON_SIZE} color={theme.fg3} />
+                </Pressable>
+              ) : null}
             </>
           )}
         </View>
@@ -230,6 +256,39 @@ export function Composer({
       </View>
     </View>
   );
+}
+
+function SlashSuggestions({
+  commands,
+  onPick,
+}: {
+  commands: string[];
+  onPick: (name: string) => void;
+}) {
+  const styles = makeStyles(useTheme());
+  return (
+    <ScrollView style={styles.suggestions} keyboardShouldPersistTaps="always">
+      {commands.map((name) => (
+        <Pressable
+          key={name}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.suggestion,
+            pressed && styles.suggestionPressed,
+          ]}
+          onPress={() => onPick(name)}
+        >
+          <Text style={styles.suggestionText} numberOfLines={1}>
+            /{name}
+          </Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
+export function useComposerBottomPadding(): number {
+  return Math.max(useSafeAreaInsets().bottom, BAR_PADDING);
 }
 
 function placeholder({
@@ -262,8 +321,29 @@ function makeStyles(theme: Theme) {
     row: {
       flexDirection: 'row',
       alignItems: 'flex-end',
-      gap: COMPOSER_ROW_GAP,
+      gap: 8,
     },
+    slash: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: SLASH_SIZE,
+      height: SLASH_SIZE,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: theme.border2,
+    },
+    suggestions: {
+      maxHeight: SUGGESTIONS_MAX_HEIGHT,
+      borderRadius: 12,
+      backgroundColor: theme.bgRaised,
+    },
+    suggestion: {
+      justifyContent: 'center',
+      minHeight: MIN_TOUCH_TARGET,
+      paddingHorizontal: 14,
+    },
+    suggestionPressed: { backgroundColor: theme.bgActive },
+    suggestionText: { ...TYPE.subhead, color: theme.fg1 },
     pill: {
       flex: 1,
       minHeight: 36,
@@ -281,14 +361,12 @@ function makeStyles(theme: Theme) {
     pillRecording: { paddingVertical: 1 },
     planMode: { borderColor: theme.accent, borderStyle: 'dashed' },
     fill: { flex: 1 },
-    attach: { paddingBottom: 1 },
     input: {
       flex: 1,
       maxHeight: 140,
       padding: 0,
+      ...TYPE.subhead,
       color: theme.fg1,
-      fontSize: 15,
-      lineHeight: 20,
     },
   });
 }

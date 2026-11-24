@@ -15,6 +15,7 @@ export const STOP_BEFORE_SWITCHING =
 export interface AgentModel {
   id: string;
   label: string;
+  efforts?: readonly string[];
 }
 
 export interface ModelChoice extends AgentModel {
@@ -23,13 +24,33 @@ export interface ModelChoice extends AgentModel {
 
 export const EFFORT_LEVELS: Record<AgentKind, readonly string[]> = {
   claude: ['low', 'medium', 'high', 'xhigh', 'max'],
-  codex: ['minimal', 'low', 'medium', 'high', 'xhigh'],
+  codex: ['low', 'medium', 'high', 'xhigh', 'max'],
 };
 
 export const DEFAULT_EFFORT: Record<AgentKind, string> = {
   claude: 'high',
   codex: 'medium',
 };
+
+export function effortLevels(
+  agent: AgentKind,
+  models: readonly AgentModel[],
+  modelId: string,
+): readonly string[] {
+  const model = models.find((entry) => entry.id === modelId);
+  return model?.efforts?.length ? model.efforts : EFFORT_LEVELS[agent];
+}
+
+export function supportedEffort(
+  agent: AgentKind,
+  models: readonly AgentModel[],
+  modelId: string,
+  effort: string,
+): string {
+  return effortLevels(agent, models, modelId).includes(effort)
+    ? effort
+    : DEFAULT_EFFORT[agent];
+}
 
 export const CLAUDE_MODELS: AgentModel[] = [
   { id: 'claude-opus-5-5', label: 'Opus 5.5' },
@@ -604,6 +625,7 @@ export interface AskChat {
   reviewOf?: string;
   archivedAt?: string;
   reReview?: ReReview;
+  korev?: boolean;
 }
 
 export interface ReReview {
@@ -663,11 +685,14 @@ export interface Settings {
   reviewModel: ModelSetting | null;
   explainModel: ModelSetting | null;
   autoRenameBranches: boolean;
+  queueWhileRunning: boolean;
   deleteBranchOnArchive: boolean;
   archiveOnMerge: boolean;
   archiveReviews: boolean;
   reReviews: ReReviews;
   keepPrsReady: boolean;
+  createPrWith: CreatePrWith;
+  prCheckSeconds: number;
   reviewReplies: ReviewReplies;
   reviewReplyInstructions: string;
   toolApprovals: boolean;
@@ -680,6 +705,7 @@ export interface Settings {
   notificationSound: boolean;
   notificationSoundFile: string;
   keepAwake: boolean;
+  keepRunningInBackground: boolean;
   signAgentCommits: boolean;
   remoteAccess: boolean;
   remotePort: number;
@@ -690,6 +716,8 @@ export interface Settings {
 }
 
 export type ReReviews = 'off' | 'check' | 'approve';
+
+export type CreatePrWith = 'korev' | 'claude-ship';
 
 export type ReviewReplies = 'none' | 'reply' | 'reply-and-resolve' | 'custom';
 
@@ -772,6 +800,7 @@ export interface PrStatus {
   checks: PrCheck[];
   stack: PrStack | null;
   unansweredThreads: string[];
+  prSteward: boolean;
 }
 
 export interface PrStack {
@@ -978,6 +1007,18 @@ export interface AgentAvailability {
 
 export function isAgentReady(entry: AgentAvailability): boolean {
   return Boolean(entry.version && entry.account);
+}
+
+const CLAUDE_SHIP_MIN_VERSION = '2.1.330';
+
+export function supportsClaudeShip(agents: AgentAvailability[]): boolean {
+  const claude = agents.find((entry) => entry.agent === 'claude');
+  if (!claude?.version || !isAgentReady(claude)) return false;
+  return (
+    claude.version.localeCompare(CLAUDE_SHIP_MIN_VERSION, undefined, {
+      numeric: true,
+    }) >= 0
+  );
 }
 
 export interface AppState {
@@ -1395,6 +1436,16 @@ export function answerQuestions(
 export interface ChatUpdate {
   sessionId: string;
   item: ChatItem;
+  removed?: boolean;
+}
+
+export function applyChatUpdate(
+  items: ChatItem[],
+  update: ChatUpdate,
+): ChatItem[] {
+  if (update.removed)
+    return items.filter((entry) => entry.id !== update.item.id);
+  return upsertChatItem(items, update.item);
 }
 
 export function upsertChatItem(items: ChatItem[], item: ChatItem): ChatItem[] {
@@ -1451,7 +1502,15 @@ export interface TerminalExit {
 
 export type TerminalKind = 'shell' | 'setup' | 'run';
 
-export type TerminalPreset = 'shell' | 'claude' | 'codex';
+export type ScriptKind = Exclude<TerminalKind, 'shell'>;
+
+const SCRIPT_KINDS: readonly string[] = ['setup', 'run'] satisfies ScriptKind[];
+
+export function isScriptKind(kind: string): kind is ScriptKind {
+  return SCRIPT_KINDS.includes(kind);
+}
+
+export type TerminalPreset = 'shell' | 'claude' | 'codex' | 'ship';
 
 export type AppCommand =
   | 'new-workspace'

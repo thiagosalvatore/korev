@@ -14,7 +14,7 @@ import type {
 import { describeSchedule, nextRunAt, scheduleError } from '../shared/schedule';
 import type { TurnOutcome } from './chats';
 import { errorMessage, NotFoundError, type Context } from './context';
-import { fetchPrStatus } from './pull-requests';
+import { fetchPrByNumber } from './pull-requests';
 import { defaultTask, newChatSession } from './workspaces';
 
 export const AUTOMATION_TICK_MS = 60_000;
@@ -231,11 +231,11 @@ export function createAutomations(
     key: string,
     number: number,
   ): Promise<Result<WorkspaceSource>> {
-    const pr = await fetchPrStatus(
+    const pr = await fetchPrByNumber(
       ctx.deps.run,
       ctx.deps.env,
       repo.path,
-      String(number),
+      number,
     );
     if (!pr)
       return {

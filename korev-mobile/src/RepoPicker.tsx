@@ -6,8 +6,8 @@ import type { PickerRepo } from '../../korev-desktop/src/shared/workspaces';
 import { ROW_ICON_SIZE } from './ListRow';
 import { PickerSheet } from './PickerSheet';
 import { RepoAvatar } from './RepoAvatar';
-import { useTheme, type Theme } from './theme';
-import { CHROME_FONT_SCALE } from './ui';
+import { TYPE, useTheme, type Theme } from './theme';
+import { CHROME_FONT_SCALE, MIN_TOUCH_TARGET } from './ui';
 
 export function RepoPicker({
   repos,
@@ -74,14 +74,14 @@ function makeStyles(theme: Theme) {
     button: {
       flexDirection: 'row',
       alignItems: 'center',
-      alignSelf: 'flex-start',
-      gap: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRadius: 8,
-      borderWidth: 1,
+      gap: 10,
+      minHeight: MIN_TOUCH_TARGET + 4,
+      paddingHorizontal: 14,
+      borderRadius: 14,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.border2,
+      backgroundColor: theme.bgSurface,
     },
-    label: { flexShrink: 1, color: theme.fg1, fontSize: 14, fontWeight: '600' },
+    label: { ...TYPE.headline, flex: 1, color: theme.fg1 },
   });
 }

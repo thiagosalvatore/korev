@@ -1,12 +1,12 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { Trash2 } from 'lucide-react-native';
-import { Alert, Pressable, StyleSheet, Text } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Alert, StyleSheet, Text } from 'react-native';
 import type {
   AppState,
   AskChat,
 } from '../../../../korev-desktop/src/shared/model';
 import { attempt } from '../../attempt';
 import { Chat } from '../../chat/Chat';
+import { Capsule, ChatAccessory } from '../../chat/ChatHeader';
 import { useAppState } from '../../hooks';
 import { Loading } from '../../Offline';
 import { useConnection } from '../../korev';
@@ -23,8 +23,7 @@ export default function AskScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { api } = useConnection();
   const state = useAppState();
-  const theme = useTheme();
-  const styles = makeStyles(theme);
+  const styles = makeStyles(useTheme());
 
   if (!state) return <Loading style={styles.loading} />;
   const ask = state.askChats.find((entry) => entry.id === id);
@@ -43,32 +42,29 @@ export default function AskScreen() {
       },
     ]);
 
+  const repos = repoNames(state, ask);
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: ask.session.title,
-          headerRight: () => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Delete this Ask chat"
-              hitSlop={8}
-              onPress={confirmDelete}
-            >
-              <Trash2 size={20} color={theme.fg2} />
-            </Pressable>
-          ),
-        }}
-      />
-      <Text style={styles.repos} numberOfLines={1}>
-        {repoNames(state, ask)}
-      </Text>
-      <Chat
-        state={state}
-        session={ask.session}
-        repoId={ask.repoIds[0] ?? null}
-      />
-    </>
+    <Chat
+      state={state}
+      session={ask.session}
+      repoId={ask.repoIds[0] ?? null}
+      title={ask.session.title}
+      menu={[
+        {
+          label: 'Delete chat',
+          icon: 'trash',
+          destructive: true,
+          onPress: confirmDelete,
+        },
+      ]}
+      accessory={
+        repos ? (
+          <ChatAccessory>
+            <Capsule label={repos} />
+          </ChatAccessory>
+        ) : null
+      }
+    />
   );
 }
 
@@ -76,13 +72,5 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
     loading: { marginTop: 40 },
     empty: { padding: 24, color: theme.fg3, textAlign: 'center' },
-    repos: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      color: theme.fg3,
-      fontSize: 13,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.border1,
-    },
   });
 }

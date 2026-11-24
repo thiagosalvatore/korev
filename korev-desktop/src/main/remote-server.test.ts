@@ -47,6 +47,17 @@ describe('remote server', () => {
     expect(await response.json()).toEqual({ result: { repos: [] } });
   });
 
+  it.each(['sendQueuedNow', 'removeQueued', 'revert', 'restoreWorkspace'])(
+    'lets the phone call %s',
+    async (method) => {
+      const handler = vi.fn(() => ({ ok: true }));
+      const base = await start({ [method]: handler });
+      const response = await call(base, method);
+      expect(response.status).toBe(200);
+      expect(handler).toHaveBeenCalled();
+    },
+  );
+
   it('rejects a call without the pairing token', async () => {
     const handler = vi.fn();
     const base = await start({ getState: handler });
@@ -120,6 +131,25 @@ describe('remote server', () => {
     expect(await nextChunk(reader)).toBe(
       'event: toast\ndata: {"title":"Merged","tone":"success"}\n\n',
     );
+    await reader.cancel();
+  });
+
+  it('streams setup and run output but never an interactive shell', async () => {
+    const base = await start({});
+    const reader = await openEventStream(base);
+    await nextChunk(reader);
+    server!.broadcast('terminal-output', { ref: 'ws-1:shell', data: 'ls' });
+    server!.broadcast('terminal-output', { ref: 'ws-1:tab-2', data: 'pwd' });
+    server!.broadcast('terminal-exit', { ref: 'ws-1:shell', exitCode: 0 });
+    server!.broadcast('terminal-output', { ref: 'ws-1:run', data: 'ready' });
+    server!.broadcast('terminal-exit', { ref: 'ws-1:setup', exitCode: 1 });
+    const expected =
+      'event: terminal-output\ndata: {"ref":"ws-1:run","data":"ready"}\n\n' +
+      'event: terminal-exit\ndata: {"ref":"ws-1:setup","exitCode":1}\n\n';
+    let streamed = '';
+    while (streamed.length < expected.length)
+      streamed += await nextChunk(reader);
+    expect(streamed).toBe(expected);
     await reader.cancel();
   });
 

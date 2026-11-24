@@ -6,7 +6,90 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ### New
 
+- **Claude Ship.** Open Claude Code's `/ship` or `/steward` from the workspace header or the command palette. Korev opens a terminal tab with the command typed, and you press Enter. Set **Settings → Git → Create PRs with** to **Claude Ship** to make **Create PR** do the same. Keep PRs ready waits while the tab is open.
+- **Agents keep running after you quit.** Quitting Korev closes its window and leaves agents and automations running. Korev stays in the menu bar with the number of working agents. Open Korev again from the menu bar, the Dock or Spotlight. Choose **Quit Korev** in the menu bar to stop everything. To quit the old way, turn off **Keep agents running after you quit** in Settings.
+- **Updates wait for your agents.** **Install and restart** keeps the Korev window open while agents work and asks whether to install now or once they finish.
+- **Find in terminals.** Press ⌘F in a terminal to search its output. Korev outlines every match and shows "3 of 12". Press Enter or ⇧Enter to go to the next or previous match, and Esc to close.
+- **Re-check reviews without a re-request.** Re-check reviews no longer waits for the author to click Re-request review. Korev also re-checks when every review comment you left is resolved or has an answer from someone else. Answers from bots do not count.
 - **Start a workspace from a link.** A `korev://new-workspace?prompt=<text>` link brings Korev to the front, opens New workspace and puts the text in the message box, ready for you to press Enter. Add `&repo=<name>` to select a repository. Use it from a script or a Stream Deck button to start a task from text you selected in another app. A link never sends the message for you.
+
+## [0.39.0] - 2026-11-23
+
+The phone app is redesigned: it shows what needs you first, and you can read changes, review comments and script output and manage queued messages from your phone.
+
+### New
+
+- **Phone home sorted by what needs you.** The Workspaces tab groups your workspaces into Needs you, Working, Ready to merge and Everything else, with the same rules as the Mac. Each row shows one status line, such as "Needs your answer".
+- **Native iOS look on the phone.** The phone app uses the iOS tab bar, with Workspaces, Ask and Pull requests. New workspace and Ask a question open as sheets with a Cancel button, and Settings is now its own screen.
+- **One chat header on the phone.** The PR bar and chat bar are now one header. It shows the workspace name and its status, for example "Working · 1m 12s" or "Checks failing". The menu holds the chats, Explain changes, the next pull request step, Checks and Open on GitHub.
+- **Activity cards on the phone.** The tool calls between two messages fold into one card, such as "Explored 3 files, edited 1 file, ran 2 commands". While the agent works, the card shows the current step and the to-do list. Tap the card to see each step.
+- **Chips in the phone composer.** A row above the message box shows the model, Plan, the effort and Fast. Tap Plan or the effort to change them at once. A ring shows how much of the context the chat uses.
+- **Changes and diffs on the phone.** Open Changes from the chat menu or the branch capsule to see each changed file with its added and removed lines. Tap a file to read its diff.
+- **Queued messages, revert and close chat on the phone.** Queued messages wait in a tray above the composer, with Send now and Remove. Tap one of your messages to copy it, share it or revert the workspace to before it. The Chats menu can close a chat.
+- **Review comments and script output on the phone.** The chat menu opens the pull request's review threads, with the number that have no answer yet. You can start and stop the Setup and Run scripts and read their output. The phone never shows or types into a shell.
+
+These phone features need Korev 0.39.0 on your Mac.
+
+### Fixed
+
+- **Junk text in the terminal.** Switching workspaces, tabs or grid view no longer types text such as `1;49R11;rgb:1a1a/1919/1818` into the shell.
+- **Queued messages at quit.** Quitting Korev while an agent works no longer sends your queued messages as a new turn. They stay queued for the next launch.
+- **Phone composer and the keyboard.** The composer stays on top of the keyboard, and the chat keeps its full height. A downward swipe closes the keyboard.
+- **Repository avatars at large text sizes.** The initials on the phone no longer overflow their box at the largest text sizes.
+
+## [0.38.0] - 2026-11-19
+
+Messages you send while an agent works now wait their turn, and you choose when they go.
+
+### New
+
+- **Queued messages.** A message you send while the agent works now waits in a tray above the message box until the agent finishes. Use the arrow to send it now and steer the agent, or the x to remove it. To steer at once, as before, turn off Settings → Agents → Queue messages while the agent works.
+
+### Fixed
+
+- **Repository prompts and scripts.** Text you type in a repository's Prompts or Scripts settings is no longer erased every few seconds before you save.
+
+## [0.37.0] - 2026-11-18
+
+Use the new GPT-6.2 Astra and GPT-6.2 Sol models, and the max and ultra effort levels, in Codex chats.
+
+### New
+
+- **Effort levels for each Codex model.** The effort menu now shows the levels the chosen Codex model supports, including max and ultra. Update the Codex CLI to see GPT-6.2 Astra and GPT-6.2 Sol in the model menu.
+
+### Fixed
+
+- **Codex effort that the model does not support.** Codex no longer offers minimal effort, which current models reject. If a chat has an effort that its model does not support, Korev runs it at medium.
+
+## [0.36.0] - 2026-11-17
+
+See the skills and commands of your Claude Code plugins when you type `/`.
+
+### New
+
+- **Plugin skills in the `/` menu.** Typing `/` in the composer now also lists the skills and commands of the Claude Code plugins you have installed and enabled, such as `/superpowers:brainstorming`. Before, the menu showed only the ones in `.claude/skills` and `.claude/commands`.
+
+## [0.35.1] - 2026-11-13
+
+See at a glance which pull requests in a stack are merged.
+
+### Fixed
+
+- The PR dropdown in the workspace header now shows which pull requests in a stack are merged or closed. Open ones come first, merged and closed ones move to the bottom under a "Merged" or "Closed" header, and each icon has its status color. Before, every entry looked open.
+
+## [0.35.0] - 2026-11-13
+
+Choose how often Korev checks pull requests, and Korev no longer uses up your GitHub rate limit.
+
+### New
+
+- **Choose how often Korev checks pull requests.** Settings → Git → Check pull requests sets how often Korev asks GitHub about the pull request of a workspace whose agent is working: every 30 seconds, minute, 2 minutes or 5 minutes. Other workspaces are checked 4 times less often.
+
+### Fixed
+
+- Korev no longer uses up your GitHub rate limit, which slowed down `gh` in your agents. It checks all open pull requests with one request, stops checking merged and closed ones, checks workspaces without a working agent every 2 minutes instead of every 30 seconds, and waits when GitHub says the limit is reached.
+- Keep after merge and Keep PR ready in the workspace header now look different when they are on: an on toggle has the accent tint and border. Before, on and off looked almost the same.
+- On the New workspace page, the base branch chip now reads "new branch off origin/main", so it no longer looks like the same control as Create from....
 
 ## [0.34.0] - 2026-11-12
 

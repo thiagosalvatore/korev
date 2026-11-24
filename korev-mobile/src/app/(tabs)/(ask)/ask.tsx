@@ -8,21 +8,21 @@ import {
   Text,
   View,
 } from 'react-native';
-import { timeAgo } from '../../../../korev-desktop/src/shared/format';
+import { timeAgo } from '../../../../../korev-desktop/src/shared/format';
 import type {
   AppState,
   AskChat,
-} from '../../../../korev-desktop/src/shared/model';
+} from '../../../../../korev-desktop/src/shared/model';
 import {
   askSections,
   repoSections,
-} from '../../../../korev-desktop/src/shared/workspaces';
-import { NewAskForm } from '../../ask/NewAskForm';
-import { useAppState, useReconnect } from '../../hooks';
-import { Loading } from '../../Offline';
-import { ListRow, ROW_ICON_SIZE } from '../../ListRow';
-import { useTheme, type Theme } from '../../theme';
-import { CHROME_FONT_SCALE } from '../../ui';
+} from '../../../../../korev-desktop/src/shared/workspaces';
+import { NewAskForm } from '../../../ask/NewAskForm';
+import { useAppState, useReconnect } from '../../../hooks';
+import { Loading } from '../../../Offline';
+import { ListRow, ROW_ICON_SIZE } from '../../../ListRow';
+import { useTheme, type Theme } from '../../../theme';
+import { CHROME_FONT_SCALE } from '../../../ui';
 
 const ACROSS_REPOS = 'Across repos';
 const NO_REPOSITORY = 'No repository';
@@ -89,9 +89,10 @@ export default function AskChatsScreen() {
   if (!state) return <Loading style={styles.loading} />;
   const sections = sectionsOf(state);
   if (!sections.length)
-    return <NewAskForm state={state} autoFocus={false} onAsked={openAskChat} />;
+    return <NewAskForm state={state} onAsked={openAskChat} />;
   return (
     <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.page}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={refresh} />

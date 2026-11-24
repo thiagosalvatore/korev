@@ -256,3 +256,41 @@ describe('Appearance settings', () => {
     ]);
   });
 });
+
+describe('Repository settings', () => {
+  const repoState = () =>
+    ({
+      ...STATE,
+      workspaces: [],
+      repos: [
+        {
+          id: 'repo-1',
+          name: 'korev',
+          path: '/Users/dev/korev',
+          defaultBranch: 'main',
+          scripts: {
+            setup: 'npm ci',
+            run: [],
+            archive: '',
+            runMode: 'concurrent',
+          },
+          prompts: { general: 'Be brief.' },
+        },
+      ],
+    }) as unknown as AppState;
+
+  it.each([
+    ['General prompt', 'Be brief. Use tabs.'],
+    ['Setup script', 'npm ci && make'],
+  ])('keeps the unsaved %s when unchanged state arrives', (label, draft) => {
+    const { rerender } = render(
+      <SettingsPage state={repoState()} section="repo:repo-1" />,
+    );
+    const field = screen.getByLabelText(label) as HTMLTextAreaElement;
+
+    fireEvent.change(field, { target: { value: draft } });
+    rerender(<SettingsPage state={repoState()} section="repo:repo-1" />);
+
+    expect(field.value).toBe(draft);
+  });
+});

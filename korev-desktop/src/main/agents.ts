@@ -171,6 +171,14 @@ interface CodexCatalogModel {
   display_name: string;
   visibility: string;
   priority: number;
+  supported_reasoning_levels?: { effort: string }[];
+}
+
+function codexEfforts(model: CodexCatalogModel): Pick<AgentModel, 'efforts'> {
+  const levels = model.supported_reasoning_levels;
+  return Array.isArray(levels) && levels.length
+    ? { efforts: levels.map((level) => level.effort) }
+    : {};
 }
 
 function isListedCodexModel(value: unknown): value is CodexCatalogModel {
@@ -189,7 +197,11 @@ export function parseCodexModels(stdout: string): AgentModel[] {
   return catalog
     .filter(isListedCodexModel)
     .sort((left, right) => left.priority - right.priority)
-    .map((model) => ({ id: model.slug, label: model.display_name }));
+    .map((model) => ({
+      id: model.slug,
+      label: model.display_name,
+      ...codexEfforts(model),
+    }));
 }
 
 async function probe(

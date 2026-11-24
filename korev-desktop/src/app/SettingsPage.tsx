@@ -15,7 +15,7 @@ import {
   AGENT_KINDS,
   AGENT_LABELS,
   DEFAULT_INCLUDE_GLOBS,
-  EFFORT_LEVELS,
+  effortLevels,
   isAgentReady,
   LOADOUT_SIZE,
   loadoutKey,
@@ -35,6 +35,7 @@ import {
   type RepoScripts,
   type Settings,
   type Skill,
+  type CreatePrWith,
   type ReReviews,
   type ReviewReplies,
   type ThemePreference,
@@ -86,10 +87,22 @@ const REVIEW_REPLY_OPTIONS: { value: ReviewReplies; label: string }[] = [
   { value: 'custom', label: 'Custom' },
 ];
 
+const CREATE_PR_WITH_OPTIONS: { value: CreatePrWith; label: string }[] = [
+  { value: 'korev', label: 'Korev' },
+  { value: 'claude-ship', label: 'Claude Ship' },
+];
+
 const RE_REVIEW_OPTIONS: { value: ReReviews; label: string }[] = [
   { value: 'off', label: 'Off' },
   { value: 'check', label: 'Re-check and tell me' },
   { value: 'approve', label: 'Re-check and approve' },
+];
+
+const PR_CHECK_OPTIONS: { value: string; label: string }[] = [
+  { value: '30', label: 'Every 30 seconds' },
+  { value: '60', label: 'Every minute' },
+  { value: '120', label: 'Every 2 minutes' },
+  { value: '300', label: 'Every 5 minutes' },
 ];
 
 const DICTATION_LANGUAGES: { value: DictationLanguage; label: string }[] = [
@@ -512,6 +525,17 @@ function General({ settings }: { settings: Settings }) {
         />
       </Row>
       <Row
+        title="Keep agents running after you quit"
+        description="Quitting Korev closes its window and leaves agents and automations running. Korev stays in the menu bar. Choose Quit Korev there to stop everything."
+      >
+        <Switch
+          checked={settings.keepRunningInBackground}
+          onChange={(keepRunningInBackground) =>
+            update({ keepRunningInBackground })
+          }
+        />
+      </Row>
+      <Row
         title="Sign agent commits with a Korev key"
         description="Works while your Mac is locked. Korev keeps the key in your Mac's Secure Enclave, where it cannot be copied, and adds it to your GitHub account as a signing key. While your Mac is on, any app running as you can sign with it."
       >
@@ -642,7 +666,7 @@ function TaskModel({
           <Select
             ariaLabel={`${title} effort`}
             className="w-28"
-            options={[...EFFORT_LEVELS[current.agent]]}
+            options={[...effortLevels(current.agent, choices, current.model)]}
             value={current.effort}
             onChange={(effort) => update({ [setting]: { ...current, effort } })}
           />
@@ -848,7 +872,9 @@ function AgentModel({
         <Select
           ariaLabel={`${label} effort`}
           className="w-28"
-          options={[...EFFORT_LEVELS[agent]]}
+          options={[
+            ...effortLevels(agent, entry.models, settings.defaultModels[agent]),
+          ]}
           value={settings.defaultEffort[agent]}
           onChange={(effort) =>
             update({
@@ -961,6 +987,15 @@ function Agents({ state }: { state: AppState }) {
           onChange={(orchestration) => update({ orchestration })}
         />
       </Row>
+      <Row
+        title="Queue messages while the agent works"
+        description="A message you send while Claude Code works waits until it finishes. Click its arrow above the message box to steer the agent with it. When off, the message steers the agent at once. Codex always queues."
+      >
+        <Switch
+          checked={state.settings.queueWhileRunning}
+          onChange={(queueWhileRunning) => update({ queueWhileRunning })}
+        />
+      </Row>
       <p className="mt-3 mb-0 text-xs text-fg-3">
         Without approvals, agents run with full permissions inside the workspace
         folder. A workspace is a git worktree, not a sandbox.
@@ -995,6 +1030,18 @@ function Git({ settings }: { settings: Settings }) {
         />
       </Row>
       <Row
+        title="Check pull requests"
+        description="How often Korev asks GitHub about the pull request of a workspace whose agent is working. Other workspaces are checked 4 times less often. Check less often if GitHub limits your requests."
+      >
+        <Select
+          ariaLabel="Check pull requests"
+          className="w-56"
+          options={PR_CHECK_OPTIONS}
+          value={String(settings.prCheckSeconds)}
+          onChange={(seconds) => update({ prCheckSeconds: Number(seconds) })}
+        />
+      </Row>
+      <Row
         title="Archive on merge"
         description="Archive a workspace when its pull request is merged. A repository can override this in .korev/settings.toml."
       >
@@ -1014,7 +1061,7 @@ function Git({ settings }: { settings: Settings }) {
       </Row>
       <Row
         title="Re-check reviews"
-        description="When the author of a pull request you reviewed asks for your review again, Korev sends the new changes to the review chat. The agent checks whether each of its findings was fixed. With Re-check and approve, Korev approves the pull request when every finding is fixed."
+        description="When the author of a pull request you reviewed asks for your review again, or resolves or answers every comment you left, Korev sends the new changes to the review chat. The agent checks whether each of its findings was fixed. With Re-check and approve, Korev approves the pull request when every finding is fixed."
       >
         <Select
           ariaLabel="Re-check reviews"
@@ -1023,6 +1070,20 @@ function Git({ settings }: { settings: Settings }) {
           value={settings.reReviews}
           onChange={(reReviews) =>
             update({ reReviews: reReviews as ReReviews })
+          }
+        />
+      </Row>
+      <Row
+        title="Create PRs with"
+        description="Korev asks the workspace's chat to commit, push and open the pull request. Claude Ship opens Claude Code in a terminal with /ship typed. Press Enter and Claude commits, pushes, opens the pull request, reviews it and then fixes its checks and review comments while the terminal stays open. Keep PRs ready waits until you close that terminal. Needs Claude Code 2.1.330 or later. The phone always uses Korev."
+      >
+        <Select
+          ariaLabel="Create PRs with"
+          className="w-56"
+          options={CREATE_PR_WITH_OPTIONS}
+          value={settings.createPrWith}
+          onChange={(createPrWith) =>
+            update({ createPrWith: createPrWith as CreatePrWith })
           }
         />
       </Row>
@@ -1291,6 +1352,7 @@ const SHORTCUTS: [string, string][] = [
   ['⌘B', 'Toggle left sidebar'],
   ['⌘⌥B', 'Toggle right sidebar'],
   ['⌘J', 'Toggle terminal'],
+  ['⌘F', 'Find in terminal'],
   ['⌘.', 'Zen mode'],
   ['⌘G', 'Toggle grid view'],
   ['⌘⇧R', 'Review a pull request'],
@@ -1433,7 +1495,8 @@ function ReviewSkillPicker({
 function RepoPromptSettings({ state, repo }: { state: AppState; repo: Repo }) {
   const saved = repo.prompts ?? {};
   const [prompts, setPrompts] = useState<RepoPrompts>(saved);
-  useEffect(() => setPrompts(repo.prompts ?? {}), [repo.id, repo.prompts]);
+  const savedJson = JSON.stringify(saved);
+  useEffect(() => setPrompts(JSON.parse(savedJson)), [repo.id, savedJson]);
   const dirty =
     JSON.stringify(filledPrompts(prompts)) !==
     JSON.stringify(filledPrompts(saved));
@@ -1671,8 +1734,9 @@ function RunScriptsEditor({
 function RepoSettings({ state, repo }: { state: AppState; repo: Repo }) {
   const [scripts, setScripts] = useState<RepoScripts>(repo.scripts);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  useEffect(() => setScripts(repo.scripts), [repo.id, repo.scripts]);
-  const dirty = JSON.stringify(scripts) !== JSON.stringify(repo.scripts);
+  const savedJson = JSON.stringify(repo.scripts);
+  useEffect(() => setScripts(JSON.parse(savedJson)), [repo.id, savedJson]);
+  const dirty = JSON.stringify(scripts) !== savedJson;
   const problem = runScriptsProblem(scripts.run);
   const workspaceCount = state.workspaces.filter(
     (ws) => ws.repoId === repo.id,

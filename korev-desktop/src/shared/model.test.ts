@@ -3,6 +3,8 @@ import {
   keepsPrReady,
   answerQuestions,
   conversationText,
+  EFFORT_LEVELS,
+  effortLevels,
   EMPTY_INBOX_FILTER,
   filterInbox,
   finishedCodexPlan,
@@ -16,6 +18,8 @@ import {
   prProblems,
   replyToQuestions,
   stackRows,
+  supportedEffort,
+  supportsClaudeShip,
   type AgentQuestion,
   type ChatItem,
   type ChatSession,
@@ -121,6 +125,7 @@ describe('prBadge', () => {
     checks: [{ name: 'lint', state: 'failure', url: null, required: true }],
     stack: null,
     unansweredThreads: [],
+    prSteward: false,
   };
 
   it('shows conflicts before failing checks', () => {
@@ -515,5 +520,58 @@ describe('keepsPrReady', () => {
     ],
   ])('when %s', (_case, keepPrsReady, flags, expected) => {
     expect(keepsPrReady(flags, { keepPrsReady })).toBe(expected);
+  });
+});
+
+describe('effort levels', () => {
+  const models = [
+    { id: 'gpt-astra', label: 'Astra', efforts: ['low', 'max', 'ultra'] },
+    { id: 'gpt-luna', label: 'Luna', efforts: ['low', 'max'] },
+  ];
+
+  it('offers the levels the model supports', () => {
+    expect(effortLevels('codex', models, 'gpt-astra')).toEqual([
+      'low',
+      'max',
+      'ultra',
+    ]);
+  });
+
+  it('falls back to the agent levels for a model without its own', () => {
+    expect(effortLevels('codex', models, 'gpt-unknown')).toEqual(
+      EFFORT_LEVELS.codex,
+    );
+  });
+
+  it('replaces a level the model does not support with the default', () => {
+    expect(supportedEffort('codex', models, 'gpt-luna', 'ultra')).toBe(
+      'medium',
+    );
+    expect(supportedEffort('codex', models, 'gpt-astra', 'ultra')).toBe(
+      'ultra',
+    );
+  });
+});
+
+describe('supportsClaudeShip', () => {
+  const claude = (version: string) => ({
+    agent: 'claude' as const,
+    version,
+    account: { method: 'claude.ai', email: null, organization: null },
+    models: [],
+  });
+
+  it.each([
+    ['2.1.329', false],
+    ['2.1.330', true],
+    ['2.2.0', true],
+  ])('Claude Code %s supports Claude Ship: %s', (version, supported) => {
+    expect(supportsClaudeShip([claude(version)])).toBe(supported);
+  });
+
+  it('needs a signed-in Claude Code', () => {
+    expect(supportsClaudeShip([{ ...claude('2.2.0'), account: null }])).toBe(
+      false,
+    );
   });
 });

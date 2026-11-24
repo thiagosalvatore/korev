@@ -32,6 +32,7 @@ import type {
   RepoPrompts,
   RepoScripts,
   Result,
+  ScriptKind,
   SendOptions,
   Settings,
   Skill,
@@ -126,6 +127,7 @@ export interface KorevApi {
   deleteWorkspace(workspaceId: string): Promise<void>;
   focusWorkspaces(workspaceIds: string[]): Promise<void>;
   createAskChat(repoIds: string[]): Promise<AskChat>;
+  openKorevChat(): Promise<AskChat>;
   deleteAskChat(askChatId: string): Promise<void>;
   restoreAskChat(askChatId: string): Promise<void>;
   createAutomation(draft: AutomationDraft): Promise<Automation>;
@@ -153,6 +155,8 @@ export interface KorevApi {
   transcript(sessionId: string): Promise<ChatItem[]>;
   send(sessionId: string, options: SendOptions): Promise<Result>;
   stop(sessionId: string): Promise<void>;
+  sendQueuedNow(sessionId: string, itemId: string): Promise<Result>;
+  removeQueued(sessionId: string, itemId: string): Promise<Result>;
   respondPermission(
     sessionId: string,
     itemId: string,
@@ -230,6 +234,7 @@ export interface KorevApi {
     kind: TerminalKind,
     size: TerminalSize,
     preset?: TerminalPreset,
+    input?: string,
   ): Promise<Result<string>>;
   startScript(
     workspaceId: string,
@@ -237,6 +242,7 @@ export interface KorevApi {
     scriptId?: string,
   ): Promise<Result>;
   stopScript(workspaceId: string, kind: TerminalKind): Promise<void>;
+  scriptOutput(workspaceId: string, kind: ScriptKind): Promise<string | null>;
   writeTerminal(ref: string, data: string): Promise<void>;
   resizeTerminal(ref: string, size: TerminalSize): Promise<void>;
   closeTerminal(ref: string): Promise<void>;
@@ -247,15 +253,20 @@ export const REMOTE_METHODS = [
   'transcript',
   'send',
   'stop',
+  'sendQueuedNow',
+  'removeQueued',
+  'revert',
   'respondPermission',
   'approvePlan',
   'handoffPlan',
   'newSession',
   'closeSession',
   'updateSession',
+  'cloneRepo',
   'createWorkspaces',
   'archiveWorkspace',
   'retryWorkspace',
+  'restoreWorkspace',
   'listBranches',
   'listPullRequests',
   'listIssues',
@@ -293,6 +304,9 @@ export const REMOTE_METHODS = [
   'resumeTask',
   'answerQuestion',
   'resolveGate',
+  'startScript',
+  'stopScript',
+  'scriptOutput',
 ] as const satisfies readonly (keyof KorevApi)[];
 
 export type RemoteMethod = (typeof REMOTE_METHODS)[number];

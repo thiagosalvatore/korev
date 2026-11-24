@@ -6,7 +6,7 @@ import {
   type Workspace,
   type WorkspaceRuntime,
 } from '../shared/model';
-import { nextAction } from './WorkspaceHeader';
+import { nextAction, prMenuItems } from './WorkspaceHeader';
 
 const READY_PR: PrStatus = {
   number: 7,
@@ -24,6 +24,7 @@ const READY_PR: PrStatus = {
   checks: [{ name: 'lint', state: 'success', url: null, required: true }],
   stack: null,
   unansweredThreads: [],
+  prSteward: false,
 };
 
 function actionLabel(pr: PrStatus): string {
@@ -111,5 +112,21 @@ describe('next PR action', () => {
       const gone = 'https://github.com/acme/web/pull/42';
       expect(primaryPr(workspace, runtime, gone)?.number).toBe(7);
     });
+  });
+});
+
+describe('pull request menu', () => {
+  it('lists open PRs first and merged PRs under a Merged header', () => {
+    const merged: PrStatus = {
+      ...READY_PR,
+      number: 5,
+      url: 'https://github.com/acme/web/pull/5',
+      state: 'MERGED',
+    };
+    const items = prMenuItems({} as Workspace, READY_PR, [merged, READY_PR]);
+    expect(items.map(({ id, section }) => ({ id, section }))).toEqual([
+      { id: READY_PR.url, section: undefined },
+      { id: merged.url, section: 'Merged' },
+    ]);
   });
 });

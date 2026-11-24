@@ -58,7 +58,7 @@ The pull request tab shows the pull request:
 - Its state, conflicts, failing and running checks, and review status.
 - The list of checks. Click one to open it on GitHub.
 
-Korev refreshes the pull request every 30 seconds and after each agent turn.
+Korev refreshes the pull request after each agent turn, every 30 seconds while the workspace's agent is working, and every 2 minutes otherwise. Change this in **Settings → Git → Check pull requests**. Once a pull request is merged or closed, Korev stops asking GitHub about it. When GitHub limits your requests, Korev waits until the limit resets.
 
 ## Comments
 
@@ -81,6 +81,18 @@ Turn on **Settings → Git → Keep PRs ready**, and Korev sends a workspace's o
 - To keep one pull request ready, also with the setting off, click **Keep ready** on its row on the **Pull requests** page. If no workspace has the pull request, Korev checks it out in a new workspace first. Click **Keep ready** again to stop.
 
 The prompt uses your [`[prompts]`](./configure-your-repository.mdx#prompts) instructions for `resolve_merge_conflicts` and `fix_errors`. Add instructions for the review comments with `address_review`.
+
+## Claude Ship
+
+[Claude Ship](https://claude.com/resources/articles/introducing-claude-ship) is Claude Code's own way to open and watch a pull request. `/ship` commits, pushes, opens the pull request, reviews it, and then fixes failing checks, conflicts and review comments. `/steward` only watches a pull request that is already open. Both start only from a line you type in Claude Code's terminal app, so Korev opens them in a terminal tab, not in a chat.
+
+- Open the menu next to the next git action button and choose **Open Claude Ship**. Korev opens a **Claude Ship** terminal tab with Claude Code in auto mode and types `/ship`, or `/steward` if the branch has an open pull request. Press Enter to start it.
+- To make **Create PR** do this, set **Settings → Git → Create PRs with** to **Claude Ship**. The phone still uses Korev's **Create PR**.
+- If you type `/ship` or `/steward` in a Claude Code chat, Korev opens the terminal tab with that line instead of sending it to the chat.
+- While a Claude Ship tab runs in a workspace, **Keep PRs ready** sends nothing for that workspace. Close the tab to hand the pull request back to Korev.
+- The first time Claude Code runs in a workspace, it asks if you trust the folder. Korev types the command after you answer.
+
+Claude Ship needs Claude Code 2.1.330 or later, signed in. The watch stops when you close the tab.
 
 ## Archive on merge
 

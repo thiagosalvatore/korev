@@ -7,9 +7,11 @@ import {
   type AskChat,
   type ChatItem,
   type CheckState,
+  type FileChange,
   type ChatSession,
   type InboxPullRequest,
   type PrStatus,
+  type PrThread,
   type Repo,
   type Settings,
   type Workspace,
@@ -24,6 +26,112 @@ const MINUTE_MS = 60_000;
 
 export const DEMO_REPLY =
   'This is the Korev demo, so no agent is running. With your Mac paired, the agent would now work on this in its own worktree, and you would watch every step here as it happens.';
+
+export const DEMO_CHANGES: FileChange[] = [
+  {
+    path: 'src/search/query.ts',
+    status: 'M',
+    additions: 6,
+    deletions: 3,
+  },
+  {
+    path: 'db/migrations/add_trigram_index.sql',
+    status: 'A',
+    additions: 6,
+    deletions: 0,
+  },
+];
+
+export const DEMO_DIFFS: Record<string, string> = {
+  'src/search/query.ts': [
+    '@@ -12,8 +12,13 @@ export async function searchAccounts(term: string) {',
+    '   const db = await connect();',
+    '   const rows = await db.query(',
+    "-    'SELECT * FROM accounts WHERE name ILIKE $1',",
+    '-    [`%${term}%`],',
+    "+    'SELECT * FROM accounts WHERE name % $1 OR email % $1',",
+    '+    [term],',
+    '   );',
+    '-  return rows;',
+    '+  if (!rows.length) {',
+    '+    return [];',
+    '+  }',
+    '+  return rows.slice(0, MAX_RESULTS);',
+    ' }',
+  ].join('\n'),
+  'db/migrations/add_trigram_index.sql': [
+    '@@ -0,0 +1,6 @@',
+    '+CREATE EXTENSION IF NOT EXISTS pg_trgm;',
+    '+',
+    '+CREATE INDEX accounts_name_trgm',
+    '+  ON accounts USING gin (name gin_trgm_ops);',
+    '+CREATE INDEX accounts_email_trgm',
+    '+  ON accounts USING gin (email gin_trgm_ops);',
+  ].join('\n'),
+};
+
+export const DEMO_SETUP_OUTPUT =
+  '$ npm ci\r\n\u001b[32madded 412 packages\u001b[0m in 9s\r\n';
+
+export const DEMO_RUN_OUTPUT =
+  '$ npm run dev\r\n\r\n> acme-web@1.0.0 dev\r\n> vite\r\n\r\n  \u001b[32mVITE\u001b[0m ready in 412 ms\r\n\r\n  ➜  Local: http://localhost:3000/\r\n';
+
+export const DEMO_THREADS: PrThread[] = [
+  {
+    id: 'demo-thread-email',
+    path: 'src/search/query.ts',
+    line: 15,
+    diffHunk:
+      "@@ -12,8 +12,13 @@\n   const rows = await db.query(\n-    'SELECT * FROM accounts WHERE name ILIKE $1',\n+    'SELECT * FROM accounts WHERE name % $1 OR email % $1',",
+    isResolved: false,
+    isOutdated: false,
+    comments: [
+      {
+        id: 'demo-comment-email',
+        author: 'maria',
+        isBot: false,
+        body: 'Does `email % $1` use the new index too? I only see one on `name`.',
+        url: 'https://github.com/acme/acme-web/pull/87',
+        createdAt: '2026-11-22T09:00:00.000Z',
+      },
+    ],
+  },
+  {
+    id: 'demo-thread-limit',
+    path: 'src/search/query.ts',
+    line: 22,
+    diffHunk: '+  return rows.slice(0, MAX_RESULTS);',
+    isResolved: true,
+    isOutdated: false,
+    comments: [
+      {
+        id: 'demo-comment-limit',
+        author: 'maria',
+        isBot: false,
+        body: 'Limit this in SQL rather than in memory?',
+        url: 'https://github.com/acme/acme-web/pull/87',
+        createdAt: '2026-11-22T08:40:00.000Z',
+      },
+      {
+        id: 'demo-comment-limit-reply',
+        author: 'you',
+        isBot: false,
+        body: 'Done, it is a `LIMIT` now.',
+        url: 'https://github.com/acme/acme-web/pull/87',
+        createdAt: '2026-11-22T08:55:00.000Z',
+      },
+    ],
+  },
+];
+
+const DEMO_CONTEXT = { usedTokens: 84_000, windowTokens: 200_000 };
+
+export const DEMO_SLASH_COMMANDS = [
+  'review',
+  'security-review',
+  'init',
+  'compact',
+];
 
 export const DEMO_REVIEW_REPLY =
   'This is the Korev demo, so no agent is running. With your Mac paired, the agent would now read the pull request with gh and list what to fix, most severe first.';
@@ -61,7 +169,11 @@ const WEB: Repo = {
   name: 'acme-web',
   path: `${DEMO_HOME}/code/acme-web`,
   defaultBranch: DEMO_BASE_BRANCH,
-  scripts: EMPTY_SCRIPTS,
+  scripts: {
+    ...EMPTY_SCRIPTS,
+    setup: 'npm ci',
+    run: [{ name: 'dev', command: 'npm run dev' }],
+  },
 };
 
 const API: Repo = {
@@ -86,11 +198,14 @@ const SETTINGS: Settings = {
   reviewModel: null,
   explainModel: null,
   autoRenameBranches: true,
+  queueWhileRunning: true,
   deleteBranchOnArchive: false,
   archiveOnMerge: false,
   archiveReviews: false,
   reReviews: 'off',
   keepPrsReady: false,
+  createPrWith: 'korev',
+  prCheckSeconds: 30,
   reviewReplies: 'reply',
   reviewReplyInstructions: '',
   toolApprovals: false,
@@ -103,6 +218,7 @@ const SETTINGS: Settings = {
   notificationSound: true,
   notificationSoundFile: '',
   keepAwake: true,
+  keepRunningInBackground: true,
   signAgentCommits: false,
   remoteAccess: true,
   remotePort: 0,
@@ -212,6 +328,7 @@ export function demoPullRequest(
     }),
     stack: null,
     unansweredThreads: [],
+    prSteward: false,
     ...patch,
   };
 }
@@ -258,6 +375,7 @@ function finished(id: string, minutes: number): ChatItem {
     text: '',
     durationMs: minutes * MINUTE_MS,
     costUsd: null,
+    context: DEMO_CONTEXT,
   };
 }
 

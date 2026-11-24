@@ -1,23 +1,7 @@
 import { router } from 'expo-router';
-import {
-  Archive,
-  ChevronDown,
-  ChevronRight,
-  GitBranch,
-  GitMerge,
-  GitPullRequest,
-  GitPullRequestClosed,
-  GitPullRequestDraft,
-  Link,
-  MessageCircleQuestion,
-  MessageSquareWarning,
-  Plus,
-  TriangleAlert,
-  type LucideIcon,
-} from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Link, Plus } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -25,20 +9,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import ReanimatedSwipeable, {
-  type SwipeableMethods,
-} from 'react-native-gesture-handler/ReanimatedSwipeable';
-import {
-  prBadge,
-  primaryPr,
-  type AppState,
-  type PrBadge,
-  type Repo,
-  type RepoFolder,
-  type Workspace,
-  type WorkspaceRuntime,
-  type WorkspaceStatus,
-} from '../../../../korev-desktop/src/shared/model';
+import type {
+  AppState,
+  Repo,
+  RepoFolder,
+  Workspace,
+  WorkspaceRuntime,
+} from '../../../../../korev-desktop/src/shared/model';
 import {
   activeWorkspaces,
   crossRepoLeads,
@@ -47,53 +24,25 @@ import {
   sidebarEntries,
   waitsForLane,
   workspaceLabel,
-} from '../../../../korev-desktop/src/shared/workspaces';
-import { attempt } from '../../attempt';
-import { succeeded } from '../../haptics';
-import { useAppState, useReconnect } from '../../hooks';
-import { useConnection } from '../../korev';
-import { ListRow, ROW_ICON_SIZE } from '../../ListRow';
-import { lifted } from '../../haptics';
-import { Loading } from '../../Offline';
-import { openNewWorkspace } from '../../navigation';
-import { RepoAvatar } from '../../RepoAvatar';
-import { ReorderList } from '../../ReorderList';
-import { MONO_FONT, useTheme, type Theme } from '../../theme';
-import { CHROME_FONT_SCALE, touchSlop } from '../../ui';
+} from '../../../../../korev-desktop/src/shared/workspaces';
+import { lifted } from '../../../haptics';
+import { useAppState, useReconnect } from '../../../hooks';
+import { ListRow, ROW_ICON_SIZE } from '../../../ListRow';
+import { Loading } from '../../../Offline';
+import { openNewWorkspace } from '../../../navigation';
+import { RepoAvatar } from '../../../RepoAvatar';
+import { ReorderList } from '../../../ReorderList';
+import { MONO_FONT, useTheme, type Theme } from '../../../theme';
+import { CHROME_FONT_SCALE, touchSlop } from '../../../ui';
+import {
+  ARCHIVE_ACTION,
+  StatusIcon,
+  SwipeToArchive,
+  useArchive,
+} from '../../../WorkspaceStatus';
 
 const REPO_ADD_ICON_SIZE = ROW_ICON_SIZE + 2;
 const ACROSS_REPOS = 'across-repos';
-
-const BUSY_STATUSES: ReadonlySet<WorkspaceStatus> = new Set([
-  'creating',
-  'setting-up',
-  'working',
-]);
-
-const BADGE_ICONS: Record<PrBadge, LucideIcon> = {
-  merged: GitMerge,
-  closed: GitPullRequestClosed,
-  conflicts: GitPullRequest,
-  'checks-failing': GitPullRequest,
-  review: MessageSquareWarning,
-  'checks-running': GitPullRequest,
-  draft: GitPullRequestDraft,
-  open: GitPullRequest,
-};
-
-function badgeColor(theme: Theme, badge: PrBadge): string {
-  const colors: Record<PrBadge, string> = {
-    merged: theme.merged,
-    closed: theme.fg4,
-    conflicts: theme.warningText,
-    'checks-failing': theme.dangerText,
-    review: theme.warningText,
-    'checks-running': theme.warningText,
-    draft: theme.fg3,
-    open: theme.successText,
-  };
-  return colors[badge];
-}
 
 type Styles = ReturnType<typeof makeStyles>;
 
@@ -101,57 +50,6 @@ function toggled(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
   const next = new Set(set);
   if (!next.delete(id)) next.add(id);
   return next;
-}
-
-function StatusIcon({
-  workspace,
-  runtime,
-}: {
-  workspace: Workspace;
-  runtime: WorkspaceRuntime;
-}) {
-  const theme = useTheme();
-  if (BUSY_STATUSES.has(runtime.status))
-    return <ActivityIndicator size="small" color={theme.accentText} />;
-  if (runtime.status === 'waiting')
-    return (
-      <MessageCircleQuestion size={ROW_ICON_SIZE} color={theme.warningText} />
-    );
-  if (runtime.status === 'failed' || runtime.setupError)
-    return <TriangleAlert size={ROW_ICON_SIZE} color={theme.dangerText} />;
-  const pr = primaryPr(workspace, runtime);
-  if (!pr) return <GitBranch size={ROW_ICON_SIZE} color={theme.fg4} />;
-  const badge = prBadge(pr);
-  const Badge = BADGE_ICONS[badge];
-  return <Badge size={ROW_ICON_SIZE} color={badgeColor(theme, badge)} />;
-}
-
-const ARCHIVE_ACTION = 'archive';
-
-function ArchiveAction({
-  onPress,
-  styles,
-}: {
-  onPress: () => void;
-  styles: Styles;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={styles.archiveAction}
-      onPress={onPress}
-    >
-      <Archive size={ROW_ICON_SIZE} color={theme.fgOnWarning} />
-      <Text
-        maxFontSizeMultiplier={CHROME_FONT_SCALE}
-        style={styles.archiveLabel}
-      >
-        Archive
-      </Text>
-    </Pressable>
-  );
 }
 
 interface GroupMember {
@@ -176,30 +74,12 @@ function WorkspaceRow({
   member?: GroupMember;
   styles: Styles;
 }) {
-  const { api } = useConnection();
   const stats = runtime?.stats;
   const notice = runtime?.message ?? runtime?.setupError;
   const hasStats = stats && (stats.additions > 0 || stats.deletions > 0);
-  const archive = async () =>
-    succeeded(
-      await attempt('Korev could not archive', () =>
-        api.archiveWorkspace(workspace.id),
-      ),
-    );
-  const archiveFromSwipe = async (swipeable: SwipeableMethods) => {
-    if (!(await archive())) swipeable.close();
-  };
+  const archive = useArchive(workspace);
   return (
-    <ReanimatedSwipeable
-      overshootRight={false}
-      childrenContainerStyle={styles.swipeableRow}
-      renderRightActions={(_progress, _translation, swipeable) => (
-        <ArchiveAction
-          onPress={() => void archiveFromSwipe(swipeable)}
-          styles={styles}
-        />
-      )}
-    >
+    <SwipeToArchive archive={archive}>
       <ListRow
         accessibilityLabel={
           member
@@ -246,7 +126,7 @@ function WorkspaceRow({
           })
         }
       />
-    </ReanimatedSwipeable>
+    </SwipeToArchive>
   );
 }
 
@@ -486,6 +366,7 @@ export default function WorkspacesScreen() {
 
   return (
     <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.page}
       scrollEnabled={!dragging}
       refreshControl={

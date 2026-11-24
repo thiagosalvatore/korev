@@ -10,10 +10,12 @@ import {
   RELEASES_URL,
 } from '@/components/landing/links';
 import { THEME_STORAGE_KEY } from '@/components/landing/theme';
+import { SITE_METADATA } from '@/lib/site-metadata';
 import { source } from '@/lib/source';
 import '../styles/docs.css';
 
 export const metadata: Metadata = {
+  ...SITE_METADATA,
   title: { template: '%s · Korev docs', default: 'Korev docs' },
   description:
     'How Korev runs Claude Code and Codex in parallel, one git worktree per task.',

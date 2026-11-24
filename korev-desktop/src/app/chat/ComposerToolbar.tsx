@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { cn, Icon, IconButton } from '../../design-system';
 import {
   AGENT_LABELS,
-  EFFORT_LEVELS,
+  effortLevels,
   type AgentKind,
   type ModelChoice,
   type TurnUsage,
@@ -38,13 +38,13 @@ export interface ComposerToolbarProps {
 const CHIP =
   'flex h-7 cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent px-2 text-xs text-fg-3 hover:bg-hover hover:text-fg-1';
 
+export const QUEUED_HINT = 'Queued until the agent finishes';
+
 function sendHint(props: ComposerToolbarProps): string | null {
   if (!props.canSend) return null;
   if (props.sendHint) return props.sendHint;
   if (!props.running) return null;
-  return props.agent === 'claude'
-    ? 'Steers the running agent'
-    : 'Queued until the agent finishes';
+  return props.agent === 'claude' ? 'Steers the running agent' : QUEUED_HINT;
 }
 
 function optionItems(props: ComposerToolbarProps): MenuItem[] {
@@ -161,12 +161,14 @@ export function ComposerToolbar(props: ComposerToolbarProps) {
       <Menu
         label="Effort"
         side="top"
-        items={EFFORT_LEVELS[props.agent].map((level) => ({
-          id: level,
-          label: level,
-          checked: level === props.effort,
-          onSelect: () => props.onEffortChange(level),
-        }))}
+        items={effortLevels(props.agent, props.models, props.model).map(
+          (level) => ({
+            id: level,
+            label: level,
+            checked: level === props.effort,
+            onSelect: () => props.onEffortChange(level),
+          }),
+        )}
         trigger={({ toggle }) => (
           <button
             type="button"

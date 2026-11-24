@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { cn, Icon } from '../../design-system';
 import {
-  EFFORT_LEVELS,
+  effortLevels,
   LOADOUT_SIZE,
   PENDING_PLAN_PLACEHOLDER,
   type AgentKind,
@@ -96,8 +96,9 @@ function formatTabContext(contexts: TabContext[]): string {
   return `\n\n${TAB_CONTEXT_HEADER}\n\n${contexts.map((context) => context.prompt).join('\n\n')}`;
 }
 
-function nextEffort(agent: AgentKind, effort: string): string {
-  const levels = EFFORT_LEVELS[agent];
+function nextEffort(props: ComposerProps): string {
+  const levels = effortLevels(props.agent, props.models, props.model);
+  const { effort } = props;
   return levels[(levels.indexOf(effort) + 1) % levels.length];
 }
 
@@ -287,7 +288,7 @@ export function Composer(props: ComposerProps) {
     else if (command && event.shiftKey && key === 'e')
       props.onFastChange(!props.fast);
     else if (command && event.shiftKey && (key === '/' || key === '?'))
-      props.onEffortChange(nextEffort(props.agent, props.effort));
+      props.onEffortChange(nextEffort(props));
     else if (command && key === 'u') picker.current?.click();
     else if (command && key === ';') openSnippets();
     else if (isDictationShortcut(event)) voice.toggle();

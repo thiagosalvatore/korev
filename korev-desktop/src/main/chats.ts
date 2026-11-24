@@ -21,6 +21,7 @@ import {
   type Repo,
   type Result,
   type SendOptions,
+  supportedEffort,
   type Workspace,
 } from '../shared/model';
 import {
@@ -84,6 +85,7 @@ const REPLAY_TOTAL_CHARS = 24_000;
 const SLASH_COMMAND_PREFIX = '/';
 const DENIED_MESSAGE = 'The user denied this request.';
 const NOT_WAITING_MESSAGE = 'This request is no longer waiting for an answer';
+const NOT_QUEUED_MESSAGE = 'This message is no longer queued';
 const NO_PLAN_WAITING_MESSAGE = 'No plan is waiting for an answer';
 const AGENT_FINISHED_TITLE = 'Agent finished';
 const AGENT_FAILED_TITLE = 'Agent failed';
@@ -196,6 +198,12 @@ const NO_REPO_ASK_PROMPT = [
   `The user did not pick a repository. Answer the question directly. Do not edit files, create branches or commit.`,
 ].join('\n');
 
+const KOREV_CHAT_PROMPT = [
+  `You are Korev, a Mac app that lets the user run many coding agents in parallel. The user talks to you to act on their other chats.`,
+  `Act through the korev command. Run \`korev help\` to see what it can do. Do not edit files, create branches or commit.`,
+  `When a request applies to several chats, find them with \`korev chats list\`, act on each one, then say which chats you acted on and which you skipped.`,
+].join('\n');
+
 const AUTOMATION_PROMPT = [
   `You are running an automation inside Korev, a Mac app that lets the user run many coding agents in parallel.`,
   `Your working directory is a scratch directory, not a repository. Do not create branches or commit. Korev opens workspaces for code changes when your reply asks for them.`,
@@ -301,6 +309,8 @@ export interface Chats {
   send(sessionId: string, options: SendOptions): Promise<Result>;
   seed(sessionId: string, history: ChatItem[]): Promise<void>;
   stop(sessionId: string): void;
+  sendQueuedNow(sessionId: string, itemId: string): Promise<Result>;
+  removeQueued(sessionId: string, itemId: string): Promise<Result>;
   stopWorkspace(workspace: Workspace): void;
   refreshWorkspaceStatus(workspace: Workspace): void;
   respondPermission(
@@ -311,7 +321,7 @@ export interface Chats {
   handoffPlan(sessionId: string): Result<string>;
   revert(sessionId: string, itemId: string): Promise<Result<string>>;
   forget(sessionId: string): Promise<void>;
-  settled(): Promise<void>;
+  shutdown(): Promise<void>;
   search(query: string): Promise<ChatMatch[]>;
 }
 
@@ -358,6 +368,7 @@ export function createChats(
   const searchTexts = new Map<string, string>();
   const turns = new Map<string, ActiveTurn>();
   const running = new Set<Promise<void>>();
+  let closing = false;
   const nudgedAboutSigning = new Set<string>();
 
   function locate(sessionId: string): { owner: Owner; session: ChatSession } {
@@ -537,6 +548,14 @@ export function createChats(
     };
   }
 
+  async function korevChatTarget(root: string): Promise<TurnTarget> {
+    return {
+      ...(await noRepoAskTarget(root)),
+      systemPrompt: KOREV_CHAT_PROMPT,
+      korevCli: true,
+    };
+  }
+
   async function automationTarget(
     root: string,
     automationId: string,
@@ -557,6 +576,7 @@ export function createChats(
     const root = ctx.store.state.settings.workspacesRoot;
     if (ask.automationRun)
       return automationTarget(root, ask.automationRun.automationId);
+    if (ask.korev) return korevChatTarget(root);
     if (!ask.repoIds.length) return noRepoAskTarget(root);
     const repos = ask.repoIds.map((repoId) => ctx.repo(repoId));
     const checkouts = await Promise.all(
@@ -799,8 +819,17 @@ export function createChats(
       await recordTurnChanges(session.id, items, turn);
       turns.delete(session.id);
       finishTurn(turn.owner, session, items, turn);
-      void sendQueued(session.id, options);
+      track(sendQueued(session.id, options));
     }
+  }
+
+  function canStartTurn(sessionId: string) {
+    return !closing && !turns.has(sessionId);
+  }
+
+  function track(task: Promise<void>) {
+    running.add(task);
+    void task.finally(() => running.delete(task));
   }
 
   async function sendQueued(sessionId: string, options: SendOptions) {
@@ -808,7 +837,7 @@ export function createChats(
     const queued = items.flatMap((item) =>
       item.kind === 'user' && item.queued ? [item] : [],
     );
-    if (!queued.length || turns.has(sessionId)) return;
+    if (!queued.length || !canStartTurn(sessionId)) return;
     const { owner } = locate(sessionId);
     const start =
       owner.kind === 'workspace'
@@ -816,7 +845,7 @@ export function createChats(
             () => null,
           )
         : null;
-    if (turns.has(sessionId)) return;
+    if (!canStartTurn(sessionId)) return;
     for (const item of queued)
       upsert(sessionId, items, { ...item, queued: false });
     const text = queued.map((item) => item.text).join('\n\n');
@@ -887,26 +916,70 @@ export function createChats(
     refreshStatus(owner);
     ctx.store.save();
     ctx.emitState();
-    const done = runTurn(session, options, items, turn);
-    running.add(done);
-    void done.finally(() => running.delete(done));
+    track(runTurn(session, options, items, turn));
   }
 
   function steer(
     sessionId: string,
     items: ChatItem[],
     turn: ActiveTurn,
-    options: SendOptions,
+    message: Pick<SendOptions, 'text' | 'fromKorev'>,
   ): boolean {
-    const { text } = options;
     const { session } = locate(sessionId);
     const process = turn.process;
     if (AGENTS[session.agent].input !== 'stream-json' || !process?.inputOpen())
       return false;
-    process.write(claudeUserMessage(text));
+    process.write(claudeUserMessage(message.text));
     turn.written += 1;
-    upsert(sessionId, items, userItem(text, options.fromKorev));
+    upsert(sessionId, items, userItem(message.text, message.fromKorev));
     return true;
+  }
+
+  function queuesUserMessage(options: SendOptions) {
+    return !options.fromKorev && ctx.store.state.settings.queueWhileRunning;
+  }
+
+  function findQueued(items: ChatItem[], itemId: string) {
+    const item = items.find((entry) => entry.id === itemId);
+    return item?.kind === 'user' && item.queued ? item : null;
+  }
+
+  function removeItem(sessionId: string, items: ChatItem[], item: ChatItem) {
+    items.splice(items.indexOf(item), 1);
+    persist(sessionId, items);
+    ctx.deps.emit('chat', { sessionId, item, removed: true });
+  }
+
+  function sessionOptions(session: ChatSession): SendOptions {
+    const { agent, model, effort, fast, planMode } = session;
+    return { text: '', agent, model, effort, fast, planMode };
+  }
+
+  async function sendQueuedNow(
+    sessionId: string,
+    itemId: string,
+  ): Promise<Result> {
+    const items = await transcript(sessionId);
+    const queued = findQueued(items, itemId);
+    if (!queued) return { ok: false, message: NOT_QUEUED_MESSAGE };
+    const turn = turns.get(sessionId);
+    if (!turn)
+      track(sendQueued(sessionId, sessionOptions(locate(sessionId).session)));
+    else if (steer(sessionId, items, turn, queued))
+      removeItem(sessionId, items, queued);
+    else stop(sessionId);
+    return { ok: true, value: undefined };
+  }
+
+  async function removeQueued(
+    sessionId: string,
+    itemId: string,
+  ): Promise<Result> {
+    const items = await transcript(sessionId);
+    const queued = findQueued(items, itemId);
+    if (!queued) return { ok: false, message: NOT_QUEUED_MESSAGE };
+    removeItem(sessionId, items, queued);
+    return { ok: true, value: undefined };
   }
 
   function sendPlanFeedback(
@@ -975,10 +1048,25 @@ export function createChats(
     };
   }
 
+  function withSupportedEffort(options: SendOptions): SendOptions {
+    const models = ctx.agentModels(options.agent);
+    if (!models.length) return options;
+    return {
+      ...options,
+      effort: supportedEffort(
+        options.agent,
+        models,
+        options.model,
+        options.effort,
+      ),
+    };
+  }
+
   async function send(
     sessionId: string,
-    options: SendOptions,
+    requested: SendOptions,
   ): Promise<Result> {
+    const options = withSupportedEffort(requested);
     const { owner, session } = locate(sessionId);
     const workspace = owner.kind === 'workspace' ? owner.workspace : null;
     if (workspace?.archivedAt)
@@ -992,7 +1080,10 @@ export function createChats(
       const questionId = waitingRequestId(sessionId, QUESTION_TOOL);
       if (questionId)
         return replyToQuestion(sessionId, items, questionId, options);
-      if (!steer(sessionId, items, active, options))
+      if (
+        queuesUserMessage(options) ||
+        !steer(sessionId, items, active, options)
+      )
         queue(sessionId, items, options);
       return { ok: true, value: undefined };
     }
@@ -1248,6 +1339,8 @@ export function createChats(
     send,
     seed,
     stop,
+    sendQueuedNow,
+    removeQueued,
     stopWorkspace: (workspace) =>
       workspace.sessions.forEach((session) => stop(session.id)),
     refreshWorkspaceStatus: (workspace) =>
@@ -1255,7 +1348,9 @@ export function createChats(
     respondPermission,
     handoffPlan,
     revert,
-    async settled() {
+    async shutdown() {
+      closing = true;
+      for (const sessionId of turns.keys()) stop(sessionId);
       while (running.size) await Promise.allSettled(running);
     },
     search,

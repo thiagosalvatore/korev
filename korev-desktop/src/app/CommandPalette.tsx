@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn, Icon, Kbd, type IconName } from '../design-system';
-import type { AppState, ChatMatch, Workspace } from '../shared/model';
+import {
+  supportsClaudeShip,
+  type AppState,
+  type ChatMatch,
+  type Workspace,
+} from '../shared/model';
 import {
   activateTab,
   archiveWorkspace,
+  claudeShipCommand,
+  claudeShipLabel,
   createPr,
   explainWorkspace,
   openPrPicker,
@@ -14,7 +21,9 @@ import {
   openFile,
   openSearch,
   openAsk,
+  openKorevChat,
   openAutomations,
+  openClaudeShip,
   openGrid,
   openNewWorkspace,
   openRuns,
@@ -90,6 +99,13 @@ function paletteItems(
       icon: 'message-circle-question',
       section: 'Actions',
       run: () => openAsk(null),
+    },
+    {
+      id: 'ask-korev',
+      label: 'Ask Korev',
+      icon: 'bot-message-square',
+      section: 'Actions',
+      run: () => void openKorevChat(),
     },
     {
       id: 'grid',
@@ -203,8 +219,9 @@ function paletteItems(
             icon: 'git-pull-request-arrow',
             hint: '⌘⇧P',
             section: 'Actions',
-            run: () => void createPr(current),
+            run: () => void createPr(state, current),
           } as PaletteItem,
+          ...claudeShipItems(state, current),
           {
             id: 'archive',
             label: `Archive ${current.name}`,
@@ -260,6 +277,20 @@ async function openChat(workspace: Workspace, sessionId: string) {
   if (workspace.archivedAt) await restoreWorkspace(workspace);
   else selectWorkspace(workspace.id);
   activateTab(workspace.id, tabKey({ kind: 'chat', sessionId }));
+}
+
+function claudeShipItems(state: AppState, workspace: Workspace): PaletteItem[] {
+  if (!supportsClaudeShip(state.agents)) return [];
+  const command = claudeShipCommand(state, workspace);
+  return [
+    {
+      id: 'claude-ship',
+      label: claudeShipLabel(command),
+      icon: 'square-terminal',
+      section: 'Actions',
+      run: () => openClaudeShip(workspace, command),
+    },
+  ];
 }
 
 function chatItems(state: AppState, matches: ChatMatch[]): PaletteItem[] {
