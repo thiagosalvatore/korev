@@ -31,7 +31,7 @@ export type QuitPrompt = 'closed' | 'asking' | 'waiting';
 
 export type Page =
   | { kind: 'workspace' }
-  | { kind: 'new-workspace'; repoId: string | null }
+  | { kind: 'new-workspace'; repoId: string | null; linkId?: number }
   | {
       kind: 'ask';
       askChatId: string | null;

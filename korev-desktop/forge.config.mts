@@ -153,6 +153,7 @@ const config: ForgeConfig = {
     },
     icon: ICON,
     extendInfo: { NSMicrophoneUsageDescription: MICROPHONE_USAGE },
+    protocols: [{ name: 'Korev', schemes: ['korev'] }],
     ...(osxNotarize && { osxSign: {}, osxNotarize }),
   },
   rebuildConfig: {},

@@ -78,9 +78,10 @@ function Shell({ state }: { state: AppState }) {
       ) : null}
       {page.kind === 'new-workspace' ? (
         <NewWorkspacePage
-          key={page.repoId ?? 'any'}
+          key={`${page.repoId ?? 'any'}:${page.linkId ?? ''}`}
           state={state}
           repoId={page.repoId}
+          filled={page.linkId !== undefined}
         />
       ) : null}
       {page.kind === 'ask' ? (

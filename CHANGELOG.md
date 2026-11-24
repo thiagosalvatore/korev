@@ -12,6 +12,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 - **Find in terminals.** Press ⌘F in a terminal to search its output. Korev outlines every match and shows "3 of 12". Press Enter or ⇧Enter to go to the next or previous match, and Esc to close.
 - **`korev` in your own terminal.** Run `korev new --task "..."` to create a workspace from Terminal while Korev is open. `korev chats list`, `korev chats send`, `korev chats stop` and `korev review rerun` act on your chats. See "Use Korev from your terminal" in the docs to put the command on your PATH. Agents that Korev starts can't use it unless they already have their own `korev` access.
 - **Re-check reviews without a re-request.** Re-check reviews no longer waits for the author to click Re-request review. Korev also re-checks when every review comment you left is resolved or has an answer from someone else. Answers from bots do not count.
+- **Start a workspace from a link.** A `korev://new-workspace?prompt=<text>` link brings Korev to the front, opens New workspace and puts the text in the message box, ready for you to press Enter. Add `&repo=<name>` to select a repository. Use it from a script or a Stream Deck button to start a task from text you selected in another app. A link never sends the message for you.
 
 ## [0.39.0] - 2026-11-23
 

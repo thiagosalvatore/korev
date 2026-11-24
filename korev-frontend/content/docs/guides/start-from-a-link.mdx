@@ -1,0 +1,33 @@
+---
+title: Start a workspace from a link
+description: 'Open New workspace with your text in the message box from a korev:// link.'
+---
+
+A `korev://new-workspace` link brings Korev to the front, opens **New workspace** and puts text in the message box. Use it from a script, a launcher or a Stream Deck button, for example to start a task from text you selected in another app.
+
+```txt
+korev://new-workspace?prompt=Fix%20the%20login%20bug&repo=acme-web
+```
+
+| Parameter | What it does                                                                                                                            |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt`  | The text for the message box. URL-encode it. Korev keeps the first 20,000 characters. It replaces the text that was in the message box. |
+| `repo`    | Optional. The name of a repository in Korev. Korev selects it. If no repository has this name, Korev ignores it.                        |
+
+Korev never sends the message from a link. Any website can open a `korev://` link, so you always read the text and press Enter yourself.
+
+## Start a workspace from the selected text
+
+This script copies the text you selected in the front app and opens it in Korev. Run it from a keyboard shortcut tool or a Stream Deck button.
+
+```sh
+#!/bin/sh
+osascript -e 'tell application "System Events" to keystroke "c" using command down'
+sleep 0.2
+prompt=$(osascript -l JavaScript -e 'const app = Application.currentApplication(); app.includeStandardAdditions = true; encodeURIComponent(app.theClipboard())')
+open "korev://new-workspace?prompt=$prompt"
+```
+
+The first time, macOS asks to let the tool that runs the script control your computer, so it can press ⌘C.
+
+Links open the Korev app in Applications. The development build (`npm start`) does not get them.

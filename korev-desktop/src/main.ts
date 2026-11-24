@@ -27,6 +27,7 @@ import {
   type KorevEvents,
   type QuitChoice,
 } from './shared/api';
+import { parseKorevLink, type NewWorkspaceLink } from './shared/korev-link';
 import type { AppCommand, Result, WindowBounds } from './shared/model';
 import trayIconUrl from '../assets/trayTemplate@2x.png?inline';
 import { appMenuTemplate } from './main/app-menu';
@@ -188,6 +189,22 @@ function showMainWindow() {
   window.show();
   window.focus();
 }
+
+const pendingLinks: NewWorkspaceLink[] = [];
+
+// The renderer takes queued links when it loads, and again on each nudge.
+function openLink(url: string) {
+  const link = parseKorevLink(url);
+  if (!link) return;
+  pendingLinks.push(link);
+  showMainWindow();
+  mainWindow()?.webContents.send(eventChannel('open-link'), null);
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  openLink(url);
+});
 
 function goBackground() {
   mainWindow()?.close();
@@ -583,6 +600,7 @@ app.whenReady().then(async () => {
     chooseQuit: gate.choose,
     setHandsFree,
     showListening: listeningWindow.show,
+    takeLinks: async () => pendingLinks.splice(0),
   };
   registerIpcHandlers(ipcMain, { ...korev.api, ...desktopApi }, (url) =>
     isAppUrl(url, appOrigin),
