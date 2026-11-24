@@ -1,27 +1,20 @@
 import { FitAddon } from '@xterm/addon-fit';
-import { Terminal, type ITheme } from '@xterm/xterm';
-import { useEffect, useRef } from 'react';
+import { SearchAddon } from '@xterm/addon-search';
+import { Terminal } from '@xterm/xterm';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { TerminalKind, TerminalPreset } from '../shared/model';
 import { api, on } from './bridge';
+import { isShortcut } from './keyboard';
+import { TerminalFind } from './TerminalFind';
+import { themeFromTokens } from './terminal-theme';
 import { reportFailure } from './ui/toast';
 
 const FONT_SIZE = 12;
+const FIND_KEY = 'f';
 
-function token(styles: CSSStyleDeclaration, name: string): string {
-  return styles.getPropertyValue(name).trim();
-}
-
-function themeFromTokens(): { theme: ITheme; fontFamily: string } {
-  const styles = getComputedStyle(document.documentElement);
-  return {
-    theme: {
-      background: token(styles, '--bg-inset'),
-      foreground: token(styles, '--fg-1'),
-      cursor: token(styles, '--accent'),
-      selectionBackground: token(styles, '--selection-bg'),
-    },
-    fontFamily: token(styles, '--font-mono'),
-  };
+interface MountedTerminal {
+  terminal: Terminal;
+  search: SearchAddon;
 }
 
 export interface XTermProps {
@@ -42,6 +35,9 @@ export function XTerm({
   initialInput,
 }: XTermProps) {
   const host = useRef<HTMLDivElement>(null);
+  const findInput = useRef<HTMLInputElement>(null);
+  const [mounted, setMounted] = useState<MountedTerminal | null>(null);
+  const [findOpen, setFindOpen] = useState(false);
   useEffect(() => {
     const element = host.current;
     if (!element) return undefined;
@@ -51,11 +47,15 @@ export function XTerm({
       cursorBlink: interactive,
       disableStdin: !interactive,
       convertEol: !interactive,
+      allowProposedApi: true,
     });
     const fit = new FitAddon();
+    const search = new SearchAddon();
     terminal.loadAddon(fit);
+    terminal.loadAddon(search);
     terminal.open(element);
     fit.fit();
+    setMounted({ terminal, search });
     let replayed = false;
     const buffered: string[] = [];
     const stopOutput = on('terminal-output', (output) => {
@@ -116,8 +116,38 @@ export function XTerm({
       input.dispose();
       resizer.disconnect();
       retheme.disconnect();
+      setMounted(null);
+      setFindOpen(false);
       terminal.dispose();
     };
   }, [ref, workspaceId, kind, interactive, preset, initialInput]);
-  return <div ref={host} className="min-h-0 flex-1 bg-inset py-1 pl-2" />;
+
+  const openFindOnShortcut = (event: KeyboardEvent) => {
+    if (!isShortcut(event, FIND_KEY)) return;
+    event.preventDefault();
+    setFindOpen(true);
+    findInput.current?.select();
+  };
+
+  const closeFind = () => {
+    setFindOpen(false);
+    mounted?.search.clearDecorations();
+    mounted?.terminal.focus();
+  };
+
+  return (
+    <div
+      className="relative flex min-h-0 flex-1 flex-col"
+      onKeyDown={openFindOnShortcut}
+    >
+      <div ref={host} className="min-h-0 flex-1 bg-inset py-1 pl-2" />
+      {findOpen && mounted ? (
+        <TerminalFind
+          search={mounted.search}
+          inputRef={findInput}
+          onClose={closeFind}
+        />
+      ) : null}
+    </div>
+  );
 }

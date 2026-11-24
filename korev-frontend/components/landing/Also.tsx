@@ -13,6 +13,7 @@ import {
   Network,
   Plug,
   ScanEye,
+  TextSearch,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -86,6 +87,11 @@ const FEATURES: [LucideIcon, string, string][] = [
     KeyRound,
     'Signed commits',
     'Agents sign their commits with a key in the Secure Enclave, even while your Mac is locked.',
+  ],
+  [
+    TextSearch,
+    'Find in terminals',
+    'Press ⌘F in any terminal to search its output and step through each match.',
   ],
 ];
 

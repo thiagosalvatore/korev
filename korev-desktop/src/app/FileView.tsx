@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ThemedToken } from 'shiki/core';
 import { Button, cn, Icon, Spinner } from '../design-system';
 import { fileName, imageType } from '../shared/format';
@@ -12,6 +6,7 @@ import type { FileContents, Workspace } from '../shared/model';
 import { api } from './bridge';
 import { Markdown } from './chat/Markdown';
 import { highlightFile } from './highlightFile';
+import { isShortcut } from './keyboard';
 import { reportFailure, toast } from './ui/toast';
 
 const MARKDOWN_FILE = /\.(md|markdown)$/i;
@@ -19,10 +14,6 @@ const SAVE_KEY = 's';
 const SELECT_ALL_KEY = 'a';
 
 type UnavailableReason = Exclude<FileContents, { kind: 'text' }>['kind'];
-
-function isShortcut(event: KeyboardEvent, key: string): boolean {
-  return (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === key;
-}
 
 function isOutsideWorkspace(file: string): boolean {
   return file.startsWith('~') || file.startsWith('/');

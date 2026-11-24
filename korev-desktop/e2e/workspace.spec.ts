@@ -673,6 +673,12 @@ test('opens a terminal tab and an in-app browser tab', async () => {
     await expect(main.locator('.xterm-rows')).toContainText(
       'korev-big-terminal',
     );
+    await window.keyboard.press('Meta+f');
+    const find = main.getByRole('textbox', { name: 'Find in terminal' });
+    await find.fill('korev-big-terminal');
+    await expect(main.getByText(/^\d+ of \d+$/)).toBeVisible();
+    await find.press('Escape');
+    await expect(find).toBeHidden();
 
     await window.getByRole('button', { name: 'New tab' }).click();
     await window.getByRole('menuitem', { name: 'New browser tab' }).click();

@@ -9,6 +9,7 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 - **Claude Ship.** Open Claude Code's `/ship` or `/steward` from the workspace header or the command palette. Korev opens a terminal tab with the command typed, and you press Enter. Set **Settings → Git → Create PRs with** to **Claude Ship** to make **Create PR** do the same. Keep PRs ready waits while the tab is open.
 - **Agents keep running after you quit.** Quitting Korev closes its window and leaves agents and automations running. Korev stays in the menu bar with the number of working agents. Open Korev again from the menu bar, the Dock or Spotlight. Choose **Quit Korev** in the menu bar to stop everything. To quit the old way, turn off **Keep agents running after you quit** in Settings.
 - **Updates wait for your agents.** **Install and restart** keeps the Korev window open while agents work and asks whether to install now or once they finish.
+- **Find in terminals.** Press ⌘F in a terminal to search its output. Korev outlines every match and shows "3 of 12". Press Enter or ⇧Enter to go to the next or previous match, and Esc to close.
 - **Re-check reviews without a re-request.** Re-check reviews no longer waits for the author to click Re-request review. Korev also re-checks when every review comment you left is resolved or has an answer from someone else. Answers from bots do not count.
 
 ## [0.39.0] - 2026-11-23
