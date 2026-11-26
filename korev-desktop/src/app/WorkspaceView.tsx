@@ -271,24 +271,28 @@ function failureDetail(message: string | null) {
 function PendingPrompt({ prompt }: { prompt: string | null | undefined }) {
   if (!prompt) return null;
   return (
-    <p className="m-0 max-w-xl rounded-md bg-raised px-3 py-2 text-left text-sm whitespace-pre-wrap text-fg-1">
+    <p className="m-0 max-h-64 w-full max-w-xl overflow-y-auto rounded-md bg-raised px-3 py-2 text-left text-sm whitespace-pre-wrap text-fg-1 select-text">
       {prompt}
     </p>
   );
 }
 
-export function WorktreePending({
-  state,
-  workspace,
-  runtime,
-}: WorktreeStatusProps) {
+export function WorktreePending(props: WorktreeStatusProps) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <WorktreeStatus {...props} />
+    </div>
+  );
+}
+
+function WorktreeStatus({ state, workspace, runtime }: WorktreeStatusProps) {
   if (runtime.status === 'failed')
     return (
       <ErrorState
         title={WORKTREE_FAILED}
         detail={failureDetail(runtime.message)}
         onRetry={() => retryWorkspace(workspace)}
-        className="flex-1 justify-center"
+        className="min-h-full justify-center py-6"
         actions={
           <Button
             size="sm"
@@ -305,7 +309,7 @@ export function WorktreePending({
     );
   const progress = worktreeProgress(workspace, runtime);
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+    <div className="flex min-h-full flex-col items-center justify-center gap-3 px-6 py-6 text-center">
       <LoadingRing size={22} className="text-accent-text" />
       <p className="m-0 text-lg font-semibold text-fg-1">{progress.title}</p>
       <p className="m-0 text-sm text-fg-3">{progress.detail}</p>
