@@ -2,6 +2,11 @@ import { Marked, Renderer, type Token, type Tokens } from 'marked';
 import { useMemo, type MouseEvent } from 'react';
 import { cn } from '../../design-system';
 import { imageType } from '../../shared/format';
+import {
+  parseFileRef,
+  splitBarePaths,
+  type FileRef,
+} from '../../shared/fileRefs';
 import { isPrUrl, splitPrRefs } from '../../shared/pr-links';
 import { api } from '../bridge';
 
@@ -17,33 +22,8 @@ export function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]);
 }
 
-interface FileRef {
-  file: string;
-  line: number | null;
-}
-
 type OpenFile = (file: string, line: number | null) => void;
 type OpenImage = (file: string) => void;
-
-const LINE_SUFFIX = String.raw`(?::(\d+)(?::\d+)?)?`;
-const PATH_SEGMENT = String.raw`[\w.@+-]+`;
-const FILE_REF = new RegExp(
-  String.raw`^((?:~|\.{1,2})?\/?(?:${PATH_SEGMENT}\/)*${PATH_SEGMENT})${LINE_SUFFIX}$`,
-);
-const SHORT_EXTENSION = /\.[a-z][a-z0-9]{0,4}$/;
-const EXPLICIT_PATH = /^(?:~|\.{1,2})?\//;
-const BARE_PATH = new RegExp(
-  String.raw`(^|[\s(;])(~?(?:\/${PATH_SEGMENT})+\.[A-Za-z][A-Za-z0-9]*)${LINE_SUFFIX}`,
-  'g',
-);
-
-function parseFileRef(text: string): FileRef | null {
-  const match = FILE_REF.exec(text);
-  if (!match) return null;
-  const [, file, line] = match;
-  if (!SHORT_EXTENSION.test(file) && !EXPLICIT_PATH.test(file)) return null;
-  return { file, line: line ? Number(line) : null };
-}
 
 function fileLink({ file, line }: FileRef, label: string): string {
   const lineAttribute = line ? ` data-line="${line}"` : '';
@@ -51,11 +31,11 @@ function fileLink({ file, line }: FileRef, label: string): string {
 }
 
 function linkBarePaths(escapedText: string): string {
-  return escapedText.replace(
-    BARE_PATH,
-    (whole, before: string, file: string, line?: string) =>
-      `${before}${fileLink({ file, line: line ? Number(line) : null }, whole.slice(before.length))}`,
-  );
+  return splitBarePaths(escapedText)
+    .map((part) =>
+      typeof part === 'string' ? part : fileLink(part, part.label),
+    )
+    .join('');
 }
 
 const markdownOptions = {

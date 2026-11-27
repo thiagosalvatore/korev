@@ -77,6 +77,11 @@ function Screens() {
           />
           <Stack.Screen name="changes/[id]/diff" options={{ title: '' }} />
           <Stack.Screen
+            name="changes/[id]/comment"
+            options={{ ...TASK_SHEET, title: 'Comment' }}
+          />
+          <Stack.Screen name="file/[id]" options={{ title: '' }} />
+          <Stack.Screen
             name="threads/[id]"
             options={{ title: 'Review comments' }}
           />

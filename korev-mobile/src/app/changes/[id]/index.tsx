@@ -5,9 +5,12 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type {
   FileChange,
   FileStatus,
+  TurnRange,
 } from '../../../../../korev-desktop/src/shared/model';
+import { rangeOf, rangeParams, type RangeParams } from '../../../changes';
 import { useConnection } from '../../../korev';
 import { Loading } from '../../../Offline';
+import { SendComments } from '../../../SendComments';
 import { MONO_FONT, TYPE, useTheme, type Theme } from '../../../theme';
 import { MIN_TOUCH_TARGET } from '../../../ui';
 
@@ -27,15 +30,23 @@ function splitPath(path: string): { name: string; folder: string } {
   return { name: path.slice(slash + 1), folder: path.slice(0, slash + 1) };
 }
 
-function useChanges(workspaceId: string): FileChange[] | null {
+function useChanges(
+  workspaceId: string,
+  range: TurnRange | null,
+): FileChange[] | null {
   const { api } = useConnection();
   const [files, setFiles] = useState<FileChange[] | null>(null);
+  const from = range?.from;
+  const to = range?.to;
   useEffect(() => {
-    void api
-      .changes(workspaceId)
+    void (
+      from && to
+        ? api.rangeChanges(workspaceId, { from, to })
+        : api.changes(workspaceId)
+    )
       .catch(() => [])
       .then(setFiles);
-  }, [api, workspaceId]);
+  }, [api, workspaceId, from, to]);
   return files;
 }
 
@@ -71,15 +82,21 @@ function FileRow({ file, onPress }: { file: FileChange; onPress: () => void }) {
 }
 
 export default function ChangesScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<
+    RangeParams & { id: string; sessionId?: string }
+  >();
+  const { id, sessionId } = params;
+  const range = rangeOf(params);
   const styles = makeStyles(useTheme());
-  const files = useChanges(id);
+  const files = useChanges(id, range);
   const added = files?.reduce((sum, file) => sum + file.additions, 0) ?? 0;
   const removed = files?.reduce((sum, file) => sum + file.deletions, 0) ?? 0;
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: 'Changes' }} />
+      <Stack.Screen
+        options={{ title: range ? 'Changes in this turn' : 'Changes' }}
+      />
       {files ? (
         <FlatList
           data={files}
@@ -102,7 +119,12 @@ export default function ChangesScreen() {
               onPress={() =>
                 router.push({
                   pathname: '/changes/[id]/diff',
-                  params: { id, path: item.path },
+                  params: {
+                    id,
+                    path: item.path,
+                    sessionId,
+                    ...rangeParams(range),
+                  },
                 })
               }
             />
@@ -114,6 +136,7 @@ export default function ChangesScreen() {
       ) : (
         <Loading />
       )}
+      <SendComments workspaceId={id} sessionId={sessionId} />
     </View>
   );
 }

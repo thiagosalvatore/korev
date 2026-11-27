@@ -1,3 +1,4 @@
+import { parseUnifiedDiff } from '../../korev-desktop/src/shared/diff';
 import {
   CLAUDE_MODELS,
   DEFAULT_EFFORT,
@@ -8,6 +9,7 @@ import {
   type ChatItem,
   type CheckState,
   type FileChange,
+  type FileContents,
   type ChatSession,
   type InboxPullRequest,
   type PrStatus,
@@ -69,6 +71,19 @@ export const DEMO_DIFFS: Record<string, string> = {
     '+  ON accounts USING gin (email gin_trgm_ops);',
   ].join('\n'),
 };
+
+export const DEMO_CHANGES_REVIEW_REPLY =
+  'This is the Korev demo, so no agent is running. With your Mac paired, the agent would now read the changes in this workspace and list what to fix, most severe first.';
+
+// The demo has no files on disk, so a changed file reads as its new side.
+export function demoFile(path: string): FileContents {
+  const patch = DEMO_DIFFS[path];
+  if (!patch) return { kind: 'missing' };
+  const lines = parseUnifiedDiff(patch)
+    .filter((row) => row.type !== 'del' && row.type !== 'hunk')
+    .map((row) => row.code);
+  return { kind: 'text', text: lines.join('\n') };
+}
 
 export const DEMO_SETUP_OUTPUT =
   '$ npm ci\r\n\u001b[32madded 412 packages\u001b[0m in 9s\r\n';
@@ -367,7 +382,7 @@ function user(id: string, text: string, at: string): ChatItem {
   return { id, kind: 'user', text, at, checkpoint: null };
 }
 
-function finished(id: string, minutes: number): ChatItem {
+function finished(id: string, minutes: number, changed = false): ChatItem {
   return {
     id,
     kind: 'result',
@@ -376,6 +391,12 @@ function finished(id: string, minutes: number): ChatItem {
     durationMs: minutes * MINUTE_MS,
     costUsd: null,
     context: DEMO_CONTEXT,
+    turn: changed
+      ? {
+          range: { from: `${id}-before`, to: `${id}-after` },
+          files: DEMO_CHANGES,
+        }
+      : null,
   };
 }
 
@@ -720,9 +741,9 @@ export function demoWorld(now: number): DemoWorld {
         {
           id: 'demo-search-4',
           kind: 'assistant',
-          text: 'Added a trigram index on the searched columns and changed the query to use it. On the benchmark, p95 went from 1.9 s to 120 ms. I opened #87.',
+          text: 'Added a trigram index in `db/migrations/add_trigram_index.sql` and changed the query in `src/search/query.ts:14` to use it. On the benchmark, p95 went from 1.9 s to 120 ms. I opened #87.',
         },
-        finished('demo-search-5', 4),
+        finished('demo-search-5', 4, true),
       ],
     ],
     [

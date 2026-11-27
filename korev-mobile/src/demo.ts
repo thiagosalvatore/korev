@@ -29,11 +29,13 @@ import {
   DEMO_REVIEW_REPLY,
   DENIED_REPLY,
   DEMO_CHANGES,
+  DEMO_CHANGES_REVIEW_REPLY,
   DEMO_DIFFS,
   DEMO_RUN_OUTPUT,
   DEMO_SETUP_OUTPUT,
   DEMO_SLASH_COMMANDS,
   DEMO_THREADS,
+  demoFile,
   demoPullRequest,
   demoRepoUrl,
   demoRuntime,
@@ -87,6 +89,9 @@ const STOPPED = 'Stopped.';
 const NO_WORKSPACE = 'This chat has no workspace.';
 const ALREADY_ANSWERED = 'This was already answered.';
 const NO_OP = () => undefined;
+const REVIEW_TITLE = 'Code review';
+const REVIEW_PROMPT =
+  'Review the changes in this workspace. List what to fix, most severe first.';
 
 function ok(): Result;
 function ok<T>(value: T): Result<T>;
@@ -410,6 +415,19 @@ export function createDemoConnection(): Connection {
       streamReply(session.id, PLAN_APPROVED_REPLY);
       return ok(session.id);
     },
+    async startReview(workspaceId) {
+      const session = demoSession(newId('session'), REVIEW_TITLE, now());
+      addSession(workspaceId, session);
+      addItem(session.id, {
+        id: newId('user'),
+        kind: 'user',
+        text: REVIEW_PROMPT,
+        at: now(),
+        checkpoint: null,
+      });
+      streamReply(session.id, DEMO_CHANGES_REVIEW_REPLY);
+      return ok(session.id);
+    },
     async newSession(workspaceId, agent) {
       const session = demoSession(
         newId('session'),
@@ -532,13 +550,13 @@ export function createDemoConnection(): Connection {
       return DEMO_DIFFS[path] ?? '';
     },
     async rangeChanges() {
-      return [];
+      return DEMO_CHANGES;
     },
     async listFiles() {
       return [];
     },
-    async readFile() {
-      return { kind: 'missing' };
+    async readFile(_workspaceId, path) {
+      return demoFile(path);
     },
     async readImage() {
       return null;

@@ -29,7 +29,7 @@ import { FILE_DRAG_TYPE } from '../dnd';
 import { insertDictation } from '../../shared/dictation';
 import { fileName } from '../../shared/format';
 import { reportFailure } from '../ui/toast';
-import type { DiffComment } from '../ui-store';
+import { formatComments, type DiffComment } from '../../shared/comments';
 import { readAsBase64 } from './attachments';
 import { ComposerToolbar } from './ComposerToolbar';
 import { DictationButton, isDictationShortcut } from './DictationButton';
@@ -81,15 +81,6 @@ export function loadDraft(key: string): string {
 export function saveDraft(key: string, text: string) {
   if (text) localStorage.setItem(DRAFT_PREFIX + key, text);
   else localStorage.removeItem(DRAFT_PREFIX + key);
-}
-
-export function formatComments(comments: DiffComment[]): string {
-  if (!comments.length) return '';
-  const lines = comments.map(
-    (comment) =>
-      `- ${comment.file}:${comment.line} \`${comment.code.trim()}\`\n  ${comment.body}`,
-  );
-  return `\n\nReview comments on the diff:\n${lines.join('\n')}`;
 }
 
 function formatTabContext(contexts: TabContext[]): string {

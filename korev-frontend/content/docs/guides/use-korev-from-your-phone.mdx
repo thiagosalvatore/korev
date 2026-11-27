@@ -57,6 +57,8 @@ The bar at the top shows the name of the open chat. Tap it to see all the chats 
 - Agent replies show formatted markdown. Swipe a wide table sideways to see all its columns.
 - Long press a message for **Copy message**, which copies the whole message, or **Select text**, which opens it in a sheet where you can select any part.
 - Tap a tool call or **Thinking…** to see its details.
+- Tap a file path in an agent reply to read the file, scrolled to the line the agent named. An image opens in a preview. A file that can't be shown says why: it doesn't exist in the workspace, or Korev can't preview it, for example because it is too big or not text.
+- When a turn changed files, **N files changed** shows under it. Tap it to see only the changes of that turn.
 - Type in the box at the bottom and tap the send arrow. While the agent works, your message steers the agent or waits in the queue, the same as on the Mac.
 - Tap the paperclip to attach a photo or a file.
 - Tap the stop button to stop the agent.
@@ -69,6 +71,15 @@ The plan card works as on the Mac. You can split a plan's lanes into [linked wor
 To speak instead of typing, hold the microphone while the box is empty. Release it to insert the text. Slide left to cancel, or slide up to lock the recording so you can let go. A locked recording shows a stop button that inserts the text and a trash icon that discards it. This also works when you start a workspace or ask a question. The phone sends the recording to your Mac, and the Mac turns it into text. See [Voice input](../reference/composer.mdx#voice-input).
 
 Opening a workspace on the phone does not mark it as read on the Mac.
+
+## Changes
+
+When a workspace has changes, the menu at the top of the workspace shows **Changes**, **Explain changes** and **Review changes**.
+
+- **Changes** lists the files the workspace changes against its target branch. Tap a file to see its diff.
+- **Review changes** starts a code review of the changes in a new chat, the same as **Review** in the Changes tab on the Mac.
+
+To leave a comment for the agent, tap a line in a diff, type the comment and tap **Add comment**. The comment shows under the line. Tap **Delete** to remove it. Comments collect across the files of the workspace until you tap **Send N comments**. The phone sends them to the chat you came from as one message, in the same format as on the Mac, and goes back to that chat.
 
 ## Pull request
 

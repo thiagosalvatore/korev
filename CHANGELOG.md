@@ -4,6 +4,10 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+### New
+
+- **Review on your phone.** Tap a line in a diff on your phone to leave a comment, then send all your comments to the agent as one message. **Review changes** in the workspace menu starts a code review chat. Under a finished turn, tap **N files changed** to see that turn's changes. Tap a file path in an agent reply to read the file.
+
 ## [0.40.1] - 2026-11-27
 
 Two fixes: Try again stays on screen when a workspace fails to start, and the phone's offline notice no longer covers screen titles.

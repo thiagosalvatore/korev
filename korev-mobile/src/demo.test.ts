@@ -181,4 +181,54 @@ describe('demo connection', () => {
     const merged = (await connection.api.getState()).runtime[workspaceId];
     expect(merged.prs[0].state).toBe('MERGED');
   });
+
+  it('opens the files a finished turn changed', async () => {
+    const state = await connection.api.getState();
+    const turns = await Promise.all(
+      state.workspaces.map(async (workspace) => ({
+        workspace,
+        items: await connection.api.transcript(workspace.sessions[0].id),
+      })),
+    );
+    const found = turns.find(({ items }) =>
+      items.some((item) => item.kind === 'result' && item.turn),
+    )!;
+    const result = found.items.findLast((item) => item.kind === 'result');
+    if (result?.kind !== 'result' || !result.turn)
+      throw new Error('The demo turn has no changes');
+
+    const files = await connection.api.rangeChanges(
+      found.workspace.id,
+      result.turn.range,
+    );
+
+    expect(files).toEqual(result.turn.files);
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  it('starts a review chat for the workspace changes', async () => {
+    const workspace = (await connection.api.getState()).workspaces.at(-1)!;
+
+    const started = await connection.api.startReview(workspace.id);
+
+    if (!started.ok) throw new Error(started.message);
+    const after = await connection.api.getState();
+    const sessions = after.workspaces.find(
+      (entry) => entry.id === workspace.id,
+    )!.sessions;
+    expect(sessions.at(-1)?.id).toBe(started.value);
+    expect(after.runningSessions).toContain(started.value);
+  });
+
+  it('reads a changed file and says when a file is missing', async () => {
+    const workspace = (await connection.api.getState()).workspaces.at(-1)!;
+    const [change] = await connection.api.changes(workspace.id);
+
+    const file = await connection.api.readFile(workspace.id, change.path);
+
+    expect(file.kind).toBe('text');
+    expect(await connection.api.readFile(workspace.id, 'nope.ts')).toEqual({
+      kind: 'missing',
+    });
+  });
 });

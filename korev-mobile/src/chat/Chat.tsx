@@ -1,6 +1,13 @@
 import { ChevronDown } from 'lucide-react-native';
-import { Stack } from 'expo-router';
-import { useCallback, useRef, useState, type ReactNode, type Ref } from 'react';
+import { router, Stack } from 'expo-router';
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import {
   FlatList,
   StyleSheet,
@@ -34,9 +41,13 @@ import {
   withPick,
   type PickedAnswers,
   type Repo,
+  type TurnRange,
 } from '../../../korev-desktop/src/shared/model';
+import { toWorkspaceRelative } from '../../../korev-desktop/src/shared/fileRefs';
 import { trackAnswer } from '../answered';
+import { workspaceOf } from '../appState';
 import { attempt } from '../attempt';
+import { rangeParams } from '../changes';
 import { succeeded, warned } from '../haptics';
 import { useRepoGithubUrl, useTranscript } from '../hooks';
 import { Loading } from '../Offline';
@@ -286,6 +297,39 @@ export function Chat({
       ),
     ).then(succeeded);
 
+  const workspace = workspaceOf(state, session.id);
+  const workspaceId = workspace?.id;
+  const workspacePath = workspace?.path;
+
+  const openTurn = workspaceId
+    ? (range: TurnRange) =>
+        router.push({
+          pathname: '/changes/[id]',
+          params: {
+            id: workspaceId,
+            sessionId: session.id,
+            ...rangeParams(range),
+          },
+        })
+    : undefined;
+
+  // Stable, so the replies' markdown is not parsed again on every render.
+  const openFile = useMemo(
+    () =>
+      workspaceId && workspacePath
+        ? (file: string, line: number | null) =>
+            router.push({
+              pathname: '/file/[id]',
+              params: {
+                id: workspaceId,
+                path: toWorkspaceRelative(workspacePath, file),
+                ...(line ? { line: String(line) } : {}),
+              },
+            })
+        : undefined,
+    [workspaceId, workspacePath],
+  );
+
   const handoff = onHandoff
     ? () =>
         attempt('Korev could not hand off the plan', async () => {
@@ -352,6 +396,8 @@ export function Chat({
                   onOpenExplainer={
                     session.explainer ? () => setMode('explainer') : undefined
                   }
+                  onOpenTurn={openTurn}
+                  onOpenFile={openFile}
                 />
               )
             }
