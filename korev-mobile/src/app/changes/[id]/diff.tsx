@@ -73,7 +73,7 @@ export default function DiffScreen() {
     <View style={styles.screen}>
       <Stack.Screen options={{ title: fileName(path) }} />
       {patch === null ? (
-        <Loading style={styles.screen} />
+        <Loading />
       ) : (
         <FlatList
           data={rows}

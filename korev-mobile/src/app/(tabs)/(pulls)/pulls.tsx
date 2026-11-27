@@ -138,7 +138,7 @@ export default function PullRequestsScreen() {
   const styles = makeStyles(theme);
   const { inbox, refreshing, refresh } = useInbox(api);
   const { pending, run } = usePendingAction();
-  if (!inbox || !state) return <Loading style={styles.loading} />;
+  if (!inbox || !state) return <Loading />;
 
   const choose = async (pr: InboxPullRequest) => {
     const action = await chooseOption(
@@ -212,7 +212,6 @@ export default function PullRequestsScreen() {
 
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
-    loading: { marginTop: 40 },
     page: { padding: 8, paddingBottom: 32, gap: 12 },
     empty: { padding: 24, color: theme.fg3, textAlign: 'center' },
     groupTitle: {

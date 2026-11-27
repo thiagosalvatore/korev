@@ -200,7 +200,7 @@ export default function HomeScreen() {
   const styles = makeStyles(theme);
   const { refreshing, refresh } = useReconnect();
   const [query, setQuery] = useState('');
-  if (!state) return <Loading style={styles.loading} />;
+  if (!state) return <Loading />;
   const sections = filtered(state, homeSections(state), query);
   return (
     <ScrollView
@@ -251,7 +251,6 @@ export default function HomeScreen() {
 
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
-    loading: { marginTop: 40 },
     page: { paddingHorizontal: 16, paddingBottom: 32, gap: 22 },
     search: {
       flexDirection: 'row',

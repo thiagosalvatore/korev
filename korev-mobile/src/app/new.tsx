@@ -23,8 +23,6 @@ import { RepoPicker } from '../RepoPicker';
 import { PlanToggle, TaskChip, TaskSheet } from '../TaskSheet';
 import { Button } from '../ui';
 
-const LOADING_STYLE = { marginTop: 40 };
-
 function openWorkspace(workspace: Workspace) {
   router.replace({ pathname: '/workspace/[id]', params: { id: workspace.id } });
 }
@@ -114,6 +112,6 @@ function NewWorkspaceForm({
 export default function NewWorkspaceScreen() {
   const { repoId } = useLocalSearchParams<{ repoId?: string }>();
   const state = useAppState();
-  if (!state) return <Loading style={LOADING_STYLE} />;
+  if (!state) return <Loading />;
   return <NewWorkspaceForm state={state} initialRepoId={repoId} />;
 }

@@ -3,12 +3,10 @@ import { NewAskForm } from '../../ask/NewAskForm';
 import { useAppState } from '../../hooks';
 import { Loading } from '../../Offline';
 
-const LOADING_STYLE = { marginTop: 40 };
-
 export default function NewAskScreen() {
   const { repoId } = useLocalSearchParams<{ repoId?: string }>();
   const state = useAppState();
-  if (!state) return <Loading style={LOADING_STYLE} />;
+  if (!state) return <Loading />;
   return (
     <NewAskForm
       state={state}

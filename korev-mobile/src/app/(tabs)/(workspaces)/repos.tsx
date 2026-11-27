@@ -344,7 +344,7 @@ export default function WorkspacesScreen() {
     setReordering(true);
   };
 
-  if (!state) return <Loading style={styles.loading} />;
+  if (!state) return <Loading />;
 
   const workspaces = activeWorkspaces(state);
   const leads = crossRepoLeads(state);
@@ -421,7 +421,6 @@ export default function WorkspacesScreen() {
 
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
-    loading: { marginTop: 40 },
     page: { padding: 8, paddingBottom: 32 },
     group: { marginBottom: 12 },
     folderHeader: {

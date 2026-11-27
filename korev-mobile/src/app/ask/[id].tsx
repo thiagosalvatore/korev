@@ -25,7 +25,7 @@ export default function AskScreen() {
   const state = useAppState();
   const styles = makeStyles(useTheme());
 
-  if (!state) return <Loading style={styles.loading} />;
+  if (!state) return <Loading />;
   const ask = state.askChats.find((entry) => entry.id === id);
   if (!ask) return <Text style={styles.empty}>This Ask chat was deleted.</Text>;
 
@@ -70,7 +70,6 @@ export default function AskScreen() {
 
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
-    loading: { marginTop: 40 },
     empty: { padding: 24, color: theme.fg3, textAlign: 'center' },
   });
 }

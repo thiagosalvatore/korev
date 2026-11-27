@@ -112,7 +112,7 @@ export default function ThreadsScreen() {
           }
         />
       ) : (
-        <Loading style={styles.screen} />
+        <Loading />
       )}
     </View>
   );
