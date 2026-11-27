@@ -33,10 +33,8 @@ const OFFLINE_CHECKLIST = [
   'Your Mac is awake and on Tailscale',
 ];
 const PANEL_ICON_SIZE = 28;
-const PILL_ICON_SIZE = 14;
-const PILL_MAX_WIDTH = 220;
-const PILL_HEIGHT = 28;
-const PILL_GAP = 8;
+const STRIP_ICON_SIZE = 14;
+const STRIP_HEIGHT = 32;
 const PANEL_MAX_WIDTH = 360;
 const FADE_MS = 150;
 
@@ -139,69 +137,62 @@ export function ConnectionAnnouncer() {
   return null;
 }
 
-function OfflineBanner({
-  panelShown,
-  screenTop,
-}: {
-  panelShown: boolean;
-  screenTop: number;
-}) {
+function OfflineStrip() {
   const connection = useConnection();
   const { unpair } = useKorev();
-  const { state } = useConnectionStatus();
   const theme = useTheme();
   const styles = makeStyles(theme);
-  const headerOverlap = Math.max(0, useHeaderHeight() - screenTop);
-  const top = headerOverlap + PILL_GAP;
-  if (state !== 'offline' || panelShown) return null;
+  const { state } = useConnectionStatus();
+  if (state !== 'offline') return null;
   return (
-    <View pointerEvents="box-none" style={[styles.bannerSlot, { top }]}>
-      <Animated.View
-        entering={FadeIn.duration(FADE_MS)}
-        exiting={FadeOut.duration(FADE_MS)}
+    <Animated.View
+      entering={FadeIn.duration(FADE_MS)}
+      exiting={FadeOut.duration(FADE_MS)}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={OFFLINE_SHORT}
+        accessibilityHint="Shows what to check"
+        style={styles.strip}
+        onPress={() => showOfflineHelp(() => connection.open(), unpair)}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={OFFLINE_SHORT}
-          accessibilityHint="Shows what to check"
-          style={styles.pill}
-          onPress={() => showOfflineHelp(() => connection.open(), unpair)}
+        <WifiOff size={STRIP_ICON_SIZE} color={theme.warningText} />
+        <Text
+          style={styles.stripText}
+          numberOfLines={1}
+          maxFontSizeMultiplier={CHROME_FONT_SCALE}
         >
-          <WifiOff size={PILL_ICON_SIZE} color={theme.warningText} />
-          <Text
-            style={styles.pillText}
-            numberOfLines={1}
-            maxFontSizeMultiplier={CHROME_FONT_SCALE}
-          >
-            {OFFLINE_SHORT}
-          </Text>
-        </Pressable>
-      </Animated.View>
-    </View>
+          {OFFLINE_SHORT}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
-function ScreenWithOfflineBanner({ children }: { children: ReactElement }) {
+function ScreenWithOfflineStrip({ children }: { children: ReactElement }) {
   const [panelShown, setPanelShown] = useState(false);
   const [screenTop, setScreenTop] = useState(0);
   const screen = useRef<View>(null);
   const { connection } = useKorev();
   const styles = makeStyles(useTheme());
+  const headerOverlap = Math.max(0, useHeaderHeight() - screenTop);
   const measureScreenTop = () =>
     screen.current?.measureInWindow((_x, y) => setScreenTop(y));
   return (
     <OfflinePanelShown value={setPanelShown}>
-      <View ref={screen} style={styles.screen} onLayout={measureScreenTop}>
-        {children}
-        {connection ? (
-          <OfflineBanner panelShown={panelShown} screenTop={screenTop} />
-        ) : null}
+      <View
+        ref={screen}
+        style={[styles.screenWithStrip, { paddingTop: headerOverlap }]}
+        onLayout={measureScreenTop}
+      >
+        <View style={styles.screen}>{children}</View>
+        {connection && !panelShown ? <OfflineStrip /> : null}
       </View>
     </OfflinePanelShown>
   );
 }
 
-export function withOfflineBanner({
+export function withOfflineStrip({
   options,
   children,
 }: {
@@ -209,12 +200,13 @@ export function withOfflineBanner({
   children: ReactElement;
 }) {
   if (options.headerShown === false) return children;
-  return <ScreenWithOfflineBanner>{children}</ScreenWithOfflineBanner>;
+  return <ScreenWithOfflineStrip>{children}</ScreenWithOfflineStrip>;
 }
 
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
     screen: { flex: 1 },
+    screenWithStrip: { flex: 1, flexDirection: 'column-reverse' },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     panel: {
       maxWidth: PANEL_MAX_WIDTH,
@@ -231,25 +223,18 @@ function makeStyles(theme: Theme) {
     checklist: { gap: 6 },
     checkItem: { color: theme.fg2, fontSize: 15, lineHeight: 21 },
     link: { color: theme.accentText, fontSize: 14, fontWeight: '600' },
-    bannerSlot: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      alignItems: 'center',
-    },
-    pill: {
-      maxWidth: PILL_MAX_WIDTH,
-      height: PILL_HEIGHT,
+    strip: {
+      height: STRIP_HEIGHT,
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
       gap: 6,
-      paddingHorizontal: 12,
-      borderRadius: PILL_HEIGHT / 2,
-      borderWidth: StyleSheet.hairlineWidth,
+      paddingHorizontal: 16,
+      borderBottomWidth: StyleSheet.hairlineWidth,
       borderColor: theme.border2,
       backgroundColor: theme.bgRaised,
     },
-    pillText: {
+    stripText: {
       flexShrink: 1,
       color: theme.warningText,
       fontSize: 13,

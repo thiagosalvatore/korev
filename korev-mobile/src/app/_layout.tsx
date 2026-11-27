@@ -5,7 +5,7 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { KorevProvider, useKorev } from '../korev';
-import { ConnectionAnnouncer, withOfflineBanner } from '../Offline';
+import { ConnectionAnnouncer, withOfflineStrip } from '../Offline';
 import { HeaderTextButton } from '../TabStack';
 import { useTheme } from '../theme';
 
@@ -42,7 +42,7 @@ function Screens() {
     <View style={FILL}>
       <StatusBar style="auto" />
       <Stack
-        screenLayout={withOfflineBanner}
+        screenLayout={withOfflineStrip}
         screenOptions={{
           headerStyle: { backgroundColor: theme.bgSurface },
           headerTintColor: theme.fg1,

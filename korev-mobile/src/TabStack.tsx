@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { withOfflineBanner } from './Offline';
+import { withOfflineStrip } from './Offline';
 import { TYPE, useTheme } from './theme';
 import { CHROME_FONT_SCALE, MIN_TOUCH_TARGET, touchSlop } from './ui';
 
@@ -11,7 +11,7 @@ export function TabStack({ children }: { children: ReactNode }) {
   const theme = useTheme();
   return (
     <Stack
-      screenLayout={withOfflineBanner}
+      screenLayout={withOfflineStrip}
       screenOptions={{
         headerLargeTitleEnabled: true,
         headerLargeTitleShadowVisible: false,
