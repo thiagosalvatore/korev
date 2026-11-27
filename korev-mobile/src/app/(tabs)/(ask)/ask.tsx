@@ -86,7 +86,7 @@ export default function AskChatsScreen() {
   const state = useAppState();
   const styles = makeStyles(useTheme());
   const { refreshing, refresh } = useReconnect();
-  if (!state) return <Loading style={styles.loading} />;
+  if (!state) return <Loading />;
   const sections = sectionsOf(state);
   if (!sections.length)
     return <NewAskForm state={state} onAsked={openAskChat} />;
@@ -118,7 +118,6 @@ export default function AskChatsScreen() {
 
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
-    loading: { marginTop: 40 },
     page: { padding: 8, paddingBottom: 32 },
     section: { marginBottom: 12 },
     sectionTitle: {

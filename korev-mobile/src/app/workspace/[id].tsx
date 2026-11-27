@@ -475,7 +475,7 @@ export default function WorkspaceScreen() {
     if (archiving) router.dismissTo('/');
   }, [archiving]);
 
-  if (!state) return <Loading style={styles.fill} />;
+  if (!state) return <Loading />;
   if (!workspace)
     return <Text style={styles.empty}>This workspace no longer exists.</Text>;
   if (runtime && !hasWorktree(runtime))
@@ -503,7 +503,6 @@ export default function WorkspaceScreen() {
 
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
-    fill: { flex: 1 },
     empty: { padding: 24, color: theme.fg3, textAlign: 'center' },
     message: {
       ...TYPE.footnote,

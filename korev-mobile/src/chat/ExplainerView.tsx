@@ -543,7 +543,7 @@ export function ExplainerView({
   const explainer = useExplainer(session);
   const [retrying, setRetrying] = useState(false);
   const ref = session.explainer;
-  if (!ref || !explainer) return <Loading style={styles.fill} />;
+  if (!ref || !explainer) return <Loading />;
   if (explainer.content)
     return (
       <Explanation
@@ -605,7 +605,6 @@ function makeStyles(theme: Theme) {
     borderRadius: 8,
   };
   return StyleSheet.create({
-    fill: { flex: 1 },
     page: { padding: 16, gap: 14, paddingBottom: 32 },
     state: {
       flex: 1,

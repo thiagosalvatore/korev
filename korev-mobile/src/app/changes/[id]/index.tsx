@@ -112,7 +112,7 @@ export default function ChangesScreen() {
           }
         />
       ) : (
-        <Loading style={styles.screen} />
+        <Loading />
       )}
     </View>
   );

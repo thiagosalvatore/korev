@@ -387,7 +387,7 @@ export function Chat({
           {scrolledBack ? <JumpToLatest onPress={jumpToLatest} /> : null}
         </View>
       ) : (
-        <Loading style={styles.fill} />
+        <Loading />
       )}
       <KeyboardStickyView offset={{ opened: keyboardOffset }}>
         {floatingAction ? (
