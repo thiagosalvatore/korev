@@ -33,6 +33,7 @@ import {
 import { AGENT_ICONS } from '../agentIcons';
 import { api } from '../bridge';
 import { loadoutChoices, modelChoices } from '../../shared/format';
+import { toWorkspaceRelative } from '../../shared/fileRefs';
 import { useRepoGithubUrl, useTranscript } from '../hooks';
 import { reportFailure, toast } from '../ui/toast';
 import {
@@ -59,11 +60,6 @@ import { PlanReview } from './PermissionCard';
 import { QuestionPanel } from './QuestionPanel';
 import { QueuedMessages } from './QueuedMessages';
 import { Transcript } from './Transcript';
-
-function toWorkspaceRelative(workspacePath: string, file: string): string {
-  const prefix = `${workspacePath}/`;
-  return file.startsWith(prefix) ? file.slice(prefix.length) : file;
-}
 
 export interface ChatViewProps {
   state: AppState;

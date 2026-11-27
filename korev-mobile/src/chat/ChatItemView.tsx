@@ -26,14 +26,15 @@ import type {
   ChatItem,
   PermissionResponse,
   Repo,
+  TurnRange,
 } from '../../../korev-desktop/src/shared/model';
 import { attempt } from '../attempt';
 import { chooseOption } from '../chooseOption';
 import { succeeded } from '../haptics';
 import { MONO_FONT, useTheme, type Theme } from '../theme';
-import { MIN_TOUCH_TARGET } from '../ui';
+import { MIN_TOUCH_TARGET, touchSlop } from '../ui';
 import { ImagePreview, ImageThumbnail } from './ImagePreview';
-import { MarkdownView } from './MarkdownView';
+import { MarkdownView, type OpenFile } from './MarkdownView';
 import { PermissionCard } from './PermissionCard';
 import { PlanChip } from './PlanChip';
 import { ReaderSheet } from './ReaderSheet';
@@ -253,11 +254,13 @@ function AssistantMessage({
   sessionId,
   repoUrl,
   onOpenExplainer,
+  onOpenFile,
 }: {
   item: ItemOf<'assistant'>;
   sessionId: string;
   repoUrl: string | null;
   onOpenExplainer?: () => void;
+  onOpenFile?: OpenFile;
 }) {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const explains = Boolean(onOpenExplainer) && hasExplainerBlock(item.text);
@@ -271,6 +274,7 @@ function AssistantMessage({
             <MarkdownView
               value={text}
               onOpenImage={setPreviewImage}
+              onOpenFile={onOpenFile}
               repoUrl={repoUrl}
               selectable={false}
             />
@@ -289,9 +293,31 @@ function AssistantMessage({
   );
 }
 
-function ResultLine({ item }: { item: ItemOf<'result'> }) {
+function ResultLine({
+  item,
+  onOpenTurn,
+}: {
+  item: ItemOf<'result'>;
+  onOpenTurn?: (range: TurnRange) => void;
+}) {
   const styles = useStyles();
-  if (item.ok) return null;
+  if (item.ok) {
+    const turn = item.turn;
+    const count = turn?.files.length ?? 0;
+    if (!turn || !count || !onOpenTurn) return null;
+    return (
+      <Pressable
+        accessibilityRole="button"
+        hitSlop={touchSlop(styles.dim.lineHeight)}
+        style={styles.turnFiles}
+        onPress={() => onOpenTurn(turn.range)}
+      >
+        <Text style={[styles.dim, styles.link]}>
+          {count} file{count === 1 ? '' : 's'} changed
+        </Text>
+      </Pressable>
+    );
+  }
   return (
     <Text style={styles.failed}>
       {item.text || 'The agent stopped with an error.'}
@@ -308,6 +334,8 @@ export function ChatItemView({
   onHandoff,
   onOpenExplainer,
   onRevert,
+  onOpenTurn,
+  onOpenFile,
 }: {
   item: ChatItem;
   sessionId: string;
@@ -317,6 +345,8 @@ export function ChatItemView({
   onHandoff?(): Promise<boolean>;
   onOpenExplainer?(): void;
   onRevert?(): void;
+  onOpenTurn?(range: TurnRange): void;
+  onOpenFile?: OpenFile;
 }) {
   const styles = useStyles();
   switch (item.kind) {
@@ -331,6 +361,7 @@ export function ChatItemView({
           sessionId={sessionId}
           repoUrl={repoUrl}
           onOpenExplainer={onOpenExplainer}
+          onOpenFile={onOpenFile}
         />
       );
     case 'thinking':
@@ -338,7 +369,7 @@ export function ChatItemView({
     case 'todos':
       return null;
     case 'result':
-      return <ResultLine item={item} />;
+      return <ResultLine item={item} onOpenTurn={onOpenTurn} />;
     case 'notice':
       return <Text style={styles.dim}>{item.text}</Text>;
     case 'permission':
@@ -374,6 +405,8 @@ function makeStyles(theme: Theme) {
     dim: { color: theme.fg3, fontSize: 13, lineHeight: 19 },
     selectableText: { padding: 0 },
     failed: { color: theme.dangerText, fontSize: 13, lineHeight: 19 },
+    turnFiles: { alignSelf: 'flex-start' },
+    link: { color: theme.accentText },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     chip: {
       flexDirection: 'row',

@@ -1,15 +1,27 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import type { DiffComment } from '../../../../../korev-desktop/src/shared/comments';
 import {
   isBinaryDiff,
   parseUnifiedDiff,
   type DiffRow,
 } from '../../../../../korev-desktop/src/shared/diff';
 import { fileName } from '../../../../../korev-desktop/src/shared/format';
+import type { TurnRange } from '../../../../../korev-desktop/src/shared/model';
+import { rangeOf, type RangeParams } from '../../../changes';
+import {
+  canComment,
+  removeComment,
+  useDiffComments,
+  withNotes,
+  type DiffItem,
+} from '../../../diffComments';
 import { useConnection } from '../../../korev';
 import { Loading } from '../../../Offline';
+import { SendComments } from '../../../SendComments';
 import { MONO_FONT, TYPE, useTheme, type Theme } from '../../../theme';
+import { MIN_TOUCH_TARGET } from '../../../ui';
 
 const SIGNS: Record<DiffRow['type'], string> = {
   add: '+',
@@ -20,15 +32,21 @@ const SIGNS: Record<DiffRow['type'], string> = {
 
 const LINE_NUMBER_WIDTH = 36;
 
-function useFileDiff(workspaceId: string, path: string): string | null {
+function useFileDiff(
+  workspaceId: string,
+  path: string,
+  range: TurnRange | null,
+): string | null {
   const { api } = useConnection();
   const [patch, setPatch] = useState<string | null>(null);
+  const from = range?.from;
+  const to = range?.to;
   useEffect(() => {
     void api
-      .fileDiff(workspaceId, path)
+      .fileDiff(workspaceId, path, from && to ? { from, to } : null)
       .catch(() => '')
       .then(setPatch);
-  }, [api, workspaceId, path]);
+  }, [api, workspaceId, path, from, to]);
   return patch;
 }
 
@@ -57,6 +75,30 @@ function DiffLine({ row, styles }: { row: DiffRow; styles: Styles }) {
   );
 }
 
+function Note({
+  comment,
+  onDelete,
+  styles,
+}: {
+  comment: DiffComment;
+  onDelete: () => void;
+  styles: Styles;
+}) {
+  return (
+    <View style={styles.note}>
+      <Text style={styles.noteBody}>{comment.body}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Delete comment"
+        style={styles.noteDelete}
+        onPress={onDelete}
+      >
+        <Text style={styles.noteDeleteText}>Delete</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function emptyMessage(patch: string): string {
   return isBinaryDiff(patch)
     ? 'This is a binary file, so there is no text diff.'
@@ -64,10 +106,50 @@ function emptyMessage(patch: string): string {
 }
 
 export default function DiffScreen() {
-  const { id, path } = useLocalSearchParams<{ id: string; path: string }>();
+  const params = useLocalSearchParams<
+    RangeParams & { id: string; path: string; sessionId?: string }
+  >();
+  const { id, path } = params;
   const styles = makeStyles(useTheme());
-  const patch = useFileDiff(id, path);
-  const rows = patch && !isBinaryDiff(patch) ? parseUnifiedDiff(patch) : [];
+  const patch = useFileDiff(id, path, rangeOf(params));
+  const comments = useDiffComments(id);
+  const items = useMemo(
+    () =>
+      withNotes(
+        patch && !isBinaryDiff(patch) ? parseUnifiedDiff(patch) : [],
+        path,
+        comments,
+      ),
+    [patch, path, comments],
+  );
+
+  const comment = (row: DiffRow) =>
+    router.push({
+      pathname: '/changes/[id]/comment',
+      params: { id, path, line: String(row.newLine), code: row.code },
+    });
+
+  const renderItem = ({ item }: { item: DiffItem }) => {
+    if (item.kind === 'note')
+      return (
+        <Note
+          comment={item.comment}
+          styles={styles}
+          onDelete={() => removeComment(id, item.comment.id)}
+        />
+      );
+    const line = <DiffLine row={item.row} styles={styles} />;
+    if (!canComment(item.row)) return line;
+    const { row } = item;
+    return (
+      <Pressable
+        accessibilityHint="Comments on this line"
+        onPress={() => comment(row)}
+      >
+        {line}
+      </Pressable>
+    );
+  };
 
   return (
     <View style={styles.screen}>
@@ -76,20 +158,23 @@ export default function DiffScreen() {
         <Loading />
       ) : (
         <FlatList
-          data={rows}
-          keyExtractor={(_, index) => String(index)}
+          data={items}
+          keyExtractor={(item) =>
+            item.kind === 'note' ? item.comment.id : String(item.index)
+          }
           contentInsetAdjustmentBehavior="automatic"
           ListHeaderComponent={
             <Text style={styles.path} selectable>
               {path}
             </Text>
           }
-          renderItem={({ item }) => <DiffLine row={item} styles={styles} />}
+          renderItem={renderItem}
           ListEmptyComponent={
             <Text style={styles.empty}>{emptyMessage(patch)}</Text>
           }
         />
       )}
+      <SendComments workspaceId={id} sessionId={params.sessionId} />
     </View>
   );
 }
@@ -116,6 +201,27 @@ function makeStyles(theme: Theme) {
     },
     code: { ...mono, flex: 1, paddingRight: 12, color: theme.fg1 },
     hunk: { ...mono, paddingHorizontal: 12, paddingVertical: 4 },
+    note: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingLeft: 12,
+      borderLeftWidth: 3,
+      borderLeftColor: theme.accent,
+      backgroundColor: theme.accentSubtle,
+    },
+    noteBody: {
+      ...TYPE.subhead,
+      flex: 1,
+      paddingVertical: 8,
+      color: theme.fg1,
+    },
+    noteDelete: {
+      minHeight: MIN_TOUCH_TARGET,
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+    },
+    noteDeleteText: { ...TYPE.footnote, color: theme.fg3 },
     rowAdd: { backgroundColor: theme.diffAddBg, color: theme.diffAdd },
     rowDel: { backgroundColor: theme.diffDelBg, color: theme.diffDel },
     rowHunk: { backgroundColor: theme.diffHunkBg, color: theme.accentText },

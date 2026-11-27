@@ -272,6 +272,7 @@ export const REMOTE_METHODS = [
   'listIssues',
   'pullRequestInbox',
   'reviewPullRequest',
+  'startReview',
   'slashCommands',
   'changes',
   'fileDiff',

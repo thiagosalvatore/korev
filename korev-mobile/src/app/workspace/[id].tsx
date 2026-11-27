@@ -167,7 +167,19 @@ function useWorkspaceActions(
     );
 
   const openChanges = () =>
-    router.push({ pathname: '/changes/[id]', params: { id: workspace.id } });
+    router.push({
+      pathname: '/changes/[id]',
+      params: { id: workspace.id, sessionId: session?.id },
+    });
+
+  const review = () =>
+    void run('review', () =>
+      attempt('Korev could not start the review', async () => {
+        const started = await api.startReview(workspace.id);
+        if (started.ok) onSelect(started.value);
+        return started;
+      }),
+    );
 
   const openChecks = () =>
     router.push({
@@ -308,6 +320,12 @@ function useWorkspaceActions(
             icon: 'book' as const,
             disabled: busy,
             onPress: explain,
+          },
+          {
+            label: 'Review changes',
+            icon: 'text.magnifyingglass' as const,
+            disabled: busy,
+            onPress: review,
           },
         ]
       : []),

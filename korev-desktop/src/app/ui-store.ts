@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import type { DiffComment } from '../shared/comments';
 import {
   EMPTY_INBOX_FILTER,
   type InboxFilter,
@@ -66,13 +67,7 @@ export interface GridUi {
   focused: number;
 }
 
-export interface DiffComment {
-  id: string;
-  file: string;
-  line: number;
-  code: string;
-  body: string;
-}
+export type { DiffComment };
 
 export interface WorkspaceUi {
   extraTabs: MainTab[];
