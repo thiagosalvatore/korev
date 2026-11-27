@@ -1308,10 +1308,12 @@ test('runs korev from the user terminal but refuses agents without access', asyn
     const created = runKorevCli(home, ['new', '--task', 'Add a note']);
 
     expect(created.stdout).toContain('Created');
+    await window
+      .getByRole('navigation', { name: 'Workspaces' })
+      .getByText('dev-person/add-agent-note')
+      .click();
     await expect(
-      window
-        .getByRole('navigation', { name: 'Workspaces' })
-        .getByText('dev-person/add-agent-note'),
+      window.getByRole('main').getByText('I added agent-note.txt.'),
     ).toBeVisible();
     await waitForAgentsToFinish(window);
   } finally {
