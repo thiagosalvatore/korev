@@ -4,6 +4,15 @@ Korev shows the section of each version in its "What's new" window, and korev.ai
 
 ## [Unreleased]
 
+## [0.40.1] - 2026-11-27
+
+Two fixes: Try again stays on screen when a workspace fails to start, and the phone's offline notice no longer covers screen titles.
+
+### Fixed
+
+- **Try again after a long prompt.** When a workspace with a long first message fails to start, the message now scrolls in its own box, so the Try again button stays on screen. You can also select and copy the message.
+- **Phone loading and offline notice.** The phone's loading spinner is now in the middle of the screen, not under the Workspaces title. "Not connected to your Mac" is now a strip under the nav bar that pushes the content down, instead of a pill over the screen's title. Tap it for the offline help. This fix is in Korev for iPhone 1.5.1.
+
 ## [0.40.0] - 2026-11-24
 
 Korev now runs opencode, keeps your agents running after you quit, and takes commands from your terminal and from links.
